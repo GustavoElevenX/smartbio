@@ -1,103 +1,1190 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import {
+  ArrowLeft,
+  ArrowRight,
+  ArrowUpRight,
+  Bike,
+  BookOpen,
+  Building2,
+  CalendarCheck,
+  Check,
+  Compass,
+  FileText,
+  LineChart,
+  LoaderCircle,
+  Mail,
+  MapPin,
+  MessageCircle,
+  MessageSquare,
+  Share2,
+  ShoppingBag,
+  Sparkles,
+  Store,
+  Target,
+  TrendingUp,
+} from "lucide-react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, ArrowUpRight, Bike, BookOpen, Building2, CalendarCheck, Check, ChevronRight, Compass, FileText, LineChart, LoaderCircle, Mail, MapPin, MessageCircle, MessageSquare, Share2, ShoppingBag, Sparkles, Store, Target, TrendingUp } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { BlockRendererView } from "@/components/public-experience/blocks/block-renderers";
+import { qualifyLead } from "@/features/qualification/qualification-engine";
+import { calculateReservationTotal } from "@/features/reservations/reservation-engine";
+import { resolveRoute } from "@/features/routing/routing-engine";
+import {
+  buildWhatsAppMessage,
+  buildWhatsAppUrl,
+} from "@/features/whatsapp/whatsapp";
 import { localStore } from "@/lib/local-store";
-import { buildWhatsAppMessage, buildWhatsAppUrl } from "@/features/whatsapp/whatsapp";
-import { uid } from "@/lib/utils";
-import type { AnalyticsEvent, FormField, JourneyStep, Project, StepOption } from "@/types";
+import { cn, uid } from "@/lib/utils";
+import type {
+  AnalyticsEventName,
+  Booking,
+  CapabilityKey,
+  FormField,
+  JourneyRuntimeState,
+  Lead,
+  OrderRequest,
+  Project,
+  QuoteRequest,
+  Reservation,
+  StepOption,
+} from "@/types";
 
-const iconMap = { ShoppingBag, BookOpen, MapPin, Building2, Bike, Store, Target, LineChart, TrendingUp, MessageSquare, MessageCircle, CalendarCheck, FileText, Mail, Sparkles, Compass, ArrowUpRight };
+const iconMap = {
+  ShoppingBag,
+  BookOpen,
+  MapPin,
+  Building2,
+  Bike,
+  Store,
+  Target,
+  LineChart,
+  TrendingUp,
+  MessageSquare,
+  MessageCircle,
+  CalendarCheck,
+  FileText,
+  Mail,
+  Sparkles,
+  Compass,
+  ArrowUpRight,
+};
 
-function DynamicIcon({ name }: { name?: string }) { const Icon = iconMap[name as keyof typeof iconMap] || ArrowRight; return <Icon size={19} />; }
-
-function FieldControl({ field, value, onChange, onFocus }: { field: FormField; value: string; onChange: (value: string) => void; onFocus: () => void }) {
-  const style = "min-h-12 w-full rounded-[var(--input-radius)] border border-[var(--border)] bg-[var(--surface)] px-3.5 text-sm text-[var(--foreground)] outline-none transition focus:ring-4 focus:ring-[var(--primary)]/10";
-  if (field.type === "select") return <select aria-label={field.label} required={field.required} value={value} onChange={(event) => onChange(event.target.value)} onFocus={onFocus} className={style}><option value="">Selecione</option>{field.options?.map((item) => <option key={item}>{item}</option>)}</select>;
-  if (field.type === "radio") return <div className="grid gap-2">{field.options?.map((item) => <label key={item} className={`flex min-h-12 cursor-pointer items-center gap-3 rounded-[var(--input-radius)] border px-3.5 text-sm font-semibold ${value === item ? "border-[var(--primary)] bg-[var(--muted)]" : "border-[var(--border)] bg-[var(--surface)]"}`}><input type="radio" name={field.id} value={item} checked={value === item} onChange={() => onChange(item)} onFocus={onFocus} className="accent-[var(--primary)]" />{item}</label>)}</div>;
-  if (field.type === "checkbox") return <label className="flex items-start gap-3 text-sm"><input type="checkbox" checked={value === "true"} onChange={(event) => onChange(String(event.target.checked))} onFocus={onFocus} className="mt-1 accent-[var(--primary)]" /><span>{field.placeholder || field.label}</span></label>;
-  if (field.type === "textarea") return <textarea aria-label={field.label} required={field.required} value={value} onChange={(event) => onChange(event.target.value)} onFocus={onFocus} placeholder={field.placeholder} className={`${style} min-h-24 py-3`} />;
-  return <input aria-label={field.label} required={field.required} type={field.type === "phone" ? "tel" : field.type} value={value} onChange={(event) => onChange(event.target.value)} onFocus={onFocus} placeholder={field.placeholder} className={style} />;
+function DynamicIcon({ name }: { name?: string }) {
+  const Icon = iconMap[name as keyof typeof iconMap] || ArrowRight;
+  return <Icon size={19} />;
 }
 
-function SpecialBlocks({ step }: { step: JourneyStep }) {
-  return <>{step.blocks?.map((block) => {
-    if (block.type === "location_card") { const content = block.content as { name?: string; eta?: string; status?: string; address?: string }; return <div key={block.id} className="rounded-[var(--card-radius)] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card-shadow)]"><div className="flex items-start gap-3"><span className="grid size-11 place-items-center rounded-2xl bg-[var(--muted)] text-[var(--primary)]"><MapPin size={21} /></span><div><strong className="block text-lg">{content.name}</strong><span className="mt-1 block text-xs text-[var(--muted-fg)]">{content.address}</span></div></div><div className="mt-4 flex gap-2"><span className="rounded-full bg-[var(--muted)] px-3 py-1.5 text-xs font-bold">{content.eta}</span><span className="rounded-full bg-[#e8f7ef] px-3 py-1.5 text-xs font-bold text-[#147b58]">{content.status}</span></div></div>; }
-    if (block.type === "product_cards") { const content = block.content as { products?: Array<{ name: string; price: string; emoji: string }> }; return <div key={block.id} className="grid gap-2">{content.products?.map((product) => <button type="button" key={product.name} className="flex items-center gap-3 rounded-[var(--card-radius)] border border-[var(--border)] bg-[var(--surface)] p-3 text-left shadow-[var(--card-shadow)]"><span className="grid size-12 place-items-center rounded-2xl bg-[var(--muted)] text-2xl">{product.emoji}</span><span className="flex-1"><strong className="block text-sm">{product.name}</strong><small className="text-[var(--muted-fg)]">{product.price}</small></span><ChevronRight size={18} className="text-[var(--primary)]" /></button>)}</div>; }
-    if (block.type === "schedule_slots") { const content = block.content as { slots?: string[] }; return <div key={block.id} className="grid grid-cols-2 gap-2">{content.slots?.map((slot, index) => <button type="button" key={slot} className={`min-h-11 rounded-[var(--input-radius)] border px-3 text-xs font-bold ${index === 0 ? "border-[var(--primary)] bg-[var(--muted)] text-[var(--primary)]" : "border-[var(--border)] bg-[var(--surface)]"}`}>{slot}</button>)}</div>; }
-    return null;
-  })}</>;
+function emptyRuntime(project: Project): JourneyRuntimeState {
+  return {
+    visitorId: uid("visitor"),
+    sessionId: uid("session"),
+    currentStepId:
+      project.steps
+        .filter((step) => step.isActive)
+        .toSorted((a, b) => a.order - b.order)[0]?.id || "",
+    answers: {},
+    selectedOfferIds: [],
+    cart: { items: [], totals: { subtotal: 0, total: 0, currency: "BRL" } },
+  };
 }
 
-export function ExperienceCanvas({ project, preview = false }: { project: Project; preview?: boolean }) {
-  const activeSteps = useMemo(() => project.steps.filter((step) => step.isActive).sort((a, b) => a.order - b.order), [project]);
-  const storageKey = `smartbio:session:${project.slug}`;
-  const restored = typeof window !== "undefined" && !preview ? (() => { try { return JSON.parse(localStorage.getItem(storageKey) || "null") as { visitorId: string; sessionId: string; answers: Record<string, string>; stepId?: string } | null; } catch { return null; } })() : null;
-  const [currentId, setCurrentId] = useState(restored?.stepId || activeSteps[0]?.id); const [answers, setAnswers] = useState<Record<string, string>>(restored?.answers || {}); const [history, setHistory] = useState<string[]>([]); const [leadForm, setLeadForm] = useState(false); const [submitted, setSubmitted] = useState(false); const formStarted = useRef(false);
-  const visitorId = useRef(restored?.visitorId || uid("visitor")); const sessionId = useRef(restored?.sessionId || uid("session"));
-  const step = activeSteps.find((item) => item.id === currentId) || activeSteps[0]; const stepIndex = Math.max(0, activeSteps.findIndex((item) => item.id === step?.id));
+function runtimeFromStorage(project: Project, preview: boolean) {
+  const fallback = emptyRuntime(project);
+  if (typeof window === "undefined" || preview) return fallback;
+  try {
+    const raw = sessionStorage.getItem(`smartbio:journey:v3:${project.slug}`);
+    if (!raw) return fallback;
+    const stored = JSON.parse(raw) as Partial<JourneyRuntimeState>;
+    return {
+      ...fallback,
+      ...stored,
+      cart: { ...fallback.cart, ...stored.cart },
+      quoteDraft: stored.quoteDraft
+        ? { ...stored.quoteDraft, attachments: [] }
+        : undefined,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function stringAnswers(answers: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(answers).map(([key, value]) => [
+      key,
+      Array.isArray(value) ? value.join(", ") : String(value ?? ""),
+    ]),
+  ) as Record<string, string>;
+}
+
+function FieldControl({
+  field,
+  value,
+  onChange,
+  onFocus,
+}: {
+  field: FormField;
+  value: unknown;
+  onChange: (value: string | number | boolean) => void;
+  onFocus: () => void;
+}) {
+  const style =
+    "min-h-12 w-full rounded-[var(--input-radius)] border border-[var(--border)] bg-[var(--surface)] px-3.5 text-sm text-[var(--foreground)] outline-none transition focus:ring-4 focus:ring-[var(--primary)]/10";
+  const stringValue = value === undefined ? "" : String(value);
+  if (field.type === "select")
+    return (
+      <select
+        aria-label={field.label}
+        required={field.required}
+        value={stringValue}
+        onChange={(event) => onChange(event.target.value)}
+        onFocus={onFocus}
+        className={style}
+      >
+        <option value="">Selecione</option>
+        {field.options?.map((item) => (
+          <option key={item}>{item}</option>
+        ))}
+      </select>
+    );
+  if (field.type === "radio")
+    return (
+      <div className="grid gap-2">
+        {field.options?.map((item) => (
+          <label
+            key={item}
+            className={cn(
+              "flex min-h-12 cursor-pointer items-center gap-3 rounded-[var(--input-radius)] border px-3.5 text-sm font-semibold",
+              stringValue === item
+                ? "border-[var(--primary)] bg-[var(--muted)]"
+                : "border-[var(--border)] bg-[var(--surface)]",
+            )}
+          >
+            <input
+              type="radio"
+              name={field.id}
+              value={item}
+              checked={stringValue === item}
+              onChange={() => onChange(item)}
+              onFocus={onFocus}
+              required={field.required}
+              className="accent-[var(--primary)]"
+            />
+            {item}
+          </label>
+        ))}
+      </div>
+    );
+  if (field.type === "checkbox")
+    return (
+      <label className="flex items-start gap-3 text-sm">
+        <input
+          type="checkbox"
+          checked={value === true || value === "true"}
+          onChange={(event) => onChange(event.target.checked)}
+          onFocus={onFocus}
+          className="mt-1 accent-[var(--primary)]"
+        />
+        <span>{field.placeholder || field.label}</span>
+      </label>
+    );
+  if (field.type === "textarea")
+    return (
+      <textarea
+        aria-label={field.label}
+        required={field.required}
+        value={stringValue}
+        onChange={(event) => onChange(event.target.value)}
+        onFocus={onFocus}
+        placeholder={field.placeholder}
+        className={`${style} min-h-24 py-3`}
+      />
+    );
+  if (field.type === "file")
+    return (
+      <input
+        aria-label={field.label}
+        type="file"
+        required={field.required}
+        onFocus={onFocus}
+        className={style}
+      />
+    );
+  const type = field.type === "phone" ? "tel" : field.type;
+  return (
+    <input
+      aria-label={field.label}
+      required={field.required}
+      type={type}
+      value={stringValue}
+      min={field.type === "number" ? 0 : undefined}
+      onChange={(event) =>
+        onChange(
+          field.type === "number"
+            ? Number(event.target.value)
+            : event.target.value,
+        )
+      }
+      onFocus={onFocus}
+      placeholder={field.placeholder}
+      className={style}
+    />
+  );
+}
+
+export function ExperienceCanvas({
+  project,
+  preview = false,
+}: {
+  project: Project;
+  preview?: boolean;
+}) {
+  const activeSteps = useMemo(
+    () =>
+      project.steps
+        .filter((step) => step.isActive)
+        .toSorted((a, b) => a.order - b.order),
+    [project.steps],
+  );
+  const [runtime, setRuntime] = useState<JourneyRuntimeState>(() =>
+    runtimeFromStorage(project, preview),
+  );
+  const [history, setHistory] = useState<string[]>([]);
+  const [leadForm, setLeadForm] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const formStarted = useRef(false);
+  const mediaFiles = useRef<File[]>([]);
+  const reduceMotion = useReducedMotion();
+  const step =
+    activeSteps.find((item) => item.id === runtime.currentStepId) ||
+    activeSteps[0];
+  const stepIndex = Math.max(
+    0,
+    activeSteps.findIndex((item) => item.id === step?.id),
+  );
   const palette = project.designSystem.colors;
 
-  function event(eventName: AnalyticsEvent["eventName"], input?: { optionId?: string; metadata?: Record<string, unknown> }) {
+  function emit(
+    eventName: AnalyticsEventName,
+    metadata?: Record<string, unknown>,
+  ) {
     if (preview || !step) return;
     const params = new URLSearchParams(location.search);
-    const payload = { projectId: project.id, visitorId: visitorId.current, sessionId: sessionId.current, eventName, stepId: step.id, optionId: input?.optionId, metadata: input?.metadata, referrer: document.referrer, utmSource: params.get("utm_source") || undefined, utmMedium: params.get("utm_medium") || undefined, utmCampaign: params.get("utm_campaign") || undefined, utmContent: params.get("utm_content") || undefined, utmTerm: params.get("utm_term") || undefined, deviceType: matchMedia("(max-width: 700px)").matches ? "mobile" : "desktop" };
-    localStore.track(payload); void fetch("/api/events", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), keepalive: true }).catch(() => undefined);
+    const payload = {
+      projectId: project.id,
+      visitorId: runtime.visitorId,
+      sessionId: runtime.sessionId,
+      eventName,
+      stepId: step.id,
+      metadata,
+      referrer: document.referrer,
+      utmSource: params.get("utm_source") || undefined,
+      utmMedium: params.get("utm_medium") || undefined,
+      utmCampaign: params.get("utm_campaign") || undefined,
+      utmContent: params.get("utm_content") || undefined,
+      utmTerm: params.get("utm_term") || undefined,
+      deviceType: matchMedia("(max-width: 700px)").matches
+        ? "mobile"
+        : "desktop",
+    } as const;
+    localStore.track(payload);
+    void fetch("/api/events", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+      keepalive: true,
+    }).catch(() => undefined);
   }
 
-  useEffect(() => { if (!step || preview) return; const value = { visitorId: visitorId.current, sessionId: sessionId.current, answers, stepId: step.id, startedAt: new Date().toISOString() }; localStorage.setItem(storageKey, JSON.stringify(value)); }, [answers, preview, step, storageKey]);
-  useEffect(() => { if (preview || !step) return; event("page_view"); event("session_started"); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (preview || !step) return; event("step_viewed"); if (step.type === "recommendation") event("recommendation_viewed"); }, [currentId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (preview) return;
+    try {
+      const serializable = {
+        ...runtime,
+        quoteDraft: runtime.quoteDraft
+          ? {
+              ...runtime.quoteDraft,
+              attachments: runtime.quoteDraft.attachments.map(
+                ({ id, name, mimeType, size }) => ({
+                  id,
+                  name,
+                  mimeType,
+                  size,
+                }),
+              ),
+            }
+          : undefined,
+      };
+      sessionStorage.setItem(
+        `smartbio:journey:v3:${project.slug}`,
+        JSON.stringify(serializable),
+      );
+    } catch {}
+  }, [preview, project.slug, runtime]);
 
-  function go(target?: string) { if (!target || !step) return; setHistory((items) => [...items, step.id]); setCurrentId(target); setLeadForm(false); setSubmitted(false); }
-  function back() { const previous = history.at(-1); if (!previous) return; setHistory((items) => items.slice(0, -1)); setCurrentId(previous); setLeadForm(false); }
-  function updateAnswer(key: string, value: string) { setAnswers((current) => ({ ...current, [key]: value })); }
-  function formReady(fields = step?.formFields || []) { return fields.every((field) => !field.required || Boolean(answers[field.key])); }
+  useEffect(() => {
+    if (!preview) {
+      emit("page_view");
+      emit("session_started");
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!preview && step) {
+      emit("step_viewed");
+      if (step.type === "recommendation") emit("recommendation_viewed");
+    }
+  }, [runtime.currentStepId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function optionClicked(option: StepOption) {
-    if (preview && option.actionType !== "go_to_step") return;
-    event("option_clicked", { optionId: option.id, metadata: { value: option.value } }); updateAnswer(`escolha_${step.id}`, option.label);
-    if (option.actionType === "go_to_step" || option.actionType === "show_recommendation") go(option.targetStepId);
-    else if (option.actionType === "open_whatsapp") { const phone = String(option.actionPayload?.phone || project.phone || "5511999999999"); const message = buildWhatsAppMessage({ interest: step.recommendation?.title || answers[`escolha_${activeSteps[0]?.id}`], answers, closing: "Quero saber qual é o melhor próximo passo." }); event("whatsapp_clicked", { optionId: option.id }); window.open(buildWhatsAppUrl(phone, message), "_blank", "noopener,noreferrer"); }
-    else if (option.actionType === "open_url") { event("external_link_clicked", { optionId: option.id }); window.open(String(option.actionPayload?.url || "https://example.com"), "_blank", "noopener,noreferrer"); }
-    else if (option.actionType === "submit_form") setLeadForm(true);
-    else if (option.actionType === "finish") { event("journey_completed"); setSubmitted(true); }
+  function updateAnswer(key: string, value: string | number | boolean) {
+    setRuntime((current) => ({
+      ...current,
+      answers: { ...current.answers, [key]: value },
+      quoteDraft: current.quoteDraft
+        ? {
+            ...current.quoteDraft,
+            answers: { ...current.quoteDraft.answers, [key]: value },
+          }
+        : current.quoteDraft,
+    }));
   }
 
-  function submitStep(eventObject: React.FormEvent) { eventObject.preventDefault(); if (!step || !formReady()) return; event("form_submitted"); const continueOption = step.options?.find((option) => option.actionType === "go_to_step" || option.actionType === "show_recommendation"); if (continueOption) go(continueOption.targetStepId); else submitLead(); }
-  function submitLead() {
-    if (!step || !formReady(step.formFields || [])) return;
-    const lead = { projectId: project.id, projectName: project.name, sessionId: sessionId.current, name: answers.name, email: answers.email, phone: answers.phone, company: answers.company || answers.negocio, status: "new" as const, source: new URLSearchParams(location.search).get("utm_source") || "direct", campaign: new URLSearchParams(location.search).get("utm_campaign") || undefined, recommendation: activeSteps.find((item) => item.type === "recommendation")?.recommendation?.title, answers };
-    localStore.addLead(lead); void fetch("/api/leads", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...lead, honeypot: "" }) }).catch(() => undefined); event("form_submitted"); event("journey_completed"); setSubmitted(true); setLeadForm(false);
+  function go(target?: string) {
+    if (!target || !step) return;
+    setHistory((items) => [...items, step.id]);
+    setRuntime((current) => ({ ...current, currentStepId: target }));
+    setLeadForm(false);
+    setSubmitted(false);
+    setConfirmation("");
+    setError("");
   }
-  async function share() { const data = { title: project.name, text: project.description, url: location.href }; if (navigator.share) await navigator.share(data); else { await navigator.clipboard.writeText(location.href); } }
 
-  if (!step) return <div className="grid min-h-[420px] place-items-center text-sm">Esta experiência ainda não tem etapas ativas.</div>;
-  const bodyFont = `"${project.designSystem.typography.bodyFont}", Inter, ui-sans-serif, system-ui, sans-serif`;
-  const headingFont = `"${project.designSystem.typography.headingFont}", Inter, ui-sans-serif, system-ui, sans-serif`;
-  const css = { "--primary": palette.primary, "--primary-fg": palette.primaryForeground, "--secondary": palette.secondary, "--accent": palette.accent, "--background": palette.background, "--surface": palette.surface, "--surface-elevated": palette.surfaceElevated, "--foreground": palette.foreground, "--muted": palette.muted, "--muted-fg": palette.mutedForeground, "--border": palette.border, "--card-radius": `${project.designSystem.shape.cardRadius}px`, "--button-radius": `${project.designSystem.shape.buttonRadius}px`, "--input-radius": `${project.designSystem.shape.inputRadius}px`, "--card-shadow": project.designSystem.elevation.cardShadow, fontFamily: bodyFont } as React.CSSProperties;
-  return <div style={css} className={`relative flex h-full min-h-[560px] flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)] ${project.designSystem.mode === "dark" ? "dark" : ""}`}>
-    <div className="pointer-events-none absolute inset-0 overflow-hidden"><div className="absolute -right-24 -top-24 size-72 rounded-full bg-[var(--primary)] opacity-[.12] blur-3xl" /><div className="absolute -bottom-32 -left-20 size-72 rounded-full bg-[var(--accent)] opacity-[.1] blur-3xl" />{project.designSystem.imagery.decorativeStyle?.includes("grid") && <div className="dot-grid absolute inset-0 text-[var(--foreground)] opacity-[.055]" />}</div>
-    <header className="relative flex items-center justify-between p-5"><div className="flex items-center gap-2">{history.length > 0 ? <button onClick={back} className="grid size-10 place-items-center rounded-full border border-[var(--border)] bg-[var(--surface)]" aria-label="Voltar"><ArrowLeft size={18} /></button> : project.brand.logoDataUrl ? <img src={project.brand.logoDataUrl} alt={`Logo ${project.name}`} className="h-9 max-w-28 object-contain" /> : <span className="grid size-10 place-items-center rounded-[14px] bg-[var(--primary)] text-xs font-extrabold text-[var(--primary-fg)]">{project.name.slice(0, 2).toUpperCase()}</span>}</div><div className="flex items-center gap-2"><span className="text-[11px] font-bold text-[var(--muted-fg)]">{stepIndex + 1} de {activeSteps.length}</span>{!preview && <button onClick={() => void share()} className="grid size-10 place-items-center rounded-full border border-[var(--border)] bg-[var(--surface)]" aria-label="Compartilhar"><Share2 size={17} /></button>}</div></header>
-    <div className="relative mx-5 h-1 overflow-hidden rounded-full bg-[var(--muted)]"><motion.div className="h-full rounded-full bg-[var(--primary)]" animate={{ width: `${(stepIndex + 1) / activeSteps.length * 100}%` }} /></div>
-    <main className="relative flex flex-1 flex-col overflow-y-auto px-5 pb-6 pt-8 scrollbar-thin sm:px-7"><AnimatePresence mode="wait"><motion.div key={step.id} initial={{ opacity: 0, x: project.designSystem.motion.transition === "slide" ? 18 : 0, scale: project.designSystem.motion.transition === "scale" ? .98 : 1 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: project.designSystem.motion.duration / 1000 }} className="flex min-h-full flex-col">
-      <div><span className="text-[11px] font-extrabold uppercase tracking-[.16em] text-[var(--primary)]">{step.type === "recommendation" ? "Feito para você" : step.type === "form" ? "Só mais um passo" : step.type === "action" ? "Hora de avançar" : "Seu próximo passo"}</span><h1 className="text-balance mt-3 text-[clamp(2rem,8vw,3.4rem)] font-extrabold leading-[1.01] tracking-[-.052em]" style={{ fontFamily: headingFont }}>{step.title}</h1>{step.description && <p className="mt-3 max-w-md text-sm leading-6 text-[var(--muted-fg)]">{step.description}</p>}</div>
-      {step.recommendation && <div className="mt-7 overflow-hidden rounded-[var(--card-radius)] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card-shadow)]"><span className="inline-flex rounded-full bg-[var(--muted)] px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[var(--primary)]">{step.recommendation.label || "Recomendado"}</span><h2 className="mt-4 text-2xl font-extrabold tracking-[-.035em]">{step.recommendation.title}</h2><p className="mt-2 text-xs leading-5 text-[var(--muted-fg)]">{step.recommendation.description}</p><ul className="mt-5 space-y-2">{step.recommendation.benefits.map((item) => <li key={item} className="flex items-center gap-2 text-sm font-semibold"><span className="grid size-5 place-items-center rounded-full bg-[var(--primary)] text-[var(--primary-fg)]"><Check size={12} /></span>{item}</li>)}</ul>{step.recommendation.deliverables && <div className="mt-5 flex flex-wrap gap-2">{step.recommendation.deliverables.map((item) => <span key={item} className="rounded-full border border-[var(--border)] px-3 py-1.5 text-[10px] font-bold text-[var(--muted-fg)]">{item}</span>)}</div>}</div>}
-      <div className="mt-7"><SpecialBlocks step={step} /></div>
-      {step.formFields && step.type === "form" && <form onSubmit={submitStep} className="mt-7 space-y-4">{step.formFields.map((field) => <div key={field.id}><label className="mb-2 block text-xs font-bold">{field.label}{field.required && <span className="text-[var(--primary)]"> *</span>}</label><FieldControl field={field} value={answers[field.key] || ""} onChange={(value) => updateAnswer(field.key, value)} onFocus={() => { if (!formStarted.current) { formStarted.current = true; event("form_started"); } }} /></div>)}<button type="submit" disabled={!formReady()} className="focus-ring flex min-h-13 w-full items-center justify-center gap-2 rounded-[var(--button-radius)] bg-[var(--primary)] px-5 text-sm font-extrabold text-[var(--primary-fg)] shadow-lg">{step.options?.[0]?.label || "Continuar"}<ArrowRight size={17} /></button></form>}
-      {leadForm && step.formFields && <div className="mt-7 rounded-[var(--card-radius)] border border-[var(--border)] bg-[var(--surface)] p-5"><h2 className="font-extrabold">Receba os detalhes</h2><p className="mt-1 text-xs text-[var(--muted-fg)]">Preencha para nosso time continuar com contexto.</p><div className="mt-4 space-y-4">{step.formFields.map((field) => <div key={field.id}><label className="mb-2 block text-xs font-bold">{field.label}</label><FieldControl field={field} value={answers[field.key] || ""} onChange={(value) => updateAnswer(field.key, value)} onFocus={() => event("form_started")} /></div>)}</div><button onClick={submitLead} disabled={!formReady(step.formFields)} className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-[var(--button-radius)] bg-[var(--primary)] text-sm font-extrabold text-[var(--primary-fg)]">Enviar e continuar <ArrowRight size={16} /></button></div>}
-      {submitted ? <div className="mt-8 rounded-[var(--card-radius)] border border-[#bde7d6] bg-[#eaf8f2] p-5 text-[#176f53]"><span className="grid size-10 place-items-center rounded-full bg-[#15966c] text-white"><Check size={19} /></span><h2 className="mt-4 text-xl font-extrabold">Tudo certo!</h2><p className="mt-1 text-sm">Recebemos seus dados e o contexto da jornada.</p></div> : step.type !== "form" && !leadForm && <div className="mt-auto space-y-2 pt-7">{step.options?.map((option, index) => <button key={option.id} onClick={() => void optionClicked(option)} className={`focus-ring group flex min-h-[58px] w-full items-center gap-3 rounded-[var(--button-radius)] border px-4 text-left text-sm font-extrabold transition active:scale-[.985] ${index === 0 ? "border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-fg)] shadow-lg" : "border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)]"}`}><span className={`grid size-9 place-items-center rounded-xl ${index === 0 ? "bg-white/15" : "bg-[var(--muted)] text-[var(--primary)]"}`}><DynamicIcon name={option.icon} /></span><span className="flex-1"><span className="block">{option.label}</span>{option.description && <small className={`mt-0.5 block font-medium ${index === 0 ? "opacity-70" : "text-[var(--muted-fg)]"}`}>{option.description}</small>}</span><ChevronRight size={18} className="transition group-hover:translate-x-1" /></button>)}</div>}
-    </motion.div></AnimatePresence></main>
-    <footer className="relative px-5 pb-4 text-center text-[10px] font-semibold text-[var(--muted-fg)]">Experiência criada com <span className="font-extrabold text-[var(--primary)]">SmartBio</span></footer>
-  </div>;
+  function back() {
+    const previous = history.at(-1);
+    if (!previous) return;
+    setHistory((items) => items.slice(0, -1));
+    setRuntime((current) => ({ ...current, currentStepId: previous }));
+    setLeadForm(false);
+    setError("");
+    setConfirmation("");
+  }
+
+  function addLead(
+    input: Partial<Lead>,
+    capability?: CapabilityKey,
+    commercialObjectId?: string,
+  ) {
+    const answers = stringAnswers(runtime.answers);
+    const lead = localStore.addLead({
+      projectId: project.id,
+      projectName: project.name,
+      sessionId: runtime.sessionId,
+      name: String(runtime.answers.name || input.name || ""),
+      email: String(runtime.answers.email || input.email || ""),
+      phone: String(runtime.answers.phone || input.phone || ""),
+      company: String(runtime.answers.company || input.company || ""),
+      status: input.status || "new",
+      source:
+        new URLSearchParams(location.search).get("utm_source") || "direct",
+      campaign:
+        new URLSearchParams(location.search).get("utm_campaign") || undefined,
+      recommendation: input.recommendation || runtime.recommendationKey,
+      answers,
+      score: input.score,
+      qualificationBand: input.qualificationBand,
+      qualificationReason: input.qualificationReason,
+      commercialAction: capability,
+      commercialObjectId,
+      operationalStatus: input.operationalStatus,
+      estimatedValue: input.estimatedValue,
+      scheduledAt: input.scheduledAt,
+      locationName: input.locationName,
+    });
+    void fetch("/api/leads", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...lead, honeypot: "" }),
+    }).catch(() => undefined);
+    return lead;
+  }
+
+  async function submitCapability(capability: CapabilityKey) {
+    setBusy(true);
+    setError("");
+    setConfirmation("");
+    emit("capability_started", { capability });
+    const idempotencyKey = runtime.idempotencyKeys?.[capability] || uid("idem");
+    if (!runtime.idempotencyKeys?.[capability])
+      setRuntime((current) => ({
+        ...current,
+        idempotencyKeys: {
+          ...current.idempotencyKeys,
+          [capability]: idempotencyKey,
+        },
+      }));
+    try {
+      if (capability === "quote") {
+        const definition = project.commercialConfig?.quoteDefinition;
+        if (!definition) throw new Error("Orçamento indisponível.");
+        const request: QuoteRequest = {
+          id: uid("quote"),
+          projectId: project.id,
+          sessionId: runtime.sessionId,
+          idempotencyKey,
+          status: "submitted",
+          answers: runtime.answers,
+          estimatedMin: runtime.quoteDraft?.estimatedMin,
+          estimatedMax: runtime.quoteDraft?.estimatedMax,
+          currency: definition.currency,
+          attachments: runtime.quoteDraft?.attachments || [],
+          createdAt: new Date().toISOString(),
+        };
+        localStore.saveQuoteRequest(request);
+        const response = await fetch("/api/public/quotes", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ...request,
+            visitorData: {
+              name: runtime.answers.name || "",
+              phone: runtime.answers.phone || "",
+              email: runtime.answers.email || "",
+            },
+            honeypot: "",
+          }),
+        });
+        const payload = (await response.json()) as {
+          data?: { request?: { id?: string } };
+          error?: { message?: string };
+        };
+        if (!response.ok)
+          throw new Error(
+            payload.error?.message || "Não foi possível enviar o orçamento.",
+          );
+        const remoteId = payload.data?.request?.id;
+        if (remoteId && mediaFiles.current.length)
+          await Promise.all(
+            mediaFiles.current.map(async (file) => {
+              const form = new FormData();
+              form.set("file", file);
+              await fetch(`/api/public/quotes/${remoteId}/attachments`, {
+                method: "POST",
+                body: form,
+              });
+            }),
+          );
+        addLead(
+          {
+            operationalStatus: "orçamento enviado",
+            estimatedValue: request.estimatedMax,
+          },
+          "quote",
+          remoteId || request.id,
+        );
+        emit("quote_submitted", { quoteId: remoteId || request.id });
+        setConfirmation(
+          "Orçamento enviado. O negócio recebeu suas respostas e fotos.",
+        );
+      } else if (capability === "scheduling") {
+        const service =
+          project.commercialConfig?.schedulableServices?.find(
+            (item) => item.id === runtime.answers.serviceId,
+          ) || project.commercialConfig?.schedulableServices?.[0];
+        if (!service || !runtime.selectedSlot)
+          throw new Error("Escolha um serviço e um horário disponível.");
+        const endsAt = String(
+          runtime.answers.booking_ends_at ||
+            new Date(
+              new Date(runtime.selectedSlot).getTime() +
+                service.durationMinutes * 60_000,
+            ).toISOString(),
+        );
+        const booking: Booking = {
+          id: uid("booking"),
+          projectId: project.id,
+          sessionId: runtime.sessionId,
+          idempotencyKey,
+          serviceId: service.id,
+          resourceId: runtime.selectedResourceId,
+          startsAt: runtime.selectedSlot,
+          endsAt,
+          status:
+            service.confirmationMode === "instant" ? "confirmed" : "pending",
+          confirmationMode: service.confirmationMode,
+          visitorData: runtime.answers,
+          createdAt: new Date().toISOString(),
+        };
+        localStore.saveBooking(booking);
+        const response = await fetch("/api/public/bookings", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ...booking, honeypot: "" }),
+        });
+        const payload = (await response.json()) as {
+          error?: { message?: string };
+        };
+        if (!response.ok)
+          throw new Error(
+            payload.error?.message || "Não foi possível agendar.",
+          );
+        addLead(
+          { operationalStatus: booking.status, scheduledAt: booking.startsAt },
+          "scheduling",
+          booking.id,
+        );
+        emit("booking_submitted", { bookingId: booking.id });
+        if (booking.status === "confirmed")
+          emit("booking_confirmed", { bookingId: booking.id });
+        setConfirmation(
+          booking.status === "confirmed"
+            ? "Agendamento confirmado."
+            : "Solicitação enviada para aprovação.",
+        );
+      } else if (capability === "catalog_order") {
+        if (!runtime.cart.items.length)
+          throw new Error("Adicione ao menos um item ao pedido.");
+        const order: OrderRequest = {
+          id: uid("order"),
+          projectId: project.id,
+          sessionId: runtime.sessionId,
+          idempotencyKey,
+          status: "submitted",
+          fulfillment: runtime.cart.fulfillment || "pickup",
+          locationId: runtime.selectedLocationId,
+          items: runtime.cart.items,
+          totals: runtime.cart.totals,
+          visitorData: runtime.answers,
+          createdAt: new Date().toISOString(),
+        };
+        localStore.saveOrder(order);
+        const response = await fetch("/api/public/orders", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ...order, honeypot: "" }),
+        });
+        const payload = (await response.json()) as {
+          error?: { message?: string };
+        };
+        if (!response.ok)
+          throw new Error(
+            payload.error?.message || "Não foi possível enviar o pedido.",
+          );
+        addLead(
+          {
+            operationalStatus: "pedido enviado",
+            estimatedValue: order.totals.total,
+          },
+          "catalog_order",
+          order.id,
+        );
+        emit("order_submitted", {
+          orderId: order.id,
+          total: order.totals.total,
+        });
+        setConfirmation("Pedido enviado com sucesso.");
+      } else if (capability === "reservation") {
+        const range = runtime.selectedDateRange;
+        const unitId = runtime.selectedOfferIds[0];
+        const unit = project.commercialConfig?.reservableUnits?.find(
+          (item) => item.id === unitId,
+        );
+        if (!range?.start || !range.end || !unit)
+          throw new Error("Consulte as datas e escolha uma opção disponível.");
+        const total = calculateReservationTotal(unit, range.start, range.end);
+        const reservation: Reservation = {
+          id: uid("reservation"),
+          projectId: project.id,
+          sessionId: runtime.sessionId,
+          idempotencyKey,
+          unitId,
+          checkIn: range.start,
+          checkOut: range.end,
+          adults: runtime.guests?.adults || 2,
+          children: runtime.guests?.children || 0,
+          status:
+            project.businessProfile?.confirmationMode === "instant"
+              ? "confirmed"
+              : "pending",
+          total,
+          depositAmount: project.commercialConfig?.paymentUrl
+            ? Math.round(total * 0.3 * 100) / 100
+            : undefined,
+          visitorData: runtime.answers,
+          createdAt: new Date().toISOString(),
+        };
+        localStore.saveReservation(reservation);
+        const response = await fetch("/api/public/reservations", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ...reservation, honeypot: "" }),
+        });
+        const payload = (await response.json()) as {
+          error?: { message?: string };
+        };
+        if (!response.ok)
+          throw new Error(
+            payload.error?.message || "Não foi possível solicitar a reserva.",
+          );
+        addLead(
+          { operationalStatus: reservation.status, estimatedValue: total },
+          "reservation",
+          reservation.id,
+        );
+        emit("reservation_submitted", { reservationId: reservation.id, total });
+        if (reservation.status === "confirmed")
+          emit("reservation_confirmed", { reservationId: reservation.id });
+        setConfirmation(
+          reservation.status === "confirmed"
+            ? "Reserva confirmada."
+            : "Solicitação de reserva enviada.",
+        );
+      } else if (capability === "routing") {
+        const destinations =
+          project.commercialConfig?.routingDestinations || [];
+        const result = resolveRoute(
+          runtime.answers,
+          project.commercialConfig?.routingRules || [],
+          destinations,
+          destinations[0]?.id,
+        );
+        setRuntime((current) => ({
+          ...current,
+          routeResult: result,
+          selectedLocationId:
+            result.destination?.locationId || result.destination?.id,
+        }));
+        await fetch("/api/public/routing/resolve", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            projectId: project.id,
+            sessionId: runtime.sessionId,
+            context: runtime.answers,
+          }),
+        }).catch(() => undefined);
+        emit("route_resolved", {
+          ruleId: result.ruleId,
+          destinationId: result.destination?.id,
+          fallback: result.fallback,
+        });
+        setConfirmation(
+          result.destination
+            ? `Destino encontrado: ${result.destination.label}.`
+            : "Seu pedido será direcionado manualmente.",
+        );
+      } else if (capability === "payment") {
+        const paymentUrl = project.commercialConfig?.paymentUrl;
+        if (!paymentUrl)
+          throw new Error("O link de pagamento ainda não foi configurado.");
+        emit("payment_started", { provider: "external" });
+        if (!preview) window.open(paymentUrl, "_blank", "noopener,noreferrer");
+        setConfirmation("Pagamento aberto em ambiente externo seguro.");
+      }
+      setSubmitted(true);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Não foi possível concluir. Tente novamente.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function act(option: StepOption) {
+    if (!step) return;
+    emit("option_clicked", { optionId: option.id, value: option.value });
+    if (
+      step.type === "form" &&
+      project.commercialConfig?.qualificationRules?.length
+    ) {
+      const result = qualifyLead(
+        runtime.answers,
+        project.commercialConfig.qualificationRules,
+      );
+      setRuntime((current) => ({
+        ...current,
+        recommendationKey: result.recommendationKey,
+        answers: {
+          ...current.answers,
+          qualification_score: result.score,
+          qualification_band: result.band,
+          qualification_reason: result.reasons.join(" "),
+        },
+      }));
+      emit("qualification_completed", {
+        score: result.score,
+        band: result.band,
+      });
+    }
+    if (
+      option.actionType === "go_to_step" ||
+      option.actionType === "show_recommendation"
+    )
+      return go(option.targetStepId);
+    if (option.actionType === "start_capability")
+      return submitCapability(
+        String(option.actionPayload?.capability) as CapabilityKey,
+      );
+    if (option.actionType === "submit_form") {
+      setLeadForm(true);
+      return;
+    }
+    if (option.actionType === "open_whatsapp") {
+      emit("whatsapp_clicked");
+      const phone = String(option.actionPayload?.phone || project.phone || "");
+      const cart = runtime.cart.items.length
+        ? `Pedido: ${runtime.cart.items.map((item) => `${item.quantity}x ${item.name}`).join(", ")}`
+        : undefined;
+      const recommendation =
+        step.recommendation?.title || runtime.recommendationKey;
+      const message = buildWhatsAppMessage({
+        interest: step.title,
+        answers: {
+          ...stringAnswers(runtime.answers),
+          ...(cart ? { pedido: cart } : {}),
+          ...(recommendation ? { recomendacao: recommendation } : {}),
+        },
+      });
+      if (!preview)
+        window.open(
+          buildWhatsAppUrl(phone, message),
+          "_blank",
+          "noopener,noreferrer",
+        );
+      return;
+    }
+    if (option.actionType === "open_url") {
+      emit(
+        option.value === "payment"
+          ? "payment_started"
+          : "external_link_clicked",
+        { url: option.actionPayload?.url },
+      );
+      if (!preview)
+        window.open(
+          String(option.actionPayload?.url || "#"),
+          "_blank",
+          "noopener,noreferrer",
+        );
+      return;
+    }
+    if (option.actionType === "finish") {
+      emit("journey_completed");
+      setConfirmation("Jornada concluída.");
+    }
+  }
+
+  function submitStep(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const option = step?.options?.[0];
+    if (
+      step?.type === "quote" &&
+      (!runtime.answers.servico || !runtime.answers.quantidade)
+    ) {
+      setError("Escolha o serviço e a quantidade.");
+      return;
+    }
+    if (step?.type === "schedule" && !runtime.selectedSlot) {
+      setError("Consulte e escolha um horário.");
+      return;
+    }
+    if (option) void act(option);
+  }
+
+  function submitLead(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const result = project.commercialConfig?.qualificationRules?.length
+      ? qualifyLead(
+          runtime.answers,
+          project.commercialConfig.qualificationRules,
+        )
+      : undefined;
+    addLead(
+      {
+        status: result?.band === "qualified" ? "qualified" : "new",
+        score: result?.score,
+        qualificationBand: result?.band,
+        qualificationReason: result?.reasons.join(" "),
+        recommendation: runtime.recommendationKey,
+        operationalStatus: "lead capturado",
+      },
+      result ? "qualification" : undefined,
+    );
+    emit("form_submitted");
+    emit("journey_completed");
+    setSubmitted(true);
+    setLeadForm(false);
+    setConfirmation(
+      "Dados enviados. O negócio recebeu todo o contexto da jornada.",
+    );
+  }
+
+  async function share() {
+    const data = {
+      title: project.name,
+      text: project.description,
+      url: location.href,
+    };
+    if (navigator.share) await navigator.share(data);
+    else await navigator.clipboard.writeText(location.href);
+  }
+
+  if (!step) return null;
+  const style = {
+    "--primary": palette.primary,
+    "--primary-fg": palette.primaryForeground,
+    "--secondary": palette.secondary,
+    "--accent": palette.accent,
+    "--background": palette.background,
+    "--surface": palette.surface,
+    "--foreground": palette.foreground,
+    "--muted": palette.muted,
+    "--muted-fg": palette.mutedForeground,
+    "--border": palette.border,
+    "--destructive": palette.destructive,
+    "--card-radius": `${project.designSystem.shape.cardRadius}px`,
+    "--button-radius": `${project.designSystem.shape.buttonRadius}px`,
+    "--input-radius": `${project.designSystem.shape.inputRadius}px`,
+    "--card-shadow": project.designSystem.elevation.cardShadow,
+  } as React.CSSProperties;
+  const blocks = step.blocks || [];
+
+  return (
+    <div
+      style={{
+        ...style,
+        fontFamily: `"${project.designSystem.typography.bodyFont}", Inter, ui-sans-serif, system-ui, sans-serif`,
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
+      className="relative flex min-h-full flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]"
+    >
+      <div className="pointer-events-none absolute -right-24 -top-24 size-64 rounded-full bg-[var(--primary)] opacity-[var(--glow-opacity,.1)] blur-3xl" />
+      <header className="relative flex items-center justify-between px-5 pt-[max(1rem,env(safe-area-inset-top))]">
+        <button
+          type="button"
+          onClick={back}
+          disabled={!history.length}
+          aria-label="Voltar"
+          className="grid size-10 place-items-center rounded-full border border-[var(--border)] bg-[var(--surface)] disabled:invisible"
+        >
+          <ArrowLeft size={18} />
+        </button>
+        <div className="flex items-center gap-2">
+          {project.brand.logoDataUrl ? (
+            <img
+              src={project.brand.logoDataUrl}
+              alt={project.name}
+              className="max-h-9 max-w-28 object-contain"
+            />
+          ) : (
+            <span className="text-xs font-extrabold">{project.name}</span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => void share()}
+          aria-label="Compartilhar"
+          className="grid size-10 place-items-center rounded-full border border-[var(--border)] bg-[var(--surface)]"
+        >
+          <Share2 size={17} />
+        </button>
+      </header>
+      <div className="relative mx-5 mt-4 h-1 overflow-hidden rounded-full bg-[var(--muted)]">
+        <div
+          className="h-full rounded-full bg-[var(--primary)] transition-[width]"
+          style={{
+            width: `${Math.max(6, ((stepIndex + 1) / activeSteps.length) * 100)}%`,
+          }}
+        />
+      </div>
+      <main className="relative flex flex-1 items-center justify-center px-5 py-8 sm:px-8">
+        <AnimatePresence mode="wait">
+          <motion.section
+            key={step.id}
+            initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduceMotion ? undefined : { opacity: 0, y: -8 }}
+            transition={{
+              duration: reduceMotion
+                ? 0
+                : project.designSystem.motion.duration / 1000,
+            }}
+            className="w-full max-w-[620px]"
+          >
+            <p className="text-xs font-extrabold uppercase tracking-[.16em] text-[var(--primary)]">
+              {project.name}
+            </p>
+            <h1
+              className="mt-4 text-[clamp(2rem,8vw,3.6rem)] font-extrabold leading-[1.02] tracking-[-.055em]"
+              style={{
+                fontFamily: `"${project.designSystem.typography.headingFont}", Inter, ui-sans-serif, system-ui, sans-serif`,
+                fontWeight: project.designSystem.typography.headingWeight,
+              }}
+            >
+              {step.title}
+            </h1>
+            {step.description ? (
+              <p className="mt-4 max-w-xl text-sm leading-6 text-[var(--muted-fg)]">
+                {step.description}
+              </p>
+            ) : null}
+            {step.recommendation ? (
+              <div className="mt-7 rounded-[var(--card-radius)] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card-shadow)]">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--primary)]">
+                  {step.recommendation.label || "Recomendado"}
+                </span>
+                <h2 className="mt-2 text-2xl font-extrabold">
+                  {step.recommendation.title}
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-[var(--muted-fg)]">
+                  {step.recommendation.description}
+                </p>
+                <ul className="mt-4 grid gap-2">
+                  {step.recommendation.benefits.map((benefit) => (
+                    <li
+                      key={benefit}
+                      className="flex items-center gap-2 text-xs font-semibold"
+                    >
+                      <span className="grid size-5 place-items-center rounded-full bg-[var(--muted)] text-[var(--primary)]">
+                        <Check size={12} />
+                      </span>
+                      {benefit}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {blocks.length ? (
+              <div className="mt-7 flex flex-col gap-3">
+                {blocks.map((block) => (
+                  <BlockRendererView
+                    key={block.id}
+                    block={block}
+                    project={project}
+                    runtime={runtime}
+                    setRuntime={setRuntime}
+                    mediaFilesRef={mediaFiles}
+                    emit={emit}
+                  />
+                ))}
+              </div>
+            ) : null}
+            <form onSubmit={submitStep} className="mt-7 flex flex-col gap-4">
+              {step.formFields?.map((field) => (
+                <label key={field.id} className="block">
+                  <span className="mb-2 block text-xs font-bold">
+                    {field.label}
+                    {field.required ? " *" : ""}
+                  </span>
+                  <FieldControl
+                    field={field}
+                    value={runtime.answers[field.key]}
+                    onChange={(value) => updateAnswer(field.key, value)}
+                    onFocus={() => {
+                      if (!formStarted.current) {
+                        formStarted.current = true;
+                        emit("form_started");
+                      }
+                    }}
+                  />
+                </label>
+              ))}
+              {step.options?.map((option, index) => {
+                const submitsForm = Boolean(
+                  step.formFields?.length && index === 0,
+                );
+                return (
+                  <button
+                    key={option.id}
+                    type={submitsForm ? "submit" : "button"}
+                    onClick={submitsForm ? undefined : () => void act(option)}
+                    disabled={busy}
+                    className={cn(
+                      "group flex min-h-14 w-full items-center gap-3 rounded-[var(--button-radius)] border p-3.5 text-left text-sm font-bold transition active:scale-[.99] disabled:opacity-60",
+                      index === 0
+                        ? "border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-fg)]"
+                        : "border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)]",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "grid size-9 place-items-center rounded-xl",
+                        index === 0
+                          ? "bg-white/15"
+                          : "bg-[var(--muted)] text-[var(--primary)]",
+                      )}
+                    >
+                      {busy && index === 0 ? (
+                        <LoaderCircle size={18} className="animate-spin" />
+                      ) : (
+                        <DynamicIcon name={option.icon} />
+                      )}
+                    </span>
+                    <span className="flex-1">
+                      <span className="block">{option.label}</span>
+                      {option.description ? (
+                        <small
+                          className={cn(
+                            "mt-0.5 block font-normal",
+                            index === 0
+                              ? "opacity-75"
+                              : "text-[var(--muted-fg)]",
+                          )}
+                        >
+                          {option.description}
+                        </small>
+                      ) : null}
+                    </span>
+                    <ArrowRight size={17} />
+                  </button>
+                );
+              })}
+            </form>
+            {leadForm ? (
+              <form
+                onSubmit={submitLead}
+                className="mt-5 flex flex-col gap-3 rounded-[var(--card-radius)] border border-[var(--border)] bg-[var(--surface)] p-5"
+              >
+                <strong>Seus dados para continuar</strong>
+                <input
+                  aria-label="Nome"
+                  required
+                  value={String(runtime.answers.name || "")}
+                  onChange={(event) => updateAnswer("name", event.target.value)}
+                  placeholder="Nome"
+                  className="min-h-12 rounded-[var(--input-radius)] border border-[var(--border)] bg-transparent px-3 text-sm"
+                />
+                <input
+                  aria-label="WhatsApp"
+                  required
+                  value={String(runtime.answers.phone || "")}
+                  onChange={(event) =>
+                    updateAnswer("phone", event.target.value)
+                  }
+                  placeholder="WhatsApp"
+                  className="min-h-12 rounded-[var(--input-radius)] border border-[var(--border)] bg-transparent px-3 text-sm"
+                />
+                <button className="min-h-12 rounded-[var(--button-radius)] bg-[var(--primary)] text-sm font-bold text-[var(--primary-fg)]">
+                  Enviar com contexto
+                </button>
+              </form>
+            ) : null}
+            {error ? (
+              <div
+                role="alert"
+                className="mt-4 rounded-[var(--input-radius)] border border-[var(--destructive)]/30 bg-[var(--surface)] p-3 text-sm text-[var(--destructive)]"
+              >
+                {error}
+              </div>
+            ) : null}
+            {confirmation ? (
+              <div
+                role="status"
+                className="mt-4 rounded-[var(--input-radius)] border border-[var(--primary)]/30 bg-[var(--muted)] p-4 text-sm font-semibold"
+              >
+                <Check className="mr-2 inline" size={17} />
+                {confirmation}
+              </div>
+            ) : null}
+            {submitted && !confirmation ? (
+              <p
+                role="status"
+                className="mt-4 text-sm font-semibold text-[var(--primary)]"
+              >
+                Concluído.
+              </p>
+            ) : null}
+          </motion.section>
+        </AnimatePresence>
+      </main>
+      <footer className="relative px-5 pb-4 text-center text-[10px] font-semibold text-[var(--muted-fg)]">
+        Não encontrou o que procura?{" "}
+        <button
+          type="button"
+          onClick={() => {
+            const whatsapp = step.options?.find(
+              (option) => option.actionType === "open_whatsapp",
+            );
+            if (whatsapp) void act(whatsapp);
+          }}
+          className="font-extrabold text-[var(--primary)]"
+        >
+          Fale com a gente
+        </button>
+        <span className="mx-2 opacity-30">·</span>Experiência criada com{" "}
+        <span className="font-extrabold text-[var(--primary)]">SmartBio</span>
+      </footer>
+    </div>
+  );
 }
 
-export function PublicExperience({ slug, preview = false }: { slug: string; preview?: boolean }) {
+export function PublicExperience({
+  slug,
+  preview = false,
+}: {
+  slug: string;
+  preview?: boolean;
+}) {
   const [project, setProject] = useState<Project | null>();
-  useEffect(() => { setProject(localStore.getProject(slug) || null); }, [slug]);
-  if (project === undefined) return <div className="grid min-h-screen place-items-center bg-[#f7f7fa]"><LoaderCircle className="animate-spin text-[#6d5ef5]" /></div>;
-  if (!project || (!preview && project.status !== "published")) return <div className="grid min-h-screen place-items-center bg-[#f7f7fa] p-6 text-center"><div><span className="mx-auto grid size-12 place-items-center rounded-2xl bg-[#e9e6ff] text-[#5f52d6]"><Compass /></span><h1 className="mt-5 text-2xl font-extrabold">Experiência indisponível</h1><p className="mt-2 text-sm text-[#74747e]">O endereço não existe ou ainda não foi publicado.</p><Link href="/" className="mt-6 inline-flex font-bold text-[#5f52d6]">Conhecer a SmartBio</Link></div></div>;
-  return <div className="min-h-screen" style={{ background: project.designSystem.colors.background }}><div className={preview ? "mx-auto h-full max-w-md" : "mx-auto min-h-screen w-full max-w-[560px] shadow-[0_0_80px_rgba(0,0,0,.12)]"}><ExperienceCanvas project={project} preview={preview} /></div></div>;
+  useEffect(() => {
+    const local = localStore.getProject(slug) || null;
+    setProject(local);
+    if (!preview)
+      void fetch(`/api/public/projects/${encodeURIComponent(slug)}/experience`)
+        .then(async (response) => {
+          if (!response.ok) return;
+          const payload = (await response.json()) as {
+            data?: { project?: Project };
+          };
+          if (payload.data?.project) setProject(payload.data.project);
+        })
+        .catch(() => undefined);
+  }, [preview, slug]);
+  if (project === undefined)
+    return (
+      <div className="grid min-h-screen place-items-center bg-[#f7f7fa]">
+        <LoaderCircle className="animate-spin text-[#6d5ef5]" />
+      </div>
+    );
+  if (!project || (!preview && project.status !== "published"))
+    return (
+      <div className="grid min-h-screen place-items-center bg-[#f7f7fa] p-6 text-center">
+        <div>
+          <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-[#e9e6ff] text-[#5f52d6]">
+            <Compass />
+          </span>
+          <h1 className="mt-5 text-2xl font-extrabold">
+            Experiência indisponível
+          </h1>
+          <p className="mt-2 text-sm text-[#74747e]">
+            O endereço não existe ou ainda não foi publicado.
+          </p>
+          <Link href="/" className="mt-6 inline-flex font-bold text-[#5f52d6]">
+            Conhecer a SmartBio
+          </Link>
+        </div>
+      </div>
+    );
+  return (
+    <div
+      className="min-h-screen"
+      style={{ background: project.designSystem.colors.background }}
+    >
+      <div
+        className={
+          preview
+            ? "mx-auto h-full max-w-md"
+            : "mx-auto min-h-screen w-full max-w-[760px] shadow-[0_0_80px_rgba(0,0,0,.12)]"
+        }
+      >
+        <ExperienceCanvas project={project} preview={preview} />
+      </div>
+    </div>
+  );
 }

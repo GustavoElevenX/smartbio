@@ -1,74 +1,957 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, LoaderCircle, Palette, RefreshCw, Sparkles, Upload, WandSparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  LoaderCircle,
+  Sparkles,
+  Upload,
+  WandSparkles,
+} from "lucide-react";
+import { ExperienceCanvas } from "@/components/public-experience/public-experience";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/field";
 import { analyzeBrandFile } from "@/features/brand-intelligence/brand-analyzer";
 import { buildPalette } from "@/features/brand-intelligence/colors";
+import { RuleBasedBusinessAnalyzer } from "@/features/business-understanding/rule-based-business-analyzer";
+import { CapabilityPlanner } from "@/features/capabilities/capability-planner";
+import { capabilityRegistry } from "@/features/capabilities/capability-registry";
 import { experienceComposer } from "@/features/composition/experience-composer";
-import { destinationOptions, goalOptions, personalityOptions } from "@/lib/constants";
-import { localStore } from "@/lib/local-store";
+import { personalityOptions } from "@/lib/constants";
+import { projectRepository } from "@/lib/repositories/project-repository";
 import { slugify } from "@/lib/utils";
-import type { BrandProfile, Project } from "@/types";
+import type {
+  BrandProfile,
+  CapacityKind,
+  CommercialIntent,
+  CompletionChannel,
+  ConfirmationMode,
+  ExperienceCompositionInput,
+  OfferKind,
+  Project,
+} from "@/types";
 
-const generationLabels = ["Entendendo seu negócio", "Analisando sua identidade", "Estruturando sua jornada", "Compondo sua experiência", "Criando textos e CTAs", "Validando contraste e legibilidade", "Preparando sua página"];
-const defaultBrand: BrandProfile = { extractedColors: ["#6D5EF5", "#FF725E", "#19B88B"], activePalette: buildPalette(["#6D5EF5", "#FF725E", "#19B88B"]), paletteVariations: [
-  { name: "Fiel", palette: buildPalette(["#6D5EF5", "#FF725E", "#19B88B"], "faithful") },
-  { name: "Equilibrada", palette: buildPalette(["#6D5EF5", "#FF725E", "#19B88B"], "balanced") },
-  { name: "Ousada", palette: buildPalette(["#6D5EF5", "#FF725E", "#19B88B"], "bold") },
-], brandPersonality: ["Minimalista"] };
+const stages = [
+  "Negócio",
+  "Oferta",
+  "Objetivo",
+  "Confirmação",
+  "Capacidade",
+  "Conclusão",
+  "Marca",
+  "Revisão",
+];
+const offerOptions: Array<[OfferKind, string, string]> = [
+  ["service", "Serviço", "Limpeza, manutenção ou atendimento sob demanda"],
+  [
+    "professional_service",
+    "Serviço profissional",
+    "Consultoria, clínica, agência ou especialista",
+  ],
+  ["physical_product", "Produto físico", "Loja, delivery, kits ou encomendas"],
+  ["digital_product", "Produto digital", "Curso, material ou acesso online"],
+  ["hospitality", "Hospedagem", "Chalé, pousada, hotel ou acomodação"],
+  ["rental", "Locação", "Sala, quadra, equipamento ou espaço"],
+  ["event", "Evento", "Inscrição, ingresso ou participação"],
+  ["membership", "Assinatura", "Clube, comunidade ou recorrência"],
+];
+const intentOptions: Array<[CommercialIntent, string]> = [
+  ["request_quote", "Pedir orçamento"],
+  ["request_proposal", "Solicitar proposta"],
+  ["schedule", "Agendar"],
+  ["check_availability", "Consultar disponibilidade"],
+  ["reserve", "Reservar"],
+  ["order", "Fazer pedido"],
+  ["buy", "Comprar"],
+  ["register", "Inscrever-se"],
+  ["contact", "Entrar em contato"],
+];
+const capacityOptions: Array<[CapacityKind, string]> = [
+  ["none", "Sem limite operacional"],
+  ["time_slot", "Horários"],
+  ["professional", "Profissionais"],
+  ["location", "Unidades"],
+  ["room", "Quartos ou acomodações"],
+  ["table", "Mesas"],
+  ["asset", "Espaços ou equipamentos"],
+  ["inventory", "Estoque"],
+  ["daily_capacity", "Limite diário"],
+];
+const confirmationOptions: Array<[ConfirmationMode, string, string]> = [
+  [
+    "manual_approval",
+    "Após sua aprovação",
+    "O visitante envia a solicitação e aguarda a confirmação.",
+  ],
+  [
+    "instant",
+    "Na hora",
+    "A confirmação acontece imediatamente quando houver capacidade.",
+  ],
+  [
+    "external_system",
+    "Em outro sistema",
+    "A jornada termina em uma agenda, checkout ou sistema externo.",
+  ],
+];
+const completionOptions: Array<[CompletionChannel, string]> = [
+  ["native", "Confirmar dentro da experiência"],
+  ["whatsapp", "Continuar no WhatsApp"],
+  ["external_url", "Abrir um link externo"],
+  ["email", "Enviar por e-mail"],
+  ["phone", "Ligar"],
+];
+const defaultBrand: BrandProfile = {
+  extractedColors: ["#6D5EF5", "#FF725E", "#19B88B"],
+  activePalette: buildPalette(["#6D5EF5", "#FF725E", "#19B88B"]),
+  paletteVariations: [
+    {
+      name: "Fiel",
+      palette: buildPalette(["#6D5EF5", "#FF725E", "#19B88B"], "faithful"),
+    },
+    {
+      name: "Equilibrada",
+      palette: buildPalette(["#6D5EF5", "#FF725E", "#19B88B"], "balanced"),
+    },
+    {
+      name: "Ousada",
+      palette: buildPalette(["#6D5EF5", "#FF725E", "#19B88B"], "bold"),
+    },
+  ],
+  brandPersonality: ["Minimalista"],
+};
 
-function ChoiceCard({ active, title, description, onClick }: { active: boolean; title: string; description?: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={`focus-ring relative min-h-[92px] rounded-[18px] border p-4 text-left transition ${active ? "border-[#7164e7] bg-[#f0eeff] shadow-[0_0_0_3px_rgba(113,100,231,.09)]" : "border-[#e0dfe7] bg-white hover:border-[#bebbcf]"}`}><strong className="block text-sm">{title}</strong>{description && <span className="mt-1.5 block text-xs leading-5 text-[#777781]">{description}</span>}{active && <span className="absolute right-3 top-3 grid size-5 place-items-center rounded-full bg-[#685be0] text-white"><Check size={12} /></span>}</button>;
+function ChoiceCard({
+  active,
+  title,
+  description,
+  onClick,
+}: {
+  active: boolean;
+  title: string;
+  description?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`focus-ring relative min-h-[88px] rounded-[18px] border p-4 text-left transition ${active ? "border-[#7164e7] bg-[#f0eeff] shadow-[0_0_0_3px_rgba(113,100,231,.09)]" : "border-[#e0dfe7] bg-white hover:border-[#bebbcf]"}`}
+    >
+      <strong className="block text-sm">{title}</strong>
+      {description ? (
+        <span className="mt-1.5 block text-xs leading-5 text-[#777781]">
+          {description}
+        </span>
+      ) : null}
+      {active ? (
+        <span className="absolute right-3 top-3 grid size-5 place-items-center rounded-full bg-[#685be0] text-white">
+          <Check size={12} />
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function toggleValue<T extends string>(items: T[], item: T) {
+  return items.includes(item)
+    ? items.filter((value) => value !== item)
+    : [...items, item];
 }
 
 export function OnboardingWizard() {
-  const router = useRouter(); const [stage, setStage] = useState(1); const [analyzing, setAnalyzing] = useState(false); const [error, setError] = useState(""); const [generationIndex, setGenerationIndex] = useState(0); const [project, setProject] = useState<Project | null>(null);
-  const [form, setForm] = useState({ name: "", businessName: "", slug: "", category: "", description: "", audience: "", goal: "Gerar leads", destination: "WhatsApp", phone: "", personality: "Minimalista", appearance: "", visualDirection: "Equilibrada" });
+  const router = useRouter();
+  const [stage, setStage] = useState(1);
+  const [error, setError] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [project, setProject] = useState<Project | null>(null);
   const [brand, setBrand] = useState<BrandProfile>(defaultBrand);
-  const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
+  const [offerKinds, setOfferKinds] = useState<OfferKind[]>([]);
+  const [intents, setIntents] = useState<CommercialIntent[]>([]);
+  const [confirmationMode, setConfirmationMode] =
+    useState<ConfirmationMode>("manual_approval");
+  const [capacityKinds, setCapacityKinds] = useState<CapacityKind[]>(["none"]);
+  const [completionChannel, setCompletionChannel] =
+    useState<CompletionChannel>("whatsapp");
+  const [form, setForm] = useState({
+    businessName: "",
+    slug: "",
+    websiteUrl: "",
+    category: "",
+    description: "",
+    audience: "",
+    phone: "",
+    destination: "",
+    personality: "Minimalista",
+    visualDirection: "Equilibrada",
+    hasMultipleLocations: false,
+    requiresMediaUpload: false,
+    requiresPayment: false,
+    allowsCancellationRequest: true,
+    allowsRescheduleRequest: true,
+  });
+  const update = <K extends keyof typeof form>(
+    key: K,
+    value: (typeof form)[K],
+  ) => setForm((current) => ({ ...current, [key]: value }));
+
+  const compositionInput = useMemo<ExperienceCompositionInput>(
+    () => ({
+      businessName: form.businessName,
+      businessDescription: form.description,
+      primaryGoal: intents[0] || "contact",
+      primaryDestination:
+        completionOptions.find(([key]) => key === completionChannel)?.[1] ||
+        "WhatsApp",
+      slug: form.slug,
+      websiteUrl: form.websiteUrl || undefined,
+      category: form.category || undefined,
+      audience: form.audience || undefined,
+      phone: form.phone || undefined,
+      offerKinds,
+      primaryIntents: intents,
+      confirmationMode,
+      capacityKinds,
+      hasMultipleLocations: form.hasMultipleLocations,
+      requiresMediaUpload: form.requiresMediaUpload,
+      requiresPayment: form.requiresPayment,
+      allowsCancellationRequest: form.allowsCancellationRequest,
+      allowsRescheduleRequest: form.allowsRescheduleRequest,
+      completionChannel,
+      brandPersonality: [form.personality],
+      visualDirection: form.visualDirection,
+      brand: { ...brand, brandPersonality: [form.personality] },
+    }),
+    [
+      brand,
+      capacityKinds,
+      completionChannel,
+      confirmationMode,
+      form,
+      intents,
+      offerKinds,
+    ],
+  );
+  const profile = useMemo(
+    () => new RuleBasedBusinessAnalyzer().analyze(compositionInput),
+    [compositionInput],
+  );
+  const suggestedCapabilities = useMemo(
+    () => new CapabilityPlanner().plan(profile),
+    [profile],
+  );
 
   async function logoChanged(file?: File) {
-    if (!file) return; setAnalyzing(true); setError("");
-    try { const result = await analyzeBrandFile(file); setBrand({ ...result, brandPersonality: [form.personality] }); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : "Não foi possível analisar a logo."); }
-    finally { setAnalyzing(false); }
+    if (!file) return;
+    setAnalyzing(true);
+    setError("");
+    try {
+      setBrand({
+        ...(await analyzeBrandFile(file)),
+        brandPersonality: [form.personality],
+      });
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Não foi possível analisar a logo.",
+      );
+    } finally {
+      setAnalyzing(false);
+    }
   }
 
-  function canContinue() {
-    if (stage === 1) return form.name && form.businessName && form.slug;
-    if (stage === 2) return form.description.length >= 15;
-    if (stage === 3) return form.goal;
-    if (stage === 4) return form.destination;
+  function validStage() {
+    if (stage === 1)
+      return Boolean(
+        form.businessName && form.slug && form.description.length >= 15,
+      );
+    if (stage === 2) return offerKinds.length > 0;
+    if (stage === 3) return intents.length > 0;
+    if (stage === 5) return capacityKinds.length > 0;
+    if (stage === 6)
+      return (
+        completionChannel !== "whatsapp" ||
+        form.phone.replace(/\D/g, "").length >= 10
+      );
     return true;
   }
 
-  async function generate() {
-    setStage(7); setGenerationIndex(0);
-    for (let index = 0; index < generationLabels.length; index++) { setGenerationIndex(index); await new Promise((resolve) => setTimeout(resolve, 310)); }
-    const created = await experienceComposer.compose({ businessName: form.businessName, businessDescription: form.description, primaryGoal: form.goal, primaryDestination: form.destination, slug: form.slug, category: form.category, audience: form.audience, phone: form.phone, brandPersonality: [form.personality], visualDirection: form.visualDirection, brand: { ...brand, brandPersonality: [form.personality] }, preferredTheme: form.visualDirection === "Ousada" && brand.analysisMetadata?.luminance === "dark" ? "dark" : "light" });
-    localStore.saveProject(created); setProject(created); setStage(8);
+  function next() {
+    if (!validStage()) {
+      setError("Complete as informações principais para continuar.");
+      return;
+    }
+    setError("");
+    setStage((current) => Math.min(8, current + 1));
   }
 
-  function next() { if (!canContinue()) { setError("Preencha os campos principais para continuar."); return; } setError(""); if (stage === 6) void generate(); else setStage((value) => Math.min(8, value + 1)); }
-  function publish() { if (!project) return; localStore.saveProject({ ...project, status: "published", publishedAt: new Date().toISOString(), version: project.version + 1 }); router.push(`/app/projects/${project.id}/editor`); }
+  async function generate() {
+    setGenerating(true);
+    setError("");
+    try {
+      const created = await experienceComposer.compose(compositionInput);
+      const saved = await projectRepository.saveProject(created);
+      setProject(saved);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Não foi possível criar a experiência.",
+      );
+    } finally {
+      setGenerating(false);
+    }
+  }
 
-  return <div className="mx-auto max-w-[1120px] animate-enter"><div className="mb-7 flex items-center justify-between"><div><p className="text-sm font-semibold text-[#6d5ef5]">Configuração guiada</p><h1 className="mt-1 text-2xl font-extrabold tracking-[-.035em]">Crie sua experiência</h1></div>{stage < 7 && <div className="text-right"><span className="text-xs font-bold text-[#777781]">Etapa {stage} de 6</span><div className="mt-2 h-1.5 w-36 overflow-hidden rounded-full bg-[#e6e4ed]"><div className="h-full rounded-full bg-[#6d5ef5] transition-all" style={{ width: `${stage / 6 * 100}%` }} /></div></div>}</div>
-    <div className="overflow-hidden rounded-[28px] border border-[#e3e2e9] bg-white shadow-[0_20px_60px_rgba(31,28,55,.07)]">
-      {stage <= 6 && <div className="grid min-h-[610px] lg:grid-cols-[1fr_360px]"><div className="p-6 sm:p-10 lg:p-12">
-        {stage === 1 && <div><p className="text-sm font-bold text-[#675ada]">01 · Identificação</p><h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">Vamos começar pelo essencial.</h2><p className="mt-3 text-sm leading-6 text-[#71717b]">Esses dados identificam seu negócio e criam o endereço público.</p><div className="mt-8 grid gap-5 sm:grid-cols-2"><div><Label htmlFor="your-name">Seu nome</Label><Input id="your-name" value={form.name} onChange={(event) => update("name", event.target.value)} placeholder="Seu nome" /></div><div><Label htmlFor="business-name">Nome do negócio</Label><Input id="business-name" value={form.businessName} onChange={(event) => { update("businessName", event.target.value); if (!form.slug) update("slug", slugify(event.target.value)); }} placeholder="Ex.: Estúdio Aurora" /></div><div><Label htmlFor="slug">Nome desejado para a URL</Label><div className="flex"><span className="flex items-center rounded-l-xl border border-r-0 border-[#dedde6] bg-[#f4f3f7] px-3 text-xs text-[#777781]">smart.bio/</span><Input id="slug" value={form.slug} onChange={(event) => update("slug", slugify(event.target.value))} className="rounded-l-none" placeholder="estudio-aurora" /></div></div><div><Label htmlFor="category">Categoria</Label><Input id="category" value={form.category} onChange={(event) => update("category", event.target.value)} placeholder="Ex.: Consultoria" /></div></div></div>}
-        {stage === 2 && <div><p className="text-sm font-bold text-[#675ada]">02 · Seu negócio</p><h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">Explique o que você vende.</h2><p className="mt-3 text-sm leading-6 text-[#71717b]">Use suas palavras. Isso orienta os textos, as perguntas e a recomendação.</p><div className="mt-8"><Label htmlFor="description">Descrição do negócio</Label><Textarea id="description" value={form.description} onChange={(event) => update("description", event.target.value)} className="min-h-40" placeholder="Vendo tráfego pago e social media para empresas B2B que querem gerar mais oportunidades." /><div className="mt-2 flex justify-between text-xs text-[#8b8b94]"><span>Seja direto sobre oferta e resultado.</span><span>{form.description.length}/400</span></div></div><div className="mt-5"><Label htmlFor="audience">Para quem você vende? <span className="font-normal text-[#91919a]">(opcional)</span></Label><Input id="audience" value={form.audience} onChange={(event) => update("audience", event.target.value)} placeholder="Ex.: donos de pequenas empresas" /></div></div>}
-        {stage === 3 && <div><p className="text-sm font-bold text-[#675ada]">03 · Objetivo principal</p><h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">O que essa experiência deve gerar?</h2><p className="mt-3 text-sm leading-6 text-[#71717b]">Uma meta principal deixa a jornada mais clara para o visitante.</p><div className="mt-8 grid gap-3 sm:grid-cols-2">{goalOptions.map((goal) => <ChoiceCard key={goal} active={form.goal === goal} title={goal} onClick={() => update("goal", goal)} />)}</div></div>}
-        {stage === 4 && <div><p className="text-sm font-bold text-[#675ada]">04 · Destino principal</p><h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">Onde a ação deve acontecer?</h2><p className="mt-3 text-sm leading-6 text-[#71717b]">Você ainda poderá usar destinos diferentes em cada caminho.</p><div className="mt-8 grid gap-3 sm:grid-cols-2">{destinationOptions.map((destination) => <ChoiceCard key={destination} active={form.destination === destination} title={destination} description={destination === "WhatsApp" ? "Leve o contexto da jornada na mensagem" : undefined} onClick={() => update("destination", destination)} />)}</div>{form.destination === "WhatsApp" && <div className="mt-5"><Label htmlFor="phone">Número com DDI</Label><Input id="phone" value={form.phone} onChange={(event) => update("phone", event.target.value)} placeholder="5511999999999" inputMode="tel" /></div>}</div>}
-        {stage === 5 && <div><p className="text-sm font-bold text-[#675ada]">05 · Identidade da marca</p><h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">Sua logo define o ponto de partida.</h2><p className="mt-3 text-sm leading-6 text-[#71717b]">Extraímos cores reais e montamos uma paleta funcional com contraste.</p><div className="mt-7 grid gap-5 sm:grid-cols-[180px_1fr]"><label className="focus-within:ring-4 focus-within:ring-[#6d5ef5]/10 flex min-h-[180px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[20px] border-2 border-dashed border-[#d8d5e6] bg-[#faf9fd] p-4 text-center">{brand.logoDataUrl ? <img src={brand.logoDataUrl} alt="Prévia da logo" className="max-h-28 max-w-full object-contain" /> : <><span className="grid size-11 place-items-center rounded-xl bg-[#ebe8ff] text-[#6355dc]"><Upload size={20} /></span><strong className="mt-3 text-xs">Enviar logo</strong><span className="mt-1 text-[11px] text-[#85858e]">PNG, JPG, WebP ou SVG</span></>}<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="sr-only" onChange={(event) => void logoChanged(event.target.files?.[0])} /></label><div><Label>Personalidade visual</Label><div className="flex flex-wrap gap-2">{personalityOptions.map((item) => <button type="button" key={item} onClick={() => { update("personality", item); setBrand((current) => ({ ...current, brandPersonality: [item] })); }} className={`focus-ring rounded-full border px-3 py-2 text-xs font-semibold ${form.personality === item ? "border-[#7164e7] bg-[#efedff] text-[#584bd0]" : "border-[#dfdee6]"}`}>{item}</button>)}</div><div className="mt-5"><Label htmlFor="appearance">Aparência desejada <span className="font-normal text-[#91919a]">(opcional)</span></Label><Input id="appearance" value={form.appearance} onChange={(event) => update("appearance", event.target.value)} placeholder="Ex.: limpa, editorial e acolhedora" /></div></div></div>{analyzing && <div className="mt-5 flex items-center gap-2 rounded-xl bg-[#f0eeff] p-3 text-sm font-semibold text-[#5d50d3]"><LoaderCircle size={17} className="animate-spin" /> Analisando pixels e criando paleta…</div>}<div className="mt-6"><div className="flex items-center justify-between"><Label>Cores detectadas</Label><span className="text-xs text-[#85858e]">{brand.analysisMetadata ? `${Math.round(brand.analysisMetadata.confidence * 100)}% de confiança` : "paleta inicial"}</span></div><div className="flex flex-wrap gap-3">{brand.extractedColors.map((color) => <div key={color} className="group"><div className="size-12 rounded-[14px] border border-black/10 shadow-sm" style={{ background: color }} /><span className="mt-1 block text-[10px] font-semibold text-[#7c7c86]">{color}</span></div>)}</div></div></div>}
-        {stage === 6 && <div><p className="text-sm font-bold text-[#675ada]">06 · Direção visual</p><h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">Escolha uma interpretação da sua marca.</h2><p className="mt-3 text-sm leading-6 text-[#71717b]">São composições geradas para este projeto — não templates.</p><div className="mt-8 grid gap-4 sm:grid-cols-3">{brand.paletteVariations.map((variation, index) => <button type="button" key={variation.name} onClick={() => { update("visualDirection", variation.name); setBrand((current) => ({ ...current, activePalette: variation.palette })); }} className={`focus-ring overflow-hidden rounded-[20px] border text-left transition ${form.visualDirection === variation.name ? "border-[#6d5ef5] ring-4 ring-[#6d5ef5]/10" : "border-[#dfdee6]"}`}><div className="h-40 p-4" style={{ background: variation.palette.background, color: variation.palette.foreground }}><div className="h-3 w-12 rounded-full" style={{ background: variation.palette.primary }} /><div className="mt-8 h-3 w-4/5 rounded-full opacity-80" style={{ background: variation.palette.foreground }} /><div className="mt-2 h-2 w-3/5 rounded-full opacity-25" style={{ background: variation.palette.foreground }} /><div className="mt-5 h-10 rounded-xl" style={{ background: index === 1 ? variation.palette.surface : variation.palette.primary }} /></div><div className="bg-white p-4"><strong className="text-sm">{variation.name}</strong><span className="mt-1 block text-[11px] leading-4 text-[#7b7b85]">{index === 0 ? "Cores mais fiéis à logo" : index === 1 ? "Leitura e presença equilibradas" : "Contraste forte para conversão"}</span></div></button>)}</div><button type="button" className="focus-ring mt-5 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-[#6255d9]" onClick={() => setBrand((current) => ({ ...current, paletteVariations: [...current.paletteVariations].reverse() }))}><RefreshCw size={14} /> Gerar outra combinação</button></div>}
-        {error && <div role="alert" className="mt-6 rounded-xl border border-[#ffd1d1] bg-[#fff1f1] p-3 text-sm text-[#a83333]">{error}</div>}
-        <div className="mt-10 flex items-center justify-between"><Button type="button" variant="ghost" onClick={() => setStage((value) => Math.max(1, value - 1))} disabled={stage === 1}><ArrowLeft size={17} /> Voltar</Button><Button type="button" size="lg" onClick={next} disabled={analyzing}>{stage === 6 ? <><WandSparkles size={17} /> Criar experiência</> : <>Continuar <ArrowRight size={17} /></>}</Button></div>
-      </div><aside className="relative overflow-hidden border-l border-[#e7e6ed] bg-[#f5f3fb] p-7"><div className="absolute -right-16 -top-16 size-48 rounded-full bg-[#dcd7ff] blur-3xl" /><div className="relative"><span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-bold text-[#6558da] shadow-sm"><Sparkles size={14} /> Prévia em construção</span><div className="mx-auto mt-8 w-[230px] rounded-[30px] border-[5px] border-[#222126] bg-white p-2 shadow-[0_25px_60px_rgba(40,34,78,.15)]"><div className="min-h-[420px] overflow-hidden rounded-[22px] p-5" style={{ background: brand.activePalette.background, color: brand.activePalette.foreground }}><div className="flex justify-center">{brand.logoDataUrl ? <img src={brand.logoDataUrl} alt="Logo" className="h-10 max-w-24 object-contain" /> : <span className="grid size-9 place-items-center rounded-xl text-xs font-extrabold" style={{ background: brand.activePalette.primary, color: brand.activePalette.primaryForeground }}>{(form.businessName || "SB").slice(0, 2).toUpperCase()}</span>}</div><p className="mt-10 text-[10px] font-bold uppercase tracking-wider" style={{ color: brand.activePalette.primary }}>Seu próximo passo</p><h3 className="mt-2 text-2xl font-extrabold leading-tight tracking-[-.04em]">{form.businessName ? "O que você quer fazer hoje?" : "Sua experiência começa aqui."}</h3><p className="mt-2 text-xs leading-5 opacity-60">{form.description ? `${form.description.slice(0, 76)}…` : "Conte sobre o negócio para gerar uma jornada personalizada."}</p><div className="mt-6 space-y-2">{["Quero começar", "Quero saber mais", "Falar com alguém"].map((label, index) => <div key={label} className="rounded-[13px] border p-3 text-xs font-bold" style={{ background: index === 0 ? brand.activePalette.primary : brand.activePalette.surface, color: index === 0 ? brand.activePalette.primaryForeground : brand.activePalette.foreground, borderColor: brand.activePalette.border }}>{label}</div>)}</div></div></div></div></aside></div>}
-      {stage === 7 && <div className="flex min-h-[620px] flex-col items-center justify-center p-8 text-center"><div className="relative grid size-24 place-items-center"><div className="absolute inset-0 animate-ping rounded-full bg-[#d8d3ff] opacity-50" /><div className="relative grid size-20 place-items-center rounded-[24px] bg-[#17171c] text-white shadow-xl"><WandSparkles size={30} /></div></div><h2 className="mt-9 text-3xl font-extrabold tracking-[-.04em]">Compondo algo só seu.</h2><p className="mt-3 text-sm text-[#777781]">Nada de página genérica. Cada decisão usa o contexto da sua marca.</p><div className="mt-9 w-full max-w-md space-y-3">{generationLabels.map((label, index) => <div key={label} className={`flex items-center gap-3 rounded-xl px-4 py-3 text-left text-sm transition ${index === generationIndex ? "bg-[#efedff] font-bold text-[#5d50d3]" : index < generationIndex ? "text-[#4d8f74]" : "text-[#aaa9b2]"}`}>{index < generationIndex ? <CheckCircle2 size={17} /> : index === generationIndex ? <LoaderCircle size={17} className="animate-spin" /> : <span className="size-[17px] rounded-full border border-[#d3d1dc]" />}{label}</div>)}</div></div>}
-      {stage === 8 && project && <div className="grid min-h-[650px] lg:grid-cols-[1fr_420px]"><div className="flex flex-col justify-center p-8 sm:p-12"><span className="inline-flex w-fit items-center gap-2 rounded-full bg-[#e8f7ef] px-3 py-2 text-xs font-bold text-[#147a57]"><CheckCircle2 size={15} /> Experiência criada</span><h2 className="mt-6 text-4xl font-extrabold tracking-[-.05em]">Seu próximo passo está pronto.</h2><p className="mt-4 max-w-lg text-sm leading-6 text-[#6f6f79]">Criamos {project.steps.length} etapas, uma paleta funcional e uma direção visual própria para {project.name}. Você pode publicar agora ou personalizar tudo.</p><div className="mt-8 grid max-w-lg grid-cols-2 gap-3">{[["Etapas", project.steps.length], ["Contraste", "AA validado"], ["Direção", project.visualDirection], ["Destino", project.primaryDestination]].map(([label, value]) => <div key={String(label)} className="rounded-[16px] bg-[#f5f4f8] p-4"><span className="text-xs text-[#85858f]">{label}</span><strong className="mt-1 block text-sm">{value}</strong></div>)}</div><div className="mt-8 flex flex-wrap gap-3"><Button size="lg" onClick={publish}>Publicar agora <ArrowRight size={17} /></Button><Button size="lg" variant="secondary" onClick={() => router.push(`/app/projects/${project.id}/editor`)}>Personalizar</Button><Button size="lg" variant="ghost" onClick={() => setStage(6)}><Palette size={17} /> Ajustar paleta</Button></div></div><div className="flex items-center justify-center bg-[#efedf6] p-8"><div className="w-[280px] rounded-[38px] border-[6px] border-[#202026] bg-white p-2 shadow-[0_30px_70px_rgba(38,31,80,.2)]"><div className="min-h-[520px] overflow-hidden rounded-[27px] p-6" style={{ background: project.designSystem.colors.background, color: project.designSystem.colors.foreground }}><div className="h-1 w-full rounded-full" style={{ background: project.designSystem.colors.muted }}><div className="h-full w-1/4 rounded-full" style={{ background: project.designSystem.colors.primary }} /></div><div className="mt-16"><span className="text-xs font-bold" style={{ color: project.designSystem.colors.primary }}>{project.name}</span><h3 className="mt-4 text-[30px] font-extrabold leading-[1.05] tracking-[-.045em]">{project.steps[0].title}</h3><p className="mt-3 text-xs leading-5 opacity-60">{project.steps[0].description}</p></div><div className="mt-7 space-y-2">{project.steps[0].options?.map((option, index) => <div key={option.id} className="rounded-[15px] border p-3 text-xs font-bold" style={{ background: index === 0 ? project.designSystem.colors.primary : project.designSystem.colors.surface, color: index === 0 ? project.designSystem.colors.primaryForeground : project.designSystem.colors.foreground, borderColor: project.designSystem.colors.border }}>{option.label}</div>)}</div></div></div></div></div>}
+  async function publish() {
+    if (!project) return;
+    setGenerating(true);
+    try {
+      const saved = await projectRepository.saveProject({
+        ...project,
+        status: "published",
+        publishedAt: new Date().toISOString(),
+        version: project.version + 1,
+        updatedAt: new Date().toISOString(),
+      });
+      router.push(`/app/projects/${saved.id}/editor`);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-[1140px] animate-enter">
+      <div className="mb-7 flex items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-[#6d5ef5]">
+            Configuração guiada
+          </p>
+          <h1 className="mt-1 text-2xl font-extrabold tracking-[-.035em]">
+            Crie sua experiência de conversão
+          </h1>
+        </div>
+        <div className="text-right">
+          <span className="text-xs font-bold text-[#777781]">
+            Etapa {stage} de 8 · {stages[stage - 1]}
+          </span>
+          <div className="mt-2 h-1.5 w-40 overflow-hidden rounded-full bg-[#e6e4ed]">
+            <div
+              className="h-full rounded-full bg-[#6d5ef5] transition-all"
+              style={{ width: `${(stage / 8) * 100}%` }}
+            />
+          </div>
+        </div>
+      </div>
+      <div className="overflow-hidden rounded-[28px] border border-[#e3e2e9] bg-white shadow-[0_20px_60px_rgba(31,28,55,.07)]">
+        <div className="grid min-h-[650px] lg:grid-cols-[minmax(0,1fr)_360px]">
+          <main className="p-6 sm:p-10 lg:p-12">
+            {stage === 1 ? (
+              <section>
+                <p className="text-sm font-bold text-[#675ada]">01 · Negócio</p>
+                <h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">
+                  Conte o que você resolve.
+                </h2>
+                <p className="mt-3 text-sm leading-6 text-[#71717b]">
+                  A análise combina o que você informa com sinais da descrição —
+                  sem encaixar seu negócio em um modelo fixo.
+                </p>
+                <div className="mt-8 grid gap-5 sm:grid-cols-2">
+                  <div>
+                    <Label htmlFor="business-name">Nome do negócio</Label>
+                    <Input
+                      id="business-name"
+                      value={form.businessName}
+                      onChange={(event) => {
+                        update("businessName", event.target.value);
+                        if (!form.slug)
+                          update("slug", slugify(event.target.value));
+                      }}
+                      placeholder="Ex.: LimpaBem Estofados"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="slug">Endereço público</Label>
+                    <Input
+                      id="slug"
+                      value={form.slug}
+                      onChange={(event) =>
+                        update("slug", slugify(event.target.value))
+                      }
+                      placeholder="limpabem"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="website">
+                      Site{" "}
+                      <span className="font-normal text-[#91919a]">
+                        (opcional)
+                      </span>
+                    </Label>
+                    <Input
+                      id="website"
+                      type="url"
+                      value={form.websiteUrl}
+                      onChange={(event) =>
+                        update("websiteUrl", event.target.value)
+                      }
+                      placeholder="https://seusite.com.br"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="category">
+                      Categoria{" "}
+                      <span className="font-normal text-[#91919a]">
+                        (opcional)
+                      </span>
+                    </Label>
+                    <Input
+                      id="category"
+                      value={form.category}
+                      onChange={(event) =>
+                        update("category", event.target.value)
+                      }
+                      placeholder="Ex.: Serviços residenciais"
+                    />
+                  </div>
+                </div>
+                <div className="mt-5">
+                  <Label htmlFor="description">O que você oferece?</Label>
+                  <Textarea
+                    id="description"
+                    className="min-h-32"
+                    value={form.description}
+                    onChange={(event) =>
+                      update("description", event.target.value.slice(0, 600))
+                    }
+                    placeholder="Descreva a oferta, como o preço é definido e o que o cliente precisa fazer."
+                  />
+                  <small className="mt-1 block text-right text-[#8b8b94]">
+                    {form.description.length}/600
+                  </small>
+                </div>
+                <div className="mt-4">
+                  <Label htmlFor="audience">Para quem?</Label>
+                  <Input
+                    id="audience"
+                    value={form.audience}
+                    onChange={(event) => update("audience", event.target.value)}
+                    placeholder="Ex.: famílias e empresas da região"
+                  />
+                </div>
+              </section>
+            ) : null}
+
+            {stage === 2 ? (
+              <section>
+                <p className="text-sm font-bold text-[#675ada]">02 · Oferta</p>
+                <h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">
+                  O que o cliente encontra?
+                </h2>
+                <p className="mt-3 text-sm text-[#71717b]">
+                  Selecione tudo o que se aplica. Negócios híbridos podem
+                  combinar capacidades.
+                </p>
+                <div className="mt-8 grid gap-3 sm:grid-cols-2">
+                  {offerOptions.map(([key, label, description]) => (
+                    <ChoiceCard
+                      key={key}
+                      active={offerKinds.includes(key)}
+                      title={label}
+                      description={description}
+                      onClick={() =>
+                        setOfferKinds((current) => toggleValue(current, key))
+                      }
+                    />
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {stage === 3 ? (
+              <section>
+                <p className="text-sm font-bold text-[#675ada]">
+                  03 · Objetivo
+                </p>
+                <h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">
+                  O que o visitante deve conseguir fazer?
+                </h2>
+                <p className="mt-3 text-sm text-[#71717b]">
+                  A primeira opção será tratada como objetivo principal; as
+                  demais criam caminhos complementares.
+                </p>
+                <div className="mt-8 grid gap-3 sm:grid-cols-2">
+                  {intentOptions.map(([key, label]) => (
+                    <ChoiceCard
+                      key={key}
+                      active={intents.includes(key)}
+                      title={label}
+                      onClick={() =>
+                        setIntents((current) => toggleValue(current, key))
+                      }
+                    />
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {stage === 4 ? (
+              <section>
+                <p className="text-sm font-bold text-[#675ada]">
+                  04 · Confirmação
+                </p>
+                <h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">
+                  Quando a ação está realmente confirmada?
+                </h2>
+                <div className="mt-8 grid gap-3">
+                  {confirmationOptions.map(([key, label, description]) => (
+                    <ChoiceCard
+                      key={key}
+                      active={confirmationMode === key}
+                      title={label}
+                      description={description}
+                      onClick={() => setConfirmationMode(key)}
+                    />
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {stage === 5 ? (
+              <section>
+                <p className="text-sm font-bold text-[#675ada]">
+                  05 · Capacidade
+                </p>
+                <h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">
+                  O que limita seu atendimento?
+                </h2>
+                <p className="mt-3 text-sm text-[#71717b]">
+                  Isso define quando mostrar agenda, disponibilidade, estoque ou
+                  roteamento.
+                </p>
+                <div className="mt-8 grid gap-3 sm:grid-cols-2">
+                  {capacityOptions.map(([key, label]) => (
+                    <ChoiceCard
+                      key={key}
+                      active={capacityKinds.includes(key)}
+                      title={label}
+                      onClick={() =>
+                        setCapacityKinds((current) =>
+                          key === "none"
+                            ? ["none"]
+                            : toggleValue(
+                                current.filter((item) => item !== "none"),
+                                key,
+                              ),
+                        )
+                      }
+                    />
+                  ))}
+                </div>
+                <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                  <label className="flex items-center gap-3 rounded-xl bg-[#f6f5f9] p-4 text-sm font-semibold">
+                    <input
+                      type="checkbox"
+                      checked={form.hasMultipleLocations}
+                      onChange={(event) =>
+                        update("hasMultipleLocations", event.target.checked)
+                      }
+                    />{" "}
+                    Tenho mais de uma unidade
+                  </label>
+                  <label className="flex items-center gap-3 rounded-xl bg-[#f6f5f9] p-4 text-sm font-semibold">
+                    <input
+                      type="checkbox"
+                      checked={form.requiresMediaUpload}
+                      onChange={(event) =>
+                        update("requiresMediaUpload", event.target.checked)
+                      }
+                    />{" "}
+                    Fotos ajudam a avaliar
+                  </label>
+                  <label className="flex items-center gap-3 rounded-xl bg-[#f6f5f9] p-4 text-sm font-semibold">
+                    <input
+                      type="checkbox"
+                      checked={form.allowsCancellationRequest}
+                      onChange={(event) =>
+                        update(
+                          "allowsCancellationRequest",
+                          event.target.checked,
+                        )
+                      }
+                    />{" "}
+                    Aceito pedido de cancelamento
+                  </label>
+                  <label className="flex items-center gap-3 rounded-xl bg-[#f6f5f9] p-4 text-sm font-semibold">
+                    <input
+                      type="checkbox"
+                      checked={form.allowsRescheduleRequest}
+                      onChange={(event) =>
+                        update("allowsRescheduleRequest", event.target.checked)
+                      }
+                    />{" "}
+                    Aceito pedido de remarcação
+                  </label>
+                </div>
+              </section>
+            ) : null}
+
+            {stage === 6 ? (
+              <section>
+                <p className="text-sm font-bold text-[#675ada]">
+                  06 · Conclusão
+                </p>
+                <h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">
+                  Onde a conversa continua?
+                </h2>
+                <div className="mt-8 grid gap-3 sm:grid-cols-2">
+                  {completionOptions.map(([key, label]) => (
+                    <ChoiceCard
+                      key={key}
+                      active={completionChannel === key}
+                      title={label}
+                      onClick={() => setCompletionChannel(key)}
+                    />
+                  ))}
+                </div>
+                {completionChannel === "whatsapp" ? (
+                  <div className="mt-5">
+                    <Label htmlFor="phone">WhatsApp com DDI</Label>
+                    <Input
+                      id="phone"
+                      value={form.phone}
+                      onChange={(event) => update("phone", event.target.value)}
+                      placeholder="5511999999999"
+                      inputMode="tel"
+                    />
+                  </div>
+                ) : null}
+                {completionChannel === "external_url" ? (
+                  <div className="mt-5">
+                    <Label htmlFor="destination">Link de destino</Label>
+                    <Input
+                      id="destination"
+                      type="url"
+                      value={form.destination}
+                      onChange={(event) =>
+                        update("destination", event.target.value)
+                      }
+                      placeholder="https://..."
+                    />
+                  </div>
+                ) : null}
+                <label className="mt-6 flex items-center gap-3 rounded-xl bg-[#f6f5f9] p-4 text-sm font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={form.requiresPayment}
+                    onChange={(event) =>
+                      update("requiresPayment", event.target.checked)
+                    }
+                  />{" "}
+                  Pode haver pagamento ou sinal externo
+                </label>
+              </section>
+            ) : null}
+
+            {stage === 7 ? (
+              <section>
+                <p className="text-sm font-bold text-[#675ada]">07 · Marca</p>
+                <h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">
+                  Dê o tom da experiência.
+                </h2>
+                <div className="mt-7 grid gap-6 sm:grid-cols-[190px_1fr]">
+                  <label className="focus-within:ring-4 flex min-h-[180px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[20px] border-2 border-dashed border-[#d8d5e6] bg-[#faf9fd] p-4 text-center">
+                    {brand.logoDataUrl ? (
+                      <img
+                        src={brand.logoDataUrl}
+                        alt="Prévia da logo"
+                        className="max-h-28 max-w-full object-contain"
+                      />
+                    ) : (
+                      <>
+                        <Upload size={22} className="text-[#6355dc]" />
+                        <strong className="mt-3 text-xs">Enviar logo</strong>
+                        <span className="mt-1 text-[11px] text-[#85858e]">
+                          PNG, JPG, WebP ou SVG
+                        </span>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                      className="sr-only"
+                      onChange={(event) =>
+                        void logoChanged(event.target.files?.[0])
+                      }
+                    />
+                  </label>
+                  <div>
+                    <Label>Personalidade</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {personalityOptions.map((item) => (
+                        <button
+                          type="button"
+                          key={item}
+                          onClick={() => update("personality", item)}
+                          className={`focus-ring rounded-full border px-3 py-2 text-xs font-semibold ${form.personality === item ? "border-[#7164e7] bg-[#efedff] text-[#584bd0]" : "border-[#dfdee6]"}`}
+                        >
+                          {item}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-6">
+                      <Label>Direção de cores</Label>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {brand.paletteVariations.map((variation) => (
+                        <button
+                          type="button"
+                          key={variation.name}
+                          aria-label={`Usar direção ${variation.name}`}
+                          onClick={() => {
+                            update("visualDirection", variation.name);
+                            setBrand((current) => ({
+                              ...current,
+                              activePalette: variation.palette,
+                            }));
+                          }}
+                          className={`rounded-xl border p-2 ${form.visualDirection === variation.name ? "border-[#6d5ef5] ring-2 ring-[#6d5ef5]/10" : "border-[#dfdee6]"}`}
+                        >
+                          <span className="flex h-12 overflow-hidden rounded-lg">
+                            {[
+                              variation.palette.primary,
+                              variation.palette.background,
+                              variation.palette.accent,
+                            ].map((color) => (
+                              <i
+                                key={color}
+                                className="flex-1"
+                                style={{ background: color }}
+                              />
+                            ))}
+                          </span>
+                          <small className="mt-2 block font-bold">
+                            {variation.name}
+                          </small>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                {analyzing ? (
+                  <p className="mt-5 flex items-center gap-2 text-sm font-semibold text-[#5d50d3]">
+                    <LoaderCircle size={17} className="animate-spin" />{" "}
+                    Analisando identidade…
+                  </p>
+                ) : null}
+              </section>
+            ) : null}
+
+            {stage === 8 ? (
+              <section>
+                <p className="text-sm font-bold text-[#675ada]">08 · Revisão</p>
+                {project ? (
+                  <>
+                    <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#e8f7ef] px-3 py-2 text-xs font-bold text-[#147a57]">
+                      <CheckCircle2 size={15} /> Experiência criada
+                    </span>
+                    <h2 className="mt-5 text-3xl font-extrabold tracking-[-.04em]">
+                      A jornada comercial está pronta.
+                    </h2>
+                    <p className="mt-3 text-sm leading-6 text-[#71717b]">
+                      Foram compostas {project.steps.length} etapas com{" "}
+                      {project.capabilities?.filter((item) => item.enabled)
+                        .length || 0}{" "}
+                      capacidades ativas. Você pode publicar ou ajustar cada
+                      bloco no editor.
+                    </p>
+                    <div className="mt-7 flex flex-wrap gap-3">
+                      <Button
+                        size="lg"
+                        onClick={() => void publish()}
+                        disabled={generating}
+                      >
+                        Publicar e editar <ArrowRight data-icon size={17} />
+                      </Button>
+                      <Button
+                        size="lg"
+                        variant="secondary"
+                        onClick={() =>
+                          router.push(`/app/projects/${project.id}/editor`)
+                        }
+                      >
+                        Personalizar
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">
+                      Confira como a SmartBio entendeu seu negócio.
+                    </h2>
+                    <div className="mt-7 rounded-[20px] bg-[#f6f5f9] p-5">
+                      <strong className="text-sm">Caminhos sugeridos</strong>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {suggestedCapabilities.map((capability) => (
+                          <span
+                            key={capability.key}
+                            className="rounded-full bg-white px-3 py-2 text-xs font-bold text-[#5c50cf]"
+                          >
+                            {capabilityRegistry[capability.key].label}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="mt-4 text-xs leading-5 text-[#74747e]">
+                        {profile.analysisMetadata?.reasons.join(" ")}
+                      </p>
+                    </div>
+                    <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
+                      <div className="rounded-xl border border-[#e5e4eb] p-4">
+                        <dt className="text-xs text-[#85858f]">Confirmação</dt>
+                        <dd className="mt-1 font-bold">
+                          {
+                            confirmationOptions.find(
+                              ([key]) => key === confirmationMode,
+                            )?.[1]
+                          }
+                        </dd>
+                      </div>
+                      <div className="rounded-xl border border-[#e5e4eb] p-4">
+                        <dt className="text-xs text-[#85858f]">Conclusão</dt>
+                        <dd className="mt-1 font-bold">
+                          {
+                            completionOptions.find(
+                              ([key]) => key === completionChannel,
+                            )?.[1]
+                          }
+                        </dd>
+                      </div>
+                    </dl>
+                    <Button
+                      className="mt-7"
+                      size="lg"
+                      onClick={() => void generate()}
+                      disabled={generating}
+                    >
+                      {generating ? (
+                        <LoaderCircle
+                          data-icon
+                          size={17}
+                          className="animate-spin"
+                        />
+                      ) : (
+                        <WandSparkles data-icon size={17} />
+                      )}{" "}
+                      {generating ? "Compondo jornada…" : "Criar experiência"}
+                    </Button>
+                  </>
+                )}
+              </section>
+            ) : null}
+
+            {error ? (
+              <div
+                role="alert"
+                className="mt-6 rounded-xl border border-[#ffd1d1] bg-[#fff1f1] p-3 text-sm text-[#a83333]"
+              >
+                {error}
+              </div>
+            ) : null}
+            {!project ? (
+              <div className="mt-10 flex items-center justify-between">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setStage((value) => Math.max(1, value - 1))}
+                  disabled={stage === 1 || generating}
+                >
+                  <ArrowLeft data-icon size={17} /> Voltar
+                </Button>
+                {stage < 8 ? (
+                  <Button
+                    type="button"
+                    size="lg"
+                    onClick={next}
+                    disabled={analyzing}
+                  >
+                    Continuar <ArrowRight data-icon size={17} />
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+          </main>
+
+          <aside className="relative overflow-hidden border-l border-[#e7e6ed] bg-[#f5f3fb] p-7">
+            <div className="absolute -right-16 -top-16 size-48 rounded-full bg-[#dcd7ff] blur-3xl" />
+            <div className="relative">
+              <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-bold text-[#6558da] shadow-sm">
+                <Sparkles size={14} /> Conversão em construção
+              </span>
+              {project ? (
+                <div className="mx-auto mt-7 h-[520px] w-[270px] overflow-hidden rounded-[34px] border-[6px] border-[#222126] bg-white">
+                  <ExperienceCanvas project={project} preview />
+                </div>
+              ) : (
+                <div className="mx-auto mt-8 w-[240px] rounded-[30px] border-[5px] border-[#222126] bg-white p-2 shadow-[0_25px_60px_rgba(40,34,78,.15)]">
+                  <div
+                    className="min-h-[430px] rounded-[22px] p-5"
+                    style={{
+                      background: brand.activePalette.background,
+                      color: brand.activePalette.foreground,
+                    }}
+                  >
+                    <span
+                      className="grid size-10 place-items-center rounded-xl text-xs font-black"
+                      style={{
+                        background: brand.activePalette.primary,
+                        color: brand.activePalette.primaryForeground,
+                      }}
+                    >
+                      {(form.businessName || "SB").slice(0, 2).toUpperCase()}
+                    </span>
+                    <p
+                      className="mt-12 text-[10px] font-bold uppercase tracking-wider"
+                      style={{ color: brand.activePalette.primary }}
+                    >
+                      Seu próximo passo
+                    </p>
+                    <h3 className="mt-2 text-2xl font-extrabold leading-tight">
+                      {form.businessName
+                        ? `Como podemos ajudar você hoje?`
+                        : "Sua experiência começa aqui."}
+                    </h3>
+                    <p className="mt-3 text-xs leading-5 opacity-60">
+                      {form.description
+                        ? `${form.description.slice(0, 92)}${form.description.length > 92 ? "…" : ""}`
+                        : "As respostas do onboarding definem a jornada, os blocos e a próxima ação."}
+                    </p>
+                    <div className="mt-6 space-y-2">
+                      {suggestedCapabilities.slice(0, 3).map((item) => (
+                        <div
+                          key={item.key}
+                          className="rounded-[13px] border p-3 text-xs font-bold"
+                          style={{
+                            background: brand.activePalette.surface,
+                            borderColor: brand.activePalette.border,
+                          }}
+                        >
+                          {capabilityRegistry[item.key].label}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </aside>
+        </div>
+      </div>
     </div>
-  </div>;
+  );
 }

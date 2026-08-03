@@ -44,3 +44,73 @@ begin
     (v_action, 'Receber proposta', null, 'FileText', 'proposta', 2, 'submit_form', null, '{}')
   on conflict (step_id, option_order) do nothing;
 end $$;
+
+-- Fixtures de aceitação da camada de conversão (migrações 0003–0008).
+do $$
+declare ws uuid;
+declare cleaning uuid := '30000000-0000-4000-8000-000000000001'; clinic uuid := '40000000-0000-4000-8000-000000000001'; chalet uuid := '50000000-0000-4000-8000-000000000001'; network uuid := '60000000-0000-4000-8000-000000000001';
+declare cleaning_step uuid := '31000000-0000-4000-8000-000000000001'; clinic_step uuid := '41000000-0000-4000-8000-000000000001'; chalet_step uuid := '51000000-0000-4000-8000-000000000001'; network_step uuid := '61000000-0000-4000-8000-000000000001';
+begin
+  select id into ws from public.workspaces order by created_at limit 1;
+  if ws is null then raise notice 'Fixtures de conversão ignorados: crie um usuário primeiro.'; return; end if;
+
+  insert into public.projects(id,workspace_id,name,slug,description,status,primary_goal,category,theme,settings,published_at) values
+    (cleaning,ws,'LimpaBem Estofados','limpabem','Higienização com orçamento por fotos.','published','Solicitar orçamento','Serviços','{"mode":"light","colors":{"primary":"#176B64","background":"#F4FBFA","surface":"#FFFFFF","foreground":"#15312F"}}','{"phone":"5511977771100","primaryDestination":"Experiência nativa","version":1}',now()),
+    (clinic,ws,'Clínica Aurora','clinica-aurora','Consultas por horário.','published','Agendar consulta','Clínica','{"mode":"light","colors":{"primary":"#7C5CFC","background":"#FCFAFF","surface":"#FFFFFF","foreground":"#28213C"}}','{"phone":"5511966662200","primaryDestination":"Experiência nativa","version":1}',now()),
+    (chalet,ws,'Chalés Serra Clara','chales-serra-clara','Chalés com disponibilidade por período.','published','Consultar e reservar','Hospedagem','{"mode":"light","colors":{"primary":"#315A45","background":"#F6F1E7","surface":"#FFFCF5","foreground":"#24352C"}}','{"phone":"5512955553300","primaryDestination":"Experiência nativa","version":1}',now()),
+    (network,ws,'Rede Movimento','rede-movimento','Rede de academias com roteamento por unidade.','published','Encontrar unidade','Academia','{"mode":"light","colors":{"primary":"#155EEF","background":"#F5F8FF","surface":"#FFFFFF","foreground":"#17243D"}}','{"phone":"5511944444400","primaryDestination":"WhatsApp","version":1}',now())
+  on conflict (id) do update set workspace_id = excluded.workspace_id;
+
+  insert into public.brand_profiles(project_id,extracted_colors,active_palette,palette_variations,design_system,brand_personality,analysis_metadata,analyzed_at) values
+    (cleaning,'["#176B64","#9AD9D3","#F4FBFA"]','{"primary":"#176B64","background":"#F4FBFA","surface":"#FFFFFF","foreground":"#15312F"}','[]','{}','["Acolhedora","Confiável"]','{"confidence":0.94}',now()),
+    (clinic,'["#7C5CFC","#DCCFFF","#FCFAFF"]','{"primary":"#7C5CFC","background":"#FCFAFF","surface":"#FFFFFF","foreground":"#28213C"}','[]','{}','["Humana","Serena"]','{"confidence":0.94}',now()),
+    (chalet,'["#315A45","#D6A85F","#F6F1E7"]','{"primary":"#315A45","background":"#F6F1E7","surface":"#FFFCF5","foreground":"#24352C"}','[]','{}','["Natural","Premium"]','{"confidence":0.94}',now()),
+    (network,'["#155EEF","#53B1FD","#F5F8FF"]','{"primary":"#155EEF","background":"#F5F8FF","surface":"#FFFFFF","foreground":"#17243D"}','[]','{}','["Energética","Confiável"]','{"confidence":0.94}',now())
+  on conflict (project_id) do update set active_palette = excluded.active_palette;
+
+  insert into public.business_profiles(project_id,business_name,description,offer_kinds,primary_intents,confirmation_mode,capacity_kinds,completion_channel,signals) values
+    (cleaning,'LimpaBem Estofados','Higienização com fotos',array['service'],array['request_quote'],'manual_approval',array['none'],'native','{"requiresMediaUpload":true,"requiresQualification":true}'),
+    (clinic,'Clínica Aurora','Consultas agendadas',array['professional_service'],array['schedule'],'instant',array['time_slot','professional'],'native','{}'),
+    (chalet,'Chalés Serra Clara','Hospedagem por período',array['hospitality'],array['check_availability','reserve'],'manual_approval',array['room','daily_capacity'],'native','{"requiresPayment":true}'),
+    (network,'Rede Movimento','Academias multiunidade',array['membership','service'],array['visit','contact'],'manual_approval',array['location'],'whatsapp','{"hasMultipleLocations":true}')
+  on conflict (project_id) do update set signals = excluded.signals;
+
+  insert into public.project_capabilities(project_id,capability_key,enabled,source) values
+    (cleaning,'quote',true,'suggested'),(cleaning,'qualification',true,'suggested'),
+    (clinic,'scheduling',true,'suggested'),(chalet,'reservation',true,'suggested'),(network,'routing',true,'suggested')
+  on conflict (project_id,capability_key) do update set enabled = excluded.enabled;
+
+  insert into public.journey_steps(id,project_id,type,title,description,step_order,settings) values
+    (cleaning_step,cleaning,'quote','O que você quer higienizar?','Escolha o item, quantidade e envie fotos.',0,'{}'),
+    (clinic_step,clinic,'schedule','Escolha serviço, data e horário.','A confirmação é imediata.',0,'{}'),
+    (chalet_step,chalet,'reservation','Encontre o chalé certo.','Informe período e hóspedes.',0,'{}'),
+    (network_step,network,'routing','Onde fica melhor para você?','A recomendação considera sua região.',0,'{}')
+  on conflict (id) do nothing;
+
+  insert into public.step_options(step_id,label,value,option_order,action_type,action_payload) values
+    (cleaning_step,'Enviar pedido de orçamento','submit',0,'start_capability','{"capability":"quote"}'),
+    (clinic_step,'Confirmar agendamento','submit',0,'start_capability','{"capability":"scheduling"}'),
+    (chalet_step,'Solicitar reserva','submit',0,'start_capability','{"capability":"reservation"}'),
+    (network_step,'Encontrar melhor unidade','submit',0,'start_capability','{"capability":"routing"}')
+  on conflict (step_id,option_order) do nothing;
+
+  insert into public.content_blocks(project_id,step_id,block_type,block_order,content) values
+    (cleaning,cleaning_step,'service_selector',0,'{"fieldKey":"servico","options":["Sofá","Colchão","Cadeiras"]}'),
+    (cleaning,cleaning_step,'quantity_selector',1,'{"fieldKey":"quantidade","min":1,"max":12}'),
+    (cleaning,cleaning_step,'media_upload',2,'{"fieldKey":"fotos","maxFiles":4,"required":false}'),
+    (cleaning,cleaning_step,'price_estimate',3,'{}'),
+    (clinic,clinic_step,'service_selector',0,'{"fieldKey":"service","options":["Nutrição","Psicologia"]}'),
+    (clinic,clinic_step,'calendar',1,'{}'),(clinic,clinic_step,'schedule_slots',2,'{}'),
+    (chalet,chalet_step,'date_range',0,'{}'),(chalet,chalet_step,'guest_selector',1,'{}'),(chalet,chalet_step,'reservable_unit_cards',2,'{}'),
+    (network,network_step,'location_selector',0,'{"fieldKey":"regiao","options":["Zona Sul","Centro","Zona Norte"]}'),(network,network_step,'route_result',1,'{}')
+  on conflict (step_id,block_order) do nothing;
+
+  insert into public.quote_definitions(id,project_id,name,currency,base_price,is_active,settings) values ('30000000-0000-4000-8000-000000000301',cleaning,'Orçamento de higienização','BRL',90,true,'{"estimationMode":"range"}') on conflict (project_id) do nothing;
+  insert into public.schedulable_services(id,project_id,name,duration_minutes,buffer_after_minutes,confirmation_mode,is_active) values ('40000000-0000-4000-8000-000000000401',clinic,'Consulta de nutrição',50,10,'instant',true) on conflict (id) do nothing;
+  insert into public.availability_rules(project_id,weekday,starts_at,ends_at,timezone) select clinic,weekday,'08:00','18:00','America/Sao_Paulo' from generate_series(1,5) weekday on conflict do nothing;
+  insert into public.reservable_units(id,project_id,name,description,capacity_adults,capacity_children,quantity,base_price,currency,is_active,amenities) values ('50000000-0000-4000-8000-000000000501',chalet,'Chalé Vista','Varanda e vista para a serra',2,1,2,520,'BRL',true,array['Café da manhã','Lareira','Hidromassagem']) on conflict (id) do nothing;
+  insert into public.routing_destinations(id,project_id,label,channel,value) values
+    ('60000000-0000-4000-8000-000000000601',network,'Unidade Zona Sul','whatsapp','5511944444401'),
+    ('60000000-0000-4000-8000-000000000602',network,'Unidade Centro','whatsapp','5511944444402'),
+    ('60000000-0000-4000-8000-000000000603',network,'Unidade Zona Norte','whatsapp','5511944444403') on conflict (id) do nothing;
+end $$;
