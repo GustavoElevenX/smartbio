@@ -1,0 +1,13 @@
+import Link from "next/link";
+import { Check } from "lucide-react";
+import { MarketingFooter, MarketingHeader } from "@/components/marketing/header";
+
+const plans = [
+  { name: "Free", price: "R$ 0", description: "Para publicar seu primeiro próximo passo.", features: ["1 projeto", "Domínio padrão", "Analytics básicos", "100 leads/mês", "Marca SmartBio"], cta: "Começar grátis" },
+  { name: "Pro", price: "R$ 59", description: "Para transformar audiência em oportunidades.", features: ["Até 5 projetos", "Sem marca SmartBio", "Formulários e jornadas condicionais", "Analytics avançados", "IA limitada"], cta: "Escolher Pro", featured: true },
+  { name: "Business", price: "R$ 149", description: "Para equipes e operações com mais escala.", features: ["Projetos ampliados", "Equipe owner/member", "Multiunidades", "Exportações", "Integrações futuras"], cta: "Falar com vendas" },
+];
+
+export default function PricingPage() {
+  return <main><MarketingHeader /><section className="min-h-screen pb-24 pt-36"><div className="container-shell"><div className="mx-auto max-w-2xl text-center"><p className="text-sm font-bold uppercase tracking-[.16em] text-[#6d5ef5]">Planos simples</p><h1 className="mt-4 text-5xl font-extrabold tracking-[-.055em] sm:text-6xl">Comece grátis. Evolua quando converter.</h1><p className="mt-5 text-lg leading-8 text-[#686873]">A cobrança ainda está em modo de demonstração no MVP.</p></div><div className="mt-14 grid gap-5 lg:grid-cols-3">{plans.map((plan) => <article key={plan.name} className={`relative rounded-[28px] border p-7 ${plan.featured ? "border-[#7366ea] bg-[#1c1a25] text-white shadow-[0_26px_70px_rgba(58,47,139,.2)]" : "border-[#e2e1e9] bg-white"}`}>{plan.featured && <span className="absolute right-5 top-5 rounded-full bg-[#7366ea] px-3 py-1 text-xs font-bold">Mais escolhido</span>}<h2 className="text-xl font-extrabold">{plan.name}</h2><div className="mt-7 flex items-end gap-1"><strong className="text-4xl tracking-[-.04em]">{plan.price}</strong><span className={plan.featured ? "text-white/55" : "text-[#787882]"}>/mês</span></div><p className={`mt-4 text-sm leading-6 ${plan.featured ? "text-white/65" : "text-[#6c6c76]"}`}>{plan.description}</p><div className="my-7 h-px bg-current opacity-10" /><ul className="space-y-3">{plan.features.map((item) => <li key={item} className="flex items-center gap-2.5 text-sm"><Check size={16} className={plan.featured ? "text-[#a99fff]" : "text-[#15966c]"} />{item}</li>)}</ul><Link href="/register" className={`focus-ring mt-8 inline-flex min-h-12 w-full items-center justify-center rounded-xl font-bold ${plan.featured ? "bg-white text-[#26202e]" : "bg-[#17171c] text-white"}`}>{plan.cta}</Link></article>)}</div></div></section><MarketingFooter /></main>;
+}
