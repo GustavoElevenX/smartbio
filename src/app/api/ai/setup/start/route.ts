@@ -1,19 +1,18 @@
 import { z } from "zod";
-import { setupInitialInputSchema } from "@/features/ai-setup/ai-setup.schema";
-import { getAISetupActor } from "@/server/auth/setup-actor";
+import { setupInitialInputSchema, sourceReferenceSchema } from "@/features/ai-setup/ai-setup.schema";
 import { aiSetupService } from "@/server/ai-setup/ai-setup-service";
 import { setupApiError } from "@/server/ai-setup/setup-api";
-import { apiError, apiSuccess, requestIp } from "@/server/http/api-response";
-import { checkRateLimit } from "@/server/services/rate-limit";
+import { apiError, apiSuccess } from "@/server/http/api-response";
+import { withAuthenticatedActor } from "@/server/http/with-authenticated-actor";
+import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
 
-const startSchema = z.object({ input: setupInitialInputSchema, sources: z.array(z.string().trim().min(1).max(240)).max(10).default([]) });
+const startSchema = z.object({ input: setupInitialInputSchema, sources: z.array(sourceReferenceSchema).max(10).default([]) });
 
-export async function POST(request: Request) {
-  if (!checkRateLimit(`ai-setup-start:${requestIp(request)}`, 8, 60_000)) return apiError("Muitas tentativas. Aguarde um instante.", 429, "rate_limited");
+export const POST = withAuthenticatedActor(async (request, _context, actor) => {
+  const rate = await consumeRateLimit("ai-setup-start", actor.userId, rateLimitRules.aiSetupStart, { failClosed: true });
+  if (!rate.allowed) return applyRateLimitHeaders(apiError("Muitas tentativas. Aguarde um instante.", 429, "rate_limited"), rate);
   try {
     const payload = startSchema.parse(await request.json());
-    return apiSuccess(await aiSetupService.start(await getAISetupActor(), payload.input, payload.sources), 201);
-  } catch (error) {
-    return setupApiError(error);
-  }
-}
+    return applyRateLimitHeaders(apiSuccess(await aiSetupService.start(actor, payload.input, payload.sources), 201), rate);
+  } catch (error) { return setupApiError(error); }
+});

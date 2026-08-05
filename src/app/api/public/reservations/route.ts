@@ -5,6 +5,7 @@ import { reservationRequestSchema } from "@/lib/validation/schemas";
 import { apiError, apiSuccess, requestIp, validationError } from "@/server/http/api-response";
 import { getPublicProjectById } from "@/server/repositories/public-commercial-repository";
 import { checkRateLimit } from "@/server/services/rate-limit";
+import { notifyProjectEvent } from "@/server/notifications/notification-service";
 import type { Reservation, ReservationBlock } from "@/types";
 
 export async function POST(request: Request) {
@@ -25,5 +26,7 @@ export async function POST(request: Request) {
   if (availableUnitQuantity(unit, parsed.data, reservations, blocks) <= 0) return apiError("Esta opção acabou de ficar indisponível. Consulte outras datas.", 409, "reservation_conflict");
   const { data, error } = await supabase.rpc("create_reservation_request", { target_project: project.id, request_session_key: parsed.data.sessionId, request_idempotency_key: parsed.data.idempotencyKey, target_unit: unit.id, requested_check_in: parsed.data.checkIn, requested_check_out: parsed.data.checkOut, requested_adults: parsed.data.adults, requested_children: parsed.data.children, requested_total: total, requested_deposit: depositAmount || null, requested_visitor_data: parsed.data.visitorData });
   if (error) { console.error("reservation_submit_failed", { projectId: project.id, code: error.code }); return apiError("A disponibilidade mudou. Consulte novamente.", 409, "reservation_conflict"); }
+  const reservationId = typeof data === "object" && data && "id" in data ? String(data.id) : String(data);
+  await notifyProjectEvent(project.id, "reservation.submitted", "reservation", reservationId, { ...parsed.data.visitorData, interest: unit.name, date: `${parsed.data.checkIn} – ${parsed.data.checkOut}` }).catch(() => undefined);
   return apiSuccess({ accepted: true, persisted: true, reservation: data }, 201);
 }

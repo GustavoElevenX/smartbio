@@ -12,6 +12,14 @@ export default defineConfig({
     url: "http://127.0.0.1:3000",
     reuseExistingServer: false,
     timeout: 120_000,
-    env: { ...process.env, NEXT_PUBLIC_FEATURE_CATALOG_ORDERS: "true", NEXT_PUBLIC_FEATURE_RESERVATIONS: "true" },
+    env: {
+      ...process.env,
+      ENABLE_LOCAL_DEV_AUTH: "true",
+      NEXT_PUBLIC_ENABLE_LOCAL_DEV_STORE: "true",
+      NEXT_PUBLIC_FEATURE_CATALOG_ORDERS: "true",
+      NEXT_PUBLIC_FEATURE_RESERVATIONS: "true",
+      NEXT_PUBLIC_FEATURE_GEO_ROUTING: "true",
+      NEXT_PUBLIC_FEATURE_MULTI_UNIT: "true",
+    },
   },
 });

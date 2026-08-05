@@ -5,6 +5,7 @@ import { orderRequestSchema } from "@/lib/validation/schemas";
 import { apiError, apiSuccess, requestIp, validationError } from "@/server/http/api-response";
 import { getPublicProjectById } from "@/server/repositories/public-commercial-repository";
 import { checkRateLimit } from "@/server/services/rate-limit";
+import { notifyProjectEvent } from "@/server/notifications/notification-service";
 
 export async function POST(request: Request) {
   if (!features.nativeCatalogOrders) return apiError("Pedidos nativos estão desativados.", 404, "feature_disabled");
@@ -27,5 +28,7 @@ export async function POST(request: Request) {
   if (!supabase) return apiSuccess({ accepted: true, persisted: false, order: { ...parsed.data, items, totals, status: "submitted" } }, 202);
   const { data, error } = await supabase.rpc("create_order_request", { target_project: project.id, request_session_key: parsed.data.sessionId, request_idempotency_key: parsed.data.idempotencyKey, request_fulfillment: parsed.data.fulfillment, target_location: parsed.data.locationId || null, requested_items: items, requested_totals: totals, requested_visitor_data: parsed.data.visitorData });
   if (error) { console.error("order_submit_failed", { projectId: project.id, code: error.code }); return apiError("Não foi possível enviar o pedido.", 400, "order_submit_failed"); }
+  const orderId = typeof data === "object" && data && "id" in data ? String(data.id) : String(data);
+  await notifyProjectEvent(project.id, "order.submitted", "order", orderId, { ...parsed.data.visitorData, interest: items.map((item) => item.name).join(", "), location: parsed.data.locationId }).catch(() => undefined);
   return apiSuccess({ accepted: true, persisted: true, order: data }, 201);
 }

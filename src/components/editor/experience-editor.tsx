@@ -26,13 +26,17 @@ import { Button } from "@/components/ui/button";
 import { Input, Label, Select, Textarea } from "@/components/ui/field";
 import { BlockEditor } from "@/components/editor/block-editor";
 import { CapabilityPanel } from "@/components/editor/capability-panel";
+import { AIFieldActions } from "@/components/editor/ai-field-actions";
+import { AIScopeActions } from "@/components/editor/ai-scope-actions";
 import { ExperienceCanvas } from "@/components/public-experience/public-experience";
+import { PublishReadinessModal } from "@/components/publishing/publish-readiness-modal";
 import {
   buildPalette,
   ensureAccessiblePalette,
 } from "@/features/brand-intelligence/colors";
 import { localStore } from "@/lib/local-store";
 import { projectRepository } from "@/lib/repositories/project-repository";
+import { canUseLocalStore } from "@/lib/runtime-mode";
 import { uid } from "@/lib/utils";
 import type { JourneyStep, Project, StepType } from "@/types";
 
@@ -72,6 +76,18 @@ function newStep(type: StepType, order: number): JourneyStep {
                 ? "Tudo certo!"
                 : "Nova etapa",
     description: "Edite este texto no painel ao lado.",
+    settings: {
+      generatedFields: {
+        title: { generatedByAI: false, generatedPlaceholder: true, verificationStatus: "needs_confirmation" },
+        description: { generatedByAI: false, generatedPlaceholder: true, verificationStatus: "needs_confirmation" },
+        ...(type === "choice" || type === "action"
+          ? { options: { generatedByAI: false, generatedPlaceholder: true, verificationStatus: "needs_confirmation" } }
+          : {}),
+        ...(type === "recommendation"
+          ? { recommendation: { generatedByAI: false, generatedPlaceholder: true, verificationStatus: "needs_confirmation" } }
+          : {}),
+      },
+    },
     order,
     isActive: true,
     options:
@@ -116,6 +132,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
     "saved",
   );
   const [addOpen, setAddOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
   const [undoStack, setUndoStack] = useState<Project[]>([]);
   const [redoStack, setRedoStack] = useState<Project[]>([]);
   const projectRef = useRef<Project | null>(null);
@@ -195,7 +212,23 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
     commit((current) => ({
       ...current,
       steps: current.steps.map((step) =>
-        step.id === selected.id ? { ...step, ...patch } : step,
+        step.id === selected.id
+          ? {
+              ...step,
+              ...patch,
+              settings: (() => {
+                const settings = { ...(step.settings || {}), ...(patch.settings || {}) };
+                const generated = settings.generatedFields && typeof settings.generatedFields === "object"
+                  ? { ...(settings.generatedFields as Record<string, unknown>) }
+                  : undefined;
+                if (generated) {
+                  for (const key of Object.keys(patch)) delete generated[key];
+                  settings.generatedFields = generated;
+                }
+                return settings;
+              })(),
+            }
+          : step,
       ),
     }));
   }
@@ -277,18 +310,12 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
     );
   }
   async function publish() {
-    const published: Project = {
-      ...activeProject,
-      status: "published",
-      version: activeProject.version + 1,
-      publishedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
     setSaveState("saving");
     try {
-      const saved = await projectRepository.saveProject(published);
+      const saved = await projectRepository.saveProject(activeProject);
       setProject(saved);
       setSaveState("saved");
+      setPublishOpen(true);
     } catch {
       setSaveState("error");
     }
@@ -506,6 +533,12 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
               project={activeProject}
               onChange={(next) => commit(() => next)}
             />
+            <AIScopeActions
+              project={activeProject}
+              step={selected}
+              onApplyStep={(next) => updateStep(next)}
+              onApplyVisual={(designSystem, visualDirection) => commit((current) => ({ ...current, designSystem, visualDirection, version: current.version + 1 }))}
+            />
             <div>
               <Label htmlFor="step-title">Título</Label>
               <Textarea
@@ -514,6 +547,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
                 onChange={(event) => updateStep({ title: event.target.value })}
                 className="min-h-24"
               />
+              <AIFieldActions projectId={project.id} stepId={selected.id} fieldPath={`steps.${selected.id}.title`} currentValue={selected.title} onApply={(title) => updateStep({ title })} />
             </div>
             <div className="mt-5">
               <Label htmlFor="step-description">Descrição</Label>
@@ -524,6 +558,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
                   updateStep({ description: event.target.value })
                 }
               />
+              <AIFieldActions projectId={project.id} stepId={selected.id} fieldPath={`steps.${selected.id}.description`} currentValue={selected.description || ""} onApply={(description) => updateStep({ description })} />
             </div>
             {selected.options && (
               <div className="mt-6">
@@ -849,6 +884,16 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
           </div>
         </aside>
       </div>
+      <PublishReadinessModal
+        open={publishOpen}
+        onOpenChange={setPublishOpen}
+        project={activeProject}
+        onPublished={(published) => {
+          setProject(published);
+          if (canUseLocalStore()) localStore.saveProject(published);
+          setSaveState("saved");
+        }}
+      />
     </div>
   );
 }

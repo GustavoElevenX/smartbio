@@ -1,0 +1,5 @@
+"use client";
+import { Input, Label } from "@/components/ui/field";
+import { Switch } from "@/components/ui/switch";
+import type { CatalogCategory } from "@/types";
+export function CategoryForm({ value, onChange }: { value: CatalogCategory; onChange: (value: CatalogCategory) => void }) { return <div className="grid gap-3 rounded-[16px] bg-[#f6f5f9] p-3 sm:grid-cols-[1fr_110px_auto]"><div><Label htmlFor={`category-${value.id}`}>Categoria</Label><Input id={`category-${value.id}`} value={value.name} onChange={(event) => onChange({ ...value, name: event.target.value })} /></div><div><Label htmlFor={`category-order-${value.id}`}>Ordem</Label><Input id={`category-order-${value.id}`} type="number" min="0" value={value.order} onChange={(event) => onChange({ ...value, order: Number(event.target.value) })} /></div><label className="flex items-center gap-2 self-end pb-3 text-sm font-semibold"><Switch checked={value.isActive} onCheckedChange={(isActive) => onChange({ ...value, isActive })} />Ativa</label></div>; }

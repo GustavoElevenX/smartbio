@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import type { AISetupSession, SetupQuestion } from "@/features/ai-setup/ai-setup.schema";
+import { extractedBusinessSourceSchema, type AISetupSession, type ExtractedBusinessSource, type SetupQuestion, type SourceReference } from "@/features/ai-setup/ai-setup.schema";
 import { RuleBasedBusinessAnalyzer } from "@/features/business-understanding/rule-based-business-analyzer";
 import { capabilityPlanner } from "@/features/capabilities/capability-planner";
 import { draftCapabilityRequirements } from "@/features/capabilities/capability-requirements";
@@ -13,6 +13,7 @@ import { aiSetupRepository, type AISetupRepository } from "@/server/ai-setup/ai-
 import { planAdaptiveQuestions } from "@/server/ai-setup/question-planner";
 import type { AISetupActor } from "@/server/auth/setup-actor";
 import { getAIProvider, isAIConfigured } from "@/server/ai/ai-client";
+import { sourceRepository } from "@/server/business-sources/source-repository";
 import type { DataRequirement, ExperienceCompositionInput, Project } from "@/types";
 
 export class AISetupNotFoundError extends Error {}
@@ -52,7 +53,7 @@ function mergeProjectRequirements(project: Project, session: AISetupSession) {
 export class AISetupService {
   constructor(private readonly repository: AISetupRepository = aiSetupRepository) {}
 
-  async start(actor: AISetupActor, initialInput: AISetupSession["initialInput"], sources: string[] = []) {
+  async start(actor: AISetupActor, initialInput: AISetupSession["initialInput"], sources: SourceReference[] = []) {
     const now = new Date().toISOString();
     const session: AISetupSession = {
       id: randomUUID(),
@@ -87,10 +88,23 @@ export class AISetupService {
     let providerQuestions: SetupQuestion[] | undefined;
     let usedFallback = !isAIConfigured();
 
+    const sourceData: ExtractedBusinessSource[] = [];
+    if (actor.persistence === "database") {
+      for (const reference of session.sources.filter((source) => source.status === "processed")) {
+        const source = await sourceRepository.get(actor, reference.id);
+        if (!source) continue;
+        const parsed = extractedBusinessSourceSchema.safeParse(source.extractedData);
+        if (!parsed.success) continue;
+        const reviewed = await sourceRepository.listFacts(actor, source.id);
+        sourceData.push({ ...parsed.data, facts: reviewed.filter((fact) => fact.verificationStatus !== "rejected").map((fact) => ({ key: fact.key, value: fact.value, origin: source.type === "website" ? "website" as const : "document" as const, sourceId: source.id, evidenceExcerpt: fact.evidenceExcerpt, confidence: fact.confidence || 0, verificationStatus: fact.verificationStatus === "verified" ? "verified" as const : fact.verificationStatus === "invalid" ? "invalid" as const : "needs_confirmation" as const })) });
+      }
+    }
+
     if (isAIConfigured()) {
       try {
         const result = await getAIProvider().analyzeBusiness({
           input,
+          sources: sourceData,
           workspaceId: actor.workspaceId,
           setupSessionId: id,
           userId: actor.userId,

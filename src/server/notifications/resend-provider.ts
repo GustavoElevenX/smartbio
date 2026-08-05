@@ -1,0 +1,6 @@
+import "server-only";
+import { Resend } from "resend";
+import { readServerEnv, validateServerFeature } from "@/lib/env/server";
+import { ConsoleEmailProvider, type EmailDeliveryResult, type EmailMessage, type EmailProvider } from "@/server/notifications/email-provider";
+export class ResendEmailProvider implements EmailProvider { private readonly client: Resend; private readonly from: string; private readonly replyTo?: string; constructor() { const env = validateServerFeature("email"); this.client = new Resend(env.RESEND_API_KEY); this.from = env.EMAIL_FROM!; this.replyTo = env.EMAIL_REPLY_TO; } async send(message: EmailMessage): Promise<EmailDeliveryResult> { const delivery = this.client.emails.send({ from: this.from, to: message.to, subject: message.subject, html: message.html, replyTo: this.replyTo }); const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Tempo limite do provedor de e-mail.")), 10_000)); const { data, error } = await Promise.race([delivery, timeout]); if (error) throw new Error("O provedor recusou o e-mail."); return { provider: "resend", messageId: data?.id }; } }
+export function configuredEmailProvider(): EmailProvider { return readServerEnv().EMAIL_PROVIDER === "resend" ? new ResendEmailProvider() : new ConsoleEmailProvider(); }

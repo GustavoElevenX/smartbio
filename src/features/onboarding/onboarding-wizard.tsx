@@ -13,6 +13,7 @@ import {
   WandSparkles,
 } from "lucide-react";
 import { ExperienceCanvas } from "@/components/public-experience/public-experience";
+import { PublishReadinessModal } from "@/components/publishing/publish-readiness-modal";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/field";
 import { analyzeBrandFile } from "@/features/brand-intelligence/brand-analyzer";
@@ -23,9 +24,13 @@ import { capabilityRegistry } from "@/features/capabilities/capability-registry"
 import { experienceComposer } from "@/features/composition/experience-composer";
 import { personalityOptions } from "@/lib/constants";
 import { projectRepository } from "@/lib/repositories/project-repository";
+import { localStore } from "@/lib/local-store";
+import { canUseLocalStore } from "@/lib/runtime-mode";
 import { slugify } from "@/lib/utils";
 import type {
   BrandProfile,
+  BusinessCapabilityProfile,
+  CapabilityKey,
   CapacityKind,
   CommercialIntent,
   CompletionChannel,
@@ -170,6 +175,10 @@ export function OnboardingWizard() {
   const [generating, setGenerating] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [project, setProject] = useState<Project | null>(null);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [aiAnalyzing, setAIAnalyzing] = useState(false);
+  const [aiSuggestions, setAISuggestions] = useState<CapabilityKey[]>([]);
+  const [selectedAISuggestions, setSelectedAISuggestions] = useState<CapabilityKey[]>([]);
   const [brand, setBrand] = useState<BrandProfile>(defaultBrand);
   const [offerKinds, setOfferKinds] = useState<OfferKind[]>([]);
   const [intents, setIntents] = useState<CommercialIntent[]>([]);
@@ -295,7 +304,8 @@ export function OnboardingWizard() {
     setGenerating(true);
     setError("");
     try {
-      const created = await experienceComposer.compose(compositionInput);
+      const composed = await experienceComposer.compose(compositionInput);
+      const created = selectedAISuggestions.length ? { ...composed, capabilities: (composed.capabilities || []).map((capability) => selectedAISuggestions.includes(capability.key) ? { ...capability, enabled: true, source: "ai" as const } : capability) } : composed;
       const saved = await projectRepository.saveProject(created);
       setProject(saved);
     } catch (caught) {
@@ -309,18 +319,29 @@ export function OnboardingWizard() {
     }
   }
 
+  async function analyzeWithAI() {
+    if (!validStage() && stage === 1) { setError("Informe nome, slug e descrição antes de pedir sugestões."); return; }
+    setAIAnalyzing(true); setError("");
+    try {
+      const startResponse = await fetch("/api/ai/setup/start", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input: { businessName: form.businessName, description: form.description, websiteUrl: form.websiteUrl || undefined, phone: form.phone || undefined }, sources: [] }) });
+      const started = await startResponse.json() as { data?: { id: string }; error?: { message?: string } };
+      if (!startResponse.ok || !started.data) throw new Error(started.error?.message || "Não foi possível iniciar a análise.");
+      const analyzeResponse = await fetch(`/api/ai/setup/${started.data.id}/analyze`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const analyzed = await analyzeResponse.json() as { data?: { extractedProfile?: BusinessCapabilityProfile }; error?: { message?: string } };
+      if (!analyzeResponse.ok || !analyzed.data?.extractedProfile) throw new Error(analyzed.error?.message || "A análise não retornou sugestões.");
+      const capabilities = new CapabilityPlanner().plan(analyzed.data.extractedProfile).filter((item) => item.enabled).map((item) => item.key);
+      setAISuggestions(capabilities); setSelectedAISuggestions([]);
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "Não foi possível analisar com IA."); }
+    finally { setAIAnalyzing(false); }
+  }
+
   async function publish() {
     if (!project) return;
     setGenerating(true);
     try {
-      const saved = await projectRepository.saveProject({
-        ...project,
-        status: "published",
-        publishedAt: new Date().toISOString(),
-        version: project.version + 1,
-        updatedAt: new Date().toISOString(),
-      });
-      router.push(`/app/projects/${saved.id}/editor`);
+      const saved = await projectRepository.saveProject(project);
+      setProject(saved);
+      setPublishOpen(true);
     } finally {
       setGenerating(false);
     }
@@ -795,6 +816,10 @@ export function OnboardingWizard() {
                     <h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">
                       Confira como a SmartBio entendeu seu negócio.
                     </h2>
+                    <div className="mt-6 rounded-[20px] border border-[#dfdcf2] bg-[#f9f8ff] p-5">
+                      <div className="flex flex-wrap items-start justify-between gap-3"><div><strong className="text-sm">Análise opcional com IA</strong><p className="mt-1 text-xs leading-5 text-[#74747e]">Receba sugestões sem substituir nenhum dado preenchido.</p></div><Button type="button" size="sm" variant="secondary" disabled={aiAnalyzing} onClick={() => void analyzeWithAI()}>{aiAnalyzing ? <LoaderCircle size={15} className="animate-spin" /> : <WandSparkles size={15} />}{aiAnalyzing ? "Analisando" : "Analisar e sugerir com IA"}</Button></div>
+                      {aiSuggestions.length ? <div className="mt-4"><p className="mb-2 text-xs font-bold">Escolha o que deseja aplicar:</p><div className="flex flex-wrap gap-2">{aiSuggestions.map((key) => <button type="button" key={key} onClick={() => setSelectedAISuggestions((current) => toggleValue(current, key))} className={`focus-ring rounded-full border px-3 py-2 text-xs font-bold ${selectedAISuggestions.includes(key) ? "border-[#6658d9] bg-[#ebe8ff] text-[#5547c4]" : "border-[#dedce7] bg-white text-[#666670]"}`}>{selectedAISuggestions.includes(key) ? "✓ " : ""}{capabilityRegistry[key].label}</button>)}</div><p className="mt-3 text-xs text-[#777781]">Somente as sugestões marcadas serão acrescentadas ao rascunho.</p></div> : null}
+                    </div>
                     <div className="mt-7 rounded-[20px] bg-[#f6f5f9] p-5">
                       <strong className="text-sm">Caminhos sugeridos</strong>
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -952,6 +977,18 @@ export function OnboardingWizard() {
           </aside>
         </div>
       </div>
+      {project ? (
+        <PublishReadinessModal
+          open={publishOpen}
+          onOpenChange={setPublishOpen}
+          project={project}
+          onPublished={(published) => {
+            if (canUseLocalStore()) localStore.saveProject(published);
+            setProject(published);
+            router.push(`/app/projects/${published.id}/editor`);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

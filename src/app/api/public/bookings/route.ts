@@ -4,6 +4,7 @@ import { bookingRequestSchema } from "@/lib/validation/schemas";
 import { apiError, apiSuccess, requestIp, validationError } from "@/server/http/api-response";
 import { getPublicProjectById } from "@/server/repositories/public-commercial-repository";
 import { checkRateLimit } from "@/server/services/rate-limit";
+import { notifyProjectEvent } from "@/server/notifications/notification-service";
 
 export async function POST(request: Request) {
   if (!features.nativeScheduling) return apiError("Agenda nativa desativada.", 404, "feature_disabled");
@@ -22,5 +23,7 @@ export async function POST(request: Request) {
     requested_confirmation_mode: parsed.data.confirmationMode, requested_visitor_data: parsed.data.visitorData,
   });
   if (error) { console.error("booking_submit_failed", { projectId: project.id, code: error.code }); return apiError(error.code === "P0001" ? "Este horário acabou de ser ocupado. Escolha outro." : "Não foi possível solicitar o agendamento.", 409, "booking_conflict"); }
+  const bookingId = typeof data === "object" && data && "id" in data ? String(data.id) : String(data);
+  await notifyProjectEvent(project.id, "booking.submitted", "booking", bookingId, { ...parsed.data.visitorData, service: service.name, date: parsed.data.startsAt }).catch(() => undefined);
   return apiSuccess({ accepted: true, persisted: true, booking: data }, 201);
 }

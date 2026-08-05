@@ -1,0 +1,3 @@
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import type { SourceReference } from "@/features/ai-setup/ai-setup.schema";
+export function SourceProcessingStatus({ source }: { source: SourceReference }) { if (source.status === "processed") return <span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 size={13} />Processado</span>; if (source.status === "failed") return <span className="inline-flex items-center gap-1 text-red-600"><AlertCircle size={13} />Falhou</span>; return <span className="inline-flex items-center gap-1 text-[#6658d9]"><Loader2 size={13} className="animate-spin" />Processando</span>; }

@@ -8,7 +8,7 @@ import { SourceUploader } from "@/components/ai-setup/source-uploader";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Label, Textarea } from "@/components/ui/field";
-import type { AISetupSession } from "@/features/ai-setup/ai-setup.schema";
+import type { AISetupSession, SourceReference } from "@/features/ai-setup/ai-setup.schema";
 
 export interface InitialSetupForm {
   businessName: string;
@@ -19,7 +19,7 @@ export interface InitialSetupForm {
 
 interface AIConversationProps {
   form: InitialSetupForm;
-  sources: string[];
+  sources: SourceReference[];
   session: AISetupSession | null;
   busy: boolean;
   busyQuestion?: string;
@@ -27,7 +27,7 @@ interface AIConversationProps {
   projectId?: string;
   error?: string;
   onFormChange: (form: InitialSetupForm) => void;
-  onSourcesChange: (sources: string[]) => void;
+  onSourcesChange: (sources: SourceReference[]) => void;
   onAnalyze: () => Promise<void>;
   onAnswer: (key: string, value: string) => Promise<void>;
   onGenerate: () => Promise<void>;

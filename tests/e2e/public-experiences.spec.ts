@@ -66,10 +66,42 @@ test("chalé consulta período e solicita reserva", async ({ page }) => {
   await expect(page.getByText(/solicitação de reserva enviada/i)).toBeVisible();
 });
 
-test("multiunidade resolve destino pela região", async ({ page }) => {
+test("multiunidade pede consentimento e resolve por CEP com fallback manual", async ({ page }) => {
+  await page.route("**/api/public/routing/nearest", async (route) => {
+    const body = route.request().postDataJSON() as { postalCode?: string };
+    expect(body.postalCode).toBe("01310-100");
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        data: {
+          recommended: {
+            id: "unit-sul",
+            name: "Unidade Zona Sul",
+            address: "Av. Paulista, São Paulo - SP",
+            distanceKm: 2.4,
+            isOpen: true,
+            destination: {
+              id: "60000000-0000-4000-8000-000000000601",
+              key: "sul",
+              type: "whatsapp",
+              label: "Unidade Zona Sul",
+              value: "5511944444401",
+            },
+          },
+          alternatives: [],
+          method: "postal_code",
+        },
+      }),
+    });
+  });
   await page.goto("/rede-movimento");
   await page.getByRole("button", { name: /encontrar unidade/i }).click();
-  await page.getByRole("button", { name: "Zona Sul", exact: true }).click();
-  await page.getByRole("button", { name: /encontrar melhor unidade/i }).click();
-  await expect(page.getByText("Unidade Zona Sul")).toBeVisible();
+  await expect(page.getByText(/usaremos sua localização apenas/i)).toBeVisible();
+  await page.getByRole("button", { name: /informar cep/i }).click();
+  await page.getByRole("textbox", { name: "CEP", exact: true }).fill("01310-100");
+  await page.getByRole("button", { name: /buscar pelo cep/i }).click();
+  await expect(page.getByText("Unidade Zona Sul").first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /continuar no whatsapp/i })).toHaveAttribute("href", /wa\.me\/5511944444401/);
 });

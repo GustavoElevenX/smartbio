@@ -4,6 +4,7 @@ import { z } from "zod";
 const optionalText = z.string().trim().transform((value) => value || undefined).optional();
 
 export const serverEnvSchema = z.object({
+  ENABLE_LOCAL_DEV_AUTH: z.enum(["true", "false"]).default("false"),
   AI_PROVIDER: z.enum(["openai"]).default("openai"),
   OPENAI_API_KEY: optionalText,
   OPENAI_MODEL: optionalText.default("gpt-5.6"),
@@ -13,6 +14,8 @@ export const serverEnvSchema = z.object({
   AI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
   AI_PROMPT_VERSION: z.string().trim().min(1).default("2026-08-05-v1"),
   SUPABASE_SERVICE_ROLE_KEY: optionalText,
+  UPSTASH_REDIS_REST_URL: optionalText,
+  UPSTASH_REDIS_REST_TOKEN: optionalText,
   EMAIL_PROVIDER: z.enum(["resend", "console"]).default("resend"),
   RESEND_API_KEY: optionalText,
   EMAIL_FROM: optionalText,
@@ -28,7 +31,7 @@ export const serverEnvSchema = z.object({
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
-export type ServerFeature = "ai" | "email" | "maps" | "supabase";
+export type ServerFeature = "ai" | "email" | "maps" | "supabase" | "rateLimit";
 
 export function readServerEnv(source: NodeJS.ProcessEnv = process.env): ServerEnv {
   return serverEnvSchema.parse(source);
@@ -37,13 +40,23 @@ export function readServerEnv(source: NodeJS.ProcessEnv = process.env): ServerEn
 export function validateServerFeature(feature: ServerFeature, source: NodeJS.ProcessEnv = process.env) {
   const env = readServerEnv(source);
   const missing: string[] = [];
-  if (feature === "ai" && !env.OPENAI_API_KEY) missing.push("OPENAI_API_KEY");
+  if (feature === "ai") {
+    if (!env.OPENAI_API_KEY) missing.push("OPENAI_API_KEY");
+    if (source.NODE_ENV === "production") {
+      if (!env.UPSTASH_REDIS_REST_URL) missing.push("UPSTASH_REDIS_REST_URL");
+      if (!env.UPSTASH_REDIS_REST_TOKEN) missing.push("UPSTASH_REDIS_REST_TOKEN");
+    }
+  }
   if (feature === "email" && env.EMAIL_PROVIDER === "resend") {
     if (!env.RESEND_API_KEY) missing.push("RESEND_API_KEY");
     if (!env.EMAIL_FROM) missing.push("EMAIL_FROM");
   }
   if (feature === "maps" && !env.GOOGLE_MAPS_SERVER_API_KEY) missing.push("GOOGLE_MAPS_SERVER_API_KEY");
   if (feature === "supabase" && !env.SUPABASE_SERVICE_ROLE_KEY) missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  if (feature === "rateLimit") {
+    if (!env.UPSTASH_REDIS_REST_URL) missing.push("UPSTASH_REDIS_REST_URL");
+    if (!env.UPSTASH_REDIS_REST_TOKEN) missing.push("UPSTASH_REDIS_REST_TOKEN");
+  }
   if (missing.length) throw new Error(`Configuração ausente para ${feature}: ${missing.join(", ")}.`);
   return env;
 }

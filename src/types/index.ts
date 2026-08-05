@@ -112,6 +112,13 @@ export type DataOrigin =
 
 export type DataVerificationStatus = "verified" | "needs_confirmation" | "missing" | "invalid";
 
+export interface GeneratedFieldMetadata {
+  generatedByAI: boolean;
+  generatedPlaceholder: boolean;
+  verificationStatus: DataVerificationStatus;
+  sourceId?: string;
+}
+
 export interface SourcedValue<T> {
   value: T | null;
   origin: DataOrigin;
@@ -134,6 +141,7 @@ export interface DataRequirement {
   reason: string;
   actionLabel?: string;
   actionPath?: string;
+  fieldMetadata?: GeneratedFieldMetadata;
 }
 
 export type CapabilityKey =
@@ -217,6 +225,38 @@ export interface MediaReference {
   storagePath?: string;
 }
 
+export interface ServiceOffering {
+  id: string;
+  projectId: string;
+  name: string;
+  slug: string;
+  description?: string;
+  shortDescription?: string;
+  serviceMode: "contact" | "quote" | "schedule" | "external_checkout" | "external_url";
+  priceMode: "fixed" | "starting_at" | "range" | "on_request" | "free";
+  price?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  currency: string;
+  imageAssetId?: string;
+  destinationId?: string;
+  externalUrl?: string;
+  isFeatured: boolean;
+  isActive: boolean;
+  order: number;
+  settings: Record<string, unknown>;
+}
+
+export interface ProjectPolicy {
+  id: string;
+  projectId: string;
+  type: "privacy" | "cancellation" | "rescheduling" | "delivery" | "reservation" | "payment" | "custom";
+  title: string;
+  content: string;
+  isActive: boolean;
+  settings: Record<string, unknown>;
+}
+
 export interface QuoteCalculationRule {
   id: string;
   condition: RuleCondition;
@@ -258,6 +298,7 @@ export interface QuoteRequest {
 export interface SchedulableService {
   id: string;
   projectId: string;
+  serviceOfferingId?: string;
   name: string;
   durationMinutes: number;
   bufferBeforeMinutes: number;
@@ -339,6 +380,8 @@ export interface CatalogItem {
   isAvailable: boolean;
   variants: CatalogVariant[];
   metadata: Record<string, unknown>;
+  isFeatured?: boolean;
+  order?: number;
 }
 
 export interface OrderRequestItem {
@@ -380,7 +423,10 @@ export interface ReservableUnit {
   capacityChildren: number;
   quantity: number;
   basePrice?: number;
+  depositAmount?: number;
   currency: string;
+  confirmationMode?: ConfirmationMode;
+  rules?: string;
   isActive: boolean;
   mediaAssetIds: string[];
   amenities: string[];
@@ -426,6 +472,9 @@ export interface BusinessLocation {
   projectId: string;
   name: string;
   address?: string;
+  addressLine?: string;
+  addressNumber?: string;
+  addressExtra?: string;
   city?: string;
   state?: string;
   neighborhood?: string;
@@ -435,6 +484,8 @@ export interface BusinessLocation {
   latitude?: number;
   longitude?: number;
   geocodingStatus: "pending" | "resolved" | "manual" | "failed";
+  geocodingProvider?: string;
+  geocodedAt?: string;
   phone?: string;
   whatsapp?: string;
   externalUrl?: string;
@@ -447,15 +498,18 @@ export interface BusinessLocation {
   supportsInPerson: boolean;
   priority: number;
   isActive: boolean;
+  routingDestinationId?: string;
+  settings?: Record<string, unknown>;
 }
 
 export interface RoutingDestination {
   id: string;
   key: string;
-  type: "location" | "whatsapp" | "seller" | "schedule" | "url" | "recommendation" | "unavailable";
+  type: "location" | "whatsapp" | "seller" | "schedule" | "url" | "email" | "phone" | "checkout" | "form" | "recommendation" | "unavailable";
   label: string;
   locationId?: string;
   value?: string;
+  message?: string;
 }
 
 export interface RoutingRule {
@@ -631,6 +685,10 @@ export interface JourneyStep {
 }
 
 export interface BrandProfile {
+  primaryLogoAssetId?: string;
+  lightLogoAssetId?: string;
+  darkLogoAssetId?: string;
+  faviconAssetId?: string;
   logoDataUrl?: string;
   lightLogoDataUrl?: string;
   darkLogoDataUrl?: string;
@@ -667,6 +725,7 @@ export interface Project {
   businessProfile?: BusinessCapabilityProfile;
   capabilities?: ProjectCapability[];
   commercialConfig?: {
+    serviceOfferings?: ServiceOffering[];
     qualificationRules?: QualificationRule[];
     quoteDefinition?: QuoteDefinition;
     schedulableServices?: SchedulableService[];
@@ -681,6 +740,7 @@ export interface Project {
     routingRules?: RoutingRule[];
     routingDestinations?: RoutingDestination[];
     paymentUrl?: string;
+    policies?: ProjectPolicy[];
   };
   dataRequirements?: DataRequirement[];
   version: number;
@@ -699,9 +759,47 @@ export interface MediaAsset {
   byteSize: number;
   width?: number;
   height?: number;
+  durationSeconds?: number;
+  assetType?: "logo" | "favicon" | "image" | "video" | "background" | "product" | "service" | "accommodation" | "portfolio" | "testimonial" | "document_preview";
+  status?: "processing" | "ready" | "failed" | "published";
   altText?: string;
   tags: string[];
   metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface BusinessSource {
+  id: string;
+  workspaceId: string;
+  projectId?: string;
+  setupSessionId?: string;
+  type: "website" | "text" | "pdf" | "image" | "csv";
+  name: string;
+  sourceUrl?: string;
+  storagePath?: string;
+  mimeType?: string;
+  fileSize?: number;
+  checksum?: string;
+  status: "pending" | "uploaded" | "processing" | "processed" | "failed";
+  extractedText?: string;
+  extractedData: Record<string, unknown>;
+  processingError?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BusinessSourceFact {
+  id: string;
+  sourceId: string;
+  projectId?: string;
+  key: string;
+  type: string;
+  value: unknown;
+  evidenceExcerpt?: string;
+  confidence?: number;
+  verificationStatus: DataVerificationStatus | "rejected";
+  appliedAt?: string;
   createdAt: string;
 }
 

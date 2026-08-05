@@ -18,7 +18,13 @@ Não é uma lista genérica de links e não tenta substituir o sistema operacion
 - Operação comercial para acompanhar e atualizar orçamento, pedido, agendamento e reserva.
 - Leads enriquecidos com pontuação, faixa, motivo, ação comercial, objeto relacionado, valor, data e linha do tempo.
 - Analytics com período real, origem, funil e eventos específicos de cada capacidade.
-- Persistência local completa para desenvolvimento sem login e repositório Supabase/RLS para ambientes configurados.
+- Persistência local opcional para desenvolvimento sem login e repositório Supabase/RLS para ambientes configurados.
+- Central de Dados Comerciais para serviços, orçamento, agenda, catálogo, reservas, unidades, destinos, políticas e integridade.
+- Fontes privadas (PDF, imagem, CSV, texto e site), revisão de fatos extraídos e aplicação confirmada.
+- IA granular por campo, etapa e visual, com snapshot, diff e proteção dos fatos comerciais confirmados.
+- Biblioteca privada de mídia com publicação controlada, detecção de uso e exclusão segura.
+- Multiunidades com geocodificação, horário, raio, Haversine, consentimento explícito e destino por unidade.
+- Notificações in-app/e-mail, preferências, idempotência e continuidade da operação quando o envio falhar.
 
 ## Experiências de aceitação
 
@@ -33,7 +39,7 @@ O modo local inclui seis fixtures publicadas:
 | Hospedagem | `/chales-serra-clara` | Disponibilidade, valor e solicitação de reserva |
 | Multiunidade | `/rede-movimento` | Roteamento para a unidade adequada |
 
-Catálogo/pedidos e reservas ficam desligados por padrão. Para executar os seis fluxos manualmente, habilite os dois flags correspondentes em `.env.local`; o Playwright já os habilita no servidor de teste.
+Os fluxos comerciais, geo routing e multiunidades ficam habilitados no `.env.example`. Recursos pós-MVP, como calendar sync, chat, billing e domínios customizados, permanecem desligados.
 
 ## Stack e pré-requisitos
 
@@ -48,10 +54,13 @@ Catálogo/pedidos e reservas ficam desligados por padrão. Para executar os seis
 ```bash
 npm install
 copy .env.example .env.local
+# Em .env.local, habilite somente para desenvolvimento:
+# ENABLE_LOCAL_DEV_AUTH=true
+# NEXT_PUBLIC_ENABLE_LOCAL_DEV_STORE=true
 npm run dev
 ```
 
-Abra `http://localhost:3000/app`. Sem as chaves do Supabase, autenticação e persistência usam o modo de desenvolvimento local no navegador. Esse modo é intencional para avaliação e não oferece isolamento multiusuário nem sincronização entre dispositivos.
+Abra `http://localhost:3000/app`. Sem as chaves do Supabase, autenticação e persistência só usam o modo local quando as duas flags acima estiverem explicitamente habilitadas. As flags são sempre ignoradas em produção. Esse modo é intencional para avaliação e não oferece isolamento multiusuário nem sincronização entre dispositivos.
 
 ## Supabase
 
@@ -84,6 +93,13 @@ O seed usa o primeiro workspace disponível; crie ao menos um usuário antes de 
 - `202608030006_catalog_orders.sql`: categorias, itens, pedidos e itens recalculados no servidor.
 - `202608030007_reservations.sql`: unidades, bloqueios, reservas e proteção transacional de capacidade.
 - `202608030008_routing_integrations_audit.sql`: roteamento, integrações e auditoria de status.
+- `202608050009_ai_setup.sql`: sessões, mensagens, execuções e requisitos do onboarding por IA.
+- `202608050010_launch_security_and_service_offerings.sql`: reparo idempotente de workspace, serviços genéricos e rate limit distribuído.
+- `202608050011_business_sources.sql`: fontes privadas, fatos, evidências e aplicação transacional.
+- `202608050012_media_library_enhancements.sql`: metadados, usos e publicação segura de mídia.
+- `202608050013_business_locations_geo_routing.sql`: unidades, coordenadas, horários, raios e destinos.
+- `202608050014_notifications.sql`: notificações, preferências e entregas idempotentes.
+- `202608050015_project_policies_and_readiness.sql`: políticas comerciais, metadados de verificação e prontidão.
 
 As escritas anônimas nas tabelas comerciais são revogadas. Os endpoints usam service role no servidor; o dashboard usa a sessão autenticada e RLS por membership. Agendamentos e reservas usam idempotência e travas transacionais para evitar dupla alocação.
 
@@ -102,6 +118,7 @@ As escritas anônimas nas tabelas comerciais são revogadas. Os endpoints usam s
 - `POST /api/public/reservations`
 - `POST /api/public/reservations/:id/cancel-request`
 - `POST /api/public/routing/resolve`
+- `POST /api/public/routing/nearest`
 
 ## Feature flags
 
@@ -111,11 +128,16 @@ As escritas anônimas nas tabelas comerciais são revogadas. Os endpoints usam s
 | `NEXT_PUBLIC_FEATURE_QUOTES` | `true` | Orçamentos e anexos |
 | `NEXT_PUBLIC_FEATURE_SCHEDULING` | `true` | Agenda nativa |
 | `NEXT_PUBLIC_FEATURE_ROUTING` | `true` | Roteamento determinístico |
-| `NEXT_PUBLIC_FEATURE_CATALOG_ORDERS` | `false` | Catálogo, carrinho e pedidos |
-| `NEXT_PUBLIC_FEATURE_RESERVATIONS` | `false` | Disponibilidade e reservas |
-| `NEXT_PUBLIC_FEATURE_EXTERNAL_PAYMENTS` | `false` | Continuação para pagamento externo |
-| `NEXT_PUBLIC_FEATURE_AI_BUSINESS_ANALYSIS` | `false` | Análise do negócio por IA |
-| `NEXT_PUBLIC_FEATURE_AI_JOURNEY_COMPOSITION` | `false` | Composição por IA |
+| `NEXT_PUBLIC_FEATURE_GEO_ROUTING` | `true` | CEP, geolocalização e cálculo por unidade |
+| `NEXT_PUBLIC_FEATURE_MULTI_UNIT` | `true` | Cadastro e seleção entre várias unidades |
+| `NEXT_PUBLIC_FEATURE_CATALOG_ORDERS` | `true` | Catálogo, carrinho e pedidos |
+| `NEXT_PUBLIC_FEATURE_RESERVATIONS` | `true` | Disponibilidade e reservas |
+| `NEXT_PUBLIC_FEATURE_EXTERNAL_PAYMENTS` | `true` | Continuação para pagamento externo |
+| `NEXT_PUBLIC_FEATURE_AI_BUSINESS_ANALYSIS` | `true` | Análise do negócio por IA |
+| `NEXT_PUBLIC_FEATURE_AI_JOURNEY_COMPOSITION` | `true` | Composição por IA |
+| `NEXT_PUBLIC_FEATURE_AI_SOURCE_IMPORT` | `true` | Extração assistida de fontes privadas |
+| `NEXT_PUBLIC_FEATURE_AI_BRAND_ANALYSIS` | `true` | Análise de marca por IA |
+| `NEXT_PUBLIC_FEATURE_NOTIFICATIONS` | `true` | Sino, página, preferências e e-mail |
 | `NEXT_PUBLIC_FEATURE_CALENDAR_SYNC` | `false` | Sincronização de calendário |
 | `NEXT_PUBLIC_FEATURE_CHAT` | `false` | Chat nativo |
 | `NEXT_PUBLIC_FEATURE_BILLING` | `false` | Cobrança do SaaS |
@@ -126,7 +148,10 @@ As escritas anônimas nas tabelas comerciais são revogadas. Os endpoints usam s
 ```text
 src/
   app/api/public/                 endpoints comerciais públicos
+  components/commercial-data/    fonte de verdade operacional
   components/editor/              editor de jornada, blocos e capacidades
+  components/media-library/       biblioteca e picker de mídia
+  components/notifications/       sino, lista e preferências
   components/public-experience/   runtime e registro de renderers
   features/business-understanding/
   features/capabilities/
@@ -137,6 +162,11 @@ src/
   features/catalog/
   features/reservations/
   features/routing/
+  server/business-sources/        parsing, evidências e aplicação
+  server/media/                   upload, transformação e publicação
+  server/notifications/           persistência e entregas
+  server/publishing/              prontidão, snapshots e publicação
+  server/rate-limit/              memória local e Upstash em produção
   lib/repositories/               adaptadores local/remoto do dashboard
   server/repositories/            leitura pública segura
 supabase/migrations/
@@ -160,6 +190,10 @@ O primeiro E2E pode exigir `npx playwright install chromium`.
 
 - Pagamento é apenas continuação externa; não há captura de cartão nativa.
 - Sincronização com Google/Outlook Calendar, chat, billing e domínios customizados permanecem desligados.
-- O rate limit do MVP é em memória por instância; produção distribuída deve usar armazenamento compartilhado.
+- O rate limit usa memória somente em desenvolvimento e exige Upstash nas APIs de IA em produção.
 - Alterações de cancelamento/remarcação são solicitações auditáveis, não mutações anônimas diretas.
 - O modo local é funcional para desenvolvimento e QA, mas produção deve usar Supabase.
+
+## Configuração de produção
+
+Antes do deploy, configure Supabase (URL, anon key e service role), confirmação de e-mail, OpenAI, Upstash, Resend e Google Maps. Mantenha `ENABLE_LOCAL_DEV_AUTH=false` e `NEXT_PUBLIC_ENABLE_LOCAL_DEV_STORE=false`. Aplique todas as migrations, valide o e-mail remetente no Resend, restrinja as chaves do Google Maps e execute os comandos de validação acima no mesmo commit que será publicado.

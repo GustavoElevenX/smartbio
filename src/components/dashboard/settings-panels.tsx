@@ -390,14 +390,16 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
             <Select
               id="project-status"
               value={project.status}
-              onChange={(event) =>
-                update({ status: event.target.value as Project["status"] })
-              }
+              disabled
+              aria-describedby="project-status-help"
             >
               <option value="draft">Rascunho</option>
               <option value="published">Publicado</option>
               <option value="archived">Arquivado</option>
             </Select>
+            <p id="project-status-help" className="mt-1 text-[11px] text-[#85858f]">
+              Publique pelo editor para executar a validação e criar o snapshot.
+            </p>
           </div>
           <div>
             <Label>Indexação</Label>

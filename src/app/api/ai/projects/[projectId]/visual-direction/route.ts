@@ -1,0 +1,5 @@
+import { regenerateVisualDirection } from "@/server/ai-editing/ai-editing-service";
+import { apiError } from "@/server/http/api-response";
+import { withAuthenticatedActor } from "@/server/http/with-authenticated-actor";
+import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
+export const POST = withAuthenticatedActor(async (request, context: RouteContext<"/api/ai/projects/[projectId]/visual-direction">, actor) => { const rate = await consumeRateLimit("ai-visual-regenerate", actor.userId, rateLimitRules.aiRegenerate, { failClosed: true }); if (!rate.allowed) return applyRateLimitHeaders(apiError("Limite de regenerações atingido.", 429, "rate_limited"), rate); const { projectId } = await context.params; try { return applyRateLimitHeaders(Response.json(await regenerateVisualDirection(actor, projectId, await request.json())), rate); } catch (error) { return applyRateLimitHeaders(apiError(error instanceof Error ? error.message : "Não foi possível regenerar o visual.", 400, "visual_regeneration_failed"), rate); } });

@@ -1,0 +1,4 @@
+import "server-only";
+import { syncProjectRows } from "@/server/commercial-data/repository-utils";
+import type { ServiceOffering } from "@/types";
+export async function saveServiceOfferings(projectId: string, services: ServiceOffering[]) { await syncProjectRows("service_offerings", projectId, services.map((service) => ({ id: service.id, project_id: projectId, name: service.name, slug: service.slug, description: service.description || null, short_description: service.shortDescription || null, service_mode: service.serviceMode, price_mode: service.priceMode, price: service.price ?? null, min_price: service.minPrice ?? null, max_price: service.maxPrice ?? null, currency: service.currency, image_asset_id: service.imageAssetId || null, destination_id: service.destinationId || null, external_url: service.externalUrl || null, is_featured: service.isFeatured, is_active: service.isActive, service_order: service.order, settings: service.settings }))); }

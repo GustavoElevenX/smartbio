@@ -1,0 +1,5 @@
+import { regenerateStep } from "@/server/ai-editing/ai-editing-service";
+import { apiError } from "@/server/http/api-response";
+import { withAuthenticatedActor } from "@/server/http/with-authenticated-actor";
+import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
+export const POST = withAuthenticatedActor(async (request, context: RouteContext<"/api/ai/projects/[projectId]/steps/[stepId]/regenerate">, actor) => { const rate = await consumeRateLimit("ai-step-regenerate", actor.userId, rateLimitRules.aiRegenerate, { failClosed: true }); if (!rate.allowed) return applyRateLimitHeaders(apiError("Limite de regenerações atingido.", 429, "rate_limited"), rate); const { projectId, stepId } = await context.params; try { return applyRateLimitHeaders(Response.json(await regenerateStep(actor, projectId, stepId, await request.json())), rate); } catch (error) { return applyRateLimitHeaders(apiError(error instanceof Error ? error.message : "Não foi possível regenerar a etapa.", 400, "step_regeneration_failed"), rate); } });

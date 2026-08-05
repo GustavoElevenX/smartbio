@@ -3,6 +3,7 @@
 import { demoProjects } from "@/data/demo-projects";
 import { hasBookingConflict } from "@/features/scheduling/availability-engine";
 import { uid } from "@/lib/utils";
+import { canUseLocalStore } from "@/lib/runtime-mode";
 import type { AnalyticsEvent, Booking, Lead, OrderRequest, Project, QuoteRequest, Reservation } from "@/types";
 
 const VERSION = "v3";
@@ -19,6 +20,7 @@ const KEYS = {
 const LEGACY_KEYS = { projects: "smartbio:projects:v2", leads: "smartbio:leads:v2", events: "smartbio:events:v2", user: "smartbio:user:v2" };
 
 function read<T>(key: string, fallback: T, legacyKey?: string): T {
+  if (!canUseLocalStore()) return fallback;
   if (typeof window === "undefined") return fallback;
   try {
     const value = localStorage.getItem(key);
@@ -38,6 +40,7 @@ function read<T>(key: string, fallback: T, legacyKey?: string): T {
 }
 
 function write<T>(key: string, value: T) {
+  if (!canUseLocalStore()) return;
   if (typeof window === "undefined") return;
   try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* local demo can reach the browser quota with large media */ }
 }
@@ -78,6 +81,7 @@ function upsertById<T extends { id: string }>(items: T[], value: T) {
 
 export const localStore = {
   getProjects(): Project[] {
+    if (!canUseLocalStore()) return [];
     const stored = read(KEYS.projects, demoProjects, LEGACY_KEYS.projects);
     const refreshed = stored.map((project) => {
       const demo = demoProjects.find((candidate) => candidate.id === project.id);
@@ -91,10 +95,10 @@ export const localStore = {
   getProject(value: string): Project | undefined { return this.getProjects().find((project) => project.id === value || project.slug === value); },
   saveProject(project: Project) { const projects = this.getProjects(); const next = { ...project, updatedAt: new Date().toISOString() }; write(KEYS.projects, upsertById(projects, next)); return next; },
   deleteProject(id: string) { write(KEYS.projects, this.getProjects().filter((project) => project.id !== id)); },
-  getLeads(projectId?: string): Lead[] { const leads = read<Lead[]>(KEYS.leads, initialLeads(), LEGACY_KEYS.leads); return projectId ? leads.filter((lead) => lead.projectId === projectId) : leads; },
+  getLeads(projectId?: string): Lead[] { const leads = read<Lead[]>(KEYS.leads, canUseLocalStore() ? initialLeads() : [], LEGACY_KEYS.leads); return projectId ? leads.filter((lead) => lead.projectId === projectId) : leads; },
   addLead(lead: Omit<Lead, "id" | "createdAt">) { const next = { ...lead, id: uid("lead"), createdAt: new Date().toISOString() }; write(KEYS.leads, [next, ...read<Lead[]>(KEYS.leads, initialLeads(), LEGACY_KEYS.leads)]); return next; },
   updateLead(id: string, patch: Partial<Lead>) { const leads = this.getLeads().map((lead) => lead.id === id ? { ...lead, ...patch } : lead); write(KEYS.leads, leads); },
-  getEvents(projectId?: string): AnalyticsEvent[] { const events = read<AnalyticsEvent[]>(KEYS.events, initialEvents(), LEGACY_KEYS.events); return projectId ? events.filter((event) => event.projectId === projectId) : events; },
+  getEvents(projectId?: string): AnalyticsEvent[] { const events = read<AnalyticsEvent[]>(KEYS.events, canUseLocalStore() ? initialEvents() : [], LEGACY_KEYS.events); return projectId ? events.filter((event) => event.projectId === projectId) : events; },
   track(event: Omit<AnalyticsEvent, "id" | "createdAt">) { const next = { ...event, id: uid("event"), createdAt: new Date().toISOString() }; write(KEYS.events, [next, ...read<AnalyticsEvent[]>(KEYS.events, initialEvents(), LEGACY_KEYS.events)]); return next; },
   getQuoteRequests(projectId?: string) { const items = read<QuoteRequest[]>(KEYS.quotes, []); return projectId ? items.filter((item) => item.projectId === projectId) : items; },
   saveQuoteRequest(request: QuoteRequest) { const items = this.getQuoteRequests(); const existing = request.idempotencyKey && items.find((item) => item.idempotencyKey === request.idempotencyKey); if (existing) return existing; write(KEYS.quotes, upsertById(items, request)); return request; },

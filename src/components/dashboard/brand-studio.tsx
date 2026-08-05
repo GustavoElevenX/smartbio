@@ -52,10 +52,13 @@ export function BrandStudio({ projectId }: { projectId: string }) {
     setAnalyzing(true);
     setError("");
     try {
-      const brand = await analyzeBrandFile(file);
+      const upload = new FormData(); upload.set("file", file); upload.set("assetType", "logo"); upload.set("altText", `Logo de ${project.name}`);
+      const [brand, uploadResponse] = await Promise.all([analyzeBrandFile(file), fetch(`/api/projects/${project.id}/media`, { method: "POST", body: upload })]);
+      const uploadPayload = await uploadResponse.json() as { data?: { id: string }; error?: { message?: string } };
+      if (!uploadResponse.ok || !uploadPayload.data) throw new Error(uploadPayload.error?.message || "Não foi possível persistir a logo.");
       update({
         ...project,
-        brand: { ...brand, brandPersonality: project.brand.brandPersonality },
+        brand: { ...brand, primaryLogoAssetId: uploadPayload.data.id, brandPersonality: project.brand.brandPersonality },
         designSystem: { ...project.designSystem, colors: brand.activePalette },
       });
     } catch (caught) {

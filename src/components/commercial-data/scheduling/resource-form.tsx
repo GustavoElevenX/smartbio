@@ -1,0 +1,5 @@
+"use client";
+import { Input, Label, Select } from "@/components/ui/field";
+import { Switch } from "@/components/ui/switch";
+import type { SchedulableResource } from "@/types";
+export function ResourceForm({ value, onChange }: { value: SchedulableResource; onChange: (value: SchedulableResource) => void }) { return <div className="grid gap-3 rounded-[16px] bg-[#f6f5f9] p-3 sm:grid-cols-[1fr_180px_auto]"><div><Label htmlFor={`resource-name-${value.id}`}>Nome</Label><Input id={`resource-name-${value.id}`} value={value.name} onChange={(event) => onChange({ ...value, name: event.target.value })} /></div><div><Label htmlFor={`resource-kind-${value.id}`}>Tipo</Label><Select id={`resource-kind-${value.id}`} value={value.kind} onChange={(event) => onChange({ ...value, kind: event.target.value as SchedulableResource["kind"] })}><option value="professional">Profissional</option><option value="room">Sala</option><option value="asset">Equipamento</option></Select></div><label className="flex items-center gap-2 self-end pb-3 text-sm font-semibold"><Switch checked={value.isActive} onCheckedChange={(isActive) => onChange({ ...value, isActive })} />Ativo</label></div>; }

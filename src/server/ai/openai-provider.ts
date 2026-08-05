@@ -48,7 +48,7 @@ export class OpenAISmartBioProvider implements SmartBioAIProvider {
     this.client = new OpenAI({ apiKey: env.OPENAI_API_KEY, timeout: this.timeoutMs, maxRetries: 0 });
   }
 
-  private async structured<T>({ operation, schemaName, schema, systemPrompt, payload, context, model }: StructuredAIRequest<T>): Promise<T> {
+  private async structured<T>({ operation, schemaName, schema, systemPrompt, payload, context, model, userContent }: StructuredAIRequest<T>): Promise<T> {
     const startedAt = Date.now();
     const selectedModel = model || this.model;
     await recordAIUsage({ ...context, operation, provider: "openai", model: selectedModel, promptVersion: "2026-08-05", status: "started", inputSummary: { payloadBytes: JSON.stringify(payload).length } });
@@ -60,7 +60,7 @@ export class OpenAISmartBioProvider implements SmartBioAIProvider {
           reasoning: { effort: "low" },
           input: [
             { role: "system", content: systemPrompt },
-            { role: "user", content: `DADOS_DELIMITADOS_INICIO\n${JSON.stringify(payload)}\nDADOS_DELIMITADOS_FIM` },
+            { role: "user", content: userContent || `DADOS_DELIMITADOS_INICIO\n${JSON.stringify(payload)}\nDADOS_DELIMITADOS_FIM` },
           ],
           text: { format: zodTextFormat(schema, schemaName) },
         });
@@ -108,7 +108,9 @@ export class OpenAISmartBioProvider implements SmartBioAIProvider {
   }
 
   extractSource(input: SourceExtractionInput) {
-    return this.structured({ operation: "source_extraction", schemaName: "extracted_source", schema: extractedBusinessSourceSchema, systemPrompt: sourceExtractionPrompt, payload: input, context: input });
+    const instruction = { type: "input_text" as const, text: `DADOS_DELIMITADOS_INICIO\n${JSON.stringify({ sourceId: input.sourceId, sourceType: input.sourceType, name: input.name, content: input.content })}\nDADOS_DELIMITADOS_FIM` };
+    const visual = input.fileData && input.mimeType?.startsWith("image/") ? { type: "input_image" as const, image_url: `data:${input.mimeType};base64,${input.fileData}`, detail: "high" as const } : undefined;
+    return this.structured({ operation: "source_extraction", schemaName: "extracted_source", schema: extractedBusinessSourceSchema, systemPrompt: sourceExtractionPrompt, payload: input, userContent: visual ? [instruction, visual] : [instruction], context: input });
   }
 
   analyzeBrand(input: BrandAIInput) {

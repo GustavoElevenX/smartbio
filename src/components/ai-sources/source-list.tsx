@@ -1,0 +1,4 @@
+import { FileText, X } from "lucide-react";
+import { SourceProcessingStatus } from "@/components/ai-sources/source-processing-status";
+import type { SourceReference } from "@/features/ai-setup/ai-setup.schema";
+export function SourceList({ sources, onRemove, disabled }: { sources: SourceReference[]; onRemove: (id: string) => void; disabled?: boolean }) { return <div className="flex flex-col gap-2">{sources.map((source) => <div key={source.id} className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-[#5f5e68] shadow-sm"><FileText size={14} className="text-[#6d5ef5]" /><span className="min-w-0 flex-1 truncate">{source.name}</span><SourceProcessingStatus source={source} /><button type="button" aria-label={`Remover ${source.name}`} onClick={() => onRemove(source.id)} disabled={disabled}><X size={13} /></button></div>)}</div>; }

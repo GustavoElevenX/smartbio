@@ -1,0 +1,4 @@
+import "server-only";
+import { syncProjectRows } from "@/server/commercial-data/repository-utils";
+import type { CatalogCategory, CatalogItem } from "@/types";
+export async function saveCatalogConfig(projectId: string, categories: CatalogCategory[], items: CatalogItem[]) { await syncProjectRows("catalog_categories", projectId, categories.map((item) => ({ id: item.id, project_id: projectId, name: item.name, category_order: item.order, is_active: item.isActive }))); await syncProjectRows("catalog_items", projectId, items.map((item) => ({ id: item.id, project_id: projectId, category_id: item.categoryId || null, name: item.name, description: item.description || null, image_asset_id: item.imageAssetId || null, price: item.price ?? null, currency: item.currency, is_available: item.isAvailable, variants: item.variants, metadata: { ...item.metadata, isFeatured: item.isFeatured, order: item.order } }))); }

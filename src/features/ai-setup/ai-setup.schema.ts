@@ -50,9 +50,15 @@ export const extractedBusinessSourceSchema = z.object({
   products: z.array(z.record(z.string(), z.unknown())).max(300),
   categories: z.array(z.string().max(160)).max(100),
   schedules: z.array(z.record(z.string(), z.unknown())).max(100),
+  prices: z.array(z.record(z.string(), z.unknown())).max(200).default([]),
   locations: z.array(z.record(z.string(), z.unknown())).max(100),
+  openingHours: z.array(z.record(z.string(), z.unknown())).max(100).default([]),
+  contacts: z.array(z.record(z.string(), z.unknown())).max(100).default([]),
   policies: z.array(z.string().max(1000)).max(100),
   accommodations: z.array(z.record(z.string(), z.unknown())).max(100),
+  reservableUnits: z.array(z.record(z.string(), z.unknown())).max(100).default([]),
+  frequentlyAskedQuestions: z.array(z.record(z.string(), z.unknown())).max(100).default([]),
+  brandStatements: z.array(z.record(z.string(), z.unknown())).max(100).default([]),
   destinations: z.array(z.record(z.string(), z.unknown())).max(100),
   warnings: z.array(z.string().max(400)).max(50),
 });
@@ -74,6 +80,13 @@ export const setupInitialInputSchema = z.object({
   logoReference: z.string().trim().max(500).optional(),
 });
 
+export const sourceReferenceSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1).max(240),
+  type: z.enum(["website", "text", "pdf", "image", "csv"]),
+  status: z.enum(["pending", "uploaded", "processing", "processed", "failed"]),
+});
+
 export const aiSetupSessionSchema = z.object({
   id: z.string(),
   workspaceId: z.string(),
@@ -84,7 +97,7 @@ export const aiSetupSessionSchema = z.object({
   answers: z.record(z.string(), z.unknown()),
   missingRequirements: z.array(dataRequirementSchema),
   questions: z.array(setupQuestionSchema).max(5).default([]),
-  sources: z.array(z.string()).default([]),
+  sources: z.array(sourceReferenceSchema).max(10).default([]),
   projectDraft: z.unknown().optional(),
   lastError: z.string().optional(),
   usedFallback: z.boolean().default(false),
@@ -110,3 +123,4 @@ export type ExtractedBusinessSource = z.infer<typeof extractedBusinessSourceSche
 export type BusinessAnalysisResult = z.infer<typeof businessAnalysisResultSchema>;
 export type CopyGenerationResult = z.infer<typeof copyGenerationResultSchema>;
 export type BrandAIResult = z.infer<typeof brandAIResultSchema>;
+export type SourceReference = z.infer<typeof sourceReferenceSchema>;

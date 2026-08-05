@@ -5,6 +5,7 @@ import { quoteRequestSchema } from "@/lib/validation/schemas";
 import { apiError, apiSuccess, requestIp, validationError } from "@/server/http/api-response";
 import { getPublicProjectById } from "@/server/repositories/public-commercial-repository";
 import { checkRateLimit } from "@/server/services/rate-limit";
+import { notifyProjectEvent } from "@/server/notifications/notification-service";
 
 export async function POST(request: Request) {
   if (!features.nativeQuotes) return apiError("Orçamentos nativos estão desativados neste ambiente.", 404, "feature_disabled");
@@ -23,5 +24,6 @@ export async function POST(request: Request) {
     estimated_min: estimate.min || null, estimated_max: estimate.max || null, currency: estimate.currency, visitor_data: parsed.data.visitorData,
   }, { onConflict: "project_id,idempotency_key" }).select("id,status,estimated_min,estimated_max,currency,created_at").single();
   if (error) { console.error("quote_request_failed", { projectId: project.id, code: error.code }); return apiError("Não foi possível enviar o orçamento.", 400, "quote_submit_failed"); }
+  await notifyProjectEvent(project.id, "quote.submitted", "quote", data.id, { ...parsed.data.visitorData, interest: definition.title }).catch(() => undefined);
   return apiSuccess({ accepted: true, persisted: true, request: data, estimate }, 201);
 }

@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import type { ResponseInputContent } from "openai/resources/responses/responses";
 import type { BusinessCapabilityProfile, ExperienceCompositionInput, Project, ProjectCapability } from "@/types";
 import type { AIJourneyDraftPayload } from "@/features/composition/composition.schema";
 import type { BrandAIResult, BusinessAnalysisResult, CopyGenerationResult, ExtractedBusinessSource, SetupQuestion } from "@/features/ai-setup/ai-setup.schema";
@@ -70,4 +71,5 @@ export interface StructuredAIRequest<T> {
   payload: unknown;
   context: AIRequestContext;
   model?: string;
+  userContent?: ResponseInputContent[];
 }

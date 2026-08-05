@@ -24,6 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { ContentBlockType, QuoteDefinition } from "@/types";
 import { parseBlockContent } from "@/components/public-experience/blocks/block-schemas";
+import { LocationFinder } from "@/components/public-experience/location-finder";
 import type {
   BlockRenderer,
   BlockRendererProps,
@@ -1026,38 +1027,18 @@ const BookingSummaryBlock: BlockRenderer = ({ project, runtime }) => {
 };
 
 const LocationSelectorBlock: BlockRenderer = ({
-  block,
+  project,
   runtime,
   setRuntime,
+  emit,
 }) => {
-  const parsed = parseBlockContent("location_selector", block.content);
-  const config = parsed.success
-    ? parsed.data
-    : { fieldKey: "location", options: [] };
   return (
-    <div className="grid gap-2">
-      {config.options.map((option) => (
-        <button
-          type="button"
-          key={option}
-          onClick={() =>
-            setRuntime((current) => ({
-              ...current,
-              answers: { ...current.answers, [config.fieldKey]: option },
-              routeResult: undefined,
-            }))
-          }
-          className={cn(
-            cardClass,
-            "text-left text-sm font-bold",
-            runtime.answers[config.fieldKey] === option &&
-              "ring-4 ring-[var(--primary)]/15",
-          )}
-        >
-          {option}
-        </button>
-      ))}
-    </div>
+    <LocationFinder
+      project={project}
+      runtime={runtime}
+      setRuntime={setRuntime}
+      emit={emit}
+    />
   );
 };
 

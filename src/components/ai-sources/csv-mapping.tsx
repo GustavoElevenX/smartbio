@@ -1,0 +1,3 @@
+"use client";
+import { Label, Select } from "@/components/ui/field";
+export function CSVMapping({ headers, value, onChange }: { headers: string[]; value: Record<string, string>; onChange: (value: Record<string, string>) => void }) { const targets = ["ignorar", "nome", "descrição", "preço", "categoria", "endereço", "horário", "telefone"]; return <div className="grid gap-3 sm:grid-cols-2">{headers.map((header) => <div key={header}><Label htmlFor={`csv-${header}`}>{header}</Label><Select id={`csv-${header}`} value={value[header] || "ignorar"} onChange={(event) => onChange({ ...value, [header]: event.target.value })}>{targets.map((target) => <option key={target} value={target}>{target}</option>)}</Select></div>)}</div>; }

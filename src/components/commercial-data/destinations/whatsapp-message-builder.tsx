@@ -1,0 +1,4 @@
+"use client";
+import { Label, Textarea } from "@/components/ui/field";
+const allowed = ["{{interest}}", "{{service}}", "{{location}}", "{{date}}", "{{name}}"];
+export function WhatsAppMessageBuilder({ value, onChange }: { value: string; onChange: (value: string) => void }) { return <div><Label htmlFor="whatsapp-message">Mensagem dinâmica</Label><Textarea id="whatsapp-message" value={value} onChange={(event) => onChange(event.target.value)} placeholder="Escreva a mensagem e insira somente campos permitidos." /><div className="mt-2 flex flex-wrap gap-2">{allowed.map((token) => <button key={token} type="button" className="focus-ring rounded-lg bg-[#efedf9] px-2 py-1 text-xs font-bold text-[#5d50c7]" onClick={() => onChange(`${value}${value ? " " : ""}${token}`)}>{token}</button>)}</div></div>; }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { leadSchema } from "@/lib/validation/schemas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/server/services/rate-limit";
+import { notifyProjectEvent } from "@/server/notifications/notification-service";
 
 export async function POST(request: Request) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || "local";
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
   const { data: project, error: projectError } = await supabase.from("projects").select("workspace_id").eq("id", parsed.data.projectId).eq("status", "published").single();
   if (projectError || !project) return NextResponse.json({ error: "Projeto não encontrado." }, { status: 404 });
   const { data: session } = await supabase.from("visitor_sessions").select("id").eq("session_key", parsed.data.sessionId).maybeSingle();
-  const { error } = await supabase.from("leads").insert({
+  const { data: lead, error } = await supabase.from("leads").insert({
     workspace_id: project.workspace_id, project_id: parsed.data.projectId, session_id: session?.id || null,
     name: parsed.data.name || null, email: parsed.data.email || null, phone: parsed.data.phone || null,
     company: parsed.data.company || null, status: parsed.data.status, source: parsed.data.source || null,
@@ -24,7 +25,8 @@ export async function POST(request: Request) {
     operational_status: parsed.data.operationalStatus || null, estimated_value: parsed.data.estimatedValue || null,
     scheduled_at: parsed.data.scheduledAt || null, location_name: parsed.data.locationName || null,
     items: parsed.data.items || [], attachments: parsed.data.attachments || [], timeline: parsed.data.timeline || [],
-  });
+  }).select("id").single();
   if (error) return NextResponse.json({ error: "Não foi possível salvar o lead." }, { status: 400 });
+  await notifyProjectEvent(parsed.data.projectId, "lead.created", "lead", lead.id, { visitorName: parsed.data.name, phone: parsed.data.phone, interest: parsed.data.recommendation, location: parsed.data.locationName }).catch(() => undefined);
   return NextResponse.json({ accepted: true, persisted: true }, { status: 201 });
 }
