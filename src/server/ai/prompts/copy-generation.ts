@@ -1,0 +1,1 @@
+export const copyGenerationPrompt = `Gere de uma a cinco sugestões para o campo selecionado. Pode melhorar headline, subtítulo, benefício e CTA com base apenas no contexto confirmado. Não transforme copy em promessa factual e não acrescente números, prazos, avaliações, garantias, disponibilidade ou condições comerciais ausentes. Retorne apenas o schema solicitado.`;

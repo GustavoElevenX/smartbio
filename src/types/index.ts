@@ -101,6 +101,41 @@ export type CapacityKind =
 
 export type CompletionChannel = "native" | "whatsapp" | "external_url" | "email" | "phone";
 
+export type DataOrigin =
+  | "user"
+  | "website"
+  | "document"
+  | "logo_analysis"
+  | "ai_inference"
+  | "generated_copy"
+  | "system_default";
+
+export type DataVerificationStatus = "verified" | "needs_confirmation" | "missing" | "invalid";
+
+export interface SourcedValue<T> {
+  value: T | null;
+  origin: DataOrigin;
+  verificationStatus: DataVerificationStatus;
+  sourceId?: string;
+  confidence?: number;
+  notes?: string;
+}
+
+export interface DataRequirement {
+  id: string;
+  key: string;
+  label: string;
+  capability: CapabilityKey | "brand" | "project";
+  status: DataVerificationStatus;
+  severity: "blocking" | "warning" | "optional";
+  value?: unknown;
+  origin?: DataOrigin;
+  sourceId?: string;
+  reason: string;
+  actionLabel?: string;
+  actionPath?: string;
+}
+
 export type CapabilityKey =
   | "qualification"
   | "quote"
@@ -379,17 +414,38 @@ export interface Reservation {
   createdAt?: string;
 }
 
+export interface OpeningHoursRule {
+  weekday: number;
+  opensAt: string;
+  closesAt: string;
+  isClosed?: boolean;
+}
+
 export interface BusinessLocation {
   id: string;
   projectId: string;
   name: string;
-  city?: string;
-  neighborhood?: string;
-  postalCodePrefixes?: string[];
   address?: string;
+  city?: string;
+  state?: string;
+  neighborhood?: string;
+  postalCode?: string;
+  postalCodePrefixes?: string[];
+  countryCode: string;
+  latitude?: number;
+  longitude?: number;
+  geocodingStatus: "pending" | "resolved" | "manual" | "failed";
   phone?: string;
   whatsapp?: string;
   externalUrl?: string;
+  timezone: string;
+  openingHours: OpeningHoursRule[];
+  serviceRadiusKm?: number;
+  deliveryRadiusKm?: number;
+  supportsDelivery: boolean;
+  supportsPickup: boolean;
+  supportsInPerson: boolean;
+  priority: number;
   isActive: boolean;
 }
 
@@ -626,10 +682,50 @@ export interface Project {
     routingDestinations?: RoutingDestination[];
     paymentUrl?: string;
   };
+  dataRequirements?: DataRequirement[];
   version: number;
   createdAt: string;
   updatedAt: string;
   publishedAt?: string;
+}
+
+export interface MediaAsset {
+  id: string;
+  workspaceId: string;
+  projectId?: string;
+  storagePath: string;
+  originalName: string;
+  mimeType: string;
+  byteSize: number;
+  width?: number;
+  height?: number;
+  altText?: string;
+  tags: string[];
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface Notification {
+  id: string;
+  workspaceId: string;
+  projectId?: string;
+  userId?: string;
+  type: string;
+  title: string;
+  body: string;
+  actionUrl?: string;
+  readAt?: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface NotificationPreference {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  eventKey: string;
+  inApp: boolean;
+  email: boolean;
 }
 
 export interface Lead {

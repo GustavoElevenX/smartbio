@@ -921,7 +921,10 @@ export function ExperienceCanvas({
               {project.name}
             </p>
             <h1
-              className="mt-4 text-[clamp(2rem,8vw,3.6rem)] font-extrabold leading-[1.02] tracking-[-.055em]"
+              className={cn(
+                "mt-4 font-extrabold leading-[1.02] tracking-[-.055em]",
+                preview ? "text-[2rem]" : "text-[clamp(2rem,8vw,3.6rem)]",
+              )}
               style={{
                 fontFamily: `"${project.designSystem.typography.headingFont}", Inter, ui-sans-serif, system-ui, sans-serif`,
                 fontWeight: project.designSystem.typography.headingWeight,

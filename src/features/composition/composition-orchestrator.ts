@@ -5,7 +5,20 @@ import { assignProjectToCommercialConfig, defaultSlug, journeyComposer, type Rul
 import { visualComposer, type VisualComposer } from "@/features/composition/visual-composer";
 import { features } from "@/lib/constants";
 import { uid } from "@/lib/utils";
-import type { BrandProfile, ExperienceCompositionInput, Project } from "@/types";
+import type { AIJourneyDraftPayload } from "@/features/composition/composition.schema";
+import { aiJourneyDraftSchema } from "@/features/composition/composition.schema";
+import type { BrandProfile, ExperienceCompositionInput, JourneyStep, Project, ProjectCapability } from "@/types";
+
+export type AIJourneyComposer = (input: ExperienceCompositionInput, projectProfile: NonNullable<Project["businessProfile"]>, capabilities: ProjectCapability[]) => Promise<AIJourneyDraftPayload>;
+
+function sanitizeAIJourney(steps: JourneyStep[]) {
+  const ids = new Set(steps.map((step) => step.id));
+  return steps.map((step, order) => ({
+    ...step,
+    order,
+    options: step.options?.filter((option) => option.actionType !== "go_to_step" || Boolean(option.targetStepId && ids.has(option.targetStepId))),
+  }));
+}
 
 export class CompositionOrchestrator {
   constructor(
@@ -13,12 +26,25 @@ export class CompositionOrchestrator {
     private readonly planner: CapabilityPlanner = capabilityPlanner,
     private readonly journey: RuleBasedJourneyComposer = journeyComposer,
     private readonly visual: VisualComposer = visualComposer,
+    private readonly aiJourney?: AIJourneyComposer,
   ) {}
 
   async compose(input: ExperienceCompositionInput): Promise<Project> {
     const profile = await this.analyzer.analyze(input);
     const capabilities = this.planner.plan(profile);
-    const composition = this.journey.compose(input, profile, capabilities);
+    let composition = this.journey.compose(input, profile, capabilities);
+    if (features.aiJourneyComposition && this.aiJourney) {
+      try {
+        const draft = aiJourneyDraftSchema.parse(await this.aiJourney(input, profile, capabilities));
+        composition = {
+          ...composition,
+          steps: sanitizeAIJourney(draft.steps as JourneyStep[]),
+          requirements: draft.requirements,
+        };
+      } catch {
+        // The deterministic composition remains complete enough to edit and safe to persist.
+      }
+    }
     const brand: BrandProfile = input.brand || {
       extractedColors: ["#6D5EF5", "#FF725E", "#19B88B"],
       activePalette: buildPalette(["#6D5EF5", "#FF725E", "#19B88B"]),
@@ -47,11 +73,11 @@ export class CompositionOrchestrator {
       capabilities,
       commercialConfig: assignProjectToCommercialConfig(composition.commercialConfig, id),
       steps: composition.steps,
+      dataRequirements: composition.requirements,
       version: 1,
       createdAt: now,
       updatedAt: now,
     };
-    void features.aiJourneyComposition;
     return project;
   }
 }

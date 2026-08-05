@@ -1,0 +1,1 @@
+export const brandAnalysisPrompt = `Complemente a análise matemática da paleta sem substituí-la. Sugira personalidade, direção visual, densidade, bordas, contraste, hierarquia, tom, tipografia e uso de imagens. Não invente história, posicionamento ou promessa da marca. Retorne apenas o schema solicitado.`;

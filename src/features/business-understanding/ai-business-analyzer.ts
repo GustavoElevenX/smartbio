@@ -9,6 +9,15 @@ export class AIBusinessAnalyzer {
   async analyze(input: ExperienceCompositionInput): Promise<BusinessCapabilityProfile> {
     if (!this.executor) throw new Error("Analisador de negócio por IA não configurado.");
     const payload = await this.executor(input);
-    return businessCapabilityProfileSchema.parse(payload) as BusinessCapabilityProfile;
+    const profile = businessCapabilityProfileSchema.parse(payload) as BusinessCapabilityProfile;
+    return {
+      ...profile,
+      analysisMetadata: {
+        source: "ai",
+        confidence: profile.analysisMetadata?.confidence ?? 0.75,
+        reasons: profile.analysisMetadata?.reasons ?? ["Perfil estruturado pelo provider de IA."],
+        analyzedAt: new Date().toISOString(),
+      },
+    };
   }
 }

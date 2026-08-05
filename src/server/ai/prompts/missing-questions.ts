@@ -1,0 +1,1 @@
+export const missingQuestionsPrompt = `Planeje no máximo cinco perguntas simples e objetivas para completar apenas os requisitos mais importantes. Prefira escolhas rápidas quando houver poucas opções válidas. Não use jargão, não repita respostas existentes e não pergunte dados opcionais antes de bloqueios de publicação. Retorne apenas o schema solicitado.`;

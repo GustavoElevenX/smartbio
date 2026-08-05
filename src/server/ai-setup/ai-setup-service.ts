@@ -1,0 +1,202 @@
+import "server-only";
+
+import { randomUUID } from "node:crypto";
+import type { AISetupSession, SetupQuestion } from "@/features/ai-setup/ai-setup.schema";
+import { RuleBasedBusinessAnalyzer } from "@/features/business-understanding/rule-based-business-analyzer";
+import { capabilityPlanner } from "@/features/capabilities/capability-planner";
+import { draftCapabilityRequirements } from "@/features/capabilities/capability-requirements";
+import { CompositionOrchestrator } from "@/features/composition/composition-orchestrator";
+import { journeyComposer } from "@/features/composition/journey-composer";
+import { visualComposer } from "@/features/composition/visual-composer";
+import { slugify } from "@/lib/utils";
+import { aiSetupRepository, type AISetupRepository } from "@/server/ai-setup/ai-setup-repository";
+import { planAdaptiveQuestions } from "@/server/ai-setup/question-planner";
+import type { AISetupActor } from "@/server/auth/setup-actor";
+import { getAIProvider, isAIConfigured } from "@/server/ai/ai-client";
+import type { DataRequirement, ExperienceCompositionInput, Project } from "@/types";
+
+export class AISetupNotFoundError extends Error {}
+
+function compositionInput(session: AISetupSession): ExperienceCompositionInput {
+  const destinationAnswer = Object.entries(session.answers).find(([key]) => key.endsWith(".destination") || key.endsWith(".completion"))?.[1];
+  const objective = session.answers["qualification.objective"];
+  return {
+    businessName: session.initialInput.businessName,
+    businessDescription: session.initialInput.description,
+    primaryGoal: typeof objective === "string" && objective.trim() ? objective : "Criar uma jornada comercial",
+    primaryDestination: typeof destinationAnswer === "string" && destinationAnswer.trim()
+      ? destinationAnswer
+      : session.initialInput.phone ? "WhatsApp" : session.initialInput.websiteUrl ? "Site" : "Formulário",
+    slug: slugify(session.initialInput.businessName),
+    phone: session.initialInput.phone,
+    websiteUrl: session.initialInput.websiteUrl,
+  };
+}
+
+function resolvedRequirements(requirements: DataRequirement[], answers: Record<string, unknown>) {
+  return requirements.map((requirement): DataRequirement => answers[requirement.key] == null ? requirement : {
+    ...requirement,
+    status: "verified",
+    value: answers[requirement.key],
+    origin: "user",
+    sourceId: "adaptive-onboarding",
+    reason: "Informação confirmada durante o onboarding adaptativo.",
+  });
+}
+
+function mergeProjectRequirements(project: Project, session: AISetupSession) {
+  const byKey = new Map(session.missingRequirements.map((item) => [item.key, item]));
+  return (project.dataRequirements || []).map((item) => byKey.get(item.key) || item);
+}
+
+export class AISetupService {
+  constructor(private readonly repository: AISetupRepository = aiSetupRepository) {}
+
+  async start(actor: AISetupActor, initialInput: AISetupSession["initialInput"], sources: string[] = []) {
+    const now = new Date().toISOString();
+    const session: AISetupSession = {
+      id: randomUUID(),
+      workspaceId: actor.workspaceId,
+      status: "collecting",
+      initialInput,
+      answers: {},
+      missingRequirements: [],
+      questions: [],
+      sources,
+      usedFallback: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const created = await this.repository.create(actor, session);
+    await this.repository.addMessage(actor, created.id, "user", initialInput.description, { kind: "business_description" });
+    return created;
+  }
+
+  async get(actor: AISetupActor, id: string) {
+    const session = await this.repository.get(actor, id);
+    if (!session) throw new AISetupNotFoundError("Sessão de onboarding não encontrada.");
+    return session;
+  }
+
+  async analyze(actor: AISetupActor, id: string) {
+    let session = await this.get(actor, id);
+    session = await this.repository.update(actor, { ...session, status: "analyzing", lastError: undefined });
+    const input = compositionInput(session);
+    const fallbackProfile = new RuleBasedBusinessAnalyzer().analyze(input);
+    let profile = fallbackProfile;
+    let providerQuestions: SetupQuestion[] | undefined;
+    let usedFallback = !isAIConfigured();
+
+    if (isAIConfigured()) {
+      try {
+        const result = await getAIProvider().analyzeBusiness({
+          input,
+          workspaceId: actor.workspaceId,
+          setupSessionId: id,
+          userId: actor.userId,
+        });
+        profile = result.profile;
+      } catch {
+        usedFallback = true;
+      }
+    }
+
+    const capabilities = capabilityPlanner.plan(profile);
+    const requirements = resolvedRequirements(draftCapabilityRequirements(capabilities), session.answers);
+    if (isAIConfigured() && !usedFallback) {
+      try {
+        providerQuestions = await getAIProvider().generateMissingQuestions({
+          profile,
+          requirements,
+          answers: session.answers,
+          workspaceId: actor.workspaceId,
+          setupSessionId: id,
+          userId: actor.userId,
+        });
+      } catch {
+        usedFallback = true;
+      }
+    }
+    const validKeys = new Set(requirements.filter((item) => item.status !== "verified").map((item) => item.key));
+    const questions = providerQuestions?.filter((item) => validKeys.has(item.key)).slice(0, 5);
+    const next = await this.repository.update(actor, {
+      ...session,
+      status: "waiting_answers",
+      extractedProfile: profile,
+      missingRequirements: requirements,
+      questions: questions?.length ? questions : planAdaptiveQuestions(requirements, session.answers),
+      usedFallback,
+    });
+    await this.repository.addMessage(actor, id, "assistant", "Analisei o negócio e preparei as perguntas que faltam para montar a jornada.", { kind: "analysis", usedFallback });
+    return next;
+  }
+
+  async answer(actor: AISetupActor, id: string, key: string, value: unknown) {
+    const session = await this.get(actor, id);
+    if (!session.missingRequirements.some((item) => item.key === key)) throw new Error("Essa pergunta não pertence à sessão atual.");
+    const answers = { ...session.answers, [key]: value };
+    const requirements = resolvedRequirements(session.missingRequirements, answers);
+    const next = await this.repository.update(actor, {
+      ...session,
+      status: "waiting_answers",
+      answers,
+      missingRequirements: requirements,
+      questions: planAdaptiveQuestions(requirements, answers),
+    });
+    await this.repository.addMessage(actor, id, "user", typeof value === "string" ? value : JSON.stringify(value), { kind: "answer", key });
+    return next;
+  }
+
+  async generate(actor: AISetupActor, id: string) {
+    let session = await this.get(actor, id);
+    if (!session.extractedProfile) session = await this.analyze(actor, id);
+    session = await this.repository.update(actor, { ...session, status: "generating", lastError: undefined });
+    const input = compositionInput(session);
+    const profile = session.extractedProfile || new RuleBasedBusinessAnalyzer().analyze(input);
+    const aiJourney = isAIConfigured() ? async () => getAIProvider().composeJourney({
+      input,
+      profile,
+      capabilities: capabilityPlanner.plan(profile),
+      answers: session.answers,
+      workspaceId: actor.workspaceId,
+      setupSessionId: id,
+      userId: actor.userId,
+    }) : undefined;
+    const orchestrator = new CompositionOrchestrator(
+      { analyze: () => profile },
+      capabilityPlanner,
+      journeyComposer,
+      visualComposer,
+      aiJourney,
+    );
+    try {
+      const generated = await orchestrator.compose(input);
+      const project: Project = {
+        ...generated,
+        workspaceId: actor.workspaceId,
+        status: "draft",
+        dataRequirements: mergeProjectRequirements(generated, session),
+      };
+      const next = await this.repository.update(actor, {
+        ...session,
+        status: "review",
+        projectId: project.id,
+        projectDraft: project,
+        usedFallback: session.usedFallback || !isAIConfigured(),
+      });
+      await this.repository.addMessage(actor, id, "assistant", "A jornada foi composta como rascunho e está pronta para revisão no editor.", { kind: "generation", projectId: project.id });
+      return next;
+    } catch (error) {
+      await this.repository.update(actor, { ...session, status: "failed", lastError: error instanceof Error ? error.message : "Falha ao gerar a jornada." });
+      throw error;
+    }
+  }
+
+  async complete(actor: AISetupActor, id: string, projectId?: string) {
+    const session = await this.get(actor, id);
+    if (!session.projectDraft) throw new Error("Gere a jornada antes de concluir o onboarding.");
+    return this.repository.update(actor, { ...session, status: "completed", projectId: projectId || session.projectId });
+  }
+}
+
+export const aiSetupService = new AISetupService();

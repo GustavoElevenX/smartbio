@@ -1,21 +1,27 @@
-export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "SmartBio";
+import { clientEnv } from "@/lib/env/client";
+
+export const APP_NAME = clientEnv.NEXT_PUBLIC_APP_NAME;
 
 export const features = {
-  aiGeneration: process.env.NEXT_PUBLIC_FEATURE_AI === "true",
-  aiBusinessAnalysis: process.env.NEXT_PUBLIC_FEATURE_AI_BUSINESS_ANALYSIS === "true",
-  aiJourneyComposition: process.env.NEXT_PUBLIC_FEATURE_AI_JOURNEY_COMPOSITION === "true",
-  nativeQualification: process.env.NEXT_PUBLIC_FEATURE_QUALIFICATION !== "false",
-  nativeQuotes: process.env.NEXT_PUBLIC_FEATURE_QUOTES !== "false",
-  nativeScheduling: process.env.NEXT_PUBLIC_FEATURE_SCHEDULING !== "false",
-  nativeRouting: process.env.NEXT_PUBLIC_FEATURE_ROUTING !== "false",
-  nativeCatalogOrders: process.env.NEXT_PUBLIC_FEATURE_CATALOG_ORDERS === "true",
-  nativeReservations: process.env.NEXT_PUBLIC_FEATURE_RESERVATIONS === "true",
-  externalPayments: process.env.NEXT_PUBLIC_FEATURE_EXTERNAL_PAYMENTS === "true",
-  calendarSync: process.env.NEXT_PUBLIC_FEATURE_CALENDAR_SYNC === "true",
-  nativeChat: process.env.NEXT_PUBLIC_FEATURE_CHAT === "true",
-  billing: process.env.NEXT_PUBLIC_FEATURE_BILLING === "true",
-  customDomains: process.env.NEXT_PUBLIC_FEATURE_CUSTOM_DOMAINS === "true",
-  multiUnitRouting: process.env.NEXT_PUBLIC_FEATURE_MULTI_UNIT !== "false",
+  aiGeneration: clientEnv.NEXT_PUBLIC_FEATURE_AI,
+  aiBusinessAnalysis: clientEnv.NEXT_PUBLIC_FEATURE_AI_BUSINESS_ANALYSIS,
+  aiJourneyComposition: clientEnv.NEXT_PUBLIC_FEATURE_AI_JOURNEY_COMPOSITION,
+  aiSourceImport: clientEnv.NEXT_PUBLIC_FEATURE_AI_SOURCE_IMPORT,
+  aiBrandAnalysis: clientEnv.NEXT_PUBLIC_FEATURE_AI_BRAND_ANALYSIS,
+  nativeQualification: clientEnv.NEXT_PUBLIC_FEATURE_QUALIFICATION,
+  nativeQuotes: clientEnv.NEXT_PUBLIC_FEATURE_QUOTES,
+  nativeScheduling: clientEnv.NEXT_PUBLIC_FEATURE_SCHEDULING,
+  nativeRouting: clientEnv.NEXT_PUBLIC_FEATURE_ROUTING,
+  geoRouting: clientEnv.NEXT_PUBLIC_FEATURE_GEO_ROUTING,
+  nativeCatalogOrders: clientEnv.NEXT_PUBLIC_FEATURE_CATALOG_ORDERS,
+  nativeReservations: clientEnv.NEXT_PUBLIC_FEATURE_RESERVATIONS,
+  externalPayments: clientEnv.NEXT_PUBLIC_FEATURE_EXTERNAL_PAYMENTS,
+  notifications: clientEnv.NEXT_PUBLIC_FEATURE_NOTIFICATIONS,
+  calendarSync: clientEnv.NEXT_PUBLIC_FEATURE_CALENDAR_SYNC,
+  nativeChat: clientEnv.NEXT_PUBLIC_FEATURE_CHAT,
+  billing: clientEnv.NEXT_PUBLIC_FEATURE_BILLING,
+  customDomains: clientEnv.NEXT_PUBLIC_FEATURE_CUSTOM_DOMAINS,
+  multiUnitRouting: clientEnv.NEXT_PUBLIC_FEATURE_MULTI_UNIT,
 };
 
 export const capabilityLabels = {

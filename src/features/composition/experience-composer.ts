@@ -46,6 +46,7 @@ export class RuleBasedExperienceComposer {
       capabilities,
       commercialConfig: assignProjectToCommercialConfig(composition.commercialConfig, id),
       steps: composition.steps,
+      dataRequirements: composition.requirements,
       version: 1,
       createdAt: now,
       updatedAt: now,

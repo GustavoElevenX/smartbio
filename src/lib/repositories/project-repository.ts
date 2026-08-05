@@ -2,6 +2,7 @@
 
 import { localStore } from "@/lib/local-store";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import { assertProjectPublishable } from "@/features/publishing/project-readiness";
 import type { FormField, JourneyStep, Project, StepOption } from "@/types";
 
 function isUuid(value: string) {
@@ -145,6 +146,22 @@ async function saveNormalized(project: Project) {
     if (error) throw new Error(error.message);
   }
 
+  if (normalized.dataRequirements?.length) {
+    const { error } = await supabase.from("project_data_requirements").upsert(normalized.dataRequirements.map((requirement) => ({
+      project_id: normalized.id,
+      requirement_key: requirement.key,
+      label: requirement.label,
+      capability_key: requirement.capability,
+      status: requirement.status,
+      severity: requirement.severity,
+      value: requirement.value ?? null,
+      origin: requirement.origin || null,
+      source_id: requirement.sourceId || null,
+      reason: requirement.reason,
+    })), { onConflict: "project_id,requirement_key" });
+    if (error) throw new Error(error.message);
+  }
+
   const blockRows = normalized.steps.flatMap((step) => (step.blocks || []).map((block, blockOrder) => ({
     id: block.id, project_id: normalized.id, step_id: step.id, block_type: block.type,
     block_order: blockOrder, content: block.content || {}, settings: { variant: block.variant, style: block.style || {} },
@@ -272,6 +289,7 @@ export const projectRepository = {
     return data ? projectPayload(data) || undefined : undefined;
   },
   async saveProject(project: Project): Promise<Project> {
+    if (project.status === "published") assertProjectPublishable(project);
     const local = localStore.saveProject(project);
     if (!isSupabaseConfigured()) return local;
     const remote = await saveNormalized(local);

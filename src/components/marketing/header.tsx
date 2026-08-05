@@ -12,8 +12,8 @@ export function MarketingHeader() {
         <Link href="/pricing" className="hover:text-[#17171c]">Planos</Link>
       </nav>
       <div className="flex items-center gap-2">
-        <Link href="/login" className="focus-ring hidden rounded-xl px-3 py-2 text-sm font-semibold text-[#555560] hover:bg-white sm:inline-flex">Entrar</Link>
-        <Link href="/register" className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#17171c] px-4 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(23,23,28,.16)] transition hover:bg-[#2b2b31]">Começar grátis <ArrowRight size={16} /></Link>
+        <Link href="/app" className="focus-ring hidden rounded-xl px-3 py-2 text-sm font-semibold text-[#555560] hover:bg-white sm:inline-flex">Abrir painel</Link>
+        <Link href="/app/onboarding" className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#17171c] px-4 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(23,23,28,.16)] transition hover:bg-[#2b2b31]">Começar grátis <ArrowRight size={16} /></Link>
       </div>
     </div>
   </header>;
@@ -24,7 +24,7 @@ export function MarketingFooter() {
     <div className="container-shell flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
       <Brand />
       <p className="text-sm text-[#777781]">© 2026 SmartBio. O próximo passo começa aqui.</p>
-      <div className="flex gap-5 text-sm font-medium text-[#5e5e68]"><Link href="/pricing">Planos</Link><Link href="/login">Entrar</Link></div>
+      <div className="flex gap-5 text-sm font-medium text-[#5e5e68]"><Link href="/pricing">Planos</Link><Link href="/app">Abrir painel</Link></div>
     </div>
   </footer>;
 }
