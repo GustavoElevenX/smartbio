@@ -35,19 +35,11 @@ function normalizeIds(project: Project): Project {
   return { ...project, id: projectId, steps, commercialConfig };
 }
 
-function projectPayload(row: { settings?: unknown }) {
-  if (!row.settings || typeof row.settings !== "object") return null;
-  const payload = (row.settings as Record<string, unknown>).projectPayload;
-  return payload && typeof payload === "object" ? payload as Project : null;
-}
-
 async function workspaceId() {
-  const supabase = createClient();
-  if (!supabase) return null;
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) return null;
-  const { data } = await supabase.from("workspace_members").select("workspace_id").eq("user_id", userData.user.id).limit(1).maybeSingle();
-  return data?.workspace_id || null;
+  const response = await fetch("/api/workspaces", { cache: "no-store" });
+  if (!response.ok) return null;
+  const payload = await response.json() as { data?: { activeWorkspaceId?: string } };
+  return payload.data?.activeWorkspaceId || null;
 }
 
 async function saveNormalized(project: Project) {
@@ -59,6 +51,7 @@ async function saveNormalized(project: Project) {
     .from("projects")
     .select("settings")
     .eq("id", normalized.id)
+    .eq("workspace_id", workspace)
     .maybeSingle();
   const existingSettings = existingProject?.settings && typeof existingProject.settings === "object"
     ? existingProject.settings as Record<string, unknown>
@@ -331,22 +324,20 @@ async function saveNormalized(project: Project) {
 export const projectRepository = {
   async getProjects(): Promise<Project[]> {
     if (!isSupabaseConfigured()) return canUseLocalStore() ? localStore.getProjects() : [];
-    const supabase = createClient();
-    if (!supabase) return canUseLocalStore() ? localStore.getProjects() : [];
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return canUseLocalStore() ? localStore.getProjects() : [];
-    const { data, error } = await supabase.from("projects").select("settings").order("updated_at", { ascending: false });
-    if (error) throw new Error(error.message);
-    return (data || []).map(projectPayload).filter((project): project is Project => Boolean(project));
+    const response = await fetch("/api/projects", { cache: "no-store" });
+    const payload = await response.json() as { data?: Project[]; error?: { message?: string } };
+    if (!response.ok) throw new Error(payload.error?.message || "Não foi possível carregar os projetos.");
+    return payload.data || [];
   },
   async getProject(value: string): Promise<Project | undefined> {
     if (!isSupabaseConfigured()) return canUseLocalStore() ? localStore.getProject(value) : undefined;
-    const supabase = createClient();
-    if (!supabase) return canUseLocalStore() ? localStore.getProject(value) : undefined;
-    const column = isUuid(value) ? "id" : "slug";
-    const { data, error } = await supabase.from("projects").select("settings").eq(column, value).maybeSingle();
-    if (error) throw new Error(error.message);
-    return data ? projectPayload(data) || undefined : undefined;
+    if (!isUuid(value)) {
+      return (await this.getProjects()).find((project) => project.slug === value);
+    }
+    const response = await fetch(`/api/projects/${encodeURIComponent(value)}`, { cache: "no-store" });
+    const payload = await response.json() as { data?: Project | null; error?: { message?: string } };
+    if (!response.ok) throw new Error(payload.error?.message || "Não foi possível carregar o projeto.");
+    return payload.data || undefined;
   },
   async saveProject(project: Project): Promise<Project> {
     if (!isSupabaseConfigured() && !canUseLocalStore()) throw new Error("Persistência indisponível. Configure o Supabase.");
@@ -365,7 +356,9 @@ export const projectRepository = {
     }
     const supabase = createClient();
     if (!supabase) return;
-    const { error } = await supabase.from("projects").delete().eq("id", id);
+    const workspace = await workspaceId();
+    if (!workspace) throw new Error("Workspace ativo indisponível.");
+    const { error } = await supabase.from("projects").delete().eq("id", id).eq("workspace_id", workspace);
     if (error) throw new Error(error.message);
   },
 };

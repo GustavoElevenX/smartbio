@@ -1,6 +1,5 @@
 import "server-only";
 import { z } from "zod";
-import { preserveStepOperationalFields } from "@/features/ai-editing/protected-fields";
 import { getAIProvider, isAIConfigured } from "@/server/ai/ai-client";
 import { assertProjectAccess } from "@/server/auth/project-access";
 import type { AuthenticatedActor } from "@/server/auth/setup-actor";
@@ -41,16 +40,28 @@ export async function regenerateStep(actor: AuthenticatedActor, projectId: strin
   let usedFallback = !isAIConfigured();
   if (isAIConfigured()) {
     try {
-      const context = `Negócio: ${project.name}. Propósito: ${before.type}. Anterior: ${project.steps[index - 1]?.title || "início"}. Próxima: ${project.steps[index + 1]?.title || "fim"}. Capacidades: ${(project.capabilities || []).filter((item) => item.enabled).map((item) => item.key).join(", ")}. Instrução: ${input.instruction || "melhorar clareza"}`;
-      const [title, description] = await Promise.all([
-        getAIProvider().generateCopy({ workspaceId: actor.workspaceId, projectId, userId: actor.userId, field: "title", value: before.title, action: "improve", businessContext: context }),
-        before.description ? getAIProvider().generateCopy({ workspaceId: actor.workspaceId, projectId, userId: actor.userId, field: "text", value: before.description, action: "improve", businessContext: context }) : Promise.resolve({ suggestions: [] }),
-      ]);
-      after = preserveStepOperationalFields(before, { ...before, title: title.suggestions[0] || before.title, description: description.suggestions[0] || before.description });
+      const profile = project.businessProfile;
+      if (!profile) throw new Error("Perfil de negócio indisponível.");
+      const draft = await getAIProvider().composeJourney({
+        workspaceId: actor.workspaceId, projectId, userId: actor.userId,
+        input: { businessName: project.name, businessDescription: `${project.description}\nInstrução para a etapa ${before.type}: ${input.instruction || "melhorar clareza e conversão"}`, primaryGoal: project.primaryGoal, primaryDestination: project.primaryDestination, slug: project.slug, category: project.category, audience: project.audience, phone: project.phone, visualDirection: project.visualDirection },
+        profile,
+        capabilities: project.capabilities || [],
+        answers: {},
+        confirmedCommercialData: project.commercialConfig,
+      });
+      const candidate = draft.steps.find((step) => step.id === stepId) || draft.steps.filter((step) => step.type === before.type)[0] || draft.steps[index];
+      if (!candidate) throw new Error("A IA não retornou uma etapa compatível.");
+      const options = candidate.options?.map((option, optionIndex) => {
+        const operational = before.options?.find((item) => item.id === option.id) || before.options?.[optionIndex];
+        return operational ? { ...option, id: operational.id, actionType: operational.actionType, targetStepId: operational.targetStepId, actionPayload: structuredClone(operational.actionPayload) } : option;
+      });
+      after = { ...(candidate as JourneyStep), id: before.id, order: before.order, isActive: before.isActive, options, settings: { ...candidate.settings, ...before.settings } };
       usedFallback = false;
     } catch { usedFallback = true; }
   }
-  return { before, after, diff: { title: before.title === after.title ? undefined : { before: before.title, after: after.title }, description: before.description === after.description ? undefined : { before: before.description, after: after.description } }, usedFallback };
+  const diff = Object.fromEntries((["title", "description", "options", "blocks", "formFields", "recommendation", "visualVariant", "settings"] as const).flatMap((key) => JSON.stringify(before[key]) === JSON.stringify(after[key]) ? [] : [[key, { before: before[key], after: after[key] }]]));
+  return { before, after, diff, usedFallback };
 }
 
 const visualInputSchema = z.object({ instruction: z.string().min(2).max(500), projectSnapshot: projectSnapshotSchema.optional() });

@@ -2,19 +2,26 @@ import { availableUnitQuantity, calculateReservationTotal } from "@/features/res
 import { features } from "@/lib/constants";
 import { createServiceClient } from "@/lib/supabase/server";
 import { reservationAvailabilitySchema } from "@/lib/validation/schemas";
-import { apiError, apiSuccess, requestIp, validationError } from "@/server/http/api-response";
+import { apiError, apiSuccess, validationError } from "@/server/http/api-response";
 import { getPublicProjectById } from "@/server/repositories/public-commercial-repository";
-import { checkRateLimit } from "@/server/services/rate-limit";
+import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
+import { publicRateLimitIdentifier } from "@/server/rate-limit/public-identifier";
 import type { Reservation, ReservationBlock } from "@/types";
 
 export async function POST(request: Request) {
-  if (!features.nativeReservations) return apiError("Reservas nativas estão desativadas.", 404, "feature_disabled");
-  if (!checkRateLimit(`reservation-availability:${requestIp(request)}`, 30, 60_000)) return apiError("Muitas consultas de disponibilidade.", 429, "rate_limited");
-  const parsed = reservationAvailabilitySchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return validationError(parsed.error);
+  const raw = await request.json().catch(() => null);
+  const candidate = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+  const rate = await consumeRateLimit("public-reservation-availability", publicRateLimitIdentifier(request, {
+    projectId: typeof candidate.projectId === "string" ? candidate.projectId : undefined,
+  }), rateLimitRules.publicRead, { failClosed: false });
+  const respond = <T extends Response>(response: T) => applyRateLimitHeaders(response, rate);
+  if (!rate.allowed) return respond(apiError("Muitas consultas de disponibilidade.", 429, "rate_limited"));
+  if (!features.nativeReservations) return respond(apiError("Reservas nativas estão desativadas.", 404, "feature_disabled"));
+  const parsed = reservationAvailabilitySchema.safeParse(raw);
+  if (!parsed.success) return respond(validationError(parsed.error));
   const supabase = createServiceClient();
   const project = await getPublicProjectById(supabase, parsed.data.projectId);
-  if (!project) return apiError("Projeto não encontrado.", 404, "project_not_found");
+  if (!project) return respond(apiError("Projeto não encontrado.", 404, "project_not_found"));
   let reservations: Reservation[] = []; let blocks: ReservationBlock[] = project.commercialConfig?.reservationBlocks || [];
   if (supabase) {
     const [reservationResult, blockResult] = await Promise.all([
@@ -25,5 +32,5 @@ export async function POST(request: Request) {
     blocks = (blockResult.data || []).map((item) => ({ id: item.id, projectId: item.project_id, unitId: item.unit_id || undefined, startsOn: item.starts_on, endsOn: item.ends_on, quantity: item.quantity, reason: item.reason || undefined }));
   }
   const units = (project.commercialConfig?.reservableUnits || []).filter((unit) => unit.isActive && unit.capacityAdults >= parsed.data.adults && unit.capacityChildren >= parsed.data.children).map((unit) => ({ ...unit, availableQuantity: availableUnitQuantity(unit, parsed.data, reservations, blocks), total: calculateReservationTotal(unit, parsed.data.checkIn, parsed.data.checkOut) })).filter((unit) => unit.availableQuantity > 0);
-  return apiSuccess({ units, refreshedAt: new Date().toISOString() });
+  return respond(apiSuccess({ units, refreshedAt: new Date().toISOString() }));
 }

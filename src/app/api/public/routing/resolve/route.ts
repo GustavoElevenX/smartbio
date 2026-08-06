@@ -2,18 +2,26 @@ import { resolveRoute } from "@/features/routing/routing-engine";
 import { features } from "@/lib/constants";
 import { createServiceClient } from "@/lib/supabase/server";
 import { routingResolveSchema } from "@/lib/validation/schemas";
-import { apiError, apiSuccess, requestIp, validationError } from "@/server/http/api-response";
+import { apiError, apiSuccess, validationError } from "@/server/http/api-response";
 import { getPublicProjectById } from "@/server/repositories/public-commercial-repository";
-import { checkRateLimit } from "@/server/services/rate-limit";
+import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
+import { publicRateLimitIdentifier } from "@/server/rate-limit/public-identifier";
 
 export async function POST(request: Request) {
-  if (!features.nativeRouting) return apiError("Roteamento nativo desativado.", 404, "feature_disabled");
-  if (!checkRateLimit(`routing:${requestIp(request)}`, 30, 60_000)) return apiError("Muitas consultas de rota.", 429, "rate_limited");
-  const parsed = routingResolveSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return validationError(parsed.error);
+  const raw = await request.json().catch(() => null);
+  const candidate = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+  const rate = await consumeRateLimit("public-route-resolve", publicRateLimitIdentifier(request, {
+    projectId: typeof candidate.projectId === "string" ? candidate.projectId : undefined,
+    sessionId: typeof candidate.sessionId === "string" ? candidate.sessionId : undefined,
+  }), rateLimitRules.publicRouteResolve, { failClosed: false });
+  const respond = <T extends Response>(response: T) => applyRateLimitHeaders(response, rate);
+  if (!rate.allowed) return respond(apiError("Muitas consultas de rota.", 429, "rate_limited"));
+  if (!features.nativeRouting) return respond(apiError("Roteamento nativo desativado.", 404, "feature_disabled"));
+  const parsed = routingResolveSchema.safeParse(raw);
+  if (!parsed.success) return respond(validationError(parsed.error));
   const project = await getPublicProjectById(createServiceClient(), parsed.data.projectId);
-  if (!project) return apiError("Projeto não encontrado.", 404, "project_not_found");
+  if (!project) return respond(apiError("Projeto não encontrado.", 404, "project_not_found"));
   const destinations = project.commercialConfig?.routingDestinations || [];
   const result = resolveRoute(parsed.data.context, project.commercialConfig?.routingRules || [], destinations, destinations[0]?.id);
-  return apiSuccess({ result });
+  return respond(apiSuccess({ result }));
 }

@@ -38,6 +38,9 @@ export class OpenAISmartBioProvider implements SmartBioAIProvider {
   private readonly model: string;
   private readonly timeoutMs: number;
   private readonly maxRetries: number;
+  private readonly visionModel: string;
+  private readonly maxOutputTokens: number;
+  private readonly promptVersion: string;
 
   constructor() {
     const env = readServerEnv();
@@ -45,18 +48,22 @@ export class OpenAISmartBioProvider implements SmartBioAIProvider {
     this.model = env.OPENAI_MODEL || "gpt-5.6";
     this.timeoutMs = env.AI_REQUEST_TIMEOUT_MS;
     this.maxRetries = env.AI_MAX_RETRIES;
+    this.visionModel = env.OPENAI_VISION_MODEL || this.model;
+    this.maxOutputTokens = env.OPENAI_MAX_OUTPUT_TOKENS;
+    this.promptVersion = env.AI_PROMPT_VERSION;
     this.client = new OpenAI({ apiKey: env.OPENAI_API_KEY, timeout: this.timeoutMs, maxRetries: 0 });
   }
 
   private async structured<T>({ operation, schemaName, schema, systemPrompt, payload, context, model, userContent }: StructuredAIRequest<T>): Promise<T> {
     const startedAt = Date.now();
     const selectedModel = model || this.model;
-    await recordAIUsage({ ...context, operation, provider: "openai", model: selectedModel, promptVersion: "2026-08-05", status: "started", inputSummary: { payloadBytes: JSON.stringify(payload).length } });
+    await recordAIUsage({ ...context, operation, provider: "openai", model: selectedModel, promptVersion: this.promptVersion, status: "started", inputSummary: { payloadBytes: JSON.stringify(payload).length } });
     let lastError: unknown;
     for (let attempt = 0; attempt <= this.maxRetries; attempt += 1) {
       try {
         const response = await this.client.responses.parse({
           model: selectedModel,
+          max_output_tokens: this.maxOutputTokens,
           reasoning: { effort: "low" },
           input: [
             { role: "system", content: systemPrompt },
@@ -71,12 +78,12 @@ export class OpenAISmartBioProvider implements SmartBioAIProvider {
           operation,
           provider: "openai",
           model: selectedModel,
-          promptVersion: "2026-08-05",
+          promptVersion: this.promptVersion,
           status: "completed",
           durationMs: Date.now() - startedAt,
           inputTokens: response.usage?.input_tokens,
           outputTokens: response.usage?.output_tokens,
-          outputSummary: { outputBytes: JSON.stringify(parsed).length },
+          outputSummary: operation === "journey_composition" && parsed && typeof parsed === "object" ? { outputBytes: JSON.stringify(parsed).length, suggestedCapabilities: (parsed as { suggestedCapabilities?: Array<{ key: string }> }).suggestedCapabilities?.map((item) => item.key) || [], appliedCandidates: (parsed as { suggestedCapabilities?: Array<{ key: string; enabled: boolean }> }).suggestedCapabilities?.filter((item) => item.enabled).map((item) => item.key) || [], proposedConfigSections: Object.keys((parsed as { commercialConfigPatch?: Record<string, unknown> }).commercialConfigPatch || {}), requirementsCreated: (parsed as { requirements?: unknown[] }).requirements?.length || 0 } : { outputBytes: JSON.stringify(parsed).length },
         });
         return parsed;
       } catch (error) {
@@ -86,7 +93,7 @@ export class OpenAISmartBioProvider implements SmartBioAIProvider {
       }
     }
     const normalized = normalizeAIError(lastError);
-    await recordAIUsage({ ...context, operation, provider: "openai", model: selectedModel, promptVersion: "2026-08-05", status: "failed", durationMs: Date.now() - startedAt, errorCode: normalized.code });
+    await recordAIUsage({ ...context, operation, provider: "openai", model: selectedModel, promptVersion: this.promptVersion, status: "failed", durationMs: Date.now() - startedAt, errorCode: normalized.code });
     throw normalized;
   }
 
@@ -110,7 +117,7 @@ export class OpenAISmartBioProvider implements SmartBioAIProvider {
   extractSource(input: SourceExtractionInput) {
     const instruction = { type: "input_text" as const, text: `DADOS_DELIMITADOS_INICIO\n${JSON.stringify({ sourceId: input.sourceId, sourceType: input.sourceType, name: input.name, content: input.content })}\nDADOS_DELIMITADOS_FIM` };
     const visual = input.fileData && input.mimeType?.startsWith("image/") ? { type: "input_image" as const, image_url: `data:${input.mimeType};base64,${input.fileData}`, detail: "high" as const } : undefined;
-    return this.structured({ operation: "source_extraction", schemaName: "extracted_source", schema: extractedBusinessSourceSchema, systemPrompt: sourceExtractionPrompt, payload: input, userContent: visual ? [instruction, visual] : [instruction], context: input });
+    return this.structured({ operation: "source_extraction", schemaName: "extracted_source", schema: extractedBusinessSourceSchema, systemPrompt: sourceExtractionPrompt, payload: input, userContent: visual ? [instruction, visual] : [instruction], context: input, model: visual ? this.visionModel : undefined });
   }
 
   analyzeBrand(input: BrandAIInput) {

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { commercialConfigPatchSchema } from "@/features/composition/commercial-config-patch.schema";
 
 export const capabilityKeySchema = z.enum(["qualification", "quote", "scheduling", "catalog_order", "reservation", "routing", "payment"]);
 
@@ -44,7 +45,7 @@ export const aiJourneyDraftSchema = z.object({
     version: z.number().int().min(1),
     configuration: z.record(z.string(), z.unknown()),
   })).max(7),
-  commercialConfigPatch: z.record(z.string(), z.unknown()),
+  commercialConfigPatch: commercialConfigPatchSchema,
   requirements: z.array(z.object({
     id: z.string(),
     key: z.string().min(1).max(120),

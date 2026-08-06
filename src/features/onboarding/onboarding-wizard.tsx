@@ -304,7 +304,7 @@ export function OnboardingWizard() {
     setGenerating(true);
     setError("");
     try {
-      const composed = await experienceComposer.compose(compositionInput);
+      const composed = selectedAISuggestions.length ? await (async () => { const response = await fetch("/api/projects/compose", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(compositionInput) }); const payload = await response.json() as { data?: Project; error?: { message?: string } }; if (!response.ok || !payload.data) throw new Error(payload.error?.message || "Não foi possível compor com IA."); return payload.data; })() : await experienceComposer.compose(compositionInput);
       const created = selectedAISuggestions.length ? { ...composed, capabilities: (composed.capabilities || []).map((capability) => selectedAISuggestions.includes(capability.key) ? { ...capability, enabled: true, source: "ai" as const } : capability) } : composed;
       const saved = await projectRepository.saveProject(created);
       setProject(saved);

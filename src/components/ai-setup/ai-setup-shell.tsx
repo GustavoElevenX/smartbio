@@ -89,8 +89,8 @@ export function AISetupShell() {
       const project = generatedSession.projectDraft as Project | undefined;
       if (!project) throw new Error("A geração terminou sem criar um rascunho.");
       const saved = await projectRepository.saveProject(project);
-      const completed = await apiCall<AISetupSession>(`/api/ai/setup/${session.id}/complete`, { method: "POST", body: JSON.stringify({ projectId: saved.id }) });
-      adopt(completed); setProjectId(saved.id); setGenerationStatus("ready");
+      const finalized = await apiCall<{ session: AISetupSession }>(`/api/ai/setup/${session.id}/finalize-project`, { method: "POST", body: JSON.stringify({ projectId: saved.id, applyVerifiedFacts: true }) });
+      adopt(finalized.session); setProjectId(saved.id); setGenerationStatus("ready");
     } catch (caught) { setGenerationStatus("idle"); setError(caught instanceof Error ? caught.message : "Não foi possível gerar a jornada."); }
     finally { setBusy(false); }
   }

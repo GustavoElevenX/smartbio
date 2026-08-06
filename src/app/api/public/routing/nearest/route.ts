@@ -8,13 +8,14 @@ import { isLocationOpen } from "@/features/routing/opening-hours";
 import { features } from "@/lib/constants";
 import { findDemoProject } from "@/data/demo-projects";
 import { createServiceClient } from "@/lib/supabase/server";
-import { apiError, apiSuccess, requestIp, validationError } from "@/server/http/api-response";
+import { apiError, apiSuccess, validationError } from "@/server/http/api-response";
 import { configuredMapsProvider } from "@/server/maps/maps-client";
 import {
   applyRateLimitHeaders,
   consumeRateLimit,
   rateLimitRules,
 } from "@/server/rate-limit/rate-limit";
+import { publicRateLimitIdentifier } from "@/server/rate-limit/public-identifier";
 import type { BusinessLocation, RoutingDestination } from "@/types";
 
 const nearestSchema = z
@@ -121,24 +122,26 @@ function normalize(value?: string) {
 }
 
 export async function POST(request: Request) {
-  if (!features.geoRouting) {
-    return apiError("Roteamento geográfico desativado.", 404, "feature_disabled");
-  }
-  const parsed = nearestSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return validationError(parsed.error);
-  const input = parsed.data;
+  const raw = await request.json().catch(() => null);
+  const candidate = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
   const rate = await consumeRateLimit(
     "public-route-resolve",
-    `${requestIp(request)}:${input.projectId}`,
+    publicRateLimitIdentifier(request, {
+      projectId: typeof candidate.projectId === "string" ? candidate.projectId : undefined,
+    }),
     rateLimitRules.publicRouteResolve,
-    { failClosed: true },
+    { failClosed: false },
   );
+  const respond = <T extends Response>(response: T) => applyRateLimitHeaders(response, rate);
   if (!rate.allowed) {
-    return applyRateLimitHeaders(
-      apiError("Muitas consultas de unidade.", 429, "rate_limited"),
-      rate,
-    );
+    return respond(apiError("Muitas consultas de unidade.", 429, "rate_limited"));
   }
+  if (!features.geoRouting) {
+    return respond(apiError("Roteamento geográfico desativado.", 404, "feature_disabled"));
+  }
+  const parsed = nearestSchema.safeParse(raw);
+  if (!parsed.success) return respond(validationError(parsed.error));
+  const input = parsed.data;
 
   const supabase = createServiceClient();
   if (!supabase) {

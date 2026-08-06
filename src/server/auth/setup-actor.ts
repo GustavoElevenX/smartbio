@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { canUseLocalAuth } from "@/lib/runtime-mode";
 import { createServiceClient } from "@/lib/supabase/server";
 import { ensureUserWorkspace } from "@/server/auth/workspace-bootstrap";
+import { ACTIVE_WORKSPACE_COOKIE } from "@/server/auth/active-workspace";
 import {
   AuthenticationRequiredError,
   EmailNotConfirmedError,
@@ -74,17 +75,28 @@ const resolveActor = cache(async (): Promise<AuthenticatedActor | null> => {
   if (!service) throw new ProductionConfigurationError();
   const { data, error: membershipError } = await service
     .from("workspace_members")
-    .select("workspace_id,role")
+    .select("workspace_id,role,created_at")
     .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .order("created_at", { ascending: true });
   if (membershipError) throw new WorkspaceRequiredError();
-  const membership = data?.workspace_id ? data : await ensureUserWorkspace(user);
+  const memberships = data || [];
+  const requestedWorkspaceId = cookieStore.get(ACTIVE_WORKSPACE_COOKIE)?.value;
+  const requested = memberships.find((item) => item.workspace_id === requestedWorkspaceId);
+  const membership = requested || memberships.find((item) => item.role === "owner") || memberships[0];
+  if (!membership) {
+    const created = await ensureUserWorkspace(user);
+    return {
+      userId: user.id,
+      email: user.email || "",
+      workspaceId: created.workspaceId,
+      role: created.role,
+      persistence: "database",
+    };
+  }
   return {
     userId: user.id,
     email: user.email || "",
-    workspaceId: "workspaceId" in membership ? membership.workspaceId : membership.workspace_id,
+    workspaceId: membership.workspace_id,
     role: membership.role === "owner" ? "owner" : "member",
     persistence: "database",
   };

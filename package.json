@@ -11,7 +11,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "data:backfill:dry": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/backfill-normalized-project-data.ts --dry-run",
+    "data:backfill": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/backfill-normalized-project-data.ts",
+    "data:check-consistency": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/check-project-data-consistency.ts"
   },
   "engines": {
     "node": ">=22.0.0"

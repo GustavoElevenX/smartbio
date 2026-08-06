@@ -1,7 +1,7 @@
 import { buildPalette } from "@/features/brand-intelligence/colors";
 import { RuleBasedBusinessAnalyzer } from "@/features/business-understanding/rule-based-business-analyzer";
 import { CapabilityPlanner } from "@/features/capabilities/capability-planner";
-import { compositionOrchestrator } from "@/features/composition/composition-orchestrator";
+import { deterministicCompositionOrchestrator } from "@/features/composition/composition-orchestrator";
 import { assignProjectToCommercialConfig, defaultSlug, RuleBasedJourneyComposer } from "@/features/composition/journey-composer";
 import { VisualComposer } from "@/features/composition/visual-composer";
 import { uid } from "@/lib/utils";
@@ -56,13 +56,13 @@ export class RuleBasedExperienceComposer {
 
 export class AIExperienceComposer {
   async compose(input: ExperienceCompositionInput): Promise<Project> {
-    return compositionOrchestrator.compose(input);
+    return deterministicCompositionOrchestrator.compose(input);
   }
 }
 
 export class ExperienceComposerOrchestrator {
   async compose(input: ExperienceCompositionInput) {
-    return compositionOrchestrator.compose(input);
+    return deterministicCompositionOrchestrator.compose(input);
   }
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, Check, Loader2, Plus, Save, ShieldCheck } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CatalogPanel } from "@/components/commercial-data/catalog/catalog-panel";
 import { DestinationsPanel } from "@/components/commercial-data/destinations/destinations-panel";
 import { IntegrityPanel } from "@/components/commercial-data/integrity/integrity-panel";
@@ -42,10 +42,11 @@ export function CommercialDataShell({ projectId }: { projectId: string }) {
   const [activeTab, setActiveTab] = useState<TabKey>("services");
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
+  const baselineIds = useRef<ReturnType<typeof collectDeletableIds> | null>(null);
 
   useEffect(() => {
     let current = true;
-    projectRepository.getProject(projectId).then((result) => { if (current) setProject(result || null); }).catch((error) => { if (current) { setProject(null); setStatus({ kind: "error", message: error instanceof Error ? error.message : "Não foi possível carregar os dados." }); } });
+    projectRepository.getProject(projectId).then((result) => { if (current) { setProject(result || null); baselineIds.current = result ? collectDeletableIds(result) : null; } }).catch((error) => { if (current) { setProject(null); setStatus({ kind: "error", message: error instanceof Error ? error.message : "Não foi possível carregar os dados." }); } });
     return () => { current = false; };
   }, [projectId]);
 
@@ -70,9 +71,12 @@ export function CommercialDataShell({ projectId }: { projectId: string }) {
     try {
       if (canUseLocalStore()) await projectRepository.saveProject(project);
       else {
-        const response = await fetch(`/api/projects/${project.id}/commercial-data`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ commercialConfig: project.commercialConfig || {}, capabilities: project.capabilities || [], dataRequirements: project.dataRequirements || [] }) });
-        const payload = await response.json().catch(() => ({})) as { error?: string };
-        if (!response.ok) throw new Error(payload.error || "Não foi possível salvar os dados comerciais.");
+        const currentIds = collectDeletableIds(project);
+        const deleted = Object.fromEntries(Object.entries(baselineIds.current || currentIds).map(([key, ids]) => [key, ids.filter((id) => !(currentIds[key as keyof typeof currentIds] as string[]).includes(id))]));
+        const response = await fetch(`/api/projects/${project.id}/commercial-data`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ data: project.commercialConfig || {}, capabilities: project.capabilities || [], dataRequirements: project.dataRequirements || [], deleted, expectedProjectVersion: project.version }) });
+        const payload = await response.json().catch(() => ({})) as { data?: Project; error?: string | { message?: string } };
+        if (!response.ok) throw new Error(typeof payload.error === "string" ? payload.error : payload.error?.message || "Não foi possível salvar os dados comerciais.");
+        if (payload.data) { setProject(payload.data); baselineIds.current = collectDeletableIds(payload.data); }
       }
       setStatus({ kind: "ok", message: "Dados comerciais salvos e auditados." });
     } catch (error) { setStatus({ kind: "error", message: error instanceof Error ? error.message : "Não foi possível salvar." }); }
@@ -99,4 +103,17 @@ export function CommercialDataShell({ projectId }: { projectId: string }) {
     </Tabs></div>
     <div className="flex items-center gap-2 text-xs text-[#72727c]"><ShieldCheck size={15} className="text-emerald-600" />Valores confirmados são protegidos em regenerações de IA.</div>
   </div>;
+}
+
+function collectDeletableIds(project: Project) {
+  const config = project.commercialConfig || {};
+  return {
+    serviceOfferingIds: (config.serviceOfferings || []).map((item) => item.id),
+    quoteQuestionIds: (config.quoteDefinition?.questions || []).map((item) => item.id),
+    catalogItemIds: (config.catalogItems || []).map((item) => item.id),
+    catalogCategoryIds: (config.catalogCategories || []).map((item) => item.id),
+    resourceIds: (config.resources || []).map((item) => item.id),
+    locationIds: (config.locations || []).map((item) => item.id),
+    policyIds: (config.policies || []).map((item) => item.id),
+  };
 }

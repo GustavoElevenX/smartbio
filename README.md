@@ -24,7 +24,9 @@ Não é uma lista genérica de links e não tenta substituir o sistema operacion
 - IA granular por campo, etapa e visual, com snapshot, diff e proteção dos fatos comerciais confirmados.
 - Biblioteca privada de mídia com publicação controlada, detecção de uso e exclusão segura.
 - Multiunidades com geocodificação, horário, raio, Haversine, consentimento explícito e destino por unidade.
-- Notificações in-app/e-mail, preferências, idempotência e continuidade da operação quando o envio falhar.
+- Notificações in-app/e-mail com outbox assíncrona, lock concorrente, retry, dead letter e reconciliação.
+- Workspace ativo persistido em cookie HTTP-only, seletor com role/plano e isolamento dos caches do client.
+- Tabelas normalizadas como fonte operacional; `publishedPayload` é o snapshot imutável servido ao público.
 
 ## Experiências de aceitação
 
@@ -100,6 +102,10 @@ O seed usa o primeiro workspace disponível; crie ao menos um usuário antes de 
 - `202608050013_business_locations_geo_routing.sql`: unidades, coordenadas, horários, raios e destinos.
 - `202608050014_notifications.sql`: notificações, preferências e entregas idempotentes.
 - `202608050015_project_policies_and_readiness.sql`: políticas comerciais, metadados de verificação e prontidão.
+- `202608060016_attach_sources_and_ai_drafts.sql`: vínculo transacional e idempotente das fontes do onboarding ao projeto.
+- `202608060017_transactional_commercial_data.sql`: save comercial único, schemas profundos e concorrência otimista.
+- `202608060018_notification_outbox.sql`: outbox, claim com `skip locked`, retry e dead letter.
+- `202608060019_active_workspace_support.sql`: último workspace no perfil e plano do workspace.
 
 As escritas anônimas nas tabelas comerciais são revogadas. Os endpoints usam service role no servidor; o dashboard usa a sessão autenticada e RLS por membership. Agendamentos e reservas usam idempotência e travas transacionais para evitar dupla alocação.
 
@@ -182,7 +188,15 @@ npm run typecheck
 npm run test
 npm run test:e2e
 npm run build
+npm run data:backfill:dry
+npm run data:check-consistency
 ```
+
+`npm run data:backfill` importa somente projetos antigos sem steps normalizados e nunca sobrescreve um agregado já existente. O modo `:dry` apenas relata candidatos. O consistency check compara contagens normalizadas, cache de compatibilidade e versões publicadas; divergências são somente relatadas.
+
+## Worker de notificações
+
+Configure `CRON_SECRET` e execute `POST /api/internal/notifications/process` com `Authorization: Bearer $CRON_SECRET`. O `vercel.json` agenda o worker a cada cinco minutos. Se o plano da hospedagem não aceitar essa frequência, use um cron externo autenticado ou Supabase Cron com o mesmo endpoint. As APIs públicas apenas persistem a operação e enfileiram o evento; o envio pelo Resend acontece no worker.
 
 O primeiro E2E pode exigir `npx playwright install chromium`.
 

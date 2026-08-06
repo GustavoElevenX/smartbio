@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { ZodError } from "zod";
+import { publicRequestIp } from "@/server/rate-limit/public-identifier";
 
 export function apiSuccess<T>(data: T, status = 200) {
   return NextResponse.json({ ok: true, data }, { status });
@@ -14,5 +15,5 @@ export function validationError(error: ZodError) {
 }
 
 export function requestIp(request: Request) {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  return publicRequestIp(request);
 }

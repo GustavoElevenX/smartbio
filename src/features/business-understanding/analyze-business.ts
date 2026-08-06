@@ -25,4 +25,7 @@ export class BusinessAnalyzerOrchestrator {
   }
 }
 
-export const businessAnalyzer = new BusinessAnalyzerOrchestrator();
+export const deterministicBusinessAnalyzer = new BusinessAnalyzerOrchestrator(
+  new RuleBasedBusinessAnalyzer(),
+  { analyze: () => { throw new Error("Executor de IA indisponível no analisador determinístico."); } },
+);

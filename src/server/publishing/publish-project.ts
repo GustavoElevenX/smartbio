@@ -8,6 +8,7 @@ import { publishProjectMedia, validateProjectMediaReferences } from "@/server/me
 import { createCommercialNotification } from "@/server/notifications/notification-service";
 import { loadProjectForActor } from "@/server/projects/load-project-for-actor";
 import type { DataRequirement, Project } from "@/types";
+import { revalidatePath } from "next/cache";
 
 function addBlocking(
   readiness: ProjectReadinessResult,
@@ -161,13 +162,13 @@ export async function publishProject(
         settings: {
           ...settings,
           version: published.version,
-          projectPayload: published,
           publishedPayload: published,
         },
       })
       .eq("id", projectId)
       .eq("workspace_id", actor.workspaceId);
     if (error) throw new Error("Não foi possível publicar o projeto.");
+    revalidatePath(`/${published.slug}`);
   }
 
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");

@@ -2,20 +2,25 @@ import { calculateOrderTotals } from "@/features/catalog/order-engine";
 import { features } from "@/lib/constants";
 import { createServiceClient } from "@/lib/supabase/server";
 import { orderRequestSchema } from "@/lib/validation/schemas";
-import { apiError, apiSuccess, requestIp, validationError } from "@/server/http/api-response";
+import { apiError, apiSuccess, validationError } from "@/server/http/api-response";
 import { getPublicProjectById } from "@/server/repositories/public-commercial-repository";
-import { checkRateLimit } from "@/server/services/rate-limit";
-import { notifyProjectEvent } from "@/server/notifications/notification-service";
+import { enqueueProjectNotification } from "@/server/notifications/notification-service";
+import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
+import { publicRateLimitIdentifier } from "@/server/rate-limit/public-identifier";
 
 export async function POST(request: Request) {
-  if (!features.nativeCatalogOrders) return apiError("Pedidos nativos estão desativados.", 404, "feature_disabled");
-  if (!checkRateLimit(`order:${requestIp(request)}`, 10, 60_000)) return apiError("Muitos pedidos em sequência.", 429, "rate_limited");
-  const parsed = orderRequestSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return validationError(parsed.error);
-  if (parsed.data.honeypot) return apiSuccess({ accepted: true }, 202);
+  const raw = await request.json().catch(() => null);
+  const candidate = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+  const rate = await consumeRateLimit("public-order-submit", publicRateLimitIdentifier(request, { projectId: typeof candidate.projectId === "string" ? candidate.projectId : undefined, sessionId: typeof candidate.sessionId === "string" ? candidate.sessionId : undefined }), rateLimitRules.publicFormSubmit, { failClosed: true });
+  const respond = <T extends Response>(response: T) => applyRateLimitHeaders(response, rate);
+  if (!rate.allowed) return respond(apiError("Muitos pedidos em sequência.", 429, "rate_limited"));
+  if (!features.nativeCatalogOrders) return respond(apiError("Pedidos nativos estão desativados.", 404, "feature_disabled"));
+  const parsed = orderRequestSchema.safeParse(raw);
+  if (!parsed.success) return respond(validationError(parsed.error));
+  if (parsed.data.honeypot) return respond(apiSuccess({ accepted: true }, 202));
   const supabase = createServiceClient();
   const project = await getPublicProjectById(supabase, parsed.data.projectId);
-  if (!project) return apiError("Projeto não encontrado.", 404, "project_not_found");
+  if (!project) return respond(apiError("Projeto não encontrado.", 404, "project_not_found"));
   const catalog = new Map((project.commercialConfig?.catalogItems || []).filter((item) => item.isAvailable).map((item) => [item.id, item]));
   const items = parsed.data.items.map((requested) => {
     const item = catalog.get(requested.itemId);
@@ -23,12 +28,12 @@ export async function POST(request: Request) {
     const variant = item.variants.find((candidate) => candidate.id === requested.variantId && candidate.isAvailable);
     return { itemId: item.id, name: variant ? `${item.name} · ${variant.name}` : item.name, quantity: requested.quantity, unitPrice: (item.price || 0) + (variant?.priceDelta || 0), variantId: variant?.id, notes: requested.notes };
   }).filter((item): item is NonNullable<typeof item> => Boolean(item));
-  if (!items.length || items.length !== parsed.data.items.length) return apiError("Um ou mais itens não estão disponíveis.", 409, "item_unavailable");
+  if (!items.length || items.length !== parsed.data.items.length) return respond(apiError("Um ou mais itens não estão disponíveis.", 409, "item_unavailable"));
   const totals = calculateOrderTotals(items, { currency: items.length ? catalog.get(items[0].itemId)?.currency : "BRL", deliveryFee: parsed.data.fulfillment === "delivery" ? parsed.data.totals.deliveryFee : 0, discount: parsed.data.totals.discount });
-  if (!supabase) return apiSuccess({ accepted: true, persisted: false, order: { ...parsed.data, items, totals, status: "submitted" } }, 202);
+  if (!supabase) return respond(apiSuccess({ accepted: true, persisted: false, order: { ...parsed.data, items, totals, status: "submitted" } }, 202));
   const { data, error } = await supabase.rpc("create_order_request", { target_project: project.id, request_session_key: parsed.data.sessionId, request_idempotency_key: parsed.data.idempotencyKey, request_fulfillment: parsed.data.fulfillment, target_location: parsed.data.locationId || null, requested_items: items, requested_totals: totals, requested_visitor_data: parsed.data.visitorData });
-  if (error) { console.error("order_submit_failed", { projectId: project.id, code: error.code }); return apiError("Não foi possível enviar o pedido.", 400, "order_submit_failed"); }
+  if (error) { console.error("order_submit_failed", { projectId: project.id, code: error.code }); return respond(apiError("Não foi possível enviar o pedido.", 400, "order_submit_failed")); }
   const orderId = typeof data === "object" && data && "id" in data ? String(data.id) : String(data);
-  await notifyProjectEvent(project.id, "order.submitted", "order", orderId, { ...parsed.data.visitorData, interest: items.map((item) => item.name).join(", "), location: parsed.data.locationId }).catch(() => undefined);
-  return apiSuccess({ accepted: true, persisted: true, order: data }, 201);
+  await enqueueProjectNotification(project.id, "order.submitted", "order", orderId, { ...parsed.data.visitorData, interest: items.map((item) => item.name).join(", "), location: parsed.data.locationId }).catch(() => undefined);
+  return respond(apiSuccess({ accepted: true, persisted: true, order: data }, 201));
 }

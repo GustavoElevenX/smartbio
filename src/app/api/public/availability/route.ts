@@ -2,20 +2,27 @@ import { generateAvailableSlots } from "@/features/scheduling/availability-engin
 import { features } from "@/lib/constants";
 import { createServiceClient } from "@/lib/supabase/server";
 import { availabilitySearchSchema } from "@/lib/validation/schemas";
-import { apiError, apiSuccess, requestIp, validationError } from "@/server/http/api-response";
+import { apiError, apiSuccess, validationError } from "@/server/http/api-response";
 import { getPublicProjectById } from "@/server/repositories/public-commercial-repository";
-import { checkRateLimit } from "@/server/services/rate-limit";
+import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
+import { publicRateLimitIdentifier } from "@/server/rate-limit/public-identifier";
 import type { Booking } from "@/types";
 
 export async function POST(request: Request) {
-  if (!features.nativeScheduling) return apiError("Agenda nativa desativada.", 404, "feature_disabled");
-  if (!checkRateLimit(`availability:${requestIp(request)}`, 30, 60_000)) return apiError("Muitas consultas de horário.", 429, "rate_limited");
-  const parsed = availabilitySearchSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return validationError(parsed.error);
+  const raw = await request.json().catch(() => null);
+  const candidate = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+  const rate = await consumeRateLimit("public-availability", publicRateLimitIdentifier(request, {
+    projectId: typeof candidate.projectId === "string" ? candidate.projectId : undefined,
+  }), rateLimitRules.publicRead, { failClosed: false });
+  const respond = <T extends Response>(response: T) => applyRateLimitHeaders(response, rate);
+  if (!rate.allowed) return respond(apiError("Muitas consultas de horário.", 429, "rate_limited"));
+  if (!features.nativeScheduling) return respond(apiError("Agenda nativa desativada.", 404, "feature_disabled"));
+  const parsed = availabilitySearchSchema.safeParse(raw);
+  if (!parsed.success) return respond(validationError(parsed.error));
   const supabase = createServiceClient();
   const project = await getPublicProjectById(supabase, parsed.data.projectId);
   const service = project?.commercialConfig?.schedulableServices?.find((item) => item.id === parsed.data.serviceId && item.isActive);
-  if (!project || !service) return apiError("Serviço não disponível.", 404, "service_not_found");
+  if (!project || !service) return respond(apiError("Serviço não disponível.", 404, "service_not_found"));
   let bookings: Booking[] = [];
   if (supabase) {
     const dayStart = `${parsed.data.date}T00:00:00`;
@@ -24,5 +31,5 @@ export async function POST(request: Request) {
     bookings = (data || []).map((item) => ({ id: item.id, projectId: item.project_id, sessionId: item.session_key, serviceId: item.service_id, resourceId: item.resource_id || undefined, startsAt: item.starts_at, endsAt: item.ends_at, status: item.status, confirmationMode: item.confirmation_mode, visitorData: item.visitor_data })) as Booking[];
   }
   const slots = generateAvailableSlots({ date: parsed.data.date, service, rules: project.commercialConfig?.availabilityRules || [], exceptions: project.commercialConfig?.availabilityExceptions || [], bookings, resourceId: parsed.data.resourceId });
-  return apiSuccess({ slots, refreshedAt: new Date().toISOString() });
+  return respond(apiSuccess({ slots, refreshedAt: new Date().toISOString() }));
 }

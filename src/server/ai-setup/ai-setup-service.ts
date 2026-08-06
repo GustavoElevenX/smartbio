@@ -14,6 +14,11 @@ import { planAdaptiveQuestions } from "@/server/ai-setup/question-planner";
 import type { AISetupActor } from "@/server/auth/setup-actor";
 import { getAIProvider, isAIConfigured } from "@/server/ai/ai-client";
 import { sourceRepository } from "@/server/business-sources/source-repository";
+import { applyExtractedFacts } from "@/server/business-sources/apply-extracted-facts";
+import { reconcileProjectRequirements } from "@/server/business-sources/reconcile-project-requirements";
+import { createServiceClient } from "@/lib/supabase/server";
+import { assertProjectAccess } from "@/server/auth/project-access";
+import { loadProjectForActor } from "@/server/projects/load-project-for-actor";
 import type { DataRequirement, ExperienceCompositionInput, Project } from "@/types";
 
 export class AISetupNotFoundError extends Error {}
@@ -69,6 +74,9 @@ export class AISetupService {
       updatedAt: now,
     };
     const created = await this.repository.create(actor, session);
+    if (actor.persistence === "database") {
+      await sourceRepository.attachToSession(actor, sources.map((source) => source.id), created.id);
+    }
     await this.repository.addMessage(actor, created.id, "user", initialInput.description, { kind: "business_description" });
     return created;
   }
@@ -210,6 +218,39 @@ export class AISetupService {
     const session = await this.get(actor, id);
     if (!session.projectDraft) throw new Error("Gere a jornada antes de concluir o onboarding.");
     return this.repository.update(actor, { ...session, status: "completed", projectId: projectId || session.projectId });
+  }
+
+  async finalizeProject(actor: AISetupActor, id: string, projectId: string, applyVerifiedFacts: boolean) {
+    const session = await this.get(actor, id);
+    if (!session.projectDraft) throw new Error("Gere a jornada antes de concluir o onboarding.");
+    await assertProjectAccess(actor, projectId, "write");
+    if (actor.persistence === "memory") {
+      const completed = await this.repository.update(actor, { ...session, status: "completed", projectId });
+      return { session: completed, project: session.projectDraft, summary: { sourcesAttached: 0, factsAttached: 0, applied: 0, skipped: 0 } };
+    }
+    const client = createServiceClient();
+    if (!client) throw new Error("Supabase não configurado.");
+    const { data: attached, error } = await client.rpc("attach_ai_setup_sources_to_project", {
+      p_workspace_id: actor.workspaceId,
+      p_session_id: id,
+      p_project_id: projectId,
+      p_actor_id: actor.userId,
+    });
+    if (error) throw new Error("Não foi possível vincular as fontes ao projeto.");
+    let applied = { applied: 0, skipped: 0 };
+    if (applyVerifiedFacts) {
+      const sources = await sourceRepository.list(actor, projectId);
+      const factGroups = await Promise.all(sources.map((source) => sourceRepository.listFacts(actor, source.id)));
+      const factIds = factGroups.flat().filter((fact) => fact.verificationStatus === "verified" && !fact.appliedAt).map((fact) => fact.id);
+      if (factIds.length) applied = await applyExtractedFacts(actor, { projectId, factIds });
+    }
+    const requirements = await reconcileProjectRequirements(actor, projectId);
+    const completed = await this.repository.update(actor, { ...session, status: "completed", projectId });
+    return {
+      session: completed,
+      project: await loadProjectForActor(actor, projectId),
+      summary: { ...(attached as Record<string, number>), ...applied, requirementsUpdated: requirements.length },
+    };
   }
 }
 

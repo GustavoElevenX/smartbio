@@ -1,5 +1,5 @@
 import { buildPalette } from "@/features/brand-intelligence/colors";
-import { businessAnalyzer, type BusinessAnalyzer } from "@/features/business-understanding/analyze-business";
+import { deterministicBusinessAnalyzer, type BusinessAnalyzer } from "@/features/business-understanding/analyze-business";
 import { capabilityPlanner, type CapabilityPlanner } from "@/features/capabilities/capability-planner";
 import { assignProjectToCommercialConfig, defaultSlug, journeyComposer, type RuleBasedJourneyComposer } from "@/features/composition/journey-composer";
 import { visualComposer, type VisualComposer } from "@/features/composition/visual-composer";
@@ -7,6 +7,7 @@ import { features } from "@/lib/constants";
 import { uid } from "@/lib/utils";
 import type { AIJourneyDraftPayload } from "@/features/composition/composition.schema";
 import { aiJourneyDraftSchema } from "@/features/composition/composition.schema";
+import { applyAIJourneyDraft } from "@/features/composition/apply-ai-journey-draft";
 import type { BrandProfile, ExperienceCompositionInput, JourneyStep, Project, ProjectCapability } from "@/types";
 
 export type AIJourneyComposer = (input: ExperienceCompositionInput, projectProfile: NonNullable<Project["businessProfile"]>, capabilities: ProjectCapability[]) => Promise<AIJourneyDraftPayload>;
@@ -22,7 +23,7 @@ function sanitizeAIJourney(steps: JourneyStep[]) {
 
 export class CompositionOrchestrator {
   constructor(
-    private readonly analyzer: BusinessAnalyzer = businessAnalyzer,
+    private readonly analyzer: BusinessAnalyzer = deterministicBusinessAnalyzer,
     private readonly planner: CapabilityPlanner = capabilityPlanner,
     private readonly journey: RuleBasedJourneyComposer = journeyComposer,
     private readonly visual: VisualComposer = visualComposer,
@@ -30,17 +31,16 @@ export class CompositionOrchestrator {
   ) {}
 
   async compose(input: ExperienceCompositionInput): Promise<Project> {
+    const id = uid("project");
     const profile = await this.analyzer.analyze(input);
-    const capabilities = this.planner.plan(profile);
+    let capabilities = this.planner.plan(profile);
     let composition = this.journey.compose(input, profile, capabilities);
     if (features.aiJourneyComposition && this.aiJourney) {
       try {
         const draft = aiJourneyDraftSchema.parse(await this.aiJourney(input, profile, capabilities));
-        composition = {
-          ...composition,
-          steps: sanitizeAIJourney(draft.steps as JourneyStep[]),
-          requirements: draft.requirements,
-        };
+        const applied = applyAIJourneyDraft({ deterministic: composition, draft, profile, projectId: id, existingCapabilities: capabilities });
+        capabilities = applied.capabilities;
+        composition = { steps: sanitizeAIJourney(applied.steps), commercialConfig: applied.commercialConfig, requirements: applied.requirements };
       } catch {
         // The deterministic composition remains complete enough to edit and safe to persist.
       }
@@ -52,7 +52,6 @@ export class CompositionOrchestrator {
       brandPersonality: input.brandPersonality || ["Equilibrada"],
     };
     const now = new Date().toISOString();
-    const id = uid("project");
     const project: Project = {
       id,
       workspaceId: "local-workspace",
@@ -82,4 +81,4 @@ export class CompositionOrchestrator {
   }
 }
 
-export const compositionOrchestrator = new CompositionOrchestrator();
+export const deterministicCompositionOrchestrator = new CompositionOrchestrator();

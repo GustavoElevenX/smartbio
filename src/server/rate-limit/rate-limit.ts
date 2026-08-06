@@ -21,6 +21,8 @@ export const rateLimitRules = {
   sourceProcess: { limit: 20, windowMs: 60 * 60_000 },
   publicRouteResolve: { limit: 60, windowMs: 60_000 },
   publicFormSubmit: { limit: 20, windowMs: 60_000 },
+  publicAttachmentUpload: { limit: 10, windowMs: 10 * 60_000 },
+  publicAnalytics: { limit: 120, windowMs: 60_000 },
 } satisfies Record<string, RateLimitRule>;
 
 function provider() {

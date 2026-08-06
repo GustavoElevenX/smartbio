@@ -55,7 +55,7 @@ export function AIConversation({ form, sources, session, busy, busyQuestion, gen
             </div>
             <div className="mt-4"><Label htmlFor="ai-description">O que você vende e como atende?</Label><Textarea id="ai-description" className="min-h-32" value={form.description} onChange={(event) => onFormChange({ ...form, description: event.target.value })} placeholder="Descreva serviços ou produtos, tipo de cliente, como o pedido começa e onde o atendimento termina." disabled={analyzed || busy} /></div>
             <div className="mt-4"><Label htmlFor="ai-phone">WhatsApp ou telefone (opcional)</Label><Input id="ai-phone" type="tel" autoComplete="tel" value={form.phone} onChange={(event) => onFormChange({ ...form, phone: event.target.value })} placeholder="5511999999999" disabled={analyzed || busy} /></div>
-            <div className="mt-4"><SourceUploader sources={sources} onChange={onSourcesChange} disabled={analyzed || busy} /></div>
+            <div className="mt-4"><SourceUploader sources={sources} setupSessionId={session?.id} projectId={projectId} onChange={onSourcesChange} disabled={analyzed || busy} /></div>
             {!analyzed ? <Button type="button" size="lg" className="mt-5 w-full sm:w-auto" onClick={() => void onAnalyze()} disabled={busy}>{busy ? <LoaderCircle data-icon size={17} className="animate-spin" /> : <WandSparkles data-icon size={17} />} {busy ? "Analisando o negócio…" : "Analisar meu negócio"}</Button> : null}
           </Card>
 
