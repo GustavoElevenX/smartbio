@@ -3,8 +3,8 @@ import { Check } from "lucide-react";
 import { MarketingFooter, MarketingHeader } from "@/components/marketing/header";
 
 const plans = [
-  { name: "Free", price: "R$ 0", description: "Para publicar seu primeiro próximo passo.", features: ["1 projeto", "Domínio padrão", "Analytics básicos", "100 leads/mês", "Marca SmartBio"], cta: "Começar grátis" },
-  { name: "Pro", price: "R$ 59", description: "Para transformar audiência em oportunidades.", features: ["Até 5 projetos", "Sem marca SmartBio", "Formulários e jornadas condicionais", "Analytics avançados", "IA limitada"], cta: "Escolher Pro", featured: true },
+  { name: "Free", price: "R$ 0", description: "Para publicar seu primeiro próximo passo.", features: ["1 negócio", "Domínio padrão", "Analytics básicos", "100 oportunidades/mês", "Marca Virou"], cta: "Começar grátis" },
+  { name: "Pro", price: "R$ 59", description: "Para transformar audiência em oportunidades.", features: ["Até 5 negócios", "Sem marca Virou", "Formulários e jornadas condicionais", "Analytics avançados", "IA limitada"], cta: "Escolher Pro", featured: true },
   { name: "Business", price: "R$ 149", description: "Para equipes e operações com mais escala.", features: ["Projetos ampliados", "Equipe owner/member", "Multiunidades", "Exportações", "Integrações futuras"], cta: "Falar com vendas" },
 ];
 

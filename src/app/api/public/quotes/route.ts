@@ -7,6 +7,7 @@ import { getPublicProjectById } from "@/server/repositories/public-commercial-re
 import { enqueueProjectNotification } from "@/server/notifications/notification-service";
 import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
 import { publicRateLimitIdentifier } from "@/server/rate-limit/public-identifier";
+import { registerOpportunity } from "@/server/opportunities/service";
 
 export async function POST(request: Request) {
   const raw = await request.json().catch(() => null);
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
     estimated_min: estimate.min || null, estimated_max: estimate.max || null, currency: estimate.currency, visitor_data: parsed.data.visitorData,
   }, { onConflict: "project_id,idempotency_key" }).select("id,status,estimated_min,estimated_max,currency,created_at").single();
   if (error) { console.error("quote_request_failed", { projectId: project.id, code: error.code }); return respond(apiError("Não foi possível enviar o orçamento.", 400, "quote_submit_failed")); }
-  await enqueueProjectNotification(project.id, "quote.submitted", "quote", data.id, { ...parsed.data.visitorData, interest: definition.title }).catch(() => undefined);
+  const opportunity = await registerOpportunity(supabase, { workspaceId: project.workspaceId, projectId: project.id, projectName: project.name, sessionId: parsed.data.sessionId, sourceType: "quote", sourceId: data.id, title: `Orçamento · ${definition.title}`, conversionGoalId: parsed.data.conversionGoalId, entryPointId: parsed.data.entryPointId, attribution: parsed.data.attribution, visitorData: parsed.data.visitorData, estimatedValue: estimate.max || estimate.min, currency: estimate.currency }).catch(() => null);
+  await enqueueProjectNotification(project.id, "quote.submitted", "opportunity", opportunity?.id || data.id, { ...parsed.data.visitorData, interest: definition.title }).catch(() => undefined);
   return respond(apiSuccess({ accepted: true, persisted: true, request: data, estimate }, 201));
 }

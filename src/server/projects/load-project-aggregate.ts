@@ -30,6 +30,8 @@ export async function loadProjectAggregate(
     ["business_profiles", "signals"],
     ["project_capabilities", "capability_key,enabled,source,settings"],
     ["project_data_requirements", "id,requirement_key,label,capability_key,status,severity,value,origin,source_id,field_metadata,reason"],
+    ["conversion_goals", "id,name,description,goal_kind,target_step_id,destination_label,is_primary,is_active,goal_order,created_at,updated_at"],
+    ["entry_points", "id,entry_key,name,conversion_goal_id,target_step_id,channel,utm_source,utm_medium,utm_campaign,utm_content,utm_term,is_active,created_at,updated_at"],
     ["service_offerings", "id,name,slug,description,short_description,service_mode,price_mode,price,min_price,max_price,currency,image_asset_id,destination_id,external_url,is_featured,is_active,service_order,settings"],
     ["quote_definitions", "id,name,currency,base_price,is_active,settings,quote_questions(id,field_key,label,field_type,required,options,question_order,settings),quote_rules(id,field_key,operator,expected_value,operation,price_delta,min_delta,max_delta,rule_order)"],
     ["schedulable_services", "id,service_offering_id,name,duration_minutes,buffer_before_minutes,buffer_after_minutes,confirmation_mode,is_active,settings"],
@@ -44,7 +46,7 @@ export async function loadProjectAggregate(
     ["routing_rules", "id,destination_id,conditions,priority,is_active"],
     ["business_locations", "id,name,address_line,address_number,address_extra,neighborhood,city,state,postal_code,country_code,latitude,longitude,geocoding_status,geocoding_provider,geocoded_at,phone,whatsapp,external_url,timezone,opening_hours,service_radius_km,delivery_radius_km,supports_delivery,supports_pickup,supports_in_person,priority,is_active,routing_destination_id,settings"],
     ["project_policies", "id,policy_type,title,content,is_active,settings"],
-    ["journey_steps", "id,type,title,description,step_order,is_active,settings,content_blocks(id,block_type,block_order,content,settings),step_options(id,label,description,icon,value,option_order,action_type,target_step_id,action_payload),form_definitions(form_fields(id,label,field_key,field_type,placeholder,required,field_order,options))"],
+    ["journey_steps", "id,type,title,description,step_order,is_active,settings,content_blocks(id,block_type,block_order,content,settings),step_options(id,label,description,icon,value,option_order,action_type,target_step_id,conversion_goal_id,action_payload),form_definitions(form_fields(id,label,field_key,field_type,placeholder,required,field_order,options))"],
   ] as const;
   const results = await Promise.all(tables.map(([table, columns]) => {
     let query = supabase.from(table).select(columns);

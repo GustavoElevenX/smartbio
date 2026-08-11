@@ -3,10 +3,11 @@ import { draftCapabilityRequirements } from "@/features/capabilities/capability-
 import type { AIJourneyDraftPayload } from "@/features/composition/composition.schema";
 import { mergeCommercialConfig } from "@/features/composition/merge-commercial-config";
 import type { JourneyComposition } from "@/features/composition/journey-composer";
-import type { BusinessCapabilityProfile, DataRequirement, JourneyStep, Project, ProjectCapability } from "@/types";
+import type { BusinessCapabilityProfile, ConversionGoal, DataRequirement, JourneyStep, Project, ProjectCapability } from "@/types";
 
 export interface AppliedAIJourneyDraft {
   steps: JourneyStep[];
+  conversionGoals: ConversionGoal[];
   capabilities: ProjectCapability[];
   commercialConfig: NonNullable<Project["commercialConfig"]>;
   requirements: DataRequirement[];
@@ -44,8 +45,22 @@ export function applyAIJourneyDraft(input: {
   for (const capability of deterministicCapabilities) if (!capabilities.has(capability.key)) capabilities.set(capability.key, capability);
   const merged = mergeCommercialConfig(input.deterministic.commercialConfig, input.draft.commercialConfigPatch, input.projectId);
   const planned = [...capabilities.values()];
+  const fallbackStepId = input.draft.steps[0]?.id || input.deterministic.steps[0]?.id || "";
+  const stepIds = new Set(input.draft.steps.map((step) => step.id));
+  const conversionGoals = input.draft.suggestedConversionGoals.map((goal, order) => ({
+    id: `goal-${goal.key}`,
+    projectId: input.projectId,
+    name: goal.name,
+    description: goal.description,
+    kind: goal.type,
+    targetStepId: goal.entryStepKey && stepIds.has(goal.entryStepKey) ? goal.entryStepKey : fallbackStepId,
+    isPrimary: order === 0,
+    isActive: true,
+    order,
+  }));
   return {
     steps: input.draft.steps as JourneyStep[],
+    conversionGoals,
     capabilities: planned,
     commercialConfig: merged.value,
     requirements: dedupeRequirements([...input.deterministic.requirements, ...draftCapabilityRequirements(planned), ...(input.draft.requirements as DataRequirement[]), ...merged.requirements]),

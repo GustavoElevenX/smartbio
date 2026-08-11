@@ -559,6 +559,9 @@ export interface JourneyRuntimeState {
   recommendationKey?: string;
   routeResult?: RouteResult;
   idempotencyKeys?: Partial<Record<CapabilityKey, string>>;
+  conversionGoalId?: string;
+  entryPointId?: string;
+  attribution?: AttributionContext;
 }
 
 export interface BrandPalette {
@@ -643,6 +646,73 @@ export interface StepOption {
   actionType: ActionType;
   targetStepId?: string;
   actionPayload?: Record<string, string | number | boolean>;
+  conversionGoalId?: string;
+}
+
+export type ConversionGoalKind =
+  | "buy"
+  | "request_quote"
+  | "schedule"
+  | "reserve"
+  | "contact"
+  | "visit"
+  | "learn"
+  | "custom";
+
+export type ConversionGoalType = ConversionGoalKind;
+
+export interface SuggestedConversionGoal {
+  key: string;
+  name: string;
+  description?: string;
+  type: ConversionGoalType;
+  capabilityKey?: CapabilityKey;
+  entryStepKey?: string;
+  reasoning: string;
+}
+
+export interface ConversionGoal {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string;
+  kind: ConversionGoalKind;
+  targetStepId: string;
+  destinationLabel?: string;
+  isPrimary: boolean;
+  isActive: boolean;
+  order: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface EntryPoint {
+  id: string;
+  projectId: string;
+  key: string;
+  name: string;
+  conversionGoalId?: string;
+  targetStepId?: string;
+  channel: "bio" | "story" | "ad" | "qr" | "linkedin" | "other";
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
+  utmTerm?: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AttributionContext {
+  entryPointId?: string;
+  conversionGoalId?: string;
+  source: string;
+  medium?: string;
+  campaign?: string;
+  content?: string;
+  term?: string;
+  referrer?: string;
 }
 
 export interface FormField {
@@ -722,6 +792,8 @@ export interface Project {
   designSystem: ProjectDesignSystem;
   brand: BrandProfile;
   steps: JourneyStep[];
+  conversionGoals?: ConversionGoal[];
+  entryPoints?: EntryPoint[];
   businessProfile?: BusinessCapabilityProfile;
   capabilities?: ProjectCapability[];
   commercialConfig?: {
@@ -890,7 +962,13 @@ export type AnalyticsEventName =
   | "reservation_confirmed"
   | "reservation_cancel_requested"
   | "route_resolved"
-  | "payment_started";
+  | "payment_started"
+  | "entry_point_loaded"
+  | "conversion_goal_selected"
+  | "conversion_goal_resolved"
+  | "opportunity_created"
+  | "conversion_confirmed"
+  | "conversion_lost";
 
 export interface AnalyticsEvent {
   id: string;
@@ -898,6 +976,9 @@ export interface AnalyticsEvent {
   visitorId: string;
   sessionId: string;
   eventName: AnalyticsEventName;
+  conversionGoalId?: string;
+  entryPointId?: string;
+  destinationId?: string;
   stepId?: string;
   optionId?: string;
   metadata?: Record<string, unknown>;
@@ -908,6 +989,60 @@ export interface AnalyticsEvent {
   utmContent?: string;
   utmTerm?: string;
   deviceType?: string;
+  createdAt: string;
+}
+
+export type OpportunityStatus = "new" | "in_progress" | "converted" | "lost" | "archived";
+export type OpportunitySourceType = "lead" | "quote" | "booking" | "order" | "reservation" | "routed_contact";
+
+export interface OpportunityTimelineItem {
+  id: string;
+  opportunityId: string;
+  eventType: "created" | "status_changed" | "converted" | "lost" | "note";
+  label: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface CommercialOpportunity {
+  id: string;
+  workspaceId: string;
+  projectId: string;
+  projectName?: string;
+  sessionId?: string;
+  conversionGoalId?: string;
+  entryPointId?: string;
+  destinationId?: string;
+  sourceType: OpportunitySourceType;
+  sourceId: string;
+  status: OpportunityStatus;
+  title: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  summary?: string;
+  estimatedValue?: number;
+  confirmedValue?: number;
+  currency: string;
+  lossReason?: string;
+  firstHandledAt?: string;
+  convertedAt?: string;
+  lostAt?: string;
+  attribution?: AttributionContext;
+  metadata: Record<string, unknown>;
+  timeline?: OpportunityTimelineItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OptimizationSuggestion {
+  id: string;
+  projectId: string;
+  kind: "goal_dropoff" | "entry_underperformance" | "destination_friction" | "journey_friction";
+  title: string;
+  explanation: string;
+  evidence: Record<string, number | string>;
+  status: "open" | "dismissed" | "applied";
   createdAt: string;
 }
 

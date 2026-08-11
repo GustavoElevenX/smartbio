@@ -4,7 +4,7 @@ import { demoProjects } from "@/data/demo-projects";
 import { hasBookingConflict } from "@/features/scheduling/availability-engine";
 import { uid } from "@/lib/utils";
 import { canUseLocalStore } from "@/lib/runtime-mode";
-import type { AnalyticsEvent, Booking, Lead, OrderRequest, Project, QuoteRequest, Reservation } from "@/types";
+import type { AnalyticsEvent, Booking, CommercialOpportunity, Lead, OrderRequest, Project, QuoteRequest, Reservation } from "@/types";
 
 const VERSION = "v3";
 const KEYS = {
@@ -16,6 +16,7 @@ const KEYS = {
   bookings: `smartbio:bookings:${VERSION}`,
   orders: `smartbio:orders:${VERSION}`,
   reservations: `smartbio:reservations:${VERSION}`,
+  opportunities: `virou:opportunities:${VERSION}`,
 };
 const LEGACY_KEYS = { projects: "smartbio:projects:v2", leads: "smartbio:leads:v2", events: "smartbio:events:v2", user: "smartbio:user:v2" };
 
@@ -47,7 +48,7 @@ function write<T>(key: string, value: T) {
 
 function initialEvents(): AnalyticsEvent[] {
   const events: AnalyticsEvent[] = [];
-  const names: AnalyticsEvent["eventName"][] = ["page_view", "session_started", "step_viewed", "option_clicked", "form_started", "recommendation_viewed", "cta_clicked", "whatsapp_clicked", "journey_completed"];
+  const names: AnalyticsEvent["eventName"][] = ["page_view", "session_started", "entry_point_loaded", "conversion_goal_resolved", "step_viewed", "option_clicked", "form_started", "recommendation_viewed", "cta_clicked", "whatsapp_clicked", "journey_completed"];
   for (const project of demoProjects) {
     for (let session = 0; session < (project.slug === "vertice" ? 42 : 18); session++) {
       const sessionId = `${project.id}-session-${session}`;
@@ -55,6 +56,8 @@ function initialEvents(): AnalyticsEvent[] {
       names.slice(0, depth).forEach((eventName, index) => events.push({
         id: uid("event"), projectId: project.id, visitorId: `visitor-${session}`, sessionId, eventName,
         stepId: project.steps[Math.min(index >> 1, project.steps.length - 1)]?.id,
+        conversionGoalId: project.conversionGoals?.[session % Math.max(1, project.conversionGoals.length)]?.id,
+        entryPointId: project.entryPoints?.[session % Math.max(1, project.entryPoints.length)]?.id,
         utmSource: session % 3 === 0 ? "instagram" : session % 3 === 1 ? "direct" : "youtube",
         utmCampaign: session % 4 === 0 ? "lancamento" : undefined,
         deviceType: session % 5 === 0 ? "desktop" : "mobile",
@@ -98,6 +101,9 @@ export const localStore = {
   getLeads(projectId?: string): Lead[] { const leads = read<Lead[]>(KEYS.leads, canUseLocalStore() ? initialLeads() : [], LEGACY_KEYS.leads); return projectId ? leads.filter((lead) => lead.projectId === projectId) : leads; },
   addLead(lead: Omit<Lead, "id" | "createdAt">) { const next = { ...lead, id: uid("lead"), createdAt: new Date().toISOString() }; write(KEYS.leads, [next, ...read<Lead[]>(KEYS.leads, initialLeads(), LEGACY_KEYS.leads)]); return next; },
   updateLead(id: string, patch: Partial<Lead>) { const leads = this.getLeads().map((lead) => lead.id === id ? { ...lead, ...patch } : lead); write(KEYS.leads, leads); },
+  getOpportunities(projectId?: string): CommercialOpportunity[] { const items = read<CommercialOpportunity[]>(KEYS.opportunities, []); return projectId ? items.filter((item) => item.projectId === projectId) : items; },
+  saveOpportunity(opportunity: CommercialOpportunity) { const items = this.getOpportunities(); const existing = items.find((item) => item.projectId === opportunity.projectId && item.sourceType === opportunity.sourceType && item.sourceId === opportunity.sourceId); if (existing) return existing; write(KEYS.opportunities, upsertById(items, opportunity)); return opportunity; },
+  updateOpportunity(id: string, patch: Partial<CommercialOpportunity>) { const now = new Date().toISOString(); const items = this.getOpportunities().map((item) => item.id === id ? { ...item, ...patch, updatedAt: now } : item); write(KEYS.opportunities, items); return items.find((item) => item.id === id); },
   getEvents(projectId?: string): AnalyticsEvent[] { const events = read<AnalyticsEvent[]>(KEYS.events, canUseLocalStore() ? initialEvents() : [], LEGACY_KEYS.events); return projectId ? events.filter((event) => event.projectId === projectId) : events; },
   track(event: Omit<AnalyticsEvent, "id" | "createdAt">) { const next = { ...event, id: uid("event"), createdAt: new Date().toISOString() }; write(KEYS.events, [next, ...read<AnalyticsEvent[]>(KEYS.events, initialEvents(), LEGACY_KEYS.events)]); return next; },
   getQuoteRequests(projectId?: string) { const items = read<QuoteRequest[]>(KEYS.quotes, []); return projectId ? items.filter((item) => item.projectId === projectId) : items; },

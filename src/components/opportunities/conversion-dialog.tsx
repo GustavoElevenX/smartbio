@@ -1,0 +1,5 @@
+"use client";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+export function ConversionDialog({ open, onOpenChange, onConfirm }: { open: boolean; onOpenChange: (open: boolean) => void; onConfirm: (value: number) => void }) { const [value, setValue] = useState(0); return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>Confirmar conversão</DialogTitle><DialogDescription>Registre somente o valor que foi confirmado comercialmente. Analytics não estima receita.</DialogDescription></DialogHeader><label className="text-sm font-bold">Valor confirmado (R$)<input autoFocus type="number" min="0" step="0.01" value={value} onChange={(event) => setValue(Number(event.target.value))} className="mt-2 min-h-12 w-full rounded-xl border px-3" /></label><DialogFooter><Button onClick={() => onConfirm(value)}>Confirmar conversão</Button></DialogFooter></DialogContent></Dialog>; }

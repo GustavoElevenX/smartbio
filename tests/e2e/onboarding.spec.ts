@@ -15,7 +15,7 @@ test("onboarding adaptativo funciona sem login e gera um rascunho", async ({ pag
   await page.getByRole("button", { name: /gerar jornada adaptativa/i }).click();
 
   await expect(page.getByRole("heading", { name: /a jornada foi criada sem publicar nada/i })).toBeVisible({ timeout: 30_000 });
-  const editor = page.getByRole("button", { name: /abrir no editor/i });
+  const editor = page.getByRole("button", { name: /abrir jornada/i });
   await expect(editor).toBeVisible();
   await editor.click();
   await expect(page).toHaveURL(/\/app\/projects\/.+\/editor$/);

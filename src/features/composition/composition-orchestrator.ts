@@ -34,11 +34,13 @@ export class CompositionOrchestrator {
     const profile = await this.analyzer.analyze(input);
     let capabilities = this.planner.plan(profile);
     let composition = this.journey.compose(input, profile, capabilities);
+    let conversionGoals: Project["conversionGoals"];
     if (features.aiJourneyComposition && this.aiJourney) {
       try {
         const draft = aiJourneyDraftSchema.parse(await this.aiJourney(input, profile, capabilities));
         const applied = applyAIJourneyDraft({ deterministic: composition, draft, profile, projectId: id, existingCapabilities: capabilities });
         capabilities = applied.capabilities;
+        conversionGoals = applied.conversionGoals;
         composition = { steps: sanitizeAIJourney(applied.steps), commercialConfig: applied.commercialConfig, requirements: applied.requirements };
       } catch {
         // The deterministic composition remains complete enough to edit and safe to persist.
@@ -66,6 +68,7 @@ export class CompositionOrchestrator {
       capabilities,
       commercialConfig: assignProjectToCommercialConfig(composition.commercialConfig, id),
       steps: composition.steps,
+      conversionGoals,
       dataRequirements: composition.requirements,
       version: 1,
       createdAt: now,

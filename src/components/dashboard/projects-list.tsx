@@ -36,7 +36,7 @@ export function ProjectsList() {
     <div className="animate-enter">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-semibold text-[#6d5ef5]">Projetos</p>
+          <p className="text-sm font-semibold text-[#6d5ef5]">Negócios</p>
           <h1 className="mt-1 text-3xl font-extrabold tracking-[-.04em]">
             Experiências do workspace
           </h1>
@@ -48,7 +48,7 @@ export function ProjectsList() {
           href="/app/projects/new"
           className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#17171c] px-4 text-sm font-bold text-white"
         >
-          <Plus size={17} /> Novo projeto
+          <Plus size={17} /> Novo negócio
         </Link>
       </div>
       <div className="mt-7 grid gap-5 md:grid-cols-2 xl:grid-cols-3">

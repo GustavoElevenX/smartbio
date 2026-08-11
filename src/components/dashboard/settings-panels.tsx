@@ -59,7 +59,7 @@ export function ProfileSettings() {
   const [saved, setSaved] = useState(false);
   useEffect(() => {
     const user = localStore.getUser() || {
-      name: "Usuário SmartBio",
+      name: "Usuário Virou",
       email: "voce@empresa.com",
     };
     setName(user.name);

@@ -8,6 +8,7 @@ import { enqueueProjectNotification } from "@/server/notifications/notification-
 import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
 import { publicRateLimitIdentifier } from "@/server/rate-limit/public-identifier";
 import type { Reservation, ReservationBlock } from "@/types";
+import { registerOpportunity } from "@/server/opportunities/service";
 
 export async function POST(request: Request) {
   const raw = await request.json().catch(() => null);
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
   const { data, error } = await supabase.rpc("create_reservation_request", { target_project: project.id, request_session_key: parsed.data.sessionId, request_idempotency_key: parsed.data.idempotencyKey, target_unit: unit.id, requested_check_in: parsed.data.checkIn, requested_check_out: parsed.data.checkOut, requested_adults: parsed.data.adults, requested_children: parsed.data.children, requested_total: total, requested_deposit: depositAmount || null, requested_visitor_data: parsed.data.visitorData });
   if (error) { console.error("reservation_submit_failed", { projectId: project.id, code: error.code }); return respond(apiError("A disponibilidade mudou. Consulte novamente.", 409, "reservation_conflict")); }
   const reservationId = typeof data === "object" && data && "id" in data ? String(data.id) : String(data);
-  await enqueueProjectNotification(project.id, "reservation.submitted", "reservation", reservationId, { ...parsed.data.visitorData, interest: unit.name, date: `${parsed.data.checkIn} – ${parsed.data.checkOut}` }).catch(() => undefined);
+  const opportunity = await registerOpportunity(supabase, { workspaceId: project.workspaceId, projectId: project.id, projectName: project.name, sessionId: parsed.data.sessionId, sourceType: "reservation", sourceId: reservationId, title: `Reserva · ${unit.name}`, conversionGoalId: parsed.data.conversionGoalId, entryPointId: parsed.data.entryPointId, attribution: parsed.data.attribution, visitorData: parsed.data.visitorData, estimatedValue: total, currency: unit.currency, summary: `${parsed.data.checkIn} – ${parsed.data.checkOut}` }).catch(() => null);
+  await enqueueProjectNotification(project.id, "reservation.submitted", "opportunity", opportunity?.id || reservationId, { ...parsed.data.visitorData, interest: unit.name, date: `${parsed.data.checkIn} – ${parsed.data.checkOut}` }).catch(() => undefined);
   return respond(apiSuccess({ accepted: true, persisted: true, reservation: data }, 201));
 }

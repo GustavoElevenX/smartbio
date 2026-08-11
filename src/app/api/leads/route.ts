@@ -4,6 +4,7 @@ import { apiError, apiSuccess } from "@/server/http/api-response";
 import { enqueueProjectNotification } from "@/server/notifications/notification-service";
 import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
 import { publicRateLimitIdentifier } from "@/server/rate-limit/public-identifier";
+import { registerOpportunity } from "@/server/opportunities/service";
 
 export async function POST(request: Request) {
   const raw = await request.json().catch(() => null);
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
     items: parsed.data.items || [], attachments: parsed.data.attachments || [], timeline: parsed.data.timeline || [],
   }).select("id").single();
   if (error) return respond(apiError("Não foi possível salvar o lead.", 400, "lead_submit_failed"));
-  await enqueueProjectNotification(parsed.data.projectId, "lead.created", "lead", lead.id, { visitorName: parsed.data.name, phone: parsed.data.phone, interest: parsed.data.recommendation, location: parsed.data.locationName }).catch(() => undefined);
+  const opportunity = !parsed.data.commercialObjectId ? await registerOpportunity(supabase, { workspaceId: project.workspace_id, projectId: parsed.data.projectId, sessionId: parsed.data.sessionId, sourceType: "lead", sourceId: lead.id, title: `Contato · ${parsed.data.name || "Novo interesse"}`, conversionGoalId: parsed.data.conversionGoalId, entryPointId: parsed.data.entryPointId, destinationId: parsed.data.destinationId, attribution: parsed.data.attribution, visitorData: { name: parsed.data.name || "", email: parsed.data.email || "", phone: parsed.data.phone || "", company: parsed.data.company || "" }, summary: parsed.data.recommendation, estimatedValue: parsed.data.estimatedValue }).catch(() => null) : null;
+  await enqueueProjectNotification(parsed.data.projectId, "lead.created", "opportunity", opportunity?.id || parsed.data.commercialObjectId || lead.id, { visitorName: parsed.data.name, phone: parsed.data.phone, interest: parsed.data.recommendation, location: parsed.data.locationName }).catch(() => undefined);
   return respond(apiSuccess({ accepted: true, persisted: true }, 201));
 }

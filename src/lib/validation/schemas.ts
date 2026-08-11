@@ -5,20 +5,26 @@ const shortId = z.string().trim().min(1).max(150);
 const idempotencyKey = z.string().trim().min(12).max(180);
 const visitorData = z.record(z.string().max(80), z.union([z.string().max(1000), z.number().finite(), z.boolean()]));
 const answers = z.record(z.string().max(80), z.union([z.string().max(2000), z.number().finite(), z.boolean(), z.array(z.string().max(500)).max(20)]));
+const conversionContext = {
+  conversionGoalId: shortId.optional(), entryPointId: shortId.optional(), destinationId: shortId.optional(),
+  attribution: z.object({ entryPointId: shortId.optional(), conversionGoalId: shortId.optional(), source: safeText, medium: safeText.optional(), campaign: safeText.optional(), content: safeText.optional(), term: safeText.optional(), referrer: z.string().url().max(1000).optional() }).optional(),
+};
 
 export const analyticsEventNames = [
   "page_view", "session_started", "step_viewed", "option_clicked", "form_started", "form_submitted", "recommendation_viewed", "cta_clicked", "whatsapp_clicked", "external_link_clicked", "journey_completed",
   "capability_started", "qualification_completed", "quote_started", "quote_submitted", "quote_estimate_viewed", "media_uploaded", "availability_searched", "slot_selected", "booking_submitted", "booking_confirmed", "booking_cancel_requested", "catalog_viewed", "item_viewed", "item_added", "cart_viewed", "order_submitted", "reservation_search_started", "reservation_option_viewed", "reservation_submitted", "reservation_confirmed", "reservation_cancel_requested", "route_resolved", "payment_started",
+  "entry_point_loaded", "conversion_goal_selected", "conversion_goal_resolved", "opportunity_created", "conversion_confirmed", "conversion_lost",
 ] as const;
 
 export const analyticsEventSchema = z.object({
   projectId: shortId, visitorId: shortId, sessionId: shortId,
   eventName: z.enum(analyticsEventNames),
-  stepId: shortId.optional(), optionId: shortId.optional(), metadata: z.record(z.string().max(80), z.unknown()).optional(), referrer: z.string().url().max(1000).or(z.literal("")).optional(),
+  stepId: shortId.optional(), optionId: shortId.optional(), conversionGoalId: shortId.optional(), entryPointId: shortId.optional(), destinationId: shortId.optional(), metadata: z.record(z.string().max(80), z.unknown()).optional(), referrer: z.string().url().max(1000).or(z.literal("")).optional(),
   utmSource: safeText.optional(), utmMedium: safeText.optional(), utmCampaign: safeText.optional(), utmContent: safeText.optional(), utmTerm: safeText.optional(), deviceType: z.enum(["mobile", "desktop", "tablet"]).optional(),
 });
 
 export const leadSchema = z.object({
+  ...conversionContext,
   projectId: shortId, projectName: safeText, sessionId: shortId, name: safeText.optional(),
   email: z.string().email().max(250).optional().or(z.literal("")), phone: z.string().max(40).regex(/^[\d+()\s-]*$/).optional().or(z.literal("")), company: safeText.optional(),
   status: z.enum(["new", "contacted", "qualified", "converted", "lost"]).default("new"), source: safeText.optional(), campaign: safeText.optional(), recommendation: safeText.optional(),
@@ -32,6 +38,7 @@ export const leadSchema = z.object({
 });
 
 export const quoteRequestSchema = z.object({
+  ...conversionContext,
   projectId: shortId,
   sessionId: shortId,
   idempotencyKey,
@@ -53,6 +60,7 @@ export const availabilitySearchSchema = z.object({
 });
 
 export const bookingRequestSchema = z.object({
+  ...conversionContext,
   projectId: shortId,
   sessionId: shortId,
   idempotencyKey,
@@ -73,6 +81,7 @@ export const bookingChangeSchema = z.object({
 });
 
 export const orderRequestSchema = z.object({
+  ...conversionContext,
   projectId: shortId,
   sessionId: shortId,
   idempotencyKey,
@@ -93,6 +102,7 @@ export const reservationAvailabilitySchema = z.object({
 }).refine((data) => new Date(data.checkOut) > new Date(data.checkIn), { message: "A saída deve ser posterior à entrada." });
 
 export const reservationRequestSchema = reservationAvailabilitySchema.extend({
+  ...conversionContext,
   sessionId: shortId,
   idempotencyKey,
   unitId: shortId,

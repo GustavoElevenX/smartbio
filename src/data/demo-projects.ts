@@ -179,10 +179,21 @@ export const casaDeSucos: Project = {
     },
   },
   designSystem: design(mixPalette, "mix"),
-  version: 4,
+  version: 5,
   createdAt: now,
   updatedAt: now,
   publishedAt: now,
+  conversionGoals: [
+    { id: "mix-goal-order", projectId: "demo-casa-sucos", name: "Pedir agora", description: "Escolher produtos e enviar o pedido.", kind: "buy", targetStepId: "mix-receive", destinationLabel: "Pedido", isPrimary: true, isActive: true, order: 0 },
+    { id: "mix-goal-resale", projectId: "demo-casa-sucos", name: "Comprar para revenda", description: "Informar volume e receber o caminho comercial.", kind: "request_quote", targetStepId: "mix-b2b-form", destinationLabel: "Atendimento comercial", isPrimary: false, isActive: true, order: 1 },
+    { id: "mix-goal-unit", projectId: "demo-casa-sucos", name: "Encontrar uma unidade", description: "Descobrir a unidade mais adequada.", kind: "visit", targetStepId: "mix-unit", destinationLabel: "Unidade", isPrimary: false, isActive: true, order: 2 },
+  ],
+  entryPoints: [
+    { id: "mix-entry-bio", projectId: "demo-casa-sucos", key: "bio", name: "Bio", channel: "bio", conversionGoalId: "mix-goal-order", utmSource: "instagram", utmMedium: "social", isActive: true },
+    { id: "mix-entry-story", projectId: "demo-casa-sucos", key: "story-delivery", name: "Story Delivery", channel: "story", conversionGoalId: "mix-goal-order", utmSource: "instagram", utmMedium: "story", utmCampaign: "delivery", isActive: true },
+    { id: "mix-entry-meta", projectId: "demo-casa-sucos", key: "meta-revenda", name: "Meta Revenda", channel: "ad", conversionGoalId: "mix-goal-resale", utmSource: "meta", utmMedium: "paid_social", utmCampaign: "revenda", isActive: true },
+    { id: "mix-entry-qr", projectId: "demo-casa-sucos", key: "qr-cohama", name: "QR Cohama", channel: "qr", conversionGoalId: "mix-goal-unit", utmSource: "qr", utmMedium: "offline", utmCampaign: "cohama", isActive: true },
+  ],
   businessProfile: profile({
     offerKinds: ["physical_product"],
     primaryIntents: ["order"],
@@ -489,10 +500,19 @@ export const verticeB2B: Project = {
     },
   },
   designSystem: design(verticePalette, "vertice"),
-  version: 5,
+  version: 6,
   createdAt: now,
   updatedAt: now,
   publishedAt: now,
+  conversionGoals: [
+    { id: "vertice-goal-diagnosis", projectId: "demo-vertice", name: "Solicitar diagnóstico", description: "Qualificar o cenário e recomendar o próximo passo.", kind: "request_quote", targetStepId: "vertice-form", destinationLabel: "Diagnóstico", isPrimary: true, isActive: true, order: 0 },
+    { id: "vertice-goal-contact", projectId: "demo-vertice", name: "Falar com especialista", description: "Ir para o atendimento com contexto.", kind: "contact", targetStepId: "vertice-action", destinationLabel: "Atendimento", isPrimary: false, isActive: true, order: 1 },
+  ],
+  entryPoints: [
+    { id: "vertice-entry-bio", projectId: "demo-vertice", key: "bio", name: "Bio", channel: "bio", conversionGoalId: "vertice-goal-diagnosis", utmSource: "instagram", utmMedium: "social", isActive: true },
+    { id: "vertice-entry-meta", projectId: "demo-vertice", key: "meta-ads", name: "Meta Ads", channel: "ad", conversionGoalId: "vertice-goal-diagnosis", utmSource: "meta", utmMedium: "paid_social", utmCampaign: "diagnostico", isActive: true },
+    { id: "vertice-entry-linkedin", projectId: "demo-vertice", key: "linkedin", name: "LinkedIn", channel: "linkedin", conversionGoalId: "vertice-goal-contact", utmSource: "linkedin", utmMedium: "organic_social", isActive: true },
+  ],
   businessProfile: profile({
     offerKinds: ["professional_service"],
     primaryIntents: ["request_proposal", "schedule"],

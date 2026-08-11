@@ -39,6 +39,11 @@ import { localStore } from "@/lib/local-store";
 import { canUseLocalStore } from "@/lib/runtime-mode";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { cn, uid } from "@/lib/utils";
+import { backfillConversionGoals } from "@/features/conversion-goals/utils";
+import { resolveEntryPoint } from "@/features/entry-points/resolve";
+import { resolveAttribution } from "@/features/attribution/attribution";
+import { readUtm } from "@/features/attribution/utm";
+import { createOpportunity } from "@/server/opportunities/factory";
 import type {
   AnalyticsEventName,
   Booking,
@@ -79,13 +84,14 @@ function DynamicIcon({ name }: { name?: string }) {
 }
 
 function emptyRuntime(project: Project): JourneyRuntimeState {
+  const goals = backfillConversionGoals(project).filter((goal) => goal.isActive);
   return {
     visitorId: uid("visitor"),
     sessionId: uid("session"),
     currentStepId:
-      project.steps
+      (goals.length > 1 ? "__conversion-goals" : project.steps
         .filter((step) => step.isActive)
-        .toSorted((a, b) => a.order - b.order)[0]?.id || "",
+        .toSorted((a, b) => a.order - b.order)[0]?.id) || "",
     answers: {},
     selectedOfferIds: [],
     cart: { items: [], totals: { subtotal: 0, total: 0, currency: "BRL" } },
@@ -100,30 +106,50 @@ type StoredJourneyRuntime = Partial<JourneyRuntimeState> & {
   navigationHistory?: string[];
 };
 
-function runtimeFromStorage(project: Project, preview: boolean) {
+function runtimeFromStorage(project: Project, preview: boolean, previewGoalId?: string, previewEntryKey?: string) {
   const fallback = emptyRuntime(project);
-  if (typeof window === "undefined" || preview) return fallback;
+  if (typeof window === "undefined") return fallback;
+  const params = new URLSearchParams(window.location.search);
+  if (previewGoalId) params.set("goal", previewGoalId);
+  if (previewEntryKey) params.set("entry", previewEntryKey);
+  const goals = backfillConversionGoals(project).filter((goal) => goal.isActive);
+  const resolved = resolveEntryPoint(project.entryPoints || [], goals, project.steps, params.get("entry"));
+  const previewGoal = preview && params.get("goal") ? goals.find((goal) => goal.id === params.get("goal")) : undefined;
+  const directGoal = resolved.goal || previewGoal || (goals.length === 1 ? goals[0] : undefined);
+  const attribution = resolveAttribution({ explicit: readUtm(params), entry: resolved.entry, referrer: document.referrer, conversionGoalId: directGoal?.id });
+  const direct = { ...fallback, currentStepId: resolved.step?.id || directGoal?.targetStepId || fallback.currentStepId, conversionGoalId: directGoal?.id, entryPointId: resolved.entry?.id, attribution };
+  if (preview) return direct;
   try {
     const raw = sessionStorage.getItem(`smartbio:journey:v3:${project.slug}`);
-    if (!raw) return fallback;
+    if (!raw) return direct;
     const stored = JSON.parse(raw) as StoredJourneyRuntime;
     const storedRuntime = { ...stored };
     delete storedRuntime.navigationHistory;
-    return {
-      ...fallback,
+    const merged = {
+      ...direct,
       ...storedRuntime,
       cart: { ...fallback.cart, ...storedRuntime.cart },
       quoteDraft: storedRuntime.quoteDraft
         ? { ...storedRuntime.quoteDraft, attachments: [] }
         : undefined,
     };
+    return resolved.entry || previewGoal
+      ? {
+          ...merged,
+          currentStepId: direct.currentStepId,
+          conversionGoalId: direct.conversionGoalId,
+          entryPointId: direct.entryPointId,
+          attribution: direct.attribution,
+        }
+      : merged;
   } catch {
-    return fallback;
+    return direct;
   }
 }
 
 function historyFromStorage(project: Project, preview: boolean) {
   if (typeof window === "undefined" || preview) return [];
+  if (new URLSearchParams(window.location.search).has("entry")) return [];
   try {
     const raw = sessionStorage.getItem(`smartbio:journey:v3:${project.slug}`);
     if (!raw) return [];
@@ -265,19 +291,25 @@ function FieldControl({
 export function ExperienceCanvas({
   project,
   preview = false,
+  previewGoalId,
+  previewEntryKey,
 }: {
   project: Project;
   preview?: boolean;
+  previewGoalId?: string;
+  previewEntryKey?: string;
 }) {
-  const activeSteps = useMemo(
-    () =>
-      project.steps
+  const activeSteps = useMemo<import("@/types").JourneyStep[]>(() => {
+      const goals = backfillConversionGoals(project).filter((goal) => goal.isActive).sort((a, b) => a.order - b.order);
+      const steps = project.steps
         .filter((step) => step.isActive)
-        .toSorted((a, b) => a.order - b.order),
-    [project.steps],
-  );
+        .toSorted((a, b) => a.order - b.order);
+      if (goals.length <= 1) return steps;
+      return [{ id: "__conversion-goals", type: "choice" as const, title: "O que você deseja fazer hoje?", description: "Escolha seu objetivo para seguir pelo caminho mais direto.", order: -1, isActive: true, blocks: [], formFields: [],
+        options: goals.map((goal) => ({ id: `goal-option-${goal.id}`, label: goal.name, description: goal.description, value: goal.kind, actionType: "go_to_step" as const, targetStepId: goal.targetStepId, conversionGoalId: goal.id })) }, ...steps];
+    }, [project]);
   const [runtime, setRuntime] = useState<JourneyRuntimeState>(() =>
-    runtimeFromStorage(project, preview),
+    runtimeFromStorage(project, preview, previewGoalId, previewEntryKey),
   );
   const [history, setHistory] = useState<string[]>(() =>
     historyFromStorage(project, preview),
@@ -310,14 +342,17 @@ export function ExperienceCanvas({
       visitorId: runtime.visitorId,
       sessionId: runtime.sessionId,
       eventName,
+      conversionGoalId: runtime.conversionGoalId,
+      entryPointId: runtime.entryPointId,
+      destinationId: runtime.routeResult?.destination?.id,
       stepId: step.id,
       metadata,
       referrer: document.referrer,
-      utmSource: params.get("utm_source") || undefined,
-      utmMedium: params.get("utm_medium") || undefined,
-      utmCampaign: params.get("utm_campaign") || undefined,
-      utmContent: params.get("utm_content") || undefined,
-      utmTerm: params.get("utm_term") || undefined,
+      utmSource: runtime.attribution?.source || params.get("utm_source") || undefined,
+      utmMedium: runtime.attribution?.medium || params.get("utm_medium") || undefined,
+      utmCampaign: runtime.attribution?.campaign || params.get("utm_campaign") || undefined,
+      utmContent: runtime.attribution?.content || params.get("utm_content") || undefined,
+      utmTerm: runtime.attribution?.term || params.get("utm_term") || undefined,
       deviceType: matchMedia("(max-width: 700px)").matches
         ? "mobile"
         : "desktop",
@@ -362,6 +397,8 @@ export function ExperienceCanvas({
     if (!preview) {
       emit("page_view");
       emit("session_started");
+      if (runtime.entryPointId) emit("entry_point_loaded");
+      if (runtime.conversionGoalId && runtime.currentStepId !== "__conversion-goals") emit("conversion_goal_resolved");
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -438,9 +475,17 @@ export function ExperienceCanvas({
     void fetch("/api/leads", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ...lead, honeypot: "" }),
+      body: JSON.stringify({ ...lead, conversionGoalId: runtime.conversionGoalId, entryPointId: runtime.entryPointId, destinationId: runtime.routeResult?.destination?.id, attribution: runtime.attribution, honeypot: "" }),
     }).catch(() => undefined);
     return lead;
+  }
+
+  function addOpportunity(sourceType: "lead" | "quote" | "booking" | "order" | "reservation" | "routed_contact", sourceId: string, title: string, input: { summary?: string; estimatedValue?: number; currency?: string; destinationId?: string } = {}) {
+    const opportunity = createOpportunity({ workspaceId: project.workspaceId, projectId: project.id, projectName: project.name, sessionId: runtime.sessionId,
+      sourceType, sourceId, title, conversionGoalId: runtime.conversionGoalId, entryPointId: runtime.entryPointId, destinationId: input.destinationId,
+      attribution: runtime.attribution, visitorData: runtime.answers, summary: input.summary, estimatedValue: input.estimatedValue, currency: input.currency });
+    localStore.saveOpportunity({ ...opportunity, id: uid("opportunity") });
+    emit("opportunity_created", { sourceType, sourceId });
   }
 
   async function submitCapability(capability: CapabilityKey) {
@@ -482,6 +527,9 @@ export function ExperienceCanvas({
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
               ...request,
+              conversionGoalId: runtime.conversionGoalId,
+              entryPointId: runtime.entryPointId,
+              attribution: runtime.attribution,
               visitorData: {
                 name: runtime.answers.name || "",
                 phone: runtime.answers.phone || "",
@@ -520,6 +568,7 @@ export function ExperienceCanvas({
           remoteId || request.id,
         );
         emit("quote_submitted", { quoteId: remoteId || request.id });
+        addOpportunity("quote", remoteId || request.id, `Orçamento · ${definition.title}`, { estimatedValue: request.estimatedMax || request.estimatedMin, currency: request.currency });
         setConfirmation(
           "Orçamento enviado. O negócio recebeu suas respostas e fotos.",
         );
@@ -557,7 +606,7 @@ export function ExperienceCanvas({
           const response = await fetch("/api/public/bookings", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ ...booking, honeypot: "" }),
+            body: JSON.stringify({ ...booking, conversionGoalId: runtime.conversionGoalId, entryPointId: runtime.entryPointId, attribution: runtime.attribution, honeypot: "" }),
           });
           const payload = (await response.json()) as {
             error?: { message?: string };
@@ -573,6 +622,7 @@ export function ExperienceCanvas({
           booking.id,
         );
         emit("booking_submitted", { bookingId: booking.id });
+        addOpportunity("booking", booking.id, `Agendamento · ${service.name}`, { summary: booking.startsAt });
         if (booking.status === "confirmed")
           emit("booking_confirmed", { bookingId: booking.id });
         setConfirmation(
@@ -601,7 +651,7 @@ export function ExperienceCanvas({
           const response = await fetch("/api/public/orders", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ ...order, honeypot: "" }),
+            body: JSON.stringify({ ...order, conversionGoalId: runtime.conversionGoalId, entryPointId: runtime.entryPointId, attribution: runtime.attribution, honeypot: "" }),
           });
           const payload = (await response.json()) as {
             error?: { message?: string };
@@ -623,6 +673,7 @@ export function ExperienceCanvas({
           orderId: order.id,
           total: order.totals.total,
         });
+        addOpportunity("order", order.id, `Pedido · ${order.items.length} item(ns)`, { estimatedValue: order.totals.total, currency: order.totals.currency });
         setConfirmation("Pedido enviado com sucesso.");
       } else if (capability === "reservation") {
         const range = runtime.selectedDateRange;
@@ -659,7 +710,7 @@ export function ExperienceCanvas({
           const response = await fetch("/api/public/reservations", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ ...reservation, honeypot: "" }),
+            body: JSON.stringify({ ...reservation, conversionGoalId: runtime.conversionGoalId, entryPointId: runtime.entryPointId, attribution: runtime.attribution, honeypot: "" }),
           });
           const payload = (await response.json()) as {
             error?: { message?: string };
@@ -675,6 +726,7 @@ export function ExperienceCanvas({
           reservation.id,
         );
         emit("reservation_submitted", { reservationId: reservation.id, total });
+        addOpportunity("reservation", reservation.id, `Reserva · ${unit.name}`, { estimatedValue: total, currency: unit.currency, summary: `${reservation.checkIn} → ${reservation.checkOut}` });
         if (reservation.status === "confirmed")
           emit("reservation_confirmed", { reservationId: reservation.id });
         setConfirmation(
@@ -711,6 +763,7 @@ export function ExperienceCanvas({
           destinationId: result.destination?.id,
           fallback: result.fallback,
         });
+        if (result.destination?.type === "whatsapp" && runtime.conversionGoalId) addOpportunity("routed_contact", `${runtime.sessionId}:${result.destination.id}`, `Contato encaminhado · ${result.destination.label}`, { destinationId: result.destination.id, summary: result.reason });
         setConfirmation(
           result.destination
             ? `Destino encontrado: ${result.destination.label}.`
@@ -741,6 +794,10 @@ export function ExperienceCanvas({
   async function act(option: StepOption) {
     if (!step) return;
     emit("option_clicked", { optionId: option.id, value: option.value });
+    if (option.conversionGoalId) {
+      setRuntime((current) => ({ ...current, conversionGoalId: option.conversionGoalId, attribution: current.attribution ? { ...current.attribution, conversionGoalId: option.conversionGoalId } : current.attribution }));
+      emit("conversion_goal_selected", { conversionGoalId: option.conversionGoalId });
+    }
     if (
       step.type === "form" &&
       project.commercialConfig?.qualificationRules?.length
@@ -843,7 +900,7 @@ export function ExperienceCanvas({
           project.commercialConfig.qualificationRules,
         )
       : undefined;
-    addLead(
+    const lead = addLead(
       {
         status: result?.band === "qualified" ? "qualified" : "new",
         score: result?.score,
@@ -854,6 +911,7 @@ export function ExperienceCanvas({
       },
       result ? "qualification" : undefined,
     );
+    addOpportunity("lead", lead.id, `Contato · ${lead.name || "Novo interesse"}`, { summary: runtime.recommendationKey });
     emit("form_submitted");
     emit("journey_completed");
     setSubmitted(true);
@@ -1158,8 +1216,8 @@ export function ExperienceCanvas({
         >
           Fale com a gente
         </button>
-        <span className="mx-2 opacity-30">·</span>Experiência criada com{" "}
-        <span className="font-extrabold text-[var(--primary)]">SmartBio</span>
+        <span className="mx-2 opacity-30">·</span>Feito com{" "}
+        <span className="font-extrabold text-[var(--primary)]">Virou</span>
       </footer>
     </div>
   );
@@ -1210,7 +1268,7 @@ export function PublicExperience({
             O endereço não existe ou ainda não foi publicado.
           </p>
           <Link href="/" className="mt-6 inline-flex font-bold text-[#5f52d6]">
-            Conhecer a SmartBio
+            Conhecer a Virou
           </Link>
         </div>
       </div>

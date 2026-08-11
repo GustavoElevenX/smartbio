@@ -22,6 +22,11 @@ export const features = {
   billing: clientEnv.NEXT_PUBLIC_FEATURE_BILLING,
   customDomains: clientEnv.NEXT_PUBLIC_FEATURE_CUSTOM_DOMAINS,
   multiUnitRouting: clientEnv.NEXT_PUBLIC_FEATURE_MULTI_UNIT,
+  conversionGoals: clientEnv.NEXT_PUBLIC_FEATURE_CONVERSION_GOALS,
+  entryPoints: clientEnv.NEXT_PUBLIC_FEATURE_ENTRY_POINTS,
+  opportunities: clientEnv.NEXT_PUBLIC_FEATURE_OPPORTUNITIES,
+  conversionAnalytics: clientEnv.NEXT_PUBLIC_FEATURE_CONVERSION_ANALYTICS,
+  aiOptimization: clientEnv.NEXT_PUBLIC_FEATURE_AI_OPTIMIZATION,
 };
 
 export const capabilityLabels = {
@@ -35,7 +40,7 @@ export const capabilityLabels = {
 } as const;
 
 export const reservedSlugs = new Set([
-  "app", "api", "login", "register", "forgot-password", "pricing", "privacy", "terms", "smartbio",
+  "app", "api", "login", "register", "forgot-password", "pricing", "privacy", "terms", "smartbio", "virou",
 ]);
 
 export const goalOptions = [

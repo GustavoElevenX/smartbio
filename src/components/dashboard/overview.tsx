@@ -14,23 +14,21 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { commercialRepository } from "@/lib/repositories/commercial-repository";
+import { localStore } from "@/lib/local-store";
 import { projectRepository } from "@/lib/repositories/project-repository";
 import { formatNumber } from "@/lib/utils";
-import type { AnalyticsEvent, Lead, Project } from "@/types";
+import type { AnalyticsEvent, CommercialOpportunity, Project } from "@/types";
 
 export function Overview() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [events, setEvents] = useState<AnalyticsEvent[]>([]);
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const [opportunities, setOpportunities] = useState<CommercialOpportunity[]>([]);
   useEffect(() => {
     void projectRepository.getProjects().then(async (items) => {
       setProjects(items);
-      const [tracked, captured] = await Promise.all([
-        Promise.all(items.map((project) => commercialRepository.getEvents(project.id))),
-        Promise.all(items.map((project) => commercialRepository.getLeads(project.id))),
-      ]);
+      const tracked = await Promise.all(items.map((project) => commercialRepository.getEvents(project.id)));
       setEvents(tracked.flat());
-      setLeads(captured.flat());
+      setOpportunities(items.flatMap((project) => localStore.getOpportunities(project.id)));
     });
   }, []);
   const stats = useMemo(() => {
@@ -73,7 +71,7 @@ export function Overview() {
       </div>
       <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          ["Visitas", stats.views, "+18%", Eye, "#6659df", "#eeecff"],
+          ["Visitas", stats.views, "Sem comparação ainda", Eye, "#6659df", "#eeecff"],
           [
             "Jornadas concluídas",
             stats.completed,
@@ -83,9 +81,9 @@ export function Overview() {
             "#e8f8f2",
           ],
           [
-            "Leads capturados",
-            leads.length,
-            "+3 esta semana",
+            "Oportunidades",
+            opportunities.length,
+            "Ações comerciais registradas",
             Users,
             "#dc604e",
             "#fff0ed",
@@ -133,7 +131,7 @@ export function Overview() {
         <section className="rounded-[24px] border border-[#e5e4eb] bg-white p-5 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-extrabold">Seus projetos</h2>
+              <h2 className="text-lg font-extrabold">Seus negócios</h2>
               <p className="mt-1 text-xs text-[#84848e]">
                 Experiências ativas no workspace
               </p>
@@ -192,17 +190,16 @@ export function Overview() {
           <div className="absolute -right-12 -top-12 size-48 rounded-full bg-[#6d5ef5]/35 blur-3xl" />
           <Sparkles className="relative text-[#aaa1fa]" size={22} />
           <h2 className="relative mt-10 text-2xl font-extrabold tracking-[-.035em]">
-            Uma melhoria de alto impacto
+            Sugestões baseadas em evidência
           </h2>
           <p className="relative mt-3 text-sm leading-6 text-white/60">
-            A etapa de qualificação concentra a maior saída. Reduza de 4 para 3
-            campos.
+            A Virou só sugere mudanças depois de reunir pelo menos 30 sessões no negócio e 15 na meta analisada.
           </p>
           <Link
             href="/app/projects/demo-vertice/editor"
             className="relative mt-6 inline-flex items-center gap-2 text-sm font-bold text-[#beb8ff]"
           >
-            Aplicar sugestão <ArrowUpRight size={16} />
+            Ver jornada <ArrowUpRight size={16} />
           </Link>
         </section>
       </div>
@@ -219,10 +216,10 @@ export function Overview() {
         <div className="mt-6 grid gap-3 sm:grid-cols-5">
           {[
             ["Visualizações", stats.views],
-            ["Intenção", Math.round(stats.views * 0.82)],
-            ["Qualificação", Math.round(stats.views * 0.64)],
-            ["Recomendação", Math.round(stats.views * 0.49)],
-            ["Ação", stats.completed],
+            ["Intenção", new Set(events.filter((event) => ["conversion_goal_selected", "conversion_goal_resolved"].includes(event.eventName)).map((event) => event.sessionId)).size],
+            ["Ação", new Set(events.filter((event) => ["form_submitted", "quote_submitted", "booking_submitted", "order_submitted", "reservation_submitted", "route_resolved"].includes(event.eventName)).map((event) => event.sessionId)).size],
+            ["Oportunidade", new Set(opportunities.map((item) => item.sessionId).filter(Boolean)).size],
+            ["Conversão", opportunities.filter((item) => item.status === "converted").length],
           ].map(([label, value], index) => (
             <div
               key={String(label)}

@@ -4,7 +4,8 @@ const booleanString = z.enum(["true", "false"]).transform((value) => value === "
 
 const clientEnvSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.url().default("http://localhost:3000"),
-  NEXT_PUBLIC_APP_NAME: z.string().trim().min(1).default("SmartBio"),
+  NEXT_PUBLIC_APP_NAME: z.string().trim().min(1).default("Virou"),
+  NEXT_PUBLIC_PUBLIC_BASE_URL: z.url().default("http://localhost:3000"),
   NEXT_PUBLIC_SUPABASE_URL: z.string().trim().optional(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().trim().optional(),
   NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY: z.string().trim().optional(),
@@ -29,6 +30,11 @@ const clientEnvSchema = z.object({
   NEXT_PUBLIC_FEATURE_BILLING: booleanString.default(false),
   NEXT_PUBLIC_FEATURE_CUSTOM_DOMAINS: booleanString.default(false),
   NEXT_PUBLIC_FEATURE_MULTI_UNIT: booleanString.default(true),
+  NEXT_PUBLIC_FEATURE_CONVERSION_GOALS: booleanString.default(true),
+  NEXT_PUBLIC_FEATURE_ENTRY_POINTS: booleanString.default(true),
+  NEXT_PUBLIC_FEATURE_OPPORTUNITIES: booleanString.default(true),
+  NEXT_PUBLIC_FEATURE_CONVERSION_ANALYTICS: booleanString.default(true),
+  NEXT_PUBLIC_FEATURE_AI_OPTIMIZATION: booleanString.default(false),
 });
 
 function emptyToUndefined(value: string | undefined) {
@@ -39,6 +45,7 @@ export function readClientEnv() {
   return clientEnvSchema.parse({
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME,
+    NEXT_PUBLIC_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_PUBLIC_BASE_URL,
     NEXT_PUBLIC_SUPABASE_URL: emptyToUndefined(process.env.NEXT_PUBLIC_SUPABASE_URL),
     NEXT_PUBLIC_SUPABASE_ANON_KEY: emptyToUndefined(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
     NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY: emptyToUndefined(process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY),
@@ -63,6 +70,11 @@ export function readClientEnv() {
     NEXT_PUBLIC_FEATURE_BILLING: process.env.NEXT_PUBLIC_FEATURE_BILLING,
     NEXT_PUBLIC_FEATURE_CUSTOM_DOMAINS: process.env.NEXT_PUBLIC_FEATURE_CUSTOM_DOMAINS,
     NEXT_PUBLIC_FEATURE_MULTI_UNIT: process.env.NEXT_PUBLIC_FEATURE_MULTI_UNIT,
+    NEXT_PUBLIC_FEATURE_CONVERSION_GOALS: process.env.NEXT_PUBLIC_FEATURE_CONVERSION_GOALS,
+    NEXT_PUBLIC_FEATURE_ENTRY_POINTS: process.env.NEXT_PUBLIC_FEATURE_ENTRY_POINTS,
+    NEXT_PUBLIC_FEATURE_OPPORTUNITIES: process.env.NEXT_PUBLIC_FEATURE_OPPORTUNITIES,
+    NEXT_PUBLIC_FEATURE_CONVERSION_ANALYTICS: process.env.NEXT_PUBLIC_FEATURE_CONVERSION_ANALYTICS,
+    NEXT_PUBLIC_FEATURE_AI_OPTIMIZATION: process.env.NEXT_PUBLIC_FEATURE_AI_OPTIMIZATION,
   });
 }
 

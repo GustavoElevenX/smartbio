@@ -133,6 +133,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
   );
   const [addOpen, setAddOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
+  const [previewAs, setPreviewAs] = useState("bio");
   const [undoStack, setUndoStack] = useState<Project[]>([]);
   const [redoStack, setRedoStack] = useState<Project[]>([]);
   const projectRef = useRef<Project | null>(null);
@@ -489,18 +490,20 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
         </aside>
         <section className="order-1 flex min-h-[720px] items-center justify-center overflow-hidden bg-[#efedf4] p-5 xl:order-2 xl:min-h-0">
           <div className="relative w-full max-w-[390px]">
-            <div className="mb-3 flex items-center justify-between text-xs font-semibold text-[#777781]">
+            <div className="mb-3 flex items-center justify-between gap-3 text-xs font-semibold text-[#777781]">
               <span className="inline-flex items-center gap-2">
                 <Smartphone size={15} /> Preview mobile
               </span>
-              <span>390 × 844</span>
+              <label className="flex items-center gap-2">Preview como<select aria-label="Preview como" value={previewAs} onChange={(event) => setPreviewAs(event.target.value)} className="min-h-9 rounded-lg border border-[#d9d6df] bg-white px-2 text-[11px]"><option value="bio">Bio</option>{project.entryPoints?.map((entry) => <option key={entry.id} value={`entry:${entry.key}`}>{entry.name}</option>)}{project.conversionGoals?.map((goal) => <option key={goal.id} value={`goal:${goal.id}`}>{goal.name}</option>)}</select></label>
             </div>
             <div className="h-[680px] overflow-hidden rounded-[38px] border-[7px] border-[#222126] bg-white p-1.5 shadow-[0_30px_80px_rgba(29,25,55,.2)]">
               <div className="h-full overflow-hidden rounded-[28px]">
                 <ExperienceCanvas
-                  key={`${project.id}-${project.version}`}
+                  key={`${project.id}-${project.version}-${previewAs}`}
                   project={project}
                   preview
+                  previewEntryKey={previewAs.startsWith("entry:") ? previewAs.slice(6) : undefined}
+                  previewGoalId={previewAs.startsWith("goal:") ? previewAs.slice(5) : undefined}
                 />
               </div>
             </div>

@@ -30,7 +30,7 @@ export const commercialRepository = {
     const { data, error } = await supabase
       .from("analytics_events")
       .select(
-        "id,project_id,session_id,event_name,step_id,option_id,metadata,created_at,visitor_sessions(visitor_id,utm_source,utm_medium,utm_campaign,device_type)",
+        "id,project_id,session_id,event_name,step_id,option_id,conversion_goal_id,entry_point_id,destination_id,metadata,created_at,visitor_sessions(visitor_id,utm_source,utm_medium,utm_campaign,utm_content,utm_term,device_type)",
       )
       .eq("project_id", projectId)
       .order("created_at", { ascending: false });
@@ -47,10 +47,15 @@ export const commercialRepository = {
         eventName: row.event_name,
         stepId: row.step_id || undefined,
         optionId: row.option_id || undefined,
+        conversionGoalId: row.conversion_goal_id || undefined,
+        entryPointId: row.entry_point_id || undefined,
+        destinationId: row.destination_id || undefined,
         metadata: row.metadata || {},
         utmSource: session?.utm_source || undefined,
         utmMedium: session?.utm_medium || undefined,
         utmCampaign: session?.utm_campaign || undefined,
+        utmContent: session?.utm_content || undefined,
+        utmTerm: session?.utm_term || undefined,
         deviceType: session?.device_type || undefined,
         createdAt: row.created_at,
       } as AnalyticsEvent;

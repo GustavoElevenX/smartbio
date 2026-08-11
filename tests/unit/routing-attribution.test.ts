@@ -1,0 +1,3 @@
+import { describe, expect, it } from "vitest";
+import { createOpportunity } from "@/server/opportunities/factory";
+describe("routing attribution", () => { it("keeps goal, entry and destination on routed contact", () => expect(createOpportunity({ workspaceId: "w", projectId: "p", sourceType: "routed_contact", sourceId: "s:d", title: "Contato", conversionGoalId: "g", entryPointId: "e", destinationId: "d", attribution: { source: "meta", campaign: "revenda" } })).toMatchObject({ conversionGoalId: "g", entryPointId: "e", destinationId: "d", attribution: { source: "meta", campaign: "revenda" } })); });

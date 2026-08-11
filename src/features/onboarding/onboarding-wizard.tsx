@@ -814,7 +814,7 @@ export function OnboardingWizard() {
                 ) : (
                   <>
                     <h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">
-                      Confira como a SmartBio entendeu seu negócio.
+                      Confira como a Virou entendeu seu negócio.
                     </h2>
                     <div className="mt-6 rounded-[20px] border border-[#dfdcf2] bg-[#f9f8ff] p-5">
                       <div className="flex flex-wrap items-start justify-between gap-3"><div><strong className="text-sm">Análise opcional com IA</strong><p className="mt-1 text-xs leading-5 text-[#74747e]">Receba sugestões sem substituir nenhum dado preenchido.</p></div><Button type="button" size="sm" variant="secondary" disabled={aiAnalyzing} onClick={() => void analyzeWithAI()}>{aiAnalyzing ? <LoaderCircle size={15} className="animate-spin" /> : <WandSparkles size={15} />}{aiAnalyzing ? "Analisando" : "Analisar e sugerir com IA"}</Button></div>

@@ -1,0 +1,4 @@
+"use client";
+import { Check, Copy, ExternalLink } from "lucide-react";
+import { useState } from "react";
+export function EntryPointLink({ url }: { url: string }) { const [copied, setCopied] = useState(false); return <div className="flex items-center gap-2 rounded-[13px] bg-[#f4f3f7] p-2 pl-3"><code className="min-w-0 flex-1 truncate text-[11px] text-[#56535e]">{url}</code><button type="button" aria-label="Copiar link" className="grid size-9 place-items-center rounded-lg bg-white" onClick={async () => { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>{copied ? <Check size={15} /> : <Copy size={15} />}</button><a aria-label="Abrir link" href={url} target="_blank" rel="noreferrer" className="grid size-9 place-items-center rounded-lg bg-white"><ExternalLink size={15} /></a></div>; }

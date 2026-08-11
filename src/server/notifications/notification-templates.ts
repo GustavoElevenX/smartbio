@@ -47,6 +47,6 @@ export function notificationTemplate(
     ["Bairro", data.neighborhood],
     ["URL", data.url],
   ].filter(([, value]) => typeof value === "string" && value);
-  const html = `<h1>${escapeHtml(title)}</h1><p>${escapeHtml(body)}</p>${context.length ? `<ul>${context.map(([label, value]) => `<li><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</li>`).join("")}</ul>` : ""}${actionUrl ? `<p><a href="${escapeHtml(actionUrl)}">Abrir no SmartBio</a></p>` : ""}`;
-  return { title, body, subject: `${title} · SmartBio`, html };
+  const html = `<h1>${escapeHtml(title)}</h1><p>${escapeHtml(body)}</p>${context.length ? `<ul>${context.map(([label, value]) => `<li><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</li>`).join("")}</ul>` : ""}${actionUrl ? `<p><a href="${escapeHtml(actionUrl)}">Abrir na Virou</a></p>` : ""}`;
+  return { title, body, subject: `${title} · Virou`, html };
 }

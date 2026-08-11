@@ -22,6 +22,10 @@ function normalizeIds(project: Project): Project {
     formFields: step.formFields?.map((field): FormField => ({ ...field, id: isUuid(field.id) ? field.id : uuid() })),
     blocks: step.blocks?.map((block) => ({ ...block, id: isUuid(block.id) ? block.id : uuid() })),
   }));
+  const goalIds = new Map((project.conversionGoals || []).map((goal) => [goal.id, isUuid(goal.id) ? goal.id : uuid()]));
+  const conversionGoals = project.conversionGoals?.map((goal) => ({ ...goal, id: goalIds.get(goal.id)!, projectId, targetStepId: stepIds.get(goal.targetStepId) || goal.targetStepId }));
+  const entryPoints = project.entryPoints?.map((entry) => ({ ...entry, id: isUuid(entry.id) ? entry.id : uuid(), projectId, conversionGoalId: entry.conversionGoalId ? goalIds.get(entry.conversionGoalId) || entry.conversionGoalId : undefined, targetStepId: entry.targetStepId ? stepIds.get(entry.targetStepId) || entry.targetStepId : undefined }));
+  for (const step of steps) for (const option of step.options || []) if (option.conversionGoalId) option.conversionGoalId = goalIds.get(option.conversionGoalId) || option.conversionGoalId;
   const commercialConfig = project.commercialConfig ? structuredClone(project.commercialConfig) : undefined;
   if (commercialConfig) {
     for (const rule of commercialConfig.qualificationRules || []) { rule.id = isUuid(rule.id) ? rule.id : uuid(); rule.projectId = projectId; }
@@ -32,7 +36,7 @@ function normalizeIds(project: Project): Project {
     for (const rule of commercialConfig.quoteDefinition?.rules || []) rule.id = isUuid(rule.id) ? rule.id : uuid();
     for (const destination of commercialConfig.routingDestinations || []) destination.id = isUuid(destination.id) ? destination.id : uuid();
   }
-  return { ...project, id: projectId, steps, commercialConfig };
+  return { ...project, id: projectId, steps, conversionGoals, entryPoints, commercialConfig };
 }
 
 async function workspaceId() {
@@ -97,6 +101,8 @@ async function saveNormalized(project: Project) {
   }, { onConflict: "project_id" });
   if (brandError) throw new Error(brandError.message);
 
+  await supabase.from("entry_points").delete().eq("project_id", normalized.id);
+  await supabase.from("conversion_goals").delete().eq("project_id", normalized.id);
   const { error: deleteError } = await supabase.from("journey_steps").delete().eq("project_id", normalized.id);
   if (deleteError) throw new Error(deleteError.message);
   const { error: stepsError } = await supabase.from("journey_steps").insert(normalized.steps.map((step) => ({
@@ -111,9 +117,18 @@ async function saveNormalized(project: Project) {
   })));
   if (stepsError) throw new Error(stepsError.message);
 
+  if (normalized.conversionGoals?.length) {
+    const { error } = await supabase.from("conversion_goals").insert(normalized.conversionGoals.map((goal) => ({ id: goal.id, project_id: normalized.id, name: goal.name, description: goal.description || null, goal_kind: goal.kind, target_step_id: goal.targetStepId, destination_label: goal.destinationLabel || null, is_primary: goal.isPrimary, is_active: goal.isActive, goal_order: goal.order })));
+    if (error) throw new Error(error.message);
+  }
+  if (normalized.entryPoints?.length) {
+    const { error } = await supabase.from("entry_points").insert(normalized.entryPoints.map((entry) => ({ id: entry.id, project_id: normalized.id, entry_key: entry.key, name: entry.name, conversion_goal_id: entry.conversionGoalId || null, target_step_id: entry.targetStepId || null, channel: entry.channel, utm_source: entry.utmSource || null, utm_medium: entry.utmMedium || null, utm_campaign: entry.utmCampaign || null, utm_content: entry.utmContent || null, utm_term: entry.utmTerm || null, is_active: entry.isActive })));
+    if (error) throw new Error(error.message);
+  }
+
   const optionRows = normalized.steps.flatMap((step) => (step.options || []).map((option, optionOrder) => ({
     id: option.id, step_id: step.id, label: option.label, description: option.description || null, icon: option.icon || null, value: option.value, option_order: optionOrder,
-    action_type: option.actionType, target_step_id: option.targetStepId || null, action_payload: option.actionPayload || {},
+    action_type: option.actionType, target_step_id: option.targetStepId || null, conversion_goal_id: option.conversionGoalId || null, action_payload: option.actionPayload || {},
   })));
   if (optionRows.length) {
     const { error } = await supabase.from("step_options").insert(optionRows);

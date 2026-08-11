@@ -6,6 +6,7 @@ import { getPublicProjectById } from "@/server/repositories/public-commercial-re
 import { enqueueProjectNotification } from "@/server/notifications/notification-service";
 import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
 import { publicRateLimitIdentifier } from "@/server/rate-limit/public-identifier";
+import { registerOpportunity } from "@/server/opportunities/service";
 
 export async function POST(request: Request) {
   const raw = await request.json().catch(() => null);
@@ -29,6 +30,7 @@ export async function POST(request: Request) {
   });
   if (error) { console.error("booking_submit_failed", { projectId: project.id, code: error.code }); return respond(apiError(error.code === "P0001" ? "Este horário acabou de ser ocupado. Escolha outro." : "Não foi possível solicitar o agendamento.", 409, "booking_conflict")); }
   const bookingId = typeof data === "object" && data && "id" in data ? String(data.id) : String(data);
-  await enqueueProjectNotification(project.id, "booking.submitted", "booking", bookingId, { ...parsed.data.visitorData, service: service.name, date: parsed.data.startsAt }).catch(() => undefined);
+  const opportunity = await registerOpportunity(supabase, { workspaceId: project.workspaceId, projectId: project.id, projectName: project.name, sessionId: parsed.data.sessionId, sourceType: "booking", sourceId: bookingId, title: `Agendamento · ${service.name}`, conversionGoalId: parsed.data.conversionGoalId, entryPointId: parsed.data.entryPointId, attribution: parsed.data.attribution, visitorData: parsed.data.visitorData, summary: parsed.data.startsAt }).catch(() => null);
+  await enqueueProjectNotification(project.id, "booking.submitted", "opportunity", opportunity?.id || bookingId, { ...parsed.data.visitorData, service: service.name, date: parsed.data.startsAt }).catch(() => undefined);
   return respond(apiSuccess({ accepted: true, persisted: true, booking: data }, 201));
 }
