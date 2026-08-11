@@ -7,7 +7,7 @@ import { MessagesSquare, PanelRight } from "lucide-react";
 import { AIConversation, type InitialSetupForm } from "@/components/ai-setup/ai-conversation";
 import { Button } from "@/components/ui/button";
 import { aiSetupSessionSchema, type AISetupSession, type SourceReference } from "@/features/ai-setup/ai-setup.schema";
-import { readRememberedAISetupSession, rememberAISetupSession } from "@/features/ai-setup/ai-setup-state";
+import { forgetAISetupSession, readRememberedAISetupSession, rememberAISetupSession } from "@/features/ai-setup/ai-setup-state";
 import { projectRepository } from "@/lib/repositories/project-repository";
 import type { Project } from "@/types";
 
@@ -21,7 +21,11 @@ async function apiCall<T>(url: string, init?: RequestInit): Promise<T> {
   return payload.data;
 }
 
-export function AISetupShell() {
+type AISetupShellProps = {
+  startFresh?: boolean;
+};
+
+export function AISetupShell({ startFresh = false }: AISetupShellProps) {
   const router = useRouter();
   const [form, setForm] = useState<InitialSetupForm>(initialForm);
   const [sources, setSources] = useState<SourceReference[]>([]);
@@ -46,6 +50,14 @@ export function AISetupShell() {
 
   useEffect(() => {
     let active = true;
+
+    if (startFresh) {
+      forgetAISetupSession();
+      setRestoring(false);
+      router.replace("/app/onboarding/ai");
+      return () => { active = false; };
+    }
+
     const remembered = readRememberedAISetupSession();
     if (!remembered) {
       setRestoring(false);
@@ -57,7 +69,7 @@ export function AISetupShell() {
       .catch(() => undefined)
       .finally(() => { if (active) setRestoring(false); });
     return () => { active = false; };
-  }, []);
+  }, [router, startFresh]);
 
   async function analyze() {
     if (form.businessName.trim().length < 2 || form.description.trim().length < 15) {

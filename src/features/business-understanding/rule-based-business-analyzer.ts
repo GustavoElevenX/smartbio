@@ -57,7 +57,7 @@ export class RuleBasedBusinessAnalyzer {
     const isLocalService = offerKinds.includes("service");
     const schedulingSignals = matches(text, ["agenda", "agendar", "consulta", "horario", "reuniao", "aula", "visita"]);
     const quoteSignals = matches(text, ["orcamento", "avaliacao", "sob medida", "medida", "proposta", "limpeza", "manutencao"]);
-    const locationSignals = matches(text, ["unidade", "franquia", "bairro", "cidade", "regiao", "filial", "mais perto"]);
+    const multipleLocationSignals = matches(text, ["unidades", "filiais", "franquias", "multiplas unidades", "varias unidades", "mais perto", "unidade mais proxima", "canais de atendimento"]);
     const photoSignals = matches(text, ["foto", "imagem", "estofado", "avaria", "avaliacao visual"]);
 
     const inferredPrimary: CommercialIntent[] = [];
@@ -76,11 +76,11 @@ export class RuleBasedBusinessAnalyzer {
       if (offerKinds.includes("hospitality")) capacityKinds.push("room");
       if (offerKinds.includes("rental")) capacityKinds.push("asset");
       if (isProduct) capacityKinds.push("inventory");
-      if (locationSignals) capacityKinds.push("location");
+      if (multipleLocationSignals) capacityKinds.push("location");
     }
     if (!capacityKinds.length) capacityKinds.push("none");
 
-    const hasMultipleLocations = input.hasMultipleLocations ?? locationSignals;
+    const hasMultipleLocations = input.hasMultipleLocations ?? multipleLocationSignals;
     const requiresQualification = input.requiresQualification ?? (isProfessional || quoteSignals);
     const requiresMediaUpload = input.requiresMediaUpload ?? (photoSignals || (isLocalService && quoteSignals));
     const requiresPayment = input.requiresPayment ?? primaryIntents.some((intent) => intent === "buy" || intent === "pay_deposit");

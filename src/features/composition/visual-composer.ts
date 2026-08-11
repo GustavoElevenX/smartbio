@@ -5,6 +5,65 @@ function hash(value: string) {
   return [...value].reduce((accumulator, character) => ((accumulator << 5) - accumulator + character.charCodeAt(0)) | 0, 0);
 }
 
+function normalized(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function defaultIdentity(input: ExperienceCompositionInput) {
+  const text = normalized(`${input.businessName} ${input.businessDescription} ${input.category || ""}`);
+  if (["pet", "cao", "caes", "gato", "banho e tosa", "veterin"].some((term) => text.includes(term))) {
+    return {
+      colors: ["#2F6B5B", "#F2B45B", "#D97A61"],
+      personality: ["Acolhedora", "Confiável", "Leve"],
+      subtitle: "Cuidado, confiança e o próximo passo para o seu pet.",
+    };
+  }
+  if (["clinica", "saude", "terapia", "fisioterapia", "odontologia"].some((term) => text.includes(term))) {
+    return {
+      colors: ["#246B76", "#76C7B7", "#E8B86D"],
+      personality: ["Confiável", "Calma", "Humana"],
+      subtitle: "Acolhimento claro para chegar ao atendimento certo.",
+    };
+  }
+  if (["restaurante", "comida", "sucos", "cafe", "confeitaria"].some((term) => text.includes(term))) {
+    return {
+      colors: ["#B55235", "#F2B84B", "#496B3E"],
+      personality: ["Apetitosa", "Próxima", "Vibrante"],
+      subtitle: "Escolha fácil, pedido direto e sabor no próximo passo.",
+    };
+  }
+  if (["hotel", "pousada", "chale", "hospedagem"].some((term) => text.includes(term))) {
+    return {
+      colors: ["#315B65", "#D7A86E", "#7C9A78"],
+      personality: ["Acolhedora", "Natural", "Elegante"],
+      subtitle: "Da descoberta à estadia, com clareza e acolhimento.",
+    };
+  }
+  return {
+    colors: ["#5D50D6", "#FF806B", "#20A985"],
+    personality: ["Equilibrada", "Clara", "Confiante"],
+    subtitle: "Da atenção ao próximo passo comercial.",
+  };
+}
+
+export function defaultBrandProfile(input: ExperienceCompositionInput): BrandProfile {
+  const identity = defaultIdentity(input);
+  return {
+    extractedColors: identity.colors,
+    activePalette: buildPalette(identity.colors),
+    paletteVariations: [
+      { name: "Fiel", palette: buildPalette(identity.colors, "faithful") },
+      { name: "Equilibrada", palette: buildPalette(identity.colors, "balanced") },
+      { name: "Ousada", palette: buildPalette(identity.colors, "bold") },
+    ],
+    brandPersonality: input.brandPersonality || identity.personality,
+  };
+}
+
+export function defaultProjectSubtitle(input: ExperienceCompositionInput) {
+  return defaultIdentity(input).subtitle;
+}
+
 export class VisualComposer {
   compose(input: ExperienceCompositionInput, brand: BrandProfile, journey: JourneyStep[]): ProjectDesignSystem {
     const palette = brand.activePalette || buildPalette(["#6D5EF5", "#FF725E", "#19B88B"]);

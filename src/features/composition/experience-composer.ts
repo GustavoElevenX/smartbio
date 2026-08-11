@@ -1,11 +1,10 @@
-import { buildPalette } from "@/features/brand-intelligence/colors";
 import { RuleBasedBusinessAnalyzer } from "@/features/business-understanding/rule-based-business-analyzer";
 import { CapabilityPlanner } from "@/features/capabilities/capability-planner";
 import { deterministicCompositionOrchestrator } from "@/features/composition/composition-orchestrator";
 import { assignProjectToCommercialConfig, defaultSlug, RuleBasedJourneyComposer } from "@/features/composition/journey-composer";
-import { VisualComposer } from "@/features/composition/visual-composer";
+import { defaultBrandProfile, defaultProjectSubtitle, VisualComposer } from "@/features/composition/visual-composer";
 import { uid } from "@/lib/utils";
-import type { BrandProfile, ExperienceCompositionInput, Project } from "@/types";
+import type { ExperienceCompositionInput, Project } from "@/types";
 
 /** Compatibility facade for callers and tests that require synchronous deterministic composition. */
 export class RuleBasedExperienceComposer {
@@ -18,12 +17,7 @@ export class RuleBasedExperienceComposer {
     const profile = this.analyzer.analyze(input);
     const capabilities = this.planner.plan(profile);
     const composition = this.journey.compose(input, profile, capabilities);
-    const brand: BrandProfile = input.brand || {
-      extractedColors: ["#6D5EF5", "#FF725E", "#19B88B"],
-      activePalette: buildPalette(["#6D5EF5", "#FF725E", "#19B88B"]),
-      paletteVariations: [],
-      brandPersonality: input.brandPersonality || ["Equilibrada"],
-    };
+    const brand = input.brand || defaultBrandProfile(input);
     const now = new Date().toISOString();
     const id = uid("project");
     return {
@@ -32,7 +26,7 @@ export class RuleBasedExperienceComposer {
       name: input.businessName,
       slug: defaultSlug(input),
       description: input.businessDescription,
-      subtitle: "Da atenção ao próximo passo comercial.",
+      subtitle: defaultProjectSubtitle(input),
       status: "draft",
       primaryGoal: input.primaryGoal,
       primaryDestination: input.primaryDestination,

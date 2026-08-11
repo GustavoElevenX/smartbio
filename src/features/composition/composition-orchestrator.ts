@@ -1,14 +1,13 @@
-import { buildPalette } from "@/features/brand-intelligence/colors";
 import { deterministicBusinessAnalyzer, type BusinessAnalyzer } from "@/features/business-understanding/analyze-business";
 import { capabilityPlanner, type CapabilityPlanner } from "@/features/capabilities/capability-planner";
 import { assignProjectToCommercialConfig, defaultSlug, journeyComposer, type RuleBasedJourneyComposer } from "@/features/composition/journey-composer";
-import { visualComposer, type VisualComposer } from "@/features/composition/visual-composer";
+import { defaultBrandProfile, defaultProjectSubtitle, visualComposer, type VisualComposer } from "@/features/composition/visual-composer";
 import { features } from "@/lib/constants";
 import { uid } from "@/lib/utils";
 import type { AIJourneyDraftPayload } from "@/features/composition/composition.schema";
 import { aiJourneyDraftSchema } from "@/features/composition/composition.schema";
 import { applyAIJourneyDraft } from "@/features/composition/apply-ai-journey-draft";
-import type { BrandProfile, ExperienceCompositionInput, JourneyStep, Project, ProjectCapability } from "@/types";
+import type { ExperienceCompositionInput, JourneyStep, Project, ProjectCapability } from "@/types";
 
 export type AIJourneyComposer = (input: ExperienceCompositionInput, projectProfile: NonNullable<Project["businessProfile"]>, capabilities: ProjectCapability[]) => Promise<AIJourneyDraftPayload>;
 
@@ -45,12 +44,7 @@ export class CompositionOrchestrator {
         // The deterministic composition remains complete enough to edit and safe to persist.
       }
     }
-    const brand: BrandProfile = input.brand || {
-      extractedColors: ["#6D5EF5", "#FF725E", "#19B88B"],
-      activePalette: buildPalette(["#6D5EF5", "#FF725E", "#19B88B"]),
-      paletteVariations: [],
-      brandPersonality: input.brandPersonality || ["Equilibrada"],
-    };
+    const brand = input.brand || defaultBrandProfile(input);
     const now = new Date().toISOString();
     const project: Project = {
       id,
@@ -58,7 +52,7 @@ export class CompositionOrchestrator {
       name: input.businessName,
       slug: defaultSlug(input),
       description: input.businessDescription,
-      subtitle: "Da atenção ao próximo passo comercial.",
+      subtitle: defaultProjectSubtitle(input),
       status: "draft",
       primaryGoal: input.primaryGoal,
       primaryDestination: input.primaryDestination,

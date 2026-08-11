@@ -36,6 +36,8 @@ import {
   buildWhatsAppUrl,
 } from "@/features/whatsapp/whatsapp";
 import { localStore } from "@/lib/local-store";
+import { canUseLocalStore } from "@/lib/runtime-mode";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { cn, uid } from "@/lib/utils";
 import type {
   AnalyticsEventName,
@@ -90,23 +92,49 @@ function emptyRuntime(project: Project): JourneyRuntimeState {
   };
 }
 
+function shouldSubmitCommercialOperationRemotely() {
+  return isSupabaseConfigured() || !canUseLocalStore();
+}
+
+type StoredJourneyRuntime = Partial<JourneyRuntimeState> & {
+  navigationHistory?: string[];
+};
+
 function runtimeFromStorage(project: Project, preview: boolean) {
   const fallback = emptyRuntime(project);
   if (typeof window === "undefined" || preview) return fallback;
   try {
     const raw = sessionStorage.getItem(`smartbio:journey:v3:${project.slug}`);
     if (!raw) return fallback;
-    const stored = JSON.parse(raw) as Partial<JourneyRuntimeState>;
+    const stored = JSON.parse(raw) as StoredJourneyRuntime;
+    const storedRuntime = { ...stored };
+    delete storedRuntime.navigationHistory;
     return {
       ...fallback,
-      ...stored,
-      cart: { ...fallback.cart, ...stored.cart },
-      quoteDraft: stored.quoteDraft
-        ? { ...stored.quoteDraft, attachments: [] }
+      ...storedRuntime,
+      cart: { ...fallback.cart, ...storedRuntime.cart },
+      quoteDraft: storedRuntime.quoteDraft
+        ? { ...storedRuntime.quoteDraft, attachments: [] }
         : undefined,
     };
   } catch {
     return fallback;
+  }
+}
+
+function historyFromStorage(project: Project, preview: boolean) {
+  if (typeof window === "undefined" || preview) return [];
+  try {
+    const raw = sessionStorage.getItem(`smartbio:journey:v3:${project.slug}`);
+    if (!raw) return [];
+    const stored = JSON.parse(raw) as StoredJourneyRuntime;
+    return Array.isArray(stored.navigationHistory)
+      ? stored.navigationHistory.filter((stepId) =>
+          project.steps.some((step) => step.id === stepId && step.isActive),
+        )
+      : [];
+  } catch {
+    return [];
   }
 }
 
@@ -251,7 +279,9 @@ export function ExperienceCanvas({
   const [runtime, setRuntime] = useState<JourneyRuntimeState>(() =>
     runtimeFromStorage(project, preview),
   );
-  const [history, setHistory] = useState<string[]>([]);
+  const [history, setHistory] = useState<string[]>(() =>
+    historyFromStorage(project, preview),
+  );
   const [leadForm, setLeadForm] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -306,6 +336,7 @@ export function ExperienceCanvas({
     try {
       const serializable = {
         ...runtime,
+        navigationHistory: history,
         quoteDraft: runtime.quoteDraft
           ? {
               ...runtime.quoteDraft,
@@ -325,7 +356,7 @@ export function ExperienceCanvas({
         JSON.stringify(serializable),
       );
     } catch {}
-  }, [preview, project.slug, runtime]);
+  }, [history, preview, project.slug, runtime]);
 
   useEffect(() => {
     if (!preview) {
@@ -444,39 +475,42 @@ export function ExperienceCanvas({
           createdAt: new Date().toISOString(),
         };
         localStore.saveQuoteRequest(request);
-        const response = await fetch("/api/public/quotes", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            ...request,
-            visitorData: {
-              name: runtime.answers.name || "",
-              phone: runtime.answers.phone || "",
-              email: runtime.answers.email || "",
-            },
-            honeypot: "",
-          }),
-        });
-        const payload = (await response.json()) as {
-          data?: { request?: { id?: string } };
-          error?: { message?: string };
-        };
-        if (!response.ok)
-          throw new Error(
-            payload.error?.message || "Não foi possível enviar o orçamento.",
-          );
-        const remoteId = payload.data?.request?.id;
-        if (remoteId && mediaFiles.current.length)
-          await Promise.all(
-            mediaFiles.current.map(async (file) => {
-              const form = new FormData();
-              form.set("file", file);
-              await fetch(`/api/public/quotes/${remoteId}/attachments`, {
-                method: "POST",
-                body: form,
-              });
+        let remoteId: string | undefined;
+        if (shouldSubmitCommercialOperationRemotely()) {
+          const response = await fetch("/api/public/quotes", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              ...request,
+              visitorData: {
+                name: runtime.answers.name || "",
+                phone: runtime.answers.phone || "",
+                email: runtime.answers.email || "",
+              },
+              honeypot: "",
             }),
-          );
+          });
+          const payload = (await response.json()) as {
+            data?: { request?: { id?: string } };
+            error?: { message?: string };
+          };
+          if (!response.ok)
+            throw new Error(
+              payload.error?.message || "Não foi possível enviar o orçamento.",
+            );
+          remoteId = payload.data?.request?.id;
+          if (remoteId && mediaFiles.current.length)
+            await Promise.all(
+              mediaFiles.current.map(async (file) => {
+                const form = new FormData();
+                form.set("file", file);
+                await fetch(`/api/public/quotes/${remoteId}/attachments`, {
+                  method: "POST",
+                  body: form,
+                });
+              }),
+            );
+        }
         addLead(
           {
             operationalStatus: "orçamento enviado",
@@ -519,18 +553,20 @@ export function ExperienceCanvas({
           createdAt: new Date().toISOString(),
         };
         localStore.saveBooking(booking);
-        const response = await fetch("/api/public/bookings", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ ...booking, honeypot: "" }),
-        });
-        const payload = (await response.json()) as {
-          error?: { message?: string };
-        };
-        if (!response.ok)
-          throw new Error(
-            payload.error?.message || "Não foi possível agendar.",
-          );
+        if (shouldSubmitCommercialOperationRemotely()) {
+          const response = await fetch("/api/public/bookings", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ ...booking, honeypot: "" }),
+          });
+          const payload = (await response.json()) as {
+            error?: { message?: string };
+          };
+          if (!response.ok)
+            throw new Error(
+              payload.error?.message || "Não foi possível agendar.",
+            );
+        }
         addLead(
           { operationalStatus: booking.status, scheduledAt: booking.startsAt },
           "scheduling",
@@ -561,18 +597,20 @@ export function ExperienceCanvas({
           createdAt: new Date().toISOString(),
         };
         localStore.saveOrder(order);
-        const response = await fetch("/api/public/orders", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ ...order, honeypot: "" }),
-        });
-        const payload = (await response.json()) as {
-          error?: { message?: string };
-        };
-        if (!response.ok)
-          throw new Error(
-            payload.error?.message || "Não foi possível enviar o pedido.",
-          );
+        if (shouldSubmitCommercialOperationRemotely()) {
+          const response = await fetch("/api/public/orders", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ ...order, honeypot: "" }),
+          });
+          const payload = (await response.json()) as {
+            error?: { message?: string };
+          };
+          if (!response.ok)
+            throw new Error(
+              payload.error?.message || "Não foi possível enviar o pedido.",
+            );
+        }
         addLead(
           {
             operationalStatus: "pedido enviado",
@@ -617,18 +655,20 @@ export function ExperienceCanvas({
           createdAt: new Date().toISOString(),
         };
         localStore.saveReservation(reservation);
-        const response = await fetch("/api/public/reservations", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ ...reservation, honeypot: "" }),
-        });
-        const payload = (await response.json()) as {
-          error?: { message?: string };
-        };
-        if (!response.ok)
-          throw new Error(
-            payload.error?.message || "Não foi possível solicitar a reserva.",
-          );
+        if (shouldSubmitCommercialOperationRemotely()) {
+          const response = await fetch("/api/public/reservations", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ ...reservation, honeypot: "" }),
+          });
+          const payload = (await response.json()) as {
+            error?: { message?: string };
+          };
+          if (!response.ok)
+            throw new Error(
+              payload.error?.message || "Não foi possível solicitar a reserva.",
+            );
+        }
         addLead(
           { operationalStatus: reservation.status, estimatedValue: total },
           "reservation",
@@ -685,12 +725,14 @@ export function ExperienceCanvas({
         setConfirmation("Pagamento aberto em ambiente externo seguro.");
       }
       setSubmitted(true);
+      return true;
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
           : "Não foi possível concluir. Tente novamente.",
       );
+      return false;
     } finally {
       setBusy(false);
     }
@@ -727,10 +769,13 @@ export function ExperienceCanvas({
       option.actionType === "show_recommendation"
     )
       return go(option.targetStepId);
-    if (option.actionType === "start_capability")
-      return submitCapability(
+    if (option.actionType === "start_capability") {
+      const completed = await submitCapability(
         String(option.actionPayload?.capability) as CapabilityKey,
       );
+      if (completed && option.targetStepId) go(option.targetStepId);
+      return;
+    }
     if (option.actionType === "submit_form") {
       setLeadForm(true);
       return;
@@ -783,13 +828,6 @@ export function ExperienceCanvas({
   function submitStep(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const option = step?.options?.[0];
-    if (
-      step?.type === "quote" &&
-      (!runtime.answers.servico || !runtime.answers.quantidade)
-    ) {
-      setError("Escolha o serviço e a quantidade.");
-      return;
-    }
     if (step?.type === "schedule" && !runtime.selectedSlot) {
       setError("Consulte e escolha um horário.");
       return;
@@ -1151,8 +1189,11 @@ export function PublicExperience({
   }, [preview, slug]);
   if (project === undefined)
     return (
-      <div className="grid min-h-screen place-items-center bg-[#f7f7fa]">
-        <LoaderCircle className="animate-spin text-[#6d5ef5]" />
+      <div className="grid min-h-screen place-items-center bg-[#f7f7fa] p-6 text-center">
+        <div role="status" className="flex flex-col items-center gap-3 text-sm font-semibold text-[#74747e]">
+          <LoaderCircle className="animate-spin text-[#6d5ef5]" />
+          Carregando experiência…
+        </div>
       </div>
     );
   if (!project || (!preview && project.status !== "published"))

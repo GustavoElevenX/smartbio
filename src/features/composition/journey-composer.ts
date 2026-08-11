@@ -20,6 +20,24 @@ const blockFor: Record<ProjectCapability["key"], ContentBlockType> = {
   reservation: "reservable_unit_cards", routing: "location_selector", payment: "cta_group",
 };
 
+function compactDescription(value: string, maximum = 220) {
+  const firstSentence = value.match(/^.*?[.!?](?:\s|$)/)?.[0]?.trim();
+  const candidate = firstSentence && firstSentence.length >= 60 ? firstSentence : value.trim();
+  if (candidate.length <= maximum) return candidate;
+  const clipped = candidate.slice(0, maximum + 1);
+  const boundary = clipped.lastIndexOf(" ");
+  return `${clipped.slice(0, boundary > maximum * 0.7 ? boundary : maximum).trim()}…`;
+}
+
+function welcomeActionLabel(capabilities: ProjectCapability[], businessName: string) {
+  const enabled = new Set(capabilities.filter((item) => item.enabled).map((item) => item.key));
+  if (enabled.has("quote") && enabled.has("scheduling")) return "Ver serviços e horários";
+  if (enabled.has("quote")) return "Pedir orçamento";
+  if (enabled.has("scheduling")) return "Agendar atendimento";
+  if (enabled.has("catalog_order")) return "Explorar opções";
+  return `Conhecer ${businessName}`;
+}
+
 function configuredAction(input: ExperienceCompositionInput, finalStepId: string): JourneyStep {
   const options: NonNullable<JourneyStep["options"]> = [];
   if (input.primaryDestination === "WhatsApp" && input.phone) {
@@ -39,9 +57,9 @@ export class RuleBasedJourneyComposer {
     const entries = new Map(usable.map((capability) => [capability.key, uid("step")]));
     const choiceStepId = uid("step");
     const steps: JourneyStep[] = [{
-      id: uid("step"), type: "welcome", title: input.businessName, description: input.businessDescription, order: 0, isActive: true, visualVariant: "brand-introduction",
+      id: uid("step"), type: "welcome", title: input.businessName, description: compactDescription(input.businessDescription), order: 0, isActive: true, visualVariant: "brand-introduction",
       blocks: [{ id: uid("block"), type: "text", variant: "brand-introduction" }],
-      options: [{ id: uid("option"), label: `Conhecer ${input.businessName}`, value: "start", actionType: "go_to_step", targetStepId: choiceStepId }],
+      options: [{ id: uid("option"), label: welcomeActionLabel(usable, input.businessName), value: "start", actionType: "go_to_step", targetStepId: choiceStepId }],
     }, {
       id: choiceStepId, type: "choice", title: "Como podemos ajudar?", description: `Escolha o objetivo da sua visita a ${input.businessName}.`, order: 1, isActive: true, visualVariant: "commercial-intent",
       blocks: [{ id: uid("block"), type: "choice_grid", variant: "brand-composed" }],
@@ -58,7 +76,7 @@ export class RuleBasedJourneyComposer {
         order: steps.length,
         isActive: true,
         blocks: [{ id: uid("block"), type: blockFor[capability.key], content: { source: capability.key, emptyState: "Complete os dados comerciais para concluir esta etapa." }, style: { incomplete: true, requirementKey } }],
-        options: [{ id: uid("option"), label: "Continuar", value: "continue", actionType: "go_to_step", targetStepId: finalStepId }],
+        options: [{ id: uid("option"), label: capability.key === "quote" ? "Enviar solicitação" : "Continuar", value: capability.key, actionType: "start_capability", actionPayload: { capability: capability.key }, targetStepId: finalStepId }],
       });
     }
     const finalStep = configuredAction(input, finalStepId); finalStep.order = steps.length; steps.push(finalStep);

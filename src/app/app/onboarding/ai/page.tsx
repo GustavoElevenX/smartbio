@@ -3,4 +3,11 @@ import { AISetupShell } from "@/components/ai-setup/ai-setup-shell";
 
 export const metadata: Metadata = { title: "Onboarding adaptativo" };
 
-export default function AIOnboardingPage() { return <AISetupShell />; }
+type AIOnboardingPageProps = {
+  searchParams: Promise<{ new?: string | string[] }>;
+};
+
+export default async function AIOnboardingPage({ searchParams }: AIOnboardingPageProps) {
+  const params = await searchParams;
+  return <AISetupShell startFresh={params.new === "1"} />;
+}

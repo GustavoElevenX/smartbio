@@ -2,6 +2,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { extractedBusinessSourceSchema, type AISetupSession, type ExtractedBusinessSource, type SetupQuestion, type SourceReference } from "@/features/ai-setup/ai-setup.schema";
+import { materializeSetupAnswers } from "@/features/ai-setup/materialize-setup-answers";
 import { RuleBasedBusinessAnalyzer } from "@/features/business-understanding/rule-based-business-analyzer";
 import { capabilityPlanner } from "@/features/capabilities/capability-planner";
 import { draftCapabilityRequirements } from "@/features/capabilities/capability-requirements";
@@ -193,12 +194,12 @@ export class AISetupService {
     );
     try {
       const generated = await orchestrator.compose(input);
-      const project: Project = {
+      const project = materializeSetupAnswers({
         ...generated,
         workspaceId: actor.workspaceId,
         status: "draft",
         dataRequirements: mergeProjectRequirements(generated, session),
-      };
+      }, session);
       const next = await this.repository.update(actor, {
         ...session,
         status: "review",

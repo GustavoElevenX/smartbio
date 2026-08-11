@@ -17,10 +17,14 @@ import {
   createOrderItem,
 } from "@/features/catalog/order-engine";
 import { calculateQuoteEstimate } from "@/features/quotes/quote-engine";
+import { generateAvailableSlots } from "@/features/scheduling/availability-engine";
 import {
   calculateReservationTotal,
   reservationNights,
 } from "@/features/reservations/reservation-engine";
+import { localStore } from "@/lib/local-store";
+import { canUseLocalStore } from "@/lib/runtime-mode";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import type { ContentBlockType, QuoteDefinition } from "@/types";
 import { parseBlockContent } from "@/components/public-experience/blocks/block-schemas";
@@ -467,6 +471,27 @@ const ScheduleSlotsBlock: BlockRenderer = ({
     setError("");
     emit("availability_searched", { date, serviceId: service.id });
     try {
+      if (canUseLocalStore() && !isSupabaseConfigured()) {
+        const localSlots = generateAvailableSlots({
+          date,
+          service,
+          rules: project.commercialConfig?.availabilityRules || [],
+          exceptions: project.commercialConfig?.availabilityExceptions || [],
+          bookings: localStore.getBookings(project.id),
+          resourceId: runtime.selectedResourceId,
+        });
+        setSlots(
+          localSlots.map((slot) => ({
+            ...slot,
+            label: new Date(slot.startsAt).toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          })),
+        );
+        return;
+      }
+
       const response = await fetch("/api/public/availability", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -961,26 +986,29 @@ function PriceEstimateContent({ definition, runtime, setRuntime, emit }: {
   );
 }
 
-const QuoteSummaryBlock: BlockRenderer = ({ runtime }) => (
-  <div className={cardClass}>
-    <strong className="text-sm">Resumo do pedido</strong>
-    <div className="mt-3 flex flex-col gap-2">
-      {Object.entries(runtime.answers)
-        .filter(([key]) => !["name", "phone", "email"].includes(key))
-        .slice(0, 8)
-        .map(([key, value]) => (
-          <div key={key} className="flex justify-between gap-4 text-xs">
-            <span className="capitalize text-[var(--muted-fg)]">
-              {key.replaceAll("_", " ")}
-            </span>
-            <strong className="text-right">
-              {Array.isArray(value) ? value.join(", ") : String(value)}
-            </strong>
-          </div>
-        ))}
+const QuoteSummaryBlock: BlockRenderer = ({ project, runtime }) => {
+  const labels = new Map((project.commercialConfig?.quoteDefinition?.questions || []).map((field) => [field.key, field.label]));
+  const answers = Object.entries(runtime.answers)
+    .filter(([key, value]) => !["name", "phone", "email"].includes(key) && value !== "" && value != null)
+    .slice(0, 8);
+  return (
+    <div className={cardClass}>
+      <strong className="text-sm">Resumo do pedido</strong>
+      {answers.length ? (
+        <div className="mt-3 flex flex-col gap-2">
+          {answers.map(([key, value]) => (
+            <div key={key} className="flex justify-between gap-4 text-xs">
+              <span className="text-[var(--muted-fg)]">{labels.get(key) || key.replaceAll("_", " ")}</span>
+              <strong className="text-right">{Array.isArray(value) ? value.join(", ") : String(value)}</strong>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-2 text-xs leading-5 text-[var(--muted-fg)]">Preencha as informações abaixo para montar sua solicitação.</p>
+      )}
     </div>
-  </div>
-);
+  );
+};
 
 const BookingSummaryBlock: BlockRenderer = ({ project, runtime }) => {
   if (runtime.selectedDateRange?.start && runtime.selectedOfferIds[0]) {
