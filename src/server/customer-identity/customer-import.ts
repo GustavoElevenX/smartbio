@@ -1,0 +1,5 @@
+import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { resolveOrCreateCustomerIdentity } from "./customer-identity-service";
+import { CustomerIdentityRepository } from "./customer-identity-repository";
+export async function importHistoricalCustomers(database: SupabaseClient, input: { workspaceId: string; projectId: string; rows: Array<{ phone?: string; email?: string; externalId?: string }>; sourceId: string; defaultCountry?: string }) { let imported = 0; let skipped = 0; const repository = new CustomerIdentityRepository(database); for (const [index, row] of input.rows.entries()) { try { const current = await resolveOrCreateCustomerIdentity(database, { ...input, phone: row.phone, email: row.email }); await repository.addEvidence({ customerIdentityId: current.id, projectId: input.projectId, evidenceType: "historical_customer_import", sourceType: "business_source", sourceId: `${input.sourceId}:${index}` }); imported++; } catch { skipped++; } } return { imported, skipped }; }

@@ -1,0 +1,1 @@
+import{activationAction}from"@/server/activations/activation-api-action";export async function POST(_:Request,context:RouteContext<"/api/projects/[projectId]/activations/[activationId]/pause">){return activationAction(context,"pause");}

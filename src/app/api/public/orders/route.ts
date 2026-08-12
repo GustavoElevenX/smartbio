@@ -8,6 +8,7 @@ import { enqueueProjectNotification } from "@/server/notifications/notification-
 import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
 import { publicRateLimitIdentifier } from "@/server/rate-limit/public-identifier";
 import { registerOpportunity } from "@/server/opportunities/service";
+import { calculateClaimBenefit } from "@/server/benefits/redemption-service";
 
 export async function POST(request: Request) {
   const raw = await request.json().catch(() => null);
@@ -30,12 +31,22 @@ export async function POST(request: Request) {
     return { itemId: item.id, name: variant ? `${item.name} · ${variant.name}` : item.name, quantity: requested.quantity, unitPrice: (item.price || 0) + (variant?.priceDelta || 0), variantId: variant?.id, notes: requested.notes };
   }).filter((item): item is NonNullable<typeof item> => Boolean(item));
   if (!items.length || items.length !== parsed.data.items.length) return respond(apiError("Um ou mais itens não estão disponíveis.", 409, "item_unavailable"));
-  const totals = calculateOrderTotals(items, { currency: items.length ? catalog.get(items[0].itemId)?.currency : "BRL", deliveryFee: parsed.data.fulfillment === "delivery" ? parsed.data.totals.deliveryFee : 0, discount: parsed.data.totals.discount });
+  const currency = items.length ? catalog.get(items[0].itemId)?.currency : "BRL";
+  const previewTotals = calculateOrderTotals(items, { currency, deliveryFee: 0, discount: 0 });
+  let serverDiscount = 0;
+  if (parsed.data.benefitClaimCode && supabase) {
+    try {
+      const benefit = await calculateClaimBenefit(supabase, { projectId: project.id, code: parsed.data.benefitClaimCode, subtotal: previewTotals.subtotal, deliveryFee: 0, locationId: parsed.data.locationId, fulfillment: parsed.data.fulfillment });
+      if (!benefit.eligible) return respond(apiError("O benefício não se aplica a este pedido.", 409, benefit.reason || "benefit_not_applicable"));
+      serverDiscount = benefit.discountAmount + benefit.deliveryDiscount;
+    } catch { return respond(apiError("Benefício inválido ou expirado.", 409, "invalid_benefit_claim")); }
+  }
+  const totals = calculateOrderTotals(items, { currency, deliveryFee: 0, discount: serverDiscount });
   if (!supabase) return respond(apiSuccess({ accepted: true, persisted: false, order: { ...parsed.data, items, totals, status: "submitted" } }, 202));
   const { data, error } = await supabase.rpc("create_order_request", { target_project: project.id, request_session_key: parsed.data.sessionId, request_idempotency_key: parsed.data.idempotencyKey, request_fulfillment: parsed.data.fulfillment, target_location: parsed.data.locationId || null, requested_items: items, requested_totals: totals, requested_visitor_data: parsed.data.visitorData });
   if (error) { console.error("order_submit_failed", { projectId: project.id, code: error.code }); return respond(apiError("Não foi possível enviar o pedido.", 400, "order_submit_failed")); }
   const orderId = typeof data === "object" && data && "id" in data ? String(data.id) : String(data);
-  const opportunity = await registerOpportunity(supabase, { workspaceId: project.workspaceId, projectId: project.id, projectName: project.name, sessionId: parsed.data.sessionId, sourceType: "order", sourceId: orderId, title: `Pedido · ${items.length} item(ns)`, conversionGoalId: parsed.data.conversionGoalId, entryPointId: parsed.data.entryPointId, attribution: parsed.data.attribution, visitorData: parsed.data.visitorData, estimatedValue: totals.total, currency: totals.currency, summary: items.map((item) => item.name).join(", ") }).catch(() => null);
+  const opportunity = await registerOpportunity(supabase, { workspaceId: project.workspaceId, projectId: project.id, projectName: project.name, sessionId: parsed.data.sessionId, sourceType: "order", sourceId: orderId, title: `Pedido · ${items.length} item(ns)`, conversionGoalId: parsed.data.conversionGoalId, entryPointId: parsed.data.entryPointId, activationId: parsed.data.activationId, benefitClaimId: parsed.data.benefitClaimId, attribution: parsed.data.attribution, visitorData: parsed.data.visitorData, estimatedValue: totals.total, currency: totals.currency, summary: items.map((item) => item.name).join(", ") }).catch(() => null);
   await enqueueProjectNotification(project.id, "order.submitted", "opportunity", opportunity?.id || orderId, { ...parsed.data.visitorData, interest: items.map((item) => item.name).join(", "), location: parsed.data.locationId }).catch(() => undefined);
   return respond(apiSuccess({ accepted: true, persisted: true, order: data }, 201));
 }

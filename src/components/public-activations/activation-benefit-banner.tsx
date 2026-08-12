@@ -1,0 +1,1 @@
+export function ActivationBenefitBanner({label,code}:{label:string;code?:string}){return<div className="rounded-2xl border border-[var(--presence-primary)]/20 bg-[var(--presence-primary)]/10 p-4"><strong>Seu benefício está liberado: {label}</strong>{code?<span className="ml-2 font-mono">Código {code}</span>:null}</div>}

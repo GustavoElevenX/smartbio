@@ -1,0 +1,6 @@
+import type { CustomerEligibilityHistory, CustomerIdentityEvidence } from "@/features/customer-identity/customer-identity.types";
+import type { CustomerHistoryCoverage } from "@/features/activations/activation.types";
+export function resolveCustomerHistory(evidence: CustomerIdentityEvidence[], coverage: CustomerHistoryCoverage): CustomerEligibilityHistory { const types = new Set(evidence.map((item) => item.evidenceType)); let state: CustomerEligibilityHistory["state"] = evidence.length ? "known_to_virou" : "new_to_virou"; if (types.has("historical_customer_import")) state = "known_historical_customer"; if (types.has("external_customer")) state = "known_external_customer"; return { state, evidence, coverage }; }
+export function hasOrderViaVirou(evidence: CustomerIdentityEvidence[]) { return evidence.some((item) => item.evidenceType === "order_submitted"); }
+export function hasPurchaseViaVirou(evidence: CustomerIdentityEvidence[]) { return evidence.some((item) => ["opportunity_converted", "benefit_redeemed"].includes(item.evidenceType)); }
+export function isKnownBusinessCustomer(evidence: CustomerIdentityEvidence[]) { return evidence.some((item) => ["historical_customer_import", "external_customer", "manual_confirmation", "opportunity_converted", "benefit_redeemed"].includes(item.evidenceType)); }

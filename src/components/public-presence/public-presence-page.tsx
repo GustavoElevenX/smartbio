@@ -8,6 +8,8 @@ import { PresenceActionButton } from "./presence-action-button";
 import { PresenceSectionRenderer } from "./presence-section-renderer";
 import { PresenceSectionTracker } from "./presence-section-tracker";
 import { PresenceMobileMenu } from "./presence-mobile-menu";
+import type { PublicActivation } from "@/features/activations/activation.types";
+import { ActivationRuntimeProvider } from "@/components/public-activations/activation-runtime-provider";
 
 function pagePath(project: Project, page: PresencePage) {
   return page.isHome ? `/${project.slug}` : `/${project.slug}/p/${page.key}`;
@@ -70,12 +72,16 @@ function pageSocialLinks(project: Project, page: PresencePage) {
 export function PresencePageContent({
   project,
   page,
+  publicActivations = [],
 }: {
   project: Project;
   page: PresencePage;
+  publicActivations?: PublicActivation[];
 }) {
+  const heroOverride = publicActivations.flatMap((activation) => activation.placements.map((placement) => ({ activation, placement }))).filter((item) => item.placement.placementType === "hero_override").toSorted((a,b) => b.placement.priority-a.placement.priority)[0];
   const activeSections = page.sections
     .filter((section) => section.isActive)
+    .map((section) => section.type === "hero" && heroOverride ? { ...section, eyebrow: String(heroOverride.placement.content.eyebrow || heroOverride.activation.offer?.label || section.eyebrow || ""), title: String(heroOverride.placement.content.title || heroOverride.activation.title || section.title || ""), description: String(heroOverride.placement.content.message || heroOverride.activation.message || section.description || ""), content: { ...section.content, primaryAction: { type: "start_activation", label: String(heroOverride.placement.content.ctaLabel || "Quero aproveitar"), activationId: heroOverride.activation.id, style: "primary" } } } : section)
     .toSorted((a, b) => a.order - b.order);
   const pages = (project.presence?.pages || [])
     .filter((item) => item.isActive)
@@ -159,6 +165,7 @@ export function PresencePageContent({
             project={project}
             page={page}
             section={section}
+            publicActivations={publicActivations}
           />
         </PresenceSectionTracker>
       ))}
@@ -236,10 +243,12 @@ export function PublicPresencePage({
   project,
   page,
   preview = false,
+  publicActivations = [],
 }: {
   project: Project;
   page: PresencePage;
   preview?: boolean;
+  publicActivations?: PublicActivation[];
 }) {
   const colors = project.designSystem.colors;
   const shape = project.designSystem.shape;
@@ -271,7 +280,9 @@ export function PublicPresencePage({
         presentation={page.settings.conversionPresentation.mode}
         previewProject={preview ? project : undefined}
       >
-        <PresencePageContent project={project} page={page} />
+        <ActivationRuntimeProvider projectId={project.id} pageId={page.id} activations={publicActivations}>
+          <PresencePageContent project={project} page={page} publicActivations={publicActivations} />
+        </ActivationRuntimeProvider>
       </ConversionLauncher>
     </div>
   );

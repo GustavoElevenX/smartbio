@@ -1,0 +1,1 @@
+export function ActivationProductBadge({label}:{label:string}){return<span className="inline-flex rounded-full bg-[var(--presence-primary)] px-2.5 py-1 text-xs font-extrabold text-white">{label}</span>}

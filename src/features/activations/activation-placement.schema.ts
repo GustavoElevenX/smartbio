@@ -1,0 +1,3 @@
+import { z } from "zod";
+export const activationPlacementSchema = z.object({ id: z.string().uuid(), activationId: z.string().uuid(), presencePageId: z.string().uuid().optional(), presenceSectionId: z.string().uuid().optional(), placementType: z.enum(["announcement_bar","hero_override","section_badge","product_badge","service_badge","conversion_cta","journey_banner","floating_cta"]), content: z.record(z.string(), z.unknown()).default({}), style: z.record(z.string(), z.unknown()).default({}), priority: z.number().int().min(-1000).max(1000).default(0), isActive: z.boolean().default(true) });
+export const activationPlacementDraftSchema = activationPlacementSchema.omit({ id: true, activationId: true });

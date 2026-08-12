@@ -27,7 +27,8 @@ export type PresenceActionType =
   | "go_to_presence_page"
   | "scroll_to_section"
   | "open_url"
-  | "open_whatsapp";
+  | "open_whatsapp"
+  | "start_activation";
 
 export interface PresenceAction {
   type: PresenceActionType;
@@ -38,6 +39,7 @@ export interface PresenceAction {
   url?: string;
   whatsappPhone?: string;
   whatsappMessage?: string;
+  activationId?: string;
   style?: "primary" | "secondary" | "ghost" | "link";
   analyticsLabel?: string;
 }
@@ -127,6 +129,9 @@ export interface PresenceLaunchContext {
   catalogItemId?: string;
   serviceId?: string;
   locationId?: string;
+  activationId?: string;
+  benefitClaimId?: string;
+  benefitClaimCode?: string;
 }
 
 export type DataVerificationStatus = "unverified" | "confirmed" | "source_verified";

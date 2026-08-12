@@ -351,6 +351,8 @@ export function ExperienceCanvas({
       sessionId: runtime.sessionId,
       eventName,
       conversionGoalId: runtime.conversionGoalId,
+      activationId: launchContext?.activationId,
+      benefitClaimId: launchContext?.benefitClaimId,
       entryPointId: runtime.entryPointId,
       presencePageId: runtime.attribution?.presencePageId,
       presenceSectionId: runtime.attribution?.presenceSectionId,
@@ -662,7 +664,7 @@ export function ExperienceCanvas({
           const response = await fetch("/api/public/orders", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ ...order, conversionGoalId: runtime.conversionGoalId, entryPointId: runtime.entryPointId, attribution: runtime.attribution, honeypot: "" }),
+            body: JSON.stringify({ ...order, totals: undefined, conversionGoalId: runtime.conversionGoalId, entryPointId: runtime.entryPointId, activationId: launchContext?.activationId, benefitClaimId: launchContext?.benefitClaimId, benefitClaimCode: launchContext?.benefitClaimCode, attribution: runtime.attribution, honeypot: "" }),
           });
           const payload = (await response.json()) as {
             error?: { message?: string };
@@ -857,13 +859,19 @@ export function ExperienceCanvas({
       const recommendation =
         step.recommendation?.title || runtime.recommendationKey;
       const message = buildWhatsAppMessage({
+        businessName: project.name,
         interest: step.title,
+        activation: launchContext?.activationId ? { name: "Ativação selecionada" } : undefined,
+        benefitClaim: launchContext?.benefitClaimCode ? { code: launchContext.benefitClaimCode } : undefined,
         answers: {
           ...stringAnswers(runtime.answers),
           ...(cart ? { pedido: cart } : {}),
           ...(recommendation ? { recomendacao: recommendation } : {}),
         },
       });
+      if (!preview && launchContext?.activationId && launchContext.benefitClaimId) {
+        await fetch(`/api/public/activations/${launchContext.activationId}/handoff`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ projectId: project.id, sessionId: runtime.sessionId, claimId: launchContext.benefitClaimId, destinationId: String(option.actionPayload?.destinationId || "") || undefined, locationId: runtime.selectedLocationId, entryPointId: runtime.entryPointId, presencePageId: launchContext.pageId, presenceSectionId: launchContext.sectionId, conversionGoalId: runtime.conversionGoalId }) });
+      }
       if (!preview)
         window.open(
           buildWhatsAppUrl(phone, message),

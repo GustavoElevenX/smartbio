@@ -11,6 +11,9 @@ import type {
 import { PresenceActionButton } from "./presence-action-button";
 import { GalleryLightbox } from "./gallery-lightbox";
 import { NearestLocationButton } from "./nearest-location-button";
+import type { PublicActivation } from "@/features/activations/activation.types";
+import { ActivationProductBadge } from "@/components/public-activations/activation-product-badge";
+import { ActivationServiceBadge } from "@/components/public-activations/activation-service-badge";
 
 function asset(project: Project, id?: string) {
   const item = project.mediaAssets?.find((candidate) => candidate.id === id);
@@ -160,10 +163,12 @@ export function PresenceSectionRenderer({
   project,
   page,
   section,
+  publicActivations = [],
 }: {
   project: Project;
   page: PresencePage;
   section: PresenceSection;
+  publicActivations?: PublicActivation[];
 }) {
   const content = section.content as Record<string, any>; // Content was validated by the section registry before persistence.
   const context = { pageId: page.id, sectionId: section.id };
@@ -326,6 +331,7 @@ export function PresenceSectionRenderer({
       >
         {chosen.map((service) => {
           const image = asset(project, service.imageAssetId);
+          const activation = publicActivations.find((candidate) => candidate.placements.some((placement) => placement.placementType === "service_badge") && (!candidate.offer?.scope.serviceOfferingIds?.length || candidate.offer.scope.serviceOfferingIds.includes(service.id)));
           return (
             <article
               key={service.id}
@@ -343,6 +349,7 @@ export function PresenceSectionRenderer({
                 </div>
               ) : null}
               <div className="p-6">
+                {activation ? <div className="mb-3"><ActivationServiceBadge label={activation.offer?.label || activation.name} /></div> : null}
                 <h3 className="text-xl font-black">{service.name}</h3>
                 <p className="mt-2 text-sm leading-6 text-[#66636e]">
                   {service.shortDescription || service.description}
@@ -353,11 +360,11 @@ export function PresenceSectionRenderer({
                     {money(service.price || service.minPrice, service.currency)}
                   </p>
                 ) : null}
-                {content.itemAction ? (
+                {activation || content.itemAction ? (
                   <div className="mt-5">
                     <PresenceActionButton
-                      action={content.itemAction}
-                      pageHref={pageHref(project, content.itemAction)}
+                      action={activation ? { type: "start_activation", label: "Quero aproveitar", activationId: activation.id, style: "primary" } : content.itemAction}
+                      pageHref={activation ? undefined : pageHref(project, content.itemAction)}
                       context={{ ...context, serviceId: service.id }}
                     />
                   </div>
@@ -383,7 +390,8 @@ export function PresenceSectionRenderer({
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {chosen.map((item) => {
           const image = asset(project, item.imageAssetId);
-          const action: PresenceAction = {
+          const activation = publicActivations.find((candidate) => candidate.placements.some((placement) => placement.placementType === "product_badge") && (!candidate.offer?.scope.catalogItemIds?.length || candidate.offer.scope.catalogItemIds.includes(item.id)));
+          const action: PresenceAction = activation ? { type: "start_activation", label: "Quero aproveitar", activationId: activation.id, style: "primary" } : {
             type: "start_conversion_goal",
             label: "Escolher",
             conversionGoalId:
@@ -409,6 +417,7 @@ export function PresenceSectionRenderer({
                 <div data-presence-media className="aspect-square bg-black/5" />
               )}
               <div className="p-4">
+                {activation ? <div className="mb-3"><ActivationProductBadge label={activation.offer?.label || activation.name} /></div> : null}
                 <h3 className="font-black">{item.name}</h3>
                 {content.showPrice ? (
                   <p className="mt-1 text-sm font-bold text-[var(--presence-primary)]">

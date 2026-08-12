@@ -27,7 +27,7 @@ export function ConversionLauncher({ projectSlug, projectId, pageId, presentatio
   const preview = Boolean(previewProject);
   const track = useCallback((eventName: AnalyticsEventName, metadata: Record<string, unknown> = {}) => {
     if (preview) return;
-    const payload = { projectId, visitorId: runtimeId(`virou:visitor:${projectId}`), sessionId: runtimeId(`virou:session:${projectId}`), eventName, presencePageId: String(metadata.pageId || pageId), presenceSectionId: metadata.sectionId ? String(metadata.sectionId) : undefined, metadata, referrer: document.referrer, deviceType: matchMedia("(max-width: 700px)").matches ? "mobile" : "desktop" };
+    const payload = { projectId, visitorId: runtimeId(`virou:visitor:${projectId}`), sessionId: runtimeId(`virou:session:${projectId}`), eventName, conversionGoalId: metadata.goalId ? String(metadata.goalId) : undefined, activationId: metadata.activationId ? String(metadata.activationId) : undefined, benefitClaimId: metadata.benefitClaimId ? String(metadata.benefitClaimId) : undefined, presencePageId: String(metadata.pageId || pageId), presenceSectionId: metadata.sectionId ? String(metadata.sectionId) : undefined, metadata, referrer: document.referrer, deviceType: matchMedia("(max-width: 700px)").matches ? "mobile" : "desktop" };
     void fetch("/api/events", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), keepalive: true }).catch(() => undefined);
   }, [pageId, preview, projectId]);
   const close = useCallback(() => { setContext(undefined); setComplete(false); setError(""); if (!preview && history.state?.virouConversion) history.back(); }, [preview]);

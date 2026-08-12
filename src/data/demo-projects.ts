@@ -1613,13 +1613,14 @@ export const demoProjects = [
   redeMovimento,
 ];
 export function findDemoProject(slugOrId: string) {
-  if (slugOrId === "virou-presenca-demo" || slugOrId === "demo-presence") {
+  if (["virou-presenca-demo", "demo-presence", "virou-activation-demo", "demo-activation"].includes(slugOrId)) {
+    const activationDemo = slugOrId === "virou-activation-demo" || slugOrId === "demo-activation";
     const project = structuredClone(casaDeSucos);
     const goal =
       project.conversionGoals?.find((item) => item.isPrimary) ||
       project.conversionGoals?.[0];
-    project.id = "demo-presence";
-    project.slug = "virou-presenca-demo";
+    project.id = activationDemo ? "demo-activation" : "demo-presence";
+    project.slug = activationDemo ? "virou-activation-demo" : "virou-presenca-demo";
     project.name = "Casa Mix";
     project.description =
       "Sucos naturais, bowls e lanches preparados para o seu momento.";

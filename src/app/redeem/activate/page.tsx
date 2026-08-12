@@ -1,0 +1,1 @@
+import{ValidatorActivation}from"@/components/redemption/validator-activation";export default async function Page({searchParams}:PageProps<"/redeem/activate">){const query=await searchParams;const token=Array.isArray(query.token)?query.token[0]:query.token;return<ValidatorActivation token={token||''}/>}

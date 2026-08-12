@@ -25,13 +25,14 @@ export const serverEnvSchema = z.object({
   DEFAULT_COUNTRY: z.string().trim().length(2).default("BR"),
   DEFAULT_TIMEZONE: z.string().trim().min(1).default("America/Sao_Paulo"),
   RATE_LIMIT_SECRET: optionalText,
+  CUSTOMER_IDENTITY_HASH_SECRET: optionalText,
   ENCRYPTION_KEY: optionalText,
   CRON_SECRET: optionalText,
   SENTRY_DSN: optionalText,
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
-export type ServerFeature = "ai" | "email" | "maps" | "supabase" | "rateLimit";
+export type ServerFeature = "ai" | "email" | "maps" | "supabase" | "rateLimit" | "customerIdentity";
 
 export function readServerEnv(source: NodeJS.ProcessEnv = process.env): ServerEnv {
   return serverEnvSchema.parse(source);
@@ -57,6 +58,7 @@ export function validateServerFeature(feature: ServerFeature, source: NodeJS.Pro
     if (!env.UPSTASH_REDIS_REST_URL) missing.push("UPSTASH_REDIS_REST_URL");
     if (!env.UPSTASH_REDIS_REST_TOKEN) missing.push("UPSTASH_REDIS_REST_TOKEN");
   }
+  if (feature === "customerIdentity" && source.NODE_ENV === "production" && !env.CUSTOMER_IDENTITY_HASH_SECRET) missing.push("CUSTOMER_IDENTITY_HASH_SECRET");
   if (missing.length) throw new Error(`Configuração ausente para ${feature}: ${missing.join(", ")}.`);
   return env;
 }

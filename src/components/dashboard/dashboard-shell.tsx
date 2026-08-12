@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BarChart3, BriefcaseBusiness, Check, ChevronDown, CreditCard, Database, FileSearch, FolderKanban, Globe2, HelpCircle, Images, LayoutDashboard, Link2, Loader2, LogOut, Menu, Palette, PencilRuler, Settings, Target, X } from "lucide-react";
+import { BarChart3, BriefcaseBusiness, Check, ChevronDown, CreditCard, Database, FileSearch, FolderKanban, Globe2, HelpCircle, Images, LayoutDashboard, Link2, Loader2, LogOut, Menu, Palette, PencilRuler, Settings, Target, X, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Brand } from "@/components/ui/brand";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       { href: `/app/projects/${projectId}`, label: "Visão geral", icon: LayoutDashboard, exact: true },
       { href: `/app/projects/${projectId}/conversion`, label: "Conversão", icon: Target },
       ...(features.presence ? [{ href: `/app/projects/${projectId}/site`, label: "Site", icon: Globe2 }] : []),
+      ...(features.activations ? [{ href: `/app/projects/${projectId}/activations`, label: "Ativações", icon: Zap }] : []),
       { href: `/app/projects/${projectId}/editor`, label: "Jornada", icon: PencilRuler },
       { href: `/app/projects/${projectId}/entries`, label: "Entradas", icon: Link2 },
       { href: `/app/projects/${projectId}/opportunities`, label: "Oportunidades", icon: BriefcaseBusiness },

@@ -1,0 +1,1 @@
+import{cookies}from"next/headers";import{apiSuccess}from"@/server/http/api-response";import{VALIDATOR_COOKIE}from"@/server/benefits/require-validator";export async function POST(){(await cookies()).delete(VALIDATOR_COOKIE);return apiSuccess({loggedOut:true});}

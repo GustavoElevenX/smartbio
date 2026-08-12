@@ -4,6 +4,7 @@ import { ArrowRight, MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { PresenceAction, PresenceLaunchContext } from "@/features/presence/presence.types";
 import { useConversionLauncher } from "./conversion-launcher";
+import { useActivationRuntime } from "@/components/public-activations/activation-runtime-provider";
 
 const styles = {
   primary: "bg-[var(--presence-primary)] text-white shadow-lg shadow-black/10 hover:-translate-y-0.5",
@@ -14,11 +15,13 @@ const styles = {
 
 export function PresenceActionButton({ action, context, pageHref, className = "", onAction }: { action: PresenceAction; context: PresenceLaunchContext; pageHref?: string; className?: string; onAction?: () => void }) {
   const launcher = useConversionLauncher();
+  const activationRuntime = useActivationRuntime();
   const router = useRouter();
   function act() {
     onAction?.();
     launcher.track("presence_cta_clicked", { ...context, label: action.analyticsLabel || action.label, actionType: action.type });
     if (action.type === "start_conversion_goal") return launcher.open({ ...context, goalId: action.conversionGoalId });
+    if (action.type === "start_activation" && action.activationId) return activationRuntime?.startActivation(action.activationId);
     if (action.type === "scroll_to_section" && action.anchor) return document.getElementById(action.anchor)?.scrollIntoView({ behavior: "smooth" });
     if (action.type === "go_to_presence_page" && pageHref) return router.push(pageHref);
     if (action.type === "open_url" && action.url) return window.open(action.url, "_blank", "noopener,noreferrer");

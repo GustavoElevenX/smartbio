@@ -5,5 +5,5 @@ const input = { workspaceId: "workspace", projectId: "project", sourceType: "quo
 describe("opportunities", () => {
   it("has a stable idempotency key", () => expect(opportunityIdempotencyKey(input)).toBe("project:quote:quote-1"));
   it("creates a safe unified opportunity", () => { const opportunity = createOpportunity(input); expect(opportunity).toMatchObject({ status: "new", contactName: "Ana", contactPhone: "11999999999" }); expect(opportunity.confirmedValue).toBeUndefined(); });
-  it("protects status transitions and confirmed value", () => { const opportunity = createOpportunity(input); expect(canTransitionOpportunity("new", "converted")).toBe(true); expect(() => transitionOpportunity(opportunity, "converted")).toThrow(/valor confirmado/i); expect(transitionOpportunity(opportunity, "converted", { confirmedValue: 1200 })).toMatchObject({ status: "converted", confirmedValue: 1200 }); });
+  it("allows conversion without inventing a confirmed value", () => { const opportunity = createOpportunity(input); expect(canTransitionOpportunity("new", "converted")).toBe(true); expect(transitionOpportunity(opportunity, "converted")).toMatchObject({ status: "converted", confirmedValue: undefined }); expect(transitionOpportunity(opportunity, "converted", { confirmedValue: 1200 })).toMatchObject({ status: "converted", confirmedValue: 1200 }); });
 });

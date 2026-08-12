@@ -1,0 +1,1 @@
+import"server-only";import{OpenAIVirouProvider}from"./openai-provider";import type{ActivationCompositionInput}from"./ai-provider";export function composeActivation(input:ActivationCompositionInput){return new OpenAIVirouProvider().composeActivation(input);}

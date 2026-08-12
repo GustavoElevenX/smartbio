@@ -4,6 +4,8 @@ import type { AttributionContext, BrandProfile, BusinessCapabilityProfile, Conve
 import type { AIPresenceDraft } from "@/features/presence/ai-presence.schema";
 import type { AIJourneyDraftPayload } from "@/features/composition/composition.schema";
 import type { BrandAIResult, BusinessAnalysisResult, CopyGenerationResult, ExtractedBusinessSource, SetupQuestion } from "@/features/ai-setup/ai-setup.schema";
+import type { AIActivationDraft } from "@/features/activations/ai-activation.schema";
+import type { ConversionActivation } from "@/features/activations/activation.types";
 
 export interface AIRequestContext {
   workspaceId: string;
@@ -66,12 +68,14 @@ export interface PresenceCompositionInput extends AIRequestContext {
   objective?: string;
   campaignContext?: AttributionContext;
 }
+export interface ActivationCompositionInput extends AIRequestContext { businessProfile: unknown; conversionGoals: Project["conversionGoals"]; catalogSummary: Array<{id:string;name:string;price?:number}>; serviceSummary:Array<{id:string;name:string}>; locations:Array<{id:string;name:string}>; presencePages:Array<{id:string;name:string}>; activeActivations:Pick<ConversionActivation,"id"|"name"|"activationType"|"startsAt"|"endsAt">[]; instruction:string }
 
 export interface VirouAIProvider {
   analyzeBusiness(input: BusinessAnalysisInput): Promise<BusinessAnalysisResult>;
   generateMissingQuestions(input: MissingQuestionInput): Promise<SetupQuestion[]>;
   composeJourney(input: JourneyAIInput): Promise<AIJourneyDraftPayload>;
   composePresence(input: PresenceCompositionInput): Promise<AIPresenceDraft>;
+  composeActivation(input: ActivationCompositionInput): Promise<AIActivationDraft>;
   generateCopy(input: CopyGenerationInput): Promise<CopyGenerationResult>;
   extractSource(input: SourceExtractionInput): Promise<ExtractedBusinessSource>;
   analyzeBrand?(input: BrandAIInput): Promise<BrandAIResult>;

@@ -719,6 +719,8 @@ export interface AttributionContext {
   referrer?: string;
   presencePageId?: string;
   presenceSectionId?: string;
+  activationId?: string;
+  benefitClaimId?: string;
 }
 
 export interface FormField {
@@ -980,7 +982,17 @@ export type AnalyticsEventName =
   | "conversion_goal_resolved"
   | "opportunity_created"
   | "conversion_confirmed"
-  | "conversion_lost";
+  | "conversion_lost"
+  | "activation_viewed"
+  | "activation_cta_clicked"
+  | "activation_started"
+  | "customer_identified"
+  | "benefit_eligibility_checked"
+  | "benefit_claim_issued"
+  | "benefit_claim_presented"
+  | "benefit_claim_redeemed"
+  | "benefit_claim_rejected"
+  | "activation_opportunity_created";
 
 export interface AnalyticsEvent {
   id: string;
@@ -993,6 +1005,8 @@ export interface AnalyticsEvent {
   presencePageId?: string;
   presenceSectionId?: string;
   destinationId?: string;
+  activationId?: string;
+  benefitClaimId?: string;
   stepId?: string;
   optionId?: string;
   metadata?: Record<string, unknown>;
@@ -1029,6 +1043,9 @@ export interface CommercialOpportunity {
   presencePageId?: string;
   presenceSectionId?: string;
   destinationId?: string;
+  activationId?: string;
+  benefitClaimId?: string;
+  customerIdentityId?: string;
   sourceType: OpportunitySourceType;
   sourceId: string;
   status: OpportunityStatus;

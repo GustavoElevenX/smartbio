@@ -1,0 +1,2 @@
+export function activationKey(name: string) { return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 100) || "activation"; }
+export function activationExpiry(endsAt: string | undefined, ttlMinutes = 1440, now = new Date()) { const ttl = new Date(now.getTime() + ttlMinutes * 60_000); if (!endsAt) return ttl.toISOString(); return new Date(Math.min(ttl.getTime(), new Date(endsAt).getTime())).toISOString(); }

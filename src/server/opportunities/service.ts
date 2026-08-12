@@ -8,7 +8,7 @@ export async function registerOpportunity(supabase: SupabaseClient, input: Oppor
   const opportunity = createOpportunity({ ...input, sessionId: session?.id }); const data = await upsertOpportunity(supabase, opportunity);
   if (!existing) {
     await supabase.from("opportunity_timeline").insert({ opportunity_id: data.id, event_type: "created", label: "Oportunidade criada", metadata: { sourceType: input.sourceType, sourceId: input.sourceId } });
-    await supabase.from("analytics_events").insert({ project_id: input.projectId, session_id: session?.id || null, event_name: "opportunity_created", conversion_goal_id: input.conversionGoalId || null, entry_point_id: input.entryPointId || null, destination_id: input.destinationId || null, presence_page_id: input.presencePageId || input.attribution?.presencePageId || null, presence_section_id: input.presenceSectionId || input.attribution?.presenceSectionId || null, metadata: { sourceType: input.sourceType } });
+    await supabase.from("analytics_events").insert({ project_id: input.projectId, session_id: session?.id || null, event_name: input.activationId ? "activation_opportunity_created" : "opportunity_created", conversion_goal_id: input.conversionGoalId || null, entry_point_id: input.entryPointId || null, destination_id: input.destinationId || null, presence_page_id: input.presencePageId || input.attribution?.presencePageId || null, presence_section_id: input.presenceSectionId || input.attribution?.presenceSectionId || null, activation_id: input.activationId || null, benefit_claim_id: input.benefitClaimId || null, metadata: { sourceType: input.sourceType } });
   }
   return data;
 }

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const presenceActionSchema = z.object({
-  type: z.enum(["start_conversion_goal", "go_to_presence_page", "scroll_to_section", "open_url", "open_whatsapp"]),
+  type: z.enum(["start_conversion_goal", "go_to_presence_page", "scroll_to_section", "open_url", "open_whatsapp", "start_activation"]),
   label: z.string().trim().min(1).max(80),
   conversionGoalId: z.string().min(1).optional(),
   pageId: z.string().min(1).optional(),
@@ -9,6 +9,7 @@ export const presenceActionSchema = z.object({
   url: z.url().optional(),
   whatsappPhone: z.string().regex(/^\+?[1-9]\d{7,14}$/).optional(),
   whatsappMessage: z.string().max(500).optional(),
+  activationId: z.string().uuid().optional(),
   style: z.enum(["primary", "secondary", "ghost", "link"]).default("primary"),
   analyticsLabel: z.string().max(100).optional(),
 }).superRefine((action, context) => {
@@ -18,6 +19,7 @@ export const presenceActionSchema = z.object({
     scroll_to_section: "anchor",
     open_url: "url",
     open_whatsapp: "whatsappPhone",
+    start_activation: "activationId",
   };
   const field = required[action.type];
   if (field && !action[field]) context.addIssue({ code: "custom", path: [field], message: "Destino obrigatório para esta ação." });

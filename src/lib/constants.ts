@@ -30,6 +30,10 @@ export const features = {
   presence: clientEnv.NEXT_PUBLIC_FEATURE_PRESENCE,
   presenceAI: clientEnv.NEXT_PUBLIC_FEATURE_PRESENCE_AI,
   presenceMultiPage: clientEnv.NEXT_PUBLIC_FEATURE_PRESENCE_MULTI_PAGE,
+  activations: clientEnv.NEXT_PUBLIC_FEATURE_ACTIVATIONS,
+  benefitClaims: clientEnv.NEXT_PUBLIC_FEATURE_BENEFIT_CLAIMS,
+  humanRedemption: clientEnv.NEXT_PUBLIC_FEATURE_HUMAN_REDEMPTION,
+  customerHistoryImport: clientEnv.NEXT_PUBLIC_FEATURE_CUSTOMER_HISTORY_IMPORT,
 };
 
 export const capabilityLabels = {

@@ -5,6 +5,7 @@ import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { aiJourneyDraftSchema } from "@/features/composition/composition.schema";
 import { aiPresenceDraftSchema } from "@/features/presence/ai-presence.schema";
+import { aiActivationDraftSchema } from "@/features/activations/ai-activation.schema";
 import {
   brandAIResultSchema,
   businessAnalysisResultSchema,
@@ -21,6 +22,7 @@ import type {
   JourneyAIInput,
   MissingQuestionInput,
   PresenceCompositionInput,
+  ActivationCompositionInput,
   VirouAIProvider,
   SourceExtractionInput,
   StructuredAIRequest,
@@ -33,6 +35,7 @@ import { journeyCompositionPrompt } from "@/server/ai/prompts/journey-compositio
 import { missingQuestionsPrompt } from "@/server/ai/prompts/missing-questions";
 import { presenceCompositionPrompt } from "@/server/ai/prompts/presence-composition";
 import { sourceExtractionPrompt } from "@/server/ai/prompts/source-extraction";
+import { activationCompositionPrompt } from "@/server/ai/prompts/activation-composition";
 
 const questionListSchema = z.object({ questions: z.array(setupQuestionSchema).max(5) });
 
@@ -115,6 +118,10 @@ export class OpenAIVirouProvider implements VirouAIProvider {
 
   composePresence(input: PresenceCompositionInput) {
     return this.structured({ operation: "presence_composition", schemaName: "presence_draft", schema: aiPresenceDraftSchema, systemPrompt: presenceCompositionPrompt, payload: input, context: input });
+  }
+
+  composeActivation(input: ActivationCompositionInput) {
+    return this.structured({ operation: "activation.compose", schemaName: "activation_draft", schema: aiActivationDraftSchema, systemPrompt: activationCompositionPrompt, payload: input, context: input });
   }
 
   generateCopy(input: CopyGenerationInput) {

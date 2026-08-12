@@ -4,6 +4,8 @@ import { PublicPresencePage } from "@/components/public-presence/public-presence
 import { PublicStructuredData } from "@/components/public-presence/public-structured-data";
 import { resolvePublicSurface } from "@/features/presence/resolve-public-surface";
 import { loadPublishedPublicProject } from "@/server/projects/load-public-project";
+import { resolvePublicActivations } from "@/server/activations/public-activation-resolver";
+import { createServiceClient } from "@/lib/supabase/server";
 
 const baseUrl = () => (process.env.NEXT_PUBLIC_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
 function value(input: string | string[] | undefined) { return Array.isArray(input) ? input[0] : input; }
@@ -27,6 +29,7 @@ export default async function PublicProjectPage({ params, searchParams }: PagePr
   const project = await loadPublishedPublicProject(slug);
   const surface = project ? resolvePublicSurface(project, value(query.entry), null) : null;
   if (!project || !surface?.page || surface.mode === "conversion_direct") return <PublicExperience slug={slug} />;
+  const publicActivations = await resolvePublicActivations(createServiceClient(), { projectId: project.id, entryPointId: surface.entry?.id, pageId: surface.page.id });
   const canonical = `${baseUrl()}/${project.slug}`;
-  return <><PublicStructuredData project={project} page={surface.page} canonical={canonical} /><PublicPresencePage project={project} page={surface.page} /></>;
+  return <><PublicStructuredData project={project} page={surface.page} canonical={canonical} /><PublicPresencePage project={project} page={surface.page} publicActivations={publicActivations} /></>;
 }

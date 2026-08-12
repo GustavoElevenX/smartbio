@@ -7,7 +7,8 @@ const visitorData = z.record(z.string().max(80), z.union([z.string().max(1000), 
 const answers = z.record(z.string().max(80), z.union([z.string().max(2000), z.number().finite(), z.boolean(), z.array(z.string().max(500)).max(20)]));
 const conversionContext = {
   conversionGoalId: shortId.optional(), entryPointId: shortId.optional(), destinationId: shortId.optional(), presencePageId: shortId.optional(), presenceSectionId: shortId.optional(),
-  attribution: z.object({ entryPointId: shortId.optional(), conversionGoalId: shortId.optional(), presencePageId: shortId.optional(), presenceSectionId: shortId.optional(), source: safeText, medium: safeText.optional(), campaign: safeText.optional(), content: safeText.optional(), term: safeText.optional(), referrer: z.string().url().max(1000).optional() }).optional(),
+  activationId: z.string().uuid().optional(), benefitClaimId: z.string().uuid().optional(),
+  attribution: z.object({ entryPointId: shortId.optional(), conversionGoalId: shortId.optional(), presencePageId: shortId.optional(), presenceSectionId: shortId.optional(), activationId: z.string().uuid().optional(), benefitClaimId: z.string().uuid().optional(), source: safeText, medium: safeText.optional(), campaign: safeText.optional(), content: safeText.optional(), term: safeText.optional(), referrer: z.string().url().max(1000).optional() }).optional(),
 };
 
 export const analyticsEventNames = [
@@ -15,12 +16,13 @@ export const analyticsEventNames = [
   "capability_started", "qualification_completed", "quote_started", "quote_submitted", "quote_estimate_viewed", "media_uploaded", "availability_searched", "slot_selected", "booking_submitted", "booking_confirmed", "booking_cancel_requested", "catalog_viewed", "item_viewed", "item_added", "cart_viewed", "order_submitted", "reservation_search_started", "reservation_option_viewed", "reservation_submitted", "reservation_confirmed", "reservation_cancel_requested", "route_resolved", "payment_started",
   "entry_point_loaded", "conversion_goal_selected", "conversion_goal_resolved", "opportunity_created", "conversion_confirmed", "conversion_lost",
   "presence_page_viewed", "presence_section_viewed", "presence_cta_clicked", "presence_conversion_started",
+  "activation_viewed", "activation_cta_clicked", "activation_started", "customer_identified", "benefit_eligibility_checked", "benefit_claim_issued", "benefit_claim_presented", "benefit_claim_redeemed", "benefit_claim_rejected", "activation_opportunity_created",
 ] as const;
 
 export const analyticsEventSchema = z.object({
   projectId: shortId, visitorId: shortId, sessionId: shortId,
   eventName: z.enum(analyticsEventNames),
-  stepId: shortId.optional(), optionId: shortId.optional(), conversionGoalId: shortId.optional(), entryPointId: shortId.optional(), destinationId: shortId.optional(), presencePageId: shortId.optional(), presenceSectionId: shortId.optional(), metadata: z.record(z.string().max(80), z.unknown()).optional(), referrer: z.string().url().max(1000).or(z.literal("")).optional(),
+  stepId: shortId.optional(), optionId: shortId.optional(), conversionGoalId: shortId.optional(), entryPointId: shortId.optional(), destinationId: shortId.optional(), presencePageId: shortId.optional(), presenceSectionId: shortId.optional(), activationId: z.string().uuid().optional(), benefitClaimId: z.string().uuid().optional(), metadata: z.record(z.string().max(80), z.unknown()).optional(), referrer: z.string().url().max(1000).or(z.literal("")).optional(),
   utmSource: safeText.optional(), utmMedium: safeText.optional(), utmCampaign: safeText.optional(), utmContent: safeText.optional(), utmTerm: safeText.optional(), deviceType: z.enum(["mobile", "desktop", "tablet"]).optional(),
 });
 
@@ -88,8 +90,9 @@ export const orderRequestSchema = z.object({
   idempotencyKey,
   fulfillment: z.enum(["delivery", "pickup", "digital", "external"]),
   locationId: shortId.optional(),
+  benefitClaimCode: z.string().trim().regex(/^[A-HJ-NP-Z2-9]{7}$/).optional(),
   items: z.array(z.object({ itemId: shortId, name: safeText, quantity: z.number().int().min(1).max(100), unitPrice: z.number().nonnegative().max(10_000_000), variantId: shortId.optional(), notes: safeText.optional() })).min(1).max(50),
-  totals: z.object({ subtotal: z.number().nonnegative(), deliveryFee: z.number().nonnegative().optional(), discount: z.number().nonnegative().optional(), total: z.number().nonnegative(), currency: z.string().length(3) }),
+  totals: z.object({ subtotal: z.number().nonnegative(), deliveryFee: z.number().nonnegative().optional(), discount: z.number().nonnegative().optional(), total: z.number().nonnegative(), currency: z.string().length(3) }).optional(),
   visitorData,
   honeypot: z.string().max(0).optional(),
 });

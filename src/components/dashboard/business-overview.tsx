@@ -10,6 +10,7 @@ import {
   Sparkles,
   Target,
   Users,
+  Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { projectRepository } from "@/lib/repositories/project-repository";
@@ -30,12 +31,14 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
     opportunities: number;
     conversions: number;
   }>();
+  const [activationStats, setActivationStats] = useState({ active: 0, scheduled: 0 });
   useEffect(() => {
     void projectRepository
       .getProject(projectId)
       .then(async (found) => {
         setProject(found || null);
         if (!found) return;
+        void fetch(`/api/projects/${found.id}/activations`).then(async (response) => { if (!response.ok) return; const payload = await response.json() as { data?: { activations?: Array<{ status: string }> } }; const activations = payload.data?.activations || []; setActivationStats({ active: activations.filter((item) => item.status === "active").length, scheduled: activations.filter((item) => item.status === "scheduled").length }); }).catch(() => undefined);
         if (isSupabaseConfigured()) {
           const response = await fetch(
             `/api/projects/${found.id}/analytics/overview?from=${encodeURIComponent(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())}`,
@@ -93,9 +96,27 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
     return <div className="h-96 animate-pulse rounded-[24px] bg-white" />;
   if (!project)
     return (
+      <>
       <div className="rounded-[24px] bg-white p-10 text-center">
         Negócio não encontrado.
       </div>
+      {/*
+      <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_1.15fr]">
+        <div className="rounded-[24px] border border-[#e4e2e9] bg-white p-6">
+          <Zap className="text-[#6657d8]" size={20} />
+          <h2 className="mt-5 text-xl font-black">Ativações</h2>
+          <p className="mt-2 text-sm text-[#74717d]">{activationStats.active} ativas · {activationStats.scheduled} agendadas</p>
+          <p className="mt-5 text-sm leading-6 text-[#686570]">Faça o site acompanhar promoções, lançamentos, agenda e o que precisa vender agora.</p>
+          <Link href={`/app/projects/${project.id}/activations`} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#dedbe8] px-4 text-sm font-bold text-[#5c4ed0]">Ver ativações <ArrowRight size={15}/></Link>
+        </div>
+        <div className="rounded-[24px] bg-[#1d1b26] p-6 text-white">
+          <h2 className="text-xl font-black">O que você quer melhorar agora?</h2>
+          <p className="mt-2 text-sm leading-6 text-white/60">Transforme o momento do negócio em um rascunho editável. A IA não publica nada sozinha.</p>
+          <Link href={`/app/projects/${project.id}/activations/new`} className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-xl bg-white px-5 text-sm font-bold text-[#201d2a]">Criar uma ativação <ArrowRight size={16}/></Link>
+        </div>
+      </section>
+      */}
+      </>
     );
   const pages = project.presence?.pages || [];
   return (
@@ -140,6 +161,20 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
           );
         })}
       </div>
+      <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_1.15fr]">
+        <div className="rounded-[24px] border border-[#e4e2e9] bg-white p-6">
+          <Zap className="text-[#6657d8]" size={20} />
+          <h2 className="mt-5 text-xl font-black">Ativações</h2>
+          <p className="mt-2 text-sm text-[#74717d]">{activationStats.active} ativas · {activationStats.scheduled} agendadas</p>
+          <p className="mt-5 text-sm leading-6 text-[#686570]">Faça o site acompanhar promoções, lançamentos, agenda e o que precisa vender agora.</p>
+          <Link href={`/app/projects/${project.id}/activations`} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#dedbe8] px-4 text-sm font-bold text-[#5c4ed0]">Ver ativações <ArrowRight size={15} /></Link>
+        </div>
+        <div className="rounded-[24px] bg-[#1d1b26] p-6 text-white">
+          <h2 className="text-xl font-black">O que você quer melhorar agora?</h2>
+          <p className="mt-2 text-sm leading-6 text-white/60">Transforme o momento do negócio em um rascunho editável. A IA não publica nada sozinha.</p>
+          <Link href={`/app/projects/${project.id}/activations/new`} className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-xl bg-white px-5 text-sm font-bold text-[#201d2a]">Criar uma ativação <ArrowRight size={16} /></Link>
+        </div>
+      </section>
       {pages.length ? (
         <section className="mt-6 rounded-[24px] border border-[#e4e2e9] bg-white p-6">
           <div className="flex items-center justify-between">
