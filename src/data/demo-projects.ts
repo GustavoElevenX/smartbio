@@ -1472,6 +1472,18 @@ export const demoProjects = [
   redeMovimento,
 ];
 export function findDemoProject(slugOrId: string) {
+  if (slugOrId === "virou-presenca-demo" || slugOrId === "demo-presence") {
+    const project = structuredClone(casaDeSucos);
+    const goal = project.conversionGoals?.find((item) => item.isPrimary) || project.conversionGoals?.[0];
+    project.id = "demo-presence"; project.slug = "virou-presenca-demo"; project.name = "Casa Mix"; project.description = "Sucos naturais, bowls e lanches preparados para o seu momento.";
+    project.presence = { pages: [{ id: "demo-presence-home", projectId: project.id, key: "home", name: "Início", type: "home", path: "/", title: "Sabor de verdade, do seu jeito.", description: "Escolha seus favoritos e siga pelo caminho mais rápido para pedir.", seoTitle: "Casa Mix · Sucos, bowls e lanches", seoDescription: "Conheça o cardápio da Casa Mix e faça seu pedido pelo caminho mais rápido.", defaultConversionGoalId: goal?.id, isHome: true, isActive: true, isIndexable: true, version: 1, settings: { header: { enabled: true, sticky: true, showLogo: true, showNavigation: true, primaryAction: goal ? { type: "start_conversion_goal", label: "Pedir agora", conversionGoalId: goal.id, style: "primary" } : undefined }, footer: { enabled: true, showLogo: true, showSocialLinks: false, showPolicies: true, showVirouBranding: true }, layout: { maxWidth: "xl", sectionSpacing: "normal" }, conversionPresentation: { mode: "overlay" } }, sections: [
+      { id: "demo-presence-hero", pageId: "demo-presence-home", key: "hero", type: "hero", anchor: "inicio", eyebrow: "Natural, fresco e simples", title: "Sabor de verdade, do seu jeito.", description: "Sucos, bowls e lanches preparados para transformar vontade em pedido sem complicação.", content: { badges: ["Ingredientes frescos", "Retirada ou delivery"], alignment: "left", primaryAction: goal ? { type: "start_conversion_goal", label: "Montar meu pedido", conversionGoalId: goal.id, style: "primary" } : undefined, secondaryAction: { type: "scroll_to_section", label: "Ver cardápio", anchor: "cardapio", style: "secondary" } }, style: {}, settings: {}, order: 0, isActive: true },
+      { id: "demo-presence-products", pageId: "demo-presence-home", key: "products", type: "products", anchor: "cardapio", eyebrow: "Cardápio", title: "Escolha o que combina com agora", description: "Preços e disponibilidade vêm direto do catálogo comercial.", content: { layout: "grid", maxItems: 8, showPrice: true, itemGoalId: goal?.id }, style: { theme: "muted" }, settings: {}, order: 1, isActive: true },
+      { id: "demo-presence-faq", pageId: "demo-presence-home", key: "faq", type: "faq", anchor: "duvidas", eyebrow: "Dúvidas", title: "Antes de pedir", content: { items: [{ id: "faq-1", question: "Posso escolher retirada?", answer: "Sim. A jornada mostra as opções disponíveis para o seu pedido." }, { id: "faq-2", question: "Como encontro a unidade certa?", answer: "Use sua localização ou informe a região para seguir até o destino correto." }] }, style: {}, settings: {}, order: 2, isActive: true },
+      { id: "demo-presence-cta", pageId: "demo-presence-home", key: "cta", type: "conversion_cta", title: "Pronto para escolher?", description: "Comece pelo seu objetivo e a Virou conduz o restante.", content: { primaryAction: goal ? { type: "start_conversion_goal", label: "Começar pedido", conversionGoalId: goal.id, style: "primary" } : { type: "scroll_to_section", label: "Ver cardápio", anchor: "cardapio" } }, style: {}, settings: {}, order: 3, isActive: true },
+    ] }] };
+    return project;
+  }
   return demoProjects.find(
     (project) => project.slug === slugOrId || project.id === slugOrId,
   );

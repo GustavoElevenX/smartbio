@@ -24,7 +24,10 @@ function normalizeIds(project: Project): Project {
   }));
   const goalIds = new Map((project.conversionGoals || []).map((goal) => [goal.id, isUuid(goal.id) ? goal.id : uuid()]));
   const conversionGoals = project.conversionGoals?.map((goal) => ({ ...goal, id: goalIds.get(goal.id)!, projectId, targetStepId: stepIds.get(goal.targetStepId) || goal.targetStepId }));
-  const entryPoints = project.entryPoints?.map((entry) => ({ ...entry, id: isUuid(entry.id) ? entry.id : uuid(), projectId, conversionGoalId: entry.conversionGoalId ? goalIds.get(entry.conversionGoalId) || entry.conversionGoalId : undefined, targetStepId: entry.targetStepId ? stepIds.get(entry.targetStepId) || entry.targetStepId : undefined }));
+  const pageIds = new Map((project.presence?.pages || []).map((page) => [page.id, isUuid(page.id) ? page.id : uuid()]));
+  const rewritePresenceRefs = (value: unknown): unknown => Array.isArray(value) ? value.map(rewritePresenceRefs) : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).map(([key, child]) => [key, key === "conversionGoalId" && typeof child === "string" ? goalIds.get(child) || child : key === "pageId" && typeof child === "string" ? pageIds.get(child) || child : rewritePresenceRefs(child)])) : value;
+  const presence = project.presence ? { pages: project.presence.pages.map((page) => { const pageId = pageIds.get(page.id)!; return { ...page, id: pageId, projectId, defaultConversionGoalId: page.defaultConversionGoalId ? goalIds.get(page.defaultConversionGoalId) || page.defaultConversionGoalId : undefined, settings: rewritePresenceRefs(page.settings) as typeof page.settings, sections: page.sections.map((section) => ({ ...section, id: isUuid(section.id) ? section.id : uuid(), pageId, content: rewritePresenceRefs(section.content) as Record<string, unknown>, settings: rewritePresenceRefs(section.settings) as Record<string, unknown> })) }; }) } : undefined;
+  const entryPoints = project.entryPoints?.map((entry) => ({ ...entry, id: isUuid(entry.id) ? entry.id : uuid(), projectId, conversionGoalId: entry.conversionGoalId ? goalIds.get(entry.conversionGoalId) || entry.conversionGoalId : undefined, targetStepId: entry.targetStepId ? stepIds.get(entry.targetStepId) || entry.targetStepId : undefined, presencePageId: entry.presencePageId ? pageIds.get(entry.presencePageId) || entry.presencePageId : undefined }));
   for (const step of steps) for (const option of step.options || []) if (option.conversionGoalId) option.conversionGoalId = goalIds.get(option.conversionGoalId) || option.conversionGoalId;
   const commercialConfig = project.commercialConfig ? structuredClone(project.commercialConfig) : undefined;
   if (commercialConfig) {
@@ -36,7 +39,7 @@ function normalizeIds(project: Project): Project {
     for (const rule of commercialConfig.quoteDefinition?.rules || []) rule.id = isUuid(rule.id) ? rule.id : uuid();
     for (const destination of commercialConfig.routingDestinations || []) destination.id = isUuid(destination.id) ? destination.id : uuid();
   }
-  return { ...project, id: projectId, steps, conversionGoals, entryPoints, commercialConfig };
+  return { ...project, id: projectId, steps, conversionGoals, entryPoints, presence, commercialConfig };
 }
 
 async function workspaceId() {
@@ -121,8 +124,14 @@ async function saveNormalized(project: Project) {
     const { error } = await supabase.from("conversion_goals").insert(normalized.conversionGoals.map((goal) => ({ id: goal.id, project_id: normalized.id, name: goal.name, description: goal.description || null, goal_kind: goal.kind, target_step_id: goal.targetStepId, destination_label: goal.destinationLabel || null, is_primary: goal.isPrimary, is_active: goal.isActive, goal_order: goal.order })));
     if (error) throw new Error(error.message);
   }
+  if (normalized.presence?.pages.length) {
+    const { error: pagesError } = await supabase.from("presence_pages").upsert(normalized.presence.pages.map((page) => ({ id: page.id, project_id: normalized.id, page_key: page.key, name: page.name, page_type: page.type, path: page.path, title: page.title || null, description: page.description || null, seo_title: page.seoTitle || null, seo_description: page.seoDescription || null, og_image_asset_id: page.ogImageAssetId || null, default_conversion_goal_id: page.defaultConversionGoalId || null, is_home: page.isHome, is_active: page.isActive, is_indexable: page.isIndexable, version: page.version || 1, settings: page.settings })));
+    if (pagesError) throw new Error(pagesError.message);
+    const sections = normalized.presence.pages.flatMap((page) => page.sections.map((section) => ({ id: section.id, page_id: page.id, section_key: section.key, section_type: section.type, anchor: section.anchor || null, title: section.title || null, eyebrow: section.eyebrow || null, description: section.description || null, content: section.content, style: section.style, settings: section.settings, section_order: section.order, is_active: section.isActive })));
+    if (sections.length) { const { error: sectionsError } = await supabase.from("presence_sections").upsert(sections); if (sectionsError) throw new Error(sectionsError.message); }
+  }
   if (normalized.entryPoints?.length) {
-    const { error } = await supabase.from("entry_points").insert(normalized.entryPoints.map((entry) => ({ id: entry.id, project_id: normalized.id, entry_key: entry.key, name: entry.name, conversion_goal_id: entry.conversionGoalId || null, target_step_id: entry.targetStepId || null, channel: entry.channel, utm_source: entry.utmSource || null, utm_medium: entry.utmMedium || null, utm_campaign: entry.utmCampaign || null, utm_content: entry.utmContent || null, utm_term: entry.utmTerm || null, is_active: entry.isActive })));
+    const { error } = await supabase.from("entry_points").insert(normalized.entryPoints.map((entry) => ({ id: entry.id, project_id: normalized.id, entry_key: entry.key, name: entry.name, conversion_goal_id: entry.conversionGoalId || null, target_step_id: entry.targetStepId || null, surface_mode: entry.surfaceMode || "conversion_direct", presence_page_id: entry.presencePageId || null, channel: entry.channel, utm_source: entry.utmSource || null, utm_medium: entry.utmMedium || null, utm_campaign: entry.utmCampaign || null, utm_content: entry.utmContent || null, utm_term: entry.utmTerm || null, is_active: entry.isActive })));
     if (error) throw new Error(error.message);
   }
 

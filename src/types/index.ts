@@ -1,3 +1,5 @@
+import type { PresenceSite, PublicSurfaceMode } from "@/features/presence/presence.types";
+
 export type ProjectStatus = "draft" | "published" | "archived";
 export type StepType =
   | "welcome"
@@ -693,6 +695,8 @@ export interface EntryPoint {
   name: string;
   conversionGoalId?: string;
   targetStepId?: string;
+  surfaceMode?: PublicSurfaceMode;
+  presencePageId?: string;
   channel: "bio" | "story" | "ad" | "qr" | "linkedin" | "other";
   utmSource?: string;
   utmMedium?: string;
@@ -713,6 +717,8 @@ export interface AttributionContext {
   content?: string;
   term?: string;
   referrer?: string;
+  presencePageId?: string;
+  presenceSectionId?: string;
 }
 
 export interface FormField {
@@ -794,6 +800,8 @@ export interface Project {
   steps: JourneyStep[];
   conversionGoals?: ConversionGoal[];
   entryPoints?: EntryPoint[];
+  presence?: PresenceSite;
+  mediaAssets?: MediaAsset[];
   businessProfile?: BusinessCapabilityProfile;
   capabilities?: ProjectCapability[];
   commercialConfig?: {
@@ -930,6 +938,10 @@ export interface Lead {
 
 export type AnalyticsEventName =
   | "page_view"
+  | "presence_page_viewed"
+  | "presence_section_viewed"
+  | "presence_cta_clicked"
+  | "presence_conversion_started"
   | "session_started"
   | "step_viewed"
   | "option_clicked"
@@ -978,6 +990,8 @@ export interface AnalyticsEvent {
   eventName: AnalyticsEventName;
   conversionGoalId?: string;
   entryPointId?: string;
+  presencePageId?: string;
+  presenceSectionId?: string;
   destinationId?: string;
   stepId?: string;
   optionId?: string;
@@ -1012,6 +1026,8 @@ export interface CommercialOpportunity {
   sessionId?: string;
   conversionGoalId?: string;
   entryPointId?: string;
+  presencePageId?: string;
+  presenceSectionId?: string;
   destinationId?: string;
   sourceType: OpportunitySourceType;
   sourceId: string;
@@ -1038,7 +1054,7 @@ export interface CommercialOpportunity {
 export interface OptimizationSuggestion {
   id: string;
   projectId: string;
-  kind: "goal_dropoff" | "entry_underperformance" | "destination_friction" | "journey_friction";
+  kind: "goal_dropoff" | "entry_underperformance" | "destination_friction" | "journey_friction" | "presence_cta" | "presence_structure" | "landing_page";
   title: string;
   explanation: string;
   evidence: Record<string, number | string>;

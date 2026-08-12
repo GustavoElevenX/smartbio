@@ -4,6 +4,7 @@ import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { aiJourneyDraftSchema } from "@/features/composition/composition.schema";
+import { aiPresenceDraftSchema } from "@/features/presence/ai-presence.schema";
 import {
   brandAIResultSchema,
   businessAnalysisResultSchema,
@@ -19,6 +20,7 @@ import type {
   CopyGenerationInput,
   JourneyAIInput,
   MissingQuestionInput,
+  PresenceCompositionInput,
   SmartBioAIProvider,
   SourceExtractionInput,
   StructuredAIRequest,
@@ -29,6 +31,7 @@ import { businessAnalysisPrompt } from "@/server/ai/prompts/business-analysis";
 import { copyGenerationPrompt } from "@/server/ai/prompts/copy-generation";
 import { journeyCompositionPrompt } from "@/server/ai/prompts/journey-composition";
 import { missingQuestionsPrompt } from "@/server/ai/prompts/missing-questions";
+import { presenceCompositionPrompt } from "@/server/ai/prompts/presence-composition";
 import { sourceExtractionPrompt } from "@/server/ai/prompts/source-extraction";
 
 const questionListSchema = z.object({ questions: z.array(setupQuestionSchema).max(5) });
@@ -108,6 +111,10 @@ export class OpenAISmartBioProvider implements SmartBioAIProvider {
 
   composeJourney(input: JourneyAIInput) {
     return this.structured({ operation: "journey_composition", schemaName: "journey_draft", schema: aiJourneyDraftSchema, systemPrompt: journeyCompositionPrompt, payload: input, context: input });
+  }
+
+  composePresence(input: PresenceCompositionInput) {
+    return this.structured({ operation: "presence_composition", schemaName: "presence_draft", schema: aiPresenceDraftSchema, systemPrompt: presenceCompositionPrompt, payload: input, context: input });
   }
 
   generateCopy(input: CopyGenerationInput) {

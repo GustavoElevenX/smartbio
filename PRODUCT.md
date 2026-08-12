@@ -3,7 +3,9 @@
 
 ## Product
 
-Virou is conversion infrastructure for social traffic. It turns attention into an intentional, measurable journey that ends in an action, commercial opportunity, confirmed conversion, and learning loop.
+Virou is presence and conversion infrastructure for social traffic. It turns attention into an intentional, measurable journey that ends in an action, commercial opportunity, confirmed conversion, and learning loop.
+
+Presence is not a separate website builder product. It is the presentation layer of the conversion infrastructure.
 
 Core promise: **Virou não é onde seus links ficam. É onde a intenção vira ação.**
 
@@ -18,6 +20,7 @@ The product serves Brazilian small and medium businesses that receive traffic fr
 ## Product model
 
 - A database `Project` remains the technical aggregate; the UI calls it **Negócio**.
+- **Presence** is the branded presentation layer that connects commercial content and calls to action to conversion goals.
 - A **Meta de conversão** represents visitor intent and points to the start of a journey.
 - An **Entrada** is a publishable URL/QR/campaign context that can preselect a goal and carry attribution.
 - A **Jornada** is the existing step graph and capability runtime.

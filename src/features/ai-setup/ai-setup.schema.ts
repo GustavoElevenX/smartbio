@@ -73,6 +73,7 @@ export const businessAnalysisResultSchema = z.object({
 });
 
 export const setupInitialInputSchema = z.object({
+  requestedSurface: z.enum(["business_site", "landing_page", "conversion_direct", "recommend"]).optional(),
   businessName: z.string().trim().min(2).max(160),
   description: z.string().trim().min(15).max(4000),
   websiteUrl: z.url().optional(),

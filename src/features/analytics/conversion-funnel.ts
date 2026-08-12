@@ -5,8 +5,8 @@ const actionEvents: AnalyticsEvent["eventName"][] = ["form_submitted", "quote_su
 const sessionSet = (events: AnalyticsEvent[], names: AnalyticsEvent["eventName"][]) => new Set(events.filter((event) => names.includes(event.eventName)).map((event) => event.sessionId));
 
 export function buildConversionFunnel(events: AnalyticsEvent[], opportunities: CommercialOpportunity[] = []): ConversionFunnelStage[] {
-  const attention = sessionSet(events, ["page_view", "session_started"]);
-  const intention = sessionSet(events, ["conversion_goal_selected", "conversion_goal_resolved"]);
+  const attention = sessionSet(events, ["page_view", "presence_page_viewed", "session_started"]);
+  const intention = sessionSet(events, ["presence_cta_clicked", "presence_conversion_started", "conversion_goal_selected", "conversion_goal_resolved"]);
   const action = sessionSet(events, actionEvents);
   const opportunity = new Set([...opportunities.map((item) => item.sessionId).filter(Boolean), ...sessionSet(events, ["opportunity_created"])]);
   const conversion = new Set([...opportunities.filter((item) => item.status === "converted").map((item) => item.sessionId).filter(Boolean), ...sessionSet(events, ["conversion_confirmed"])]);

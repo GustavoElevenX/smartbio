@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BarChart3, BriefcaseBusiness, Check, ChevronDown, CreditCard, Database, FileSearch, FolderKanban, HelpCircle, Images, LayoutDashboard, Link2, Loader2, LogOut, Menu, Palette, PencilRuler, Settings, Target, X } from "lucide-react";
+import { BarChart3, BriefcaseBusiness, Check, ChevronDown, CreditCard, Database, FileSearch, FolderKanban, Globe2, HelpCircle, Images, LayoutDashboard, Link2, Loader2, LogOut, Menu, Palette, PencilRuler, Settings, Target, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Brand } from "@/components/ui/brand";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ import { localStore } from "@/lib/local-store";
 import { createClient } from "@/lib/supabase/client";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { features } from "@/lib/constants";
 
 interface WorkspaceSummary {
   id: string;
@@ -31,6 +32,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     ...(projectId ? [
       { href: `/app/projects/${projectId}`, label: "Visão geral", icon: LayoutDashboard, exact: true },
       { href: `/app/projects/${projectId}/conversion`, label: "Conversão", icon: Target },
+      ...(features.presence ? [{ href: `/app/projects/${projectId}/site`, label: "Site", icon: Globe2 }] : []),
       { href: `/app/projects/${projectId}/editor`, label: "Jornada", icon: PencilRuler },
       { href: `/app/projects/${projectId}/entries`, label: "Entradas", icon: Link2 },
       { href: `/app/projects/${projectId}/opportunities`, label: "Oportunidades", icon: BriefcaseBusiness },

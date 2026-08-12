@@ -12,7 +12,7 @@ import { projectRepository } from "@/lib/repositories/project-repository";
 import type { Project } from "@/types";
 
 const SetupPreview = dynamic(() => import("@/components/ai-setup/setup-preview"), { ssr: false });
-const initialForm: InitialSetupForm = { businessName: "", description: "", websiteUrl: "", phone: "" };
+const initialForm: InitialSetupForm = { requestedSurface: "recommend", businessName: "", description: "", websiteUrl: "", phone: "" };
 
 async function apiCall<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { ...init, headers: { "content-type": "application/json", ...init?.headers } });
@@ -41,7 +41,7 @@ export function AISetupShell({ startFresh = false }: AISetupShellProps) {
   function adopt(next: AISetupSession) {
     const parsed = aiSetupSessionSchema.parse(next);
     setSession(parsed);
-    setForm({ businessName: parsed.initialInput.businessName, description: parsed.initialInput.description, websiteUrl: parsed.initialInput.websiteUrl || "", phone: parsed.initialInput.phone || "" });
+    setForm({ requestedSurface: parsed.initialInput.requestedSurface || "recommend", businessName: parsed.initialInput.businessName, description: parsed.initialInput.description, websiteUrl: parsed.initialInput.websiteUrl || "", phone: parsed.initialInput.phone || "" });
     setSources(parsed.sources);
     setProjectId(parsed.projectId);
     if (parsed.projectDraft) setGenerationStatus("ready");
@@ -78,7 +78,7 @@ export function AISetupShell({ startFresh = false }: AISetupShellProps) {
     }
     setBusy(true); setError("");
     try {
-      const created = await apiCall<AISetupSession>("/api/ai/setup/start", { method: "POST", body: JSON.stringify({ input: { businessName: form.businessName.trim(), description: form.description.trim(), websiteUrl: form.websiteUrl.trim() || undefined, phone: form.phone.trim() || undefined }, sources }) });
+      const created = await apiCall<AISetupSession>("/api/ai/setup/start", { method: "POST", body: JSON.stringify({ input: { requestedSurface: form.requestedSurface, businessName: form.businessName.trim(), description: form.description.trim(), websiteUrl: form.websiteUrl.trim() || undefined, phone: form.phone.trim() || undefined }, sources }) });
       adopt(created);
       adopt(await apiCall<AISetupSession>(`/api/ai/setup/${created.id}/analyze`, { method: "POST", body: "{}" }));
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Não foi possível analisar o negócio."); }

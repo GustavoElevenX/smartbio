@@ -27,6 +27,9 @@ export const features = {
   opportunities: clientEnv.NEXT_PUBLIC_FEATURE_OPPORTUNITIES,
   conversionAnalytics: clientEnv.NEXT_PUBLIC_FEATURE_CONVERSION_ANALYTICS,
   aiOptimization: clientEnv.NEXT_PUBLIC_FEATURE_AI_OPTIMIZATION,
+  presence: clientEnv.NEXT_PUBLIC_FEATURE_PRESENCE,
+  presenceAI: clientEnv.NEXT_PUBLIC_FEATURE_PRESENCE_AI,
+  presenceMultiPage: clientEnv.NEXT_PUBLIC_FEATURE_PRESENCE_MULTI_PAGE,
 };
 
 export const capabilityLabels = {

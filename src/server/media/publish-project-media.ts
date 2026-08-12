@@ -5,6 +5,16 @@ import type { AuthenticatedActor } from "@/server/auth/setup-actor";
 import type { Project } from "@/types";
 
 function referencedAssetIds(project: Project) {
+  const presenceAssetIds: string[] = [];
+  const scan = (value: unknown, key = "") => {
+    if (typeof value === "string" && /assetid$/i.test(key)) presenceAssetIds.push(value);
+    else if (Array.isArray(value)) value.forEach((item) => scan(item, key));
+    else if (value && typeof value === "object") Object.entries(value).forEach(([childKey, child]) => {
+      if (/assetids$/i.test(childKey) && Array.isArray(child)) child.filter((item): item is string => typeof item === "string").forEach((item) => presenceAssetIds.push(item));
+      else scan(child, childKey);
+    });
+  };
+  scan(project.presence);
   return [...new Set([
     project.brand.primaryLogoAssetId,
     project.brand.lightLogoAssetId,
@@ -13,6 +23,7 @@ function referencedAssetIds(project: Project) {
     ...(project.commercialConfig?.serviceOfferings || []).map((item) => item.imageAssetId),
     ...(project.commercialConfig?.catalogItems || []).map((item) => item.imageAssetId),
     ...(project.commercialConfig?.reservableUnits || []).flatMap((item) => item.mediaAssetIds),
+    ...presenceAssetIds,
   ].filter((value): value is string => Boolean(value)) )];
 }
 
@@ -112,5 +123,6 @@ export async function publishProjectMedia(
       item.metadata = { ...item.metadata, publicImageUrl: publicUrls.get(item.imageAssetId) };
     }
   }
+  published.mediaAssets = (published.mediaAssets || []).map((asset) => publicUrls.has(asset.id) ? { ...asset, status: "published", metadata: { ...asset.metadata, publicUrl: publicUrls.get(asset.id) } } : asset);
   return published;
 }

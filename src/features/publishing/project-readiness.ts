@@ -1,5 +1,6 @@
 import { evaluateCapabilityRequirements } from "@/features/capabilities/capability-requirements";
 import type { CapabilityKey, DataRequirement, Project } from "@/types";
+import { getPresenceReadinessIssues } from "@/features/presence/presence-readiness";
 
 export interface ProjectReadinessResult {
   score: number;
@@ -190,6 +191,7 @@ export function getProjectReadiness(project: Project): ProjectReadinessResult {
   const all = [
     ...(project.dataRequirements || []),
     ...evaluateCapabilityRequirements(project),
+    ...getPresenceReadinessIssues(project),
     ...issues,
   ];
   const unique = [...new Map(all.map((item) => [item.key, item])).values()];

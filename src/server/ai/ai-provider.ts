@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import type { ResponseInputContent } from "openai/resources/responses/responses";
-import type { BusinessCapabilityProfile, ExperienceCompositionInput, Project, ProjectCapability } from "@/types";
+import type { AttributionContext, BrandProfile, BusinessCapabilityProfile, ConversionGoal, ExperienceCompositionInput, MediaAsset, Project, ProjectCapability } from "@/types";
+import type { AIPresenceDraft } from "@/features/presence/ai-presence.schema";
 import type { AIJourneyDraftPayload } from "@/features/composition/composition.schema";
 import type { BrandAIResult, BusinessAnalysisResult, CopyGenerationResult, ExtractedBusinessSource, SetupQuestion } from "@/features/ai-setup/ai-setup.schema";
 
@@ -54,10 +55,23 @@ export interface BrandAIInput extends AIRequestContext {
   logoDescription?: string;
 }
 
+export interface PresenceCompositionInput extends AIRequestContext {
+  businessProfile: BusinessCapabilityProfile;
+  conversionGoals: ConversionGoal[];
+  brand: BrandProfile;
+  commercialData: Pick<NonNullable<Project["commercialConfig"]>, "serviceOfferings" | "catalogItems" | "locations" | "reservableUnits" | "policies">;
+  verifiedFacts: Array<{ key: string; value: unknown; sourceId?: string; verificationStatus: string }>;
+  mediaAssets: MediaAsset[];
+  requestedSurface: "business_site" | "landing_page";
+  objective?: string;
+  campaignContext?: AttributionContext;
+}
+
 export interface SmartBioAIProvider {
   analyzeBusiness(input: BusinessAnalysisInput): Promise<BusinessAnalysisResult>;
   generateMissingQuestions(input: MissingQuestionInput): Promise<SetupQuestion[]>;
   composeJourney(input: JourneyAIInput): Promise<AIJourneyDraftPayload>;
+  composePresence(input: PresenceCompositionInput): Promise<AIPresenceDraft>;
   generateCopy(input: CopyGenerationInput): Promise<CopyGenerationResult>;
   extractSource(input: SourceExtractionInput): Promise<ExtractedBusinessSource>;
   analyzeBrand?(input: BrandAIInput): Promise<BrandAIResult>;

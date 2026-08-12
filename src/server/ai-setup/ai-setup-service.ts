@@ -20,6 +20,7 @@ import { reconcileProjectRequirements } from "@/server/business-sources/reconcil
 import { createServiceClient } from "@/lib/supabase/server";
 import { assertProjectAccess } from "@/server/auth/project-access";
 import { loadProjectForActor } from "@/server/projects/load-project-for-actor";
+import { createPresencePage } from "@/features/presence/presence-page-service";
 import type { DataRequirement, ExperienceCompositionInput, Project } from "@/types";
 
 export class AISetupNotFoundError extends Error {}
@@ -194,12 +195,25 @@ export class AISetupService {
     );
     try {
       const generated = await orchestrator.compose(input);
-      const project = materializeSetupAnswers({
+      let project = materializeSetupAnswers({
         ...generated,
         workspaceId: actor.workspaceId,
         status: "draft",
         dataRequirements: mergeProjectRequirements(generated, session),
       }, session);
+      const requestedSurface = session.initialInput.requestedSurface || "recommend";
+      const surface = requestedSurface === "recommend" ? "business_site" : requestedSurface;
+      if (surface !== "conversion_direct") {
+        const page = createPresencePage(project.id, surface === "landing_page" ? "Landing principal" : "Início", surface === "landing_page" ? "landing" : "home");
+        page.title = project.name;
+        page.description = project.description;
+        page.defaultConversionGoalId = project.conversionGoals?.find((goal) => goal.isPrimary && goal.isActive)?.id || project.conversionGoals?.find((goal) => goal.isActive)?.id;
+        const hero = page.sections.find((section) => section.type === "hero");
+        if (hero && page.defaultConversionGoalId) hero.content = { ...hero.content, primaryAction: { type: "start_conversion_goal", label: project.primaryGoal || "Começar", conversionGoalId: page.defaultConversionGoalId, style: "primary" } };
+        const cta = page.sections.find((section) => section.type === "conversion_cta");
+        if (cta && page.defaultConversionGoalId) cta.content = { primaryAction: { type: "start_conversion_goal", label: project.primaryGoal || "Começar", conversionGoalId: page.defaultConversionGoalId, style: "primary" } };
+        project = { ...project, presence: { pages: [page] } };
+      }
       const next = await this.repository.update(actor, {
         ...session,
         status: "review",

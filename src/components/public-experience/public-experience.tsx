@@ -57,6 +57,7 @@ import type {
   Reservation,
   StepOption,
 } from "@/types";
+import type { PresenceLaunchContext } from "@/features/presence/presence.types";
 
 const iconMap = {
   ShoppingBag,
@@ -106,7 +107,7 @@ type StoredJourneyRuntime = Partial<JourneyRuntimeState> & {
   navigationHistory?: string[];
 };
 
-function runtimeFromStorage(project: Project, preview: boolean, previewGoalId?: string, previewEntryKey?: string) {
+function runtimeFromStorage(project: Project, preview: boolean, previewGoalId?: string, previewEntryKey?: string, launchContext?: PresenceLaunchContext) {
   const fallback = emptyRuntime(project);
   if (typeof window === "undefined") return fallback;
   const params = new URLSearchParams(window.location.search);
@@ -114,10 +115,12 @@ function runtimeFromStorage(project: Project, preview: boolean, previewGoalId?: 
   if (previewEntryKey) params.set("entry", previewEntryKey);
   const goals = backfillConversionGoals(project).filter((goal) => goal.isActive);
   const resolved = resolveEntryPoint(project.entryPoints || [], goals, project.steps, params.get("entry"));
-  const previewGoal = preview && params.get("goal") ? goals.find((goal) => goal.id === params.get("goal")) : undefined;
+  const requestedGoalId = launchContext?.goalId || (preview ? params.get("goal") : undefined);
+  const previewGoal = requestedGoalId ? goals.find((goal) => goal.id === requestedGoalId) : undefined;
   const directGoal = resolved.goal || previewGoal || (goals.length === 1 ? goals[0] : undefined);
-  const attribution = resolveAttribution({ explicit: readUtm(params), entry: resolved.entry, referrer: document.referrer, conversionGoalId: directGoal?.id });
-  const direct = { ...fallback, currentStepId: resolved.step?.id || directGoal?.targetStepId || fallback.currentStepId, conversionGoalId: directGoal?.id, entryPointId: resolved.entry?.id, attribution };
+  const attribution = { ...resolveAttribution({ explicit: readUtm(params), entry: resolved.entry, referrer: document.referrer, conversionGoalId: directGoal?.id }), presencePageId: launchContext?.pageId, presenceSectionId: launchContext?.sectionId };
+  const seededAnswers = Object.fromEntries(Object.entries({ catalogItemId: launchContext?.catalogItemId, serviceId: launchContext?.serviceId, locationId: launchContext?.locationId }).filter(([, value]) => Boolean(value))) as Record<string, string>;
+  const direct = { ...fallback, currentStepId: resolved.step?.id || directGoal?.targetStepId || fallback.currentStepId, conversionGoalId: directGoal?.id, entryPointId: launchContext?.entryPointId || resolved.entry?.id, attribution, answers: seededAnswers };
   if (preview) return direct;
   try {
     const raw = sessionStorage.getItem(`smartbio:journey:v3:${project.slug}`);
@@ -133,7 +136,7 @@ function runtimeFromStorage(project: Project, preview: boolean, previewGoalId?: 
         ? { ...storedRuntime.quoteDraft, attachments: [] }
         : undefined,
     };
-    return resolved.entry || previewGoal
+    return resolved.entry || previewGoal || launchContext
       ? {
           ...merged,
           currentStepId: direct.currentStepId,
@@ -293,11 +296,16 @@ export function ExperienceCanvas({
   preview = false,
   previewGoalId,
   previewEntryKey,
+  launchContext,
+  onComplete,
 }: {
   project: Project;
   preview?: boolean;
   previewGoalId?: string;
   previewEntryKey?: string;
+  launchContext?: PresenceLaunchContext;
+  onComplete?: () => void;
+  onClose?: () => void;
 }) {
   const activeSteps = useMemo<import("@/types").JourneyStep[]>(() => {
       const goals = backfillConversionGoals(project).filter((goal) => goal.isActive).sort((a, b) => a.order - b.order);
@@ -309,7 +317,7 @@ export function ExperienceCanvas({
         options: goals.map((goal) => ({ id: `goal-option-${goal.id}`, label: goal.name, description: goal.description, value: goal.kind, actionType: "go_to_step" as const, targetStepId: goal.targetStepId, conversionGoalId: goal.id })) }, ...steps];
     }, [project]);
   const [runtime, setRuntime] = useState<JourneyRuntimeState>(() =>
-    runtimeFromStorage(project, preview, previewGoalId, previewEntryKey),
+    runtimeFromStorage(project, preview, previewGoalId, previewEntryKey, launchContext),
   );
   const [history, setHistory] = useState<string[]>(() =>
     historyFromStorage(project, preview),
@@ -344,6 +352,8 @@ export function ExperienceCanvas({
       eventName,
       conversionGoalId: runtime.conversionGoalId,
       entryPointId: runtime.entryPointId,
+      presencePageId: runtime.attribution?.presencePageId,
+      presenceSectionId: runtime.attribution?.presenceSectionId,
       destinationId: runtime.routeResult?.destination?.id,
       stepId: step.id,
       metadata,
@@ -407,6 +417,7 @@ export function ExperienceCanvas({
       if (step.type === "recommendation") emit("recommendation_viewed");
     }
   }, [runtime.currentStepId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (submitted) onComplete?.(); }, [onComplete, submitted]);
 
   function updateAnswer(key: string, value: string | number | boolean) {
     setRuntime((current) => ({

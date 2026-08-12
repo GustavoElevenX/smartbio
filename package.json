@@ -15,6 +15,8 @@
     "data:backfill:dry": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/backfill-normalized-project-data.ts --dry-run",
     "data:backfill": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/backfill-normalized-project-data.ts",
     "data:check-consistency": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/check-project-data-consistency.ts",
+    "data:check-presence": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/check-presence-consistency.ts",
+    "data:presence:check": "npm run data:check-presence",
     "data:backfill:conversion-goals:dry": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/backfill-conversion-goals.ts --dry-run",
     "data:backfill:conversion-goals": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/backfill-conversion-goals.ts",
     "data:backfill:opportunities:dry": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/backfill-opportunities.ts --dry-run",

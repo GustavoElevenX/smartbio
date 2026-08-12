@@ -1,6 +1,10 @@
 # Virou
 
-Virou é infraestrutura de conversão para o tráfego social. O produto entende a intenção de cada visitante, abre a jornada adequada, registra a ação comercial como oportunidade e mede apenas conversões confirmadas.
+Virou is presence and conversion infrastructure for social traffic.
+
+A business can publish a branded commercial presence, landing pages or direct conversion journeys. Content and CTAs connect to conversion goals that execute qualification, quotes, bookings, orders, reservations, routing and other measurable commercial actions.
+
+**Presence → Intent → Action → Opportunity → Conversion.**
 
 > **Virou não é onde seus links ficam. É onde a intenção vira ação.**
 
@@ -63,6 +67,11 @@ As novas entidades estão em migrações aditivas:
 - `202608110021_conversion_attribution.sql`
 - `202608110022_commercial_opportunities.sql`
 - `202608110023_optimization_suggestions.sql`
+- `202608110024_presence_pages.sql`
+- `202608110025_presence_entry_points.sql`
+- `202608110026_presence_attribution.sql`
+- `202608110027_presence_save_publish.sql`
+- `202608110028_presence_optimization.sql`
 
 Todas as tabelas privadas usam RLS por workspace; metas e entradas só têm leitura anônima quando pertencem a um negócio publicado. Chaves estrangeiras e colunas usadas por RLS/analytics possuem índices dedicados.
 
@@ -86,6 +95,7 @@ npm run data:backfill:conversion-goals
 npm run data:backfill:opportunities:dry
 npm run data:backfill:opportunities
 npm run data:check-consistency
+npm run data:presence:check
 ```
 
 Os scripts são idempotentes e o modo dry-run não grava dados.

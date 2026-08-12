@@ -11,6 +11,7 @@ import { Input, Label, Textarea } from "@/components/ui/field";
 import type { AISetupSession, SourceReference } from "@/features/ai-setup/ai-setup.schema";
 
 export interface InitialSetupForm {
+  requestedSurface: "business_site" | "landing_page" | "conversion_direct" | "recommend";
   businessName: string;
   description: string;
   websiteUrl: string;
@@ -49,6 +50,7 @@ export function AIConversation({ form, sources, session, busy, busyQuestion, gen
           <AIMessage role="assistant"><strong className="text-[#34333a]">Conte o que seu negócio vende e como seus clientes normalmente compram.</strong><br />Vou identificar os caminhos necessários e perguntar apenas o que estiver faltando.</AIMessage>
 
           <Card className="p-5 sm:p-6">
+            <fieldset disabled={analyzed || busy} className="mb-5"><legend className="text-sm font-extrabold">O que você precisa colocar no ar?</legend><div className="mt-3 grid gap-2 sm:grid-cols-2">{[["business_site", "Uma presença completa para meu negócio"], ["landing_page", "Uma landing page para uma oferta/campanha"], ["conversion_direct", "Uma jornada direta para converter"], ["recommend", "Quero que a Virou recomende"]].map(([value, text]) => <label key={value} className={`flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border p-3 text-xs font-bold ${form.requestedSurface === value ? "border-[#6d5ef5] bg-[#f1efff]" : "border-[#e1dfe7]"}`}><input type="radio" name="requested-surface" value={value} checked={form.requestedSurface === value} onChange={() => onFormChange({ ...form, requestedSurface: value as InitialSetupForm["requestedSurface"] })} />{text}</label>)}</div></fieldset>
             <div className="grid gap-4 sm:grid-cols-2">
               <div><Label htmlFor="ai-business-name">Nome do negócio</Label><Input id="ai-business-name" autoComplete="organization" value={form.businessName} onChange={(event) => onFormChange({ ...form, businessName: event.target.value })} placeholder="Ex.: Estúdio Aurora" disabled={analyzed || busy} /></div>
               <div><Label htmlFor="ai-website">Site (opcional)</Label><Input id="ai-website" type="url" value={form.websiteUrl} onChange={(event) => onFormChange({ ...form, websiteUrl: event.target.value })} placeholder="https://seunegocio.com.br" disabled={analyzed || busy} /></div>
