@@ -1,4 +1,4 @@
--- SmartBio MVP — schema, triggers, segurança e storage
+-- Virou MVP — schema, triggers, segurança e storage
 create extension if not exists pgcrypto;
 
 create table public.profiles (

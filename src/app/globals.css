@@ -39,6 +39,21 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .dot-grid { background-image: radial-gradient(currentColor 1px, transparent 1px); background-size: 18px 18px; }
 .scrollbar-thin { scrollbar-width: thin; scrollbar-color: #cbc9d6 transparent; }
 
+.presence-page :is(h1, h2, h3, h4) { font-family: var(--presence-heading-font), Inter, ui-sans-serif, system-ui, sans-serif; }
+.presence-page :is(a, button) { border-radius: var(--presence-button-radius); }
+.presence-page ::selection { background: color-mix(in srgb, var(--presence-primary) 28%, transparent); color: var(--presence-fg); }
+.presence-section { --presence-local-radius: var(--presence-card-radius); }
+.presence-section[data-radius="none"] { --presence-local-radius: 0px; }
+.presence-section[data-radius="sm"] { --presence-local-radius: 8px; }
+.presence-section[data-radius="md"] { --presence-local-radius: 16px; }
+.presence-section[data-radius="lg"] { --presence-local-radius: 28px; }
+.presence-section :is(article, figure, [data-presence-surface], [data-presence-media]) { border-radius: var(--presence-local-radius); }
+.presence-section :is(article, figure, [data-presence-surface]) { border-width: var(--presence-border-width); box-shadow: var(--presence-card-shadow); }
+.presence-section [data-presence-media] { overflow: hidden; }
+.presence-section[data-media-treatment="plain"] [data-presence-media] { border-radius: 0; border: 0; box-shadow: none; }
+.presence-section[data-media-treatment="rounded"] [data-presence-media] { border-radius: var(--presence-local-radius); box-shadow: var(--presence-card-shadow); }
+.presence-section[data-media-treatment="frame"] [data-presence-media] { border: var(--presence-border-width) solid color-mix(in srgb, var(--presence-fg) 14%, transparent); background: color-mix(in srgb, var(--presence-bg) 92%, white); padding: 8px; box-shadow: var(--presence-floating-shadow); }
+
 @keyframes enter { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: none; } }
 @keyframes pulse-soft { 0%,100% { opacity: .55; transform: scale(1); } 50% { opacity: .8; transform: scale(1.08); } }
 

@@ -67,7 +67,7 @@ export interface PresenceCompositionInput extends AIRequestContext {
   campaignContext?: AttributionContext;
 }
 
-export interface SmartBioAIProvider {
+export interface VirouAIProvider {
   analyzeBusiness(input: BusinessAnalysisInput): Promise<BusinessAnalysisResult>;
   generateMissingQuestions(input: MissingQuestionInput): Promise<SetupQuestion[]>;
   composeJourney(input: JourneyAIInput): Promise<AIJourneyDraftPayload>;

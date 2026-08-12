@@ -12,10 +12,11 @@ const styles = {
   link: "px-0 text-[var(--presence-primary)] underline-offset-4 hover:underline",
 };
 
-export function PresenceActionButton({ action, context, pageHref, className = "" }: { action: PresenceAction; context: PresenceLaunchContext; pageHref?: string; className?: string }) {
+export function PresenceActionButton({ action, context, pageHref, className = "", onAction }: { action: PresenceAction; context: PresenceLaunchContext; pageHref?: string; className?: string; onAction?: () => void }) {
   const launcher = useConversionLauncher();
   const router = useRouter();
   function act() {
+    onAction?.();
     launcher.track("presence_cta_clicked", { ...context, label: action.analyticsLabel || action.label, actionType: action.type });
     if (action.type === "start_conversion_goal") return launcher.open({ ...context, goalId: action.conversionGoalId });
     if (action.type === "scroll_to_section" && action.anchor) return document.getElementById(action.anchor)?.scrollIntoView({ behavior: "smooth" });
@@ -27,5 +28,5 @@ export function PresenceActionButton({ action, context, pageHref, className = ""
     }
   }
   const Icon = action.type === "open_whatsapp" ? MessageCircle : ArrowRight;
-  return <button type="button" onClick={act} className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-5 text-sm font-extrabold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--presence-primary)]/25 ${styles[action.style || "primary"]} ${className}`}>{action.label}<Icon size={17} aria-hidden /></button>;
+  return <button type="button" onClick={act} className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-[var(--presence-button-radius)] px-5 text-sm font-extrabold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--presence-primary)]/25 ${styles[action.style || "primary"]} ${className}`}>{action.label}<Icon size={17} aria-hidden /></button>;
 }

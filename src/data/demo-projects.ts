@@ -184,15 +184,91 @@ export const casaDeSucos: Project = {
   updatedAt: now,
   publishedAt: now,
   conversionGoals: [
-    { id: "mix-goal-order", projectId: "demo-casa-sucos", name: "Pedir agora", description: "Escolher produtos e enviar o pedido.", kind: "buy", targetStepId: "mix-receive", destinationLabel: "Pedido", isPrimary: true, isActive: true, order: 0 },
-    { id: "mix-goal-resale", projectId: "demo-casa-sucos", name: "Comprar para revenda", description: "Informar volume e receber o caminho comercial.", kind: "request_quote", targetStepId: "mix-b2b-form", destinationLabel: "Atendimento comercial", isPrimary: false, isActive: true, order: 1 },
-    { id: "mix-goal-unit", projectId: "demo-casa-sucos", name: "Encontrar uma unidade", description: "Descobrir a unidade mais adequada.", kind: "visit", targetStepId: "mix-unit", destinationLabel: "Unidade", isPrimary: false, isActive: true, order: 2 },
+    {
+      id: "mix-goal-order",
+      projectId: "demo-casa-sucos",
+      name: "Pedir agora",
+      description: "Escolher produtos e enviar o pedido.",
+      kind: "buy",
+      targetStepId: "mix-receive",
+      destinationLabel: "Pedido",
+      isPrimary: true,
+      isActive: true,
+      order: 0,
+    },
+    {
+      id: "mix-goal-resale",
+      projectId: "demo-casa-sucos",
+      name: "Comprar para revenda",
+      description: "Informar volume e receber o caminho comercial.",
+      kind: "request_quote",
+      targetStepId: "mix-b2b-form",
+      destinationLabel: "Atendimento comercial",
+      isPrimary: false,
+      isActive: true,
+      order: 1,
+    },
+    {
+      id: "mix-goal-unit",
+      projectId: "demo-casa-sucos",
+      name: "Encontrar uma unidade",
+      description: "Descobrir a unidade mais adequada.",
+      kind: "visit",
+      targetStepId: "mix-unit",
+      destinationLabel: "Unidade",
+      isPrimary: false,
+      isActive: true,
+      order: 2,
+    },
   ],
   entryPoints: [
-    { id: "mix-entry-bio", projectId: "demo-casa-sucos", key: "bio", name: "Bio", channel: "bio", conversionGoalId: "mix-goal-order", utmSource: "instagram", utmMedium: "social", isActive: true },
-    { id: "mix-entry-story", projectId: "demo-casa-sucos", key: "story-delivery", name: "Story Delivery", channel: "story", conversionGoalId: "mix-goal-order", utmSource: "instagram", utmMedium: "story", utmCampaign: "delivery", isActive: true },
-    { id: "mix-entry-meta", projectId: "demo-casa-sucos", key: "meta-revenda", name: "Meta Revenda", channel: "ad", conversionGoalId: "mix-goal-resale", utmSource: "meta", utmMedium: "paid_social", utmCampaign: "revenda", isActive: true },
-    { id: "mix-entry-qr", projectId: "demo-casa-sucos", key: "qr-cohama", name: "QR Cohama", channel: "qr", conversionGoalId: "mix-goal-unit", utmSource: "qr", utmMedium: "offline", utmCampaign: "cohama", isActive: true },
+    {
+      id: "mix-entry-bio",
+      projectId: "demo-casa-sucos",
+      key: "bio",
+      name: "Bio",
+      channel: "bio",
+      conversionGoalId: "mix-goal-order",
+      utmSource: "instagram",
+      utmMedium: "social",
+      isActive: true,
+    },
+    {
+      id: "mix-entry-story",
+      projectId: "demo-casa-sucos",
+      key: "story-delivery",
+      name: "Story Delivery",
+      channel: "story",
+      conversionGoalId: "mix-goal-order",
+      utmSource: "instagram",
+      utmMedium: "story",
+      utmCampaign: "delivery",
+      isActive: true,
+    },
+    {
+      id: "mix-entry-meta",
+      projectId: "demo-casa-sucos",
+      key: "meta-revenda",
+      name: "Meta Revenda",
+      channel: "ad",
+      conversionGoalId: "mix-goal-resale",
+      utmSource: "meta",
+      utmMedium: "paid_social",
+      utmCampaign: "revenda",
+      isActive: true,
+    },
+    {
+      id: "mix-entry-qr",
+      projectId: "demo-casa-sucos",
+      key: "qr-cohama",
+      name: "QR Cohama",
+      channel: "qr",
+      conversionGoalId: "mix-goal-unit",
+      utmSource: "qr",
+      utmMedium: "offline",
+      utmCampaign: "cohama",
+      isActive: true,
+    },
   ],
   businessProfile: profile({
     offerKinds: ["physical_product"],
@@ -505,13 +581,66 @@ export const verticeB2B: Project = {
   updatedAt: now,
   publishedAt: now,
   conversionGoals: [
-    { id: "vertice-goal-diagnosis", projectId: "demo-vertice", name: "Solicitar diagnóstico", description: "Qualificar o cenário e recomendar o próximo passo.", kind: "request_quote", targetStepId: "vertice-form", destinationLabel: "Diagnóstico", isPrimary: true, isActive: true, order: 0 },
-    { id: "vertice-goal-contact", projectId: "demo-vertice", name: "Falar com especialista", description: "Ir para o atendimento com contexto.", kind: "contact", targetStepId: "vertice-action", destinationLabel: "Atendimento", isPrimary: false, isActive: true, order: 1 },
+    {
+      id: "vertice-goal-diagnosis",
+      projectId: "demo-vertice",
+      name: "Solicitar diagnóstico",
+      description: "Qualificar o cenário e recomendar o próximo passo.",
+      kind: "request_quote",
+      targetStepId: "vertice-form",
+      destinationLabel: "Diagnóstico",
+      isPrimary: true,
+      isActive: true,
+      order: 0,
+    },
+    {
+      id: "vertice-goal-contact",
+      projectId: "demo-vertice",
+      name: "Falar com especialista",
+      description: "Ir para o atendimento com contexto.",
+      kind: "contact",
+      targetStepId: "vertice-action",
+      destinationLabel: "Atendimento",
+      isPrimary: false,
+      isActive: true,
+      order: 1,
+    },
   ],
   entryPoints: [
-    { id: "vertice-entry-bio", projectId: "demo-vertice", key: "bio", name: "Bio", channel: "bio", conversionGoalId: "vertice-goal-diagnosis", utmSource: "instagram", utmMedium: "social", isActive: true },
-    { id: "vertice-entry-meta", projectId: "demo-vertice", key: "meta-ads", name: "Meta Ads", channel: "ad", conversionGoalId: "vertice-goal-diagnosis", utmSource: "meta", utmMedium: "paid_social", utmCampaign: "diagnostico", isActive: true },
-    { id: "vertice-entry-linkedin", projectId: "demo-vertice", key: "linkedin", name: "LinkedIn", channel: "linkedin", conversionGoalId: "vertice-goal-contact", utmSource: "linkedin", utmMedium: "organic_social", isActive: true },
+    {
+      id: "vertice-entry-bio",
+      projectId: "demo-vertice",
+      key: "bio",
+      name: "Bio",
+      channel: "bio",
+      conversionGoalId: "vertice-goal-diagnosis",
+      utmSource: "instagram",
+      utmMedium: "social",
+      isActive: true,
+    },
+    {
+      id: "vertice-entry-meta",
+      projectId: "demo-vertice",
+      key: "meta-ads",
+      name: "Meta Ads",
+      channel: "ad",
+      conversionGoalId: "vertice-goal-diagnosis",
+      utmSource: "meta",
+      utmMedium: "paid_social",
+      utmCampaign: "diagnostico",
+      isActive: true,
+    },
+    {
+      id: "vertice-entry-linkedin",
+      projectId: "demo-vertice",
+      key: "linkedin",
+      name: "LinkedIn",
+      channel: "linkedin",
+      conversionGoalId: "vertice-goal-contact",
+      utmSource: "linkedin",
+      utmMedium: "organic_social",
+      isActive: true,
+    },
   ],
   businessProfile: profile({
     offerKinds: ["professional_service"],
@@ -1301,7 +1430,11 @@ export const redeMovimento: Project = {
         longitude: -46.6559,
         geocodingStatus: "resolved",
         timezone: "America/Sao_Paulo",
-        openingHours: [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({ weekday, opensAt: "00:00", closesAt: "00:00" })),
+        openingHours: [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({
+          weekday,
+          opensAt: "00:00",
+          closesAt: "00:00",
+        })),
         supportsDelivery: false,
         supportsPickup: false,
         supportsInPerson: true,
@@ -1324,7 +1457,11 @@ export const redeMovimento: Project = {
         longitude: -46.6339,
         geocodingStatus: "resolved",
         timezone: "America/Sao_Paulo",
-        openingHours: [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({ weekday, opensAt: "00:00", closesAt: "00:00" })),
+        openingHours: [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({
+          weekday,
+          opensAt: "00:00",
+          closesAt: "00:00",
+        })),
         supportsDelivery: false,
         supportsPickup: false,
         supportsInPerson: true,
@@ -1347,7 +1484,11 @@ export const redeMovimento: Project = {
         longitude: -46.6242,
         geocodingStatus: "resolved",
         timezone: "America/Sao_Paulo",
-        openingHours: [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({ weekday, opensAt: "00:00", closesAt: "00:00" })),
+        openingHours: [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({
+          weekday,
+          opensAt: "00:00",
+          closesAt: "00:00",
+        })),
         supportsDelivery: false,
         supportsPickup: false,
         supportsInPerson: true,
@@ -1474,14 +1615,200 @@ export const demoProjects = [
 export function findDemoProject(slugOrId: string) {
   if (slugOrId === "virou-presenca-demo" || slugOrId === "demo-presence") {
     const project = structuredClone(casaDeSucos);
-    const goal = project.conversionGoals?.find((item) => item.isPrimary) || project.conversionGoals?.[0];
-    project.id = "demo-presence"; project.slug = "virou-presenca-demo"; project.name = "Casa Mix"; project.description = "Sucos naturais, bowls e lanches preparados para o seu momento.";
-    project.presence = { pages: [{ id: "demo-presence-home", projectId: project.id, key: "home", name: "Início", type: "home", path: "/", title: "Sabor de verdade, do seu jeito.", description: "Escolha seus favoritos e siga pelo caminho mais rápido para pedir.", seoTitle: "Casa Mix · Sucos, bowls e lanches", seoDescription: "Conheça o cardápio da Casa Mix e faça seu pedido pelo caminho mais rápido.", defaultConversionGoalId: goal?.id, isHome: true, isActive: true, isIndexable: true, version: 1, settings: { header: { enabled: true, sticky: true, showLogo: true, showNavigation: true, primaryAction: goal ? { type: "start_conversion_goal", label: "Pedir agora", conversionGoalId: goal.id, style: "primary" } : undefined }, footer: { enabled: true, showLogo: true, showSocialLinks: false, showPolicies: true, showVirouBranding: true }, layout: { maxWidth: "xl", sectionSpacing: "normal" }, conversionPresentation: { mode: "overlay" } }, sections: [
-      { id: "demo-presence-hero", pageId: "demo-presence-home", key: "hero", type: "hero", anchor: "inicio", eyebrow: "Natural, fresco e simples", title: "Sabor de verdade, do seu jeito.", description: "Sucos, bowls e lanches preparados para transformar vontade em pedido sem complicação.", content: { badges: ["Ingredientes frescos", "Retirada ou delivery"], alignment: "left", primaryAction: goal ? { type: "start_conversion_goal", label: "Montar meu pedido", conversionGoalId: goal.id, style: "primary" } : undefined, secondaryAction: { type: "scroll_to_section", label: "Ver cardápio", anchor: "cardapio", style: "secondary" } }, style: {}, settings: {}, order: 0, isActive: true },
-      { id: "demo-presence-products", pageId: "demo-presence-home", key: "products", type: "products", anchor: "cardapio", eyebrow: "Cardápio", title: "Escolha o que combina com agora", description: "Preços e disponibilidade vêm direto do catálogo comercial.", content: { layout: "grid", maxItems: 8, showPrice: true, itemGoalId: goal?.id }, style: { theme: "muted" }, settings: {}, order: 1, isActive: true },
-      { id: "demo-presence-faq", pageId: "demo-presence-home", key: "faq", type: "faq", anchor: "duvidas", eyebrow: "Dúvidas", title: "Antes de pedir", content: { items: [{ id: "faq-1", question: "Posso escolher retirada?", answer: "Sim. A jornada mostra as opções disponíveis para o seu pedido." }, { id: "faq-2", question: "Como encontro a unidade certa?", answer: "Use sua localização ou informe a região para seguir até o destino correto." }] }, style: {}, settings: {}, order: 2, isActive: true },
-      { id: "demo-presence-cta", pageId: "demo-presence-home", key: "cta", type: "conversion_cta", title: "Pronto para escolher?", description: "Comece pelo seu objetivo e a Virou conduz o restante.", content: { primaryAction: goal ? { type: "start_conversion_goal", label: "Começar pedido", conversionGoalId: goal.id, style: "primary" } : { type: "scroll_to_section", label: "Ver cardápio", anchor: "cardapio" } }, style: {}, settings: {}, order: 3, isActive: true },
-    ] }] };
+    const goal =
+      project.conversionGoals?.find((item) => item.isPrimary) ||
+      project.conversionGoals?.[0];
+    project.id = "demo-presence";
+    project.slug = "virou-presenca-demo";
+    project.name = "Casa Mix";
+    project.description =
+      "Sucos naturais, bowls e lanches preparados para o seu momento.";
+    project.brand.logoDataUrl =
+      "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='96' viewBox='0 0 360 96'%3E%3Crect width='96' height='96' rx='28' fill='%236d5ef5'/%3E%3Cpath d='M28 51c8-22 31-30 44-13-9 2-17 9-20 19-8-6-16-8-24-6Z' fill='white'/%3E%3Ctext x='116' y='62' font-family='Arial,sans-serif' font-size='42' font-weight='800' fill='%2317171c'%3ECasa Mix%3C/text%3E%3C/svg%3E";
+    project.presence = {
+      pages: [
+        {
+          id: "demo-presence-home",
+          projectId: project.id,
+          key: "home",
+          name: "Início",
+          type: "home",
+          path: "/",
+          title: "Sabor de verdade, do seu jeito.",
+          description:
+            "Escolha seus favoritos e siga pelo caminho mais rápido para pedir.",
+          seoTitle: "Casa Mix · Sucos, bowls e lanches",
+          seoDescription:
+            "Conheça o cardápio da Casa Mix e faça seu pedido pelo caminho mais rápido.",
+          defaultConversionGoalId: goal?.id,
+          isHome: true,
+          isActive: true,
+          isIndexable: true,
+          version: 1,
+          settings: {
+            header: {
+              enabled: true,
+              sticky: true,
+              showLogo: true,
+              showNavigation: true,
+              primaryAction: goal
+                ? {
+                    type: "start_conversion_goal",
+                    label: "Pedir agora",
+                    conversionGoalId: goal.id,
+                    style: "primary",
+                  }
+                : undefined,
+            },
+            footer: {
+              enabled: true,
+              showLogo: true,
+              showSocialLinks: true,
+              showPolicies: true,
+              showVirouBranding: true,
+            },
+            layout: { maxWidth: "xl", sectionSpacing: "normal" },
+            conversionPresentation: { mode: "overlay" },
+          },
+          sections: [
+            {
+              id: "demo-presence-hero",
+              pageId: "demo-presence-home",
+              key: "hero",
+              type: "hero",
+              anchor: "inicio",
+              eyebrow: "Natural, fresco e simples",
+              title: "Sabor de verdade, do seu jeito.",
+              description:
+                "Sucos, bowls e lanches preparados para transformar vontade em pedido sem complicação.",
+              content: {
+                badges: ["Ingredientes frescos", "Retirada ou delivery"],
+                alignment: "left",
+                primaryAction: goal
+                  ? {
+                      type: "start_conversion_goal",
+                      label: "Montar meu pedido",
+                      conversionGoalId: goal.id,
+                      style: "primary",
+                    }
+                  : undefined,
+                secondaryAction: {
+                  type: "scroll_to_section",
+                  label: "Ver cardápio",
+                  anchor: "cardapio",
+                  style: "secondary",
+                },
+              },
+              style: {
+                width: "lg",
+                spacing: "airy",
+                radius: "lg",
+                mediaTreatment: "frame",
+              },
+              settings: {},
+              order: 0,
+              isActive: true,
+            },
+            {
+              id: "demo-presence-products",
+              pageId: "demo-presence-home",
+              key: "products",
+              type: "products",
+              anchor: "cardapio",
+              eyebrow: "Cardápio",
+              title: "Escolha o que combina com agora",
+              description:
+                "Preços e disponibilidade vêm direto do catálogo comercial.",
+              content: {
+                layout: "grid",
+                maxItems: 8,
+                showPrice: true,
+                itemGoalId: goal?.id,
+              },
+              style: { theme: "muted", spacing: "compact", radius: "sm" },
+              settings: {},
+              order: 1,
+              isActive: true,
+            },
+            {
+              id: "demo-presence-faq",
+              pageId: "demo-presence-home",
+              key: "faq",
+              type: "faq",
+              anchor: "duvidas",
+              eyebrow: "Dúvidas",
+              title: "Antes de pedir",
+              content: {
+                items: [
+                  {
+                    id: "faq-1",
+                    question: "Posso escolher retirada?",
+                    answer:
+                      "Sim. A jornada mostra as opções disponíveis para o seu pedido.",
+                  },
+                  {
+                    id: "faq-2",
+                    question: "Como encontro a unidade certa?",
+                    answer:
+                      "Use sua localização ou informe a região para seguir até o destino correto.",
+                  },
+                ],
+              },
+              style: { width: "md", spacing: "airy" },
+              settings: {},
+              order: 2,
+              isActive: true,
+            },
+            {
+              id: "demo-presence-cta",
+              pageId: "demo-presence-home",
+              key: "cta",
+              type: "conversion_cta",
+              title: "Pronto para escolher?",
+              description:
+                "Comece pelo seu objetivo e a Virou conduz o restante.",
+              content: {
+                primaryAction: goal
+                  ? {
+                      type: "start_conversion_goal",
+                      label: "Começar pedido",
+                      conversionGoalId: goal.id,
+                      style: "primary",
+                    }
+                  : {
+                      type: "scroll_to_section",
+                      label: "Ver cardápio",
+                      anchor: "cardapio",
+                    },
+              },
+              style: { width: "lg", radius: "lg" },
+              settings: {},
+              order: 3,
+              isActive: true,
+            },
+            {
+              id: "demo-presence-contact",
+              pageId: "demo-presence-home",
+              key: "contact",
+              type: "contact",
+              anchor: "contato",
+              title: "Acompanhe a Casa Mix",
+              description:
+                "Novidades e informações confirmadas nos canais oficiais.",
+              content: {
+                socialLinks: [
+                  { label: "Instagram", url: "https://www.instagram.com/" },
+                ],
+              },
+              style: { width: "lg", spacing: "compact" },
+              settings: {},
+              order: 4,
+              isActive: true,
+            },
+          ],
+        },
+      ],
+    };
     return project;
   }
   return demoProjects.find(

@@ -5,7 +5,7 @@ declare mix_intent uuid := '11000000-0000-4000-8000-000000000001'; mix_receive u
 declare v_intent uuid := '21000000-0000-4000-8000-000000000001'; v_form uuid := '21000000-0000-4000-8000-000000000002'; v_result uuid := '21000000-0000-4000-8000-000000000003'; v_action uuid := '21000000-0000-4000-8000-000000000004';
 begin
   select id into ws from public.workspaces order by created_at limit 1;
-  if ws is null then raise notice 'Seed SmartBio ignorado: crie um usuário primeiro.'; return; end if;
+  if ws is null then raise notice 'Seed Virou ignorado: crie um usuário primeiro.'; return; end if;
   insert into public.projects(id, workspace_id, name, slug, description, status, primary_goal, category, theme, settings, published_at) values
     (mix, ws, 'Casa de Sucos Mix', 'casadesucosmix', 'Sucos naturais, saladas de frutas e combos preparados na hora.', 'published', 'Receber pedidos', 'Alimentação', '{"mode":"light","colors":{"primary":"#E62E2D","secondary":"#FFD33D","accent":"#FF7A1A","background":"#FFF8EF","surface":"#FFFFFF","foreground":"#2B1712"}}', '{"phone":"5511999991001","visualDirection":"Composição vibrante"}', now()),
     (vertice, ws, 'Vértice B2B', 'vertice', 'Estratégia de crescimento para empresas B2B.', 'published', 'Gerar leads', 'Agência B2B', '{"mode":"dark","colors":{"primary":"#FF6A00","secondary":"#FFB066","accent":"#F4F4F5","background":"#090909","surface":"#151515","foreground":"#FAFAFA"}}', '{"phone":"5511988884004","visualDirection":"Fundo escuro premium"}', now())

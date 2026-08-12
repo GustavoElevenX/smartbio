@@ -21,7 +21,7 @@ import type {
   JourneyAIInput,
   MissingQuestionInput,
   PresenceCompositionInput,
-  SmartBioAIProvider,
+  VirouAIProvider,
   SourceExtractionInput,
   StructuredAIRequest,
 } from "@/server/ai/ai-provider";
@@ -36,7 +36,7 @@ import { sourceExtractionPrompt } from "@/server/ai/prompts/source-extraction";
 
 const questionListSchema = z.object({ questions: z.array(setupQuestionSchema).max(5) });
 
-export class OpenAISmartBioProvider implements SmartBioAIProvider {
+export class OpenAIVirouProvider implements VirouAIProvider {
   private readonly client: OpenAI;
   private readonly model: string;
   private readonly timeoutMs: number;
