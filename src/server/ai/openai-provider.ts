@@ -51,7 +51,7 @@ export class OpenAIVirouProvider implements VirouAIProvider {
   constructor() {
     const env = readServerEnv();
     if (!env.OPENAI_API_KEY) throw new AIConfigurationError();
-    this.model = env.OPENAI_MODEL || "gpt-5.6";
+    this.model = env.OPENAI_MODEL || "gpt-5.4-mini-2026-03-17";
     this.timeoutMs = env.AI_REQUEST_TIMEOUT_MS;
     this.maxRetries = env.AI_MAX_RETRIES;
     this.visionModel = env.OPENAI_VISION_MODEL || this.model;

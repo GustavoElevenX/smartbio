@@ -110,6 +110,17 @@ npm run test:e2e
 npm run build
 ```
 
+Para validar o mesmo conjunto de verificações usado antes de um deploy:
+
+```bash
+npm run production:env
+npm run production:check
+```
+
+`production:env` valida URLs HTTPS, Supabase, OpenAI, rate limit distribuído, segredos, cron e provedores habilitados sem imprimir os valores. Em produção, configure essas variáveis diretamente no provedor de hospedagem; arquivos `.env` permanecem ignorados pelo Git.
+
+O modelo padrão é `gpt-5.4-mini-2026-03-17` para texto e visão. O snapshot fixo evita mudanças inesperadas de comportamento entre deploys, mantém saída estruturada e usa esforço de raciocínio baixo para controlar custo e latência.
+
 ## Limites atuais
 
 Ficam fora do escopo: WhatsApp Cloud/bots, CRM avançado, gerenciador de anúncios, ERP/estoque, novo billing, domínios customizados, A/B estatístico, automação de e-mail e marketplace. A Virou pode montar contexto e abrir um link do WhatsApp, mas não afirma enviar ou automatizar mensagens.
