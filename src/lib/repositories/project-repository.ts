@@ -347,14 +347,16 @@ async function saveNormalized(project: Project) {
 
 export const projectRepository = {
   async getProjects(): Promise<Project[]> {
-    if (!isSupabaseConfigured()) return canUseLocalStore() ? localStore.getProjects() : [];
+    if (canUseLocalStore()) return localStore.getProjects();
+    if (!isSupabaseConfigured()) return [];
     const response = await fetch("/api/projects", { cache: "no-store" });
     const payload = await response.json() as { data?: Project[]; error?: { message?: string } };
     if (!response.ok) throw new Error(payload.error?.message || "Não foi possível carregar os projetos.");
     return payload.data || [];
   },
   async getProject(value: string): Promise<Project | undefined> {
-    if (!isSupabaseConfigured()) return canUseLocalStore() ? localStore.getProject(value) : undefined;
+    if (canUseLocalStore()) return localStore.getProject(value);
+    if (!isSupabaseConfigured()) return undefined;
     if (!isUuid(value)) {
       return (await this.getProjects()).find((project) => project.slug === value);
     }
@@ -364,20 +366,19 @@ export const projectRepository = {
     return payload.data || undefined;
   },
   async saveProject(project: Project): Promise<Project> {
-    if (!isSupabaseConfigured() && !canUseLocalStore()) throw new Error("Persistência indisponível. Configure o Supabase.");
-    const local = canUseLocalStore() ? localStore.saveProject(project) : project;
-    if (!isSupabaseConfigured()) return local;
-    const remote = await saveNormalized(local);
+    if (canUseLocalStore()) return localStore.saveProject(project);
+    if (!isSupabaseConfigured()) throw new Error("Persistência indisponível. Configure o Supabase.");
+    const remote = await saveNormalized(project);
     if (!remote) throw new Error("Faça login para salvar o projeto.");
-    if (canUseLocalStore() && remote.id !== local.id) localStore.deleteProject(local.id);
-    return localStore.saveProject(remote);
+    return remote;
   },
   async deleteProject(id: string) {
-    if (canUseLocalStore()) localStore.deleteProject(id);
-    if (!isSupabaseConfigured() || !isUuid(id)) {
-      if (!canUseLocalStore()) throw new Error("Persistência indisponível. Configure o Supabase.");
+    if (canUseLocalStore()) {
+      localStore.deleteProject(id);
       return;
     }
+    if (!isSupabaseConfigured()) throw new Error("Persistência indisponível. Configure o Supabase.");
+    if (!isUuid(id)) return;
     const supabase = createClient();
     if (!supabase) return;
     const workspace = await workspaceId();
