@@ -1,348 +1,179 @@
 "use client";
 
 import { localStore } from "@/lib/local-store";
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { canUseLocalStore } from "@/lib/runtime-mode";
 import type { FormField, JourneyStep, Project, StepOption } from "@/types";
 
 function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
 }
 
-function uuid() { return crypto.randomUUID(); }
+function uuid() {
+  return crypto.randomUUID();
+}
 
 function normalizeIds(project: Project): Project {
-  if (isUuid(project.id) && project.steps.every((step) => isUuid(step.id))) return project;
+  if (isUuid(project.id) && project.steps.every((step) => isUuid(step.id)))
+    return project;
   const projectId = isUuid(project.id) ? project.id : uuid();
-  const stepIds = new Map(project.steps.map((step) => [step.id, isUuid(step.id) ? step.id : uuid()]));
+  const stepIds = new Map(
+    project.steps.map((step) => [step.id, isUuid(step.id) ? step.id : uuid()]),
+  );
   const steps = project.steps.map((step): JourneyStep => ({
     ...step,
     id: stepIds.get(step.id)!,
-    options: step.options?.map((option): StepOption => ({ ...option, id: isUuid(option.id) ? option.id : uuid(), targetStepId: option.targetStepId ? stepIds.get(option.targetStepId) || option.targetStepId : undefined })),
-    formFields: step.formFields?.map((field): FormField => ({ ...field, id: isUuid(field.id) ? field.id : uuid() })),
-    blocks: step.blocks?.map((block) => ({ ...block, id: isUuid(block.id) ? block.id : uuid() })),
+    options: step.options?.map((option): StepOption => ({
+      ...option,
+      id: isUuid(option.id) ? option.id : uuid(),
+      targetStepId: option.targetStepId
+        ? stepIds.get(option.targetStepId) || option.targetStepId
+        : undefined,
+    })),
+    formFields: step.formFields?.map((field): FormField => ({
+      ...field,
+      id: isUuid(field.id) ? field.id : uuid(),
+    })),
+    blocks: step.blocks?.map((block) => ({
+      ...block,
+      id: isUuid(block.id) ? block.id : uuid(),
+    })),
   }));
-  const goalIds = new Map((project.conversionGoals || []).map((goal) => [goal.id, isUuid(goal.id) ? goal.id : uuid()]));
-  const conversionGoals = project.conversionGoals?.map((goal) => ({ ...goal, id: goalIds.get(goal.id)!, projectId, targetStepId: stepIds.get(goal.targetStepId) || goal.targetStepId }));
-  const pageIds = new Map((project.presence?.pages || []).map((page) => [page.id, isUuid(page.id) ? page.id : uuid()]));
-  const rewritePresenceRefs = (value: unknown): unknown => Array.isArray(value) ? value.map(rewritePresenceRefs) : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).map(([key, child]) => [key, key === "conversionGoalId" && typeof child === "string" ? goalIds.get(child) || child : key === "pageId" && typeof child === "string" ? pageIds.get(child) || child : rewritePresenceRefs(child)])) : value;
-  const presence = project.presence ? { pages: project.presence.pages.map((page) => { const pageId = pageIds.get(page.id)!; return { ...page, id: pageId, projectId, defaultConversionGoalId: page.defaultConversionGoalId ? goalIds.get(page.defaultConversionGoalId) || page.defaultConversionGoalId : undefined, settings: rewritePresenceRefs(page.settings) as typeof page.settings, sections: page.sections.map((section) => ({ ...section, id: isUuid(section.id) ? section.id : uuid(), pageId, content: rewritePresenceRefs(section.content) as Record<string, unknown>, settings: rewritePresenceRefs(section.settings) as Record<string, unknown> })) }; }) } : undefined;
-  const entryPoints = project.entryPoints?.map((entry) => ({ ...entry, id: isUuid(entry.id) ? entry.id : uuid(), projectId, conversionGoalId: entry.conversionGoalId ? goalIds.get(entry.conversionGoalId) || entry.conversionGoalId : undefined, targetStepId: entry.targetStepId ? stepIds.get(entry.targetStepId) || entry.targetStepId : undefined, presencePageId: entry.presencePageId ? pageIds.get(entry.presencePageId) || entry.presencePageId : undefined }));
-  for (const step of steps) for (const option of step.options || []) if (option.conversionGoalId) option.conversionGoalId = goalIds.get(option.conversionGoalId) || option.conversionGoalId;
-  const commercialConfig = project.commercialConfig ? structuredClone(project.commercialConfig) : undefined;
+  const goalIds = new Map(
+    (project.conversionGoals || []).map((goal) => [
+      goal.id,
+      isUuid(goal.id) ? goal.id : uuid(),
+    ]),
+  );
+  const conversionGoals = project.conversionGoals?.map((goal) => ({
+    ...goal,
+    id: goalIds.get(goal.id)!,
+    projectId,
+    targetStepId: stepIds.get(goal.targetStepId) || goal.targetStepId,
+  }));
+  const pageIds = new Map(
+    (project.presence?.pages || []).map((page) => [
+      page.id,
+      isUuid(page.id) ? page.id : uuid(),
+    ]),
+  );
+  const rewritePresenceRefs = (value: unknown): unknown =>
+    Array.isArray(value)
+      ? value.map(rewritePresenceRefs)
+      : value && typeof value === "object"
+        ? Object.fromEntries(
+            Object.entries(value).map(([key, child]) => [
+              key,
+              key === "conversionGoalId" && typeof child === "string"
+                ? goalIds.get(child) || child
+                : key === "pageId" && typeof child === "string"
+                  ? pageIds.get(child) || child
+                  : rewritePresenceRefs(child),
+            ]),
+          )
+        : value;
+  const presence = project.presence
+    ? {
+        pages: project.presence.pages.map((page) => {
+          const pageId = pageIds.get(page.id)!;
+          return {
+            ...page,
+            id: pageId,
+            projectId,
+            defaultConversionGoalId: page.defaultConversionGoalId
+              ? goalIds.get(page.defaultConversionGoalId) ||
+                page.defaultConversionGoalId
+              : undefined,
+            settings: rewritePresenceRefs(
+              page.settings,
+            ) as typeof page.settings,
+            sections: page.sections.map((section) => ({
+              ...section,
+              id: isUuid(section.id) ? section.id : uuid(),
+              pageId,
+              content: rewritePresenceRefs(section.content) as Record<
+                string,
+                unknown
+              >,
+              settings: rewritePresenceRefs(section.settings) as Record<
+                string,
+                unknown
+              >,
+            })),
+          };
+        }),
+      }
+    : undefined;
+  const entryPoints = project.entryPoints?.map((entry) => ({
+    ...entry,
+    id: isUuid(entry.id) ? entry.id : uuid(),
+    projectId,
+    conversionGoalId: entry.conversionGoalId
+      ? goalIds.get(entry.conversionGoalId) || entry.conversionGoalId
+      : undefined,
+    targetStepId: entry.targetStepId
+      ? stepIds.get(entry.targetStepId) || entry.targetStepId
+      : undefined,
+    presencePageId: entry.presencePageId
+      ? pageIds.get(entry.presencePageId) || entry.presencePageId
+      : undefined,
+  }));
+  for (const step of steps)
+    for (const option of step.options || [])
+      if (option.conversionGoalId)
+        option.conversionGoalId =
+          goalIds.get(option.conversionGoalId) || option.conversionGoalId;
+  const commercialConfig = project.commercialConfig
+    ? structuredClone(project.commercialConfig)
+    : undefined;
   if (commercialConfig) {
-    for (const rule of commercialConfig.qualificationRules || []) { rule.id = isUuid(rule.id) ? rule.id : uuid(); rule.projectId = projectId; }
-    if (commercialConfig.quoteDefinition) { commercialConfig.quoteDefinition.id = isUuid(commercialConfig.quoteDefinition.id) ? commercialConfig.quoteDefinition.id : uuid(); commercialConfig.quoteDefinition.projectId = projectId; }
-    for (const collection of [commercialConfig.serviceOfferings, commercialConfig.schedulableServices, commercialConfig.resources, commercialConfig.availabilityRules, commercialConfig.availabilityExceptions, commercialConfig.catalogCategories, commercialConfig.catalogItems, commercialConfig.reservableUnits, commercialConfig.reservationBlocks, commercialConfig.locations, commercialConfig.routingRules, commercialConfig.policies]) {
-      for (const item of collection || []) { item.id = isUuid(item.id) ? item.id : uuid(); item.projectId = projectId; }
+    for (const rule of commercialConfig.qualificationRules || []) {
+      rule.id = isUuid(rule.id) ? rule.id : uuid();
+      rule.projectId = projectId;
     }
-    for (const rule of commercialConfig.quoteDefinition?.rules || []) rule.id = isUuid(rule.id) ? rule.id : uuid();
-    for (const destination of commercialConfig.routingDestinations || []) destination.id = isUuid(destination.id) ? destination.id : uuid();
+    if (commercialConfig.quoteDefinition) {
+      commercialConfig.quoteDefinition.id = isUuid(
+        commercialConfig.quoteDefinition.id,
+      )
+        ? commercialConfig.quoteDefinition.id
+        : uuid();
+      commercialConfig.quoteDefinition.projectId = projectId;
+      for (const rule of commercialConfig.quoteDefinition.rules || [])
+        rule.id = isUuid(rule.id) ? rule.id : uuid();
+    }
+    const collections = [
+      commercialConfig.serviceOfferings,
+      commercialConfig.schedulableServices,
+      commercialConfig.resources,
+      commercialConfig.availabilityRules,
+      commercialConfig.availabilityExceptions,
+      commercialConfig.catalogCategories,
+      commercialConfig.catalogItems,
+      commercialConfig.reservableUnits,
+      commercialConfig.reservationBlocks,
+      commercialConfig.locations,
+      commercialConfig.routingRules,
+      commercialConfig.policies,
+    ];
+    for (const collection of collections)
+      for (const item of collection || []) {
+        item.id = isUuid(item.id) ? item.id : uuid();
+        item.projectId = projectId;
+      }
+    for (const destination of commercialConfig.routingDestinations || [])
+      destination.id = isUuid(destination.id) ? destination.id : uuid();
   }
-  return { ...project, id: projectId, steps, conversionGoals, entryPoints, presence, commercialConfig };
-}
-
-async function workspaceId() {
-  const response = await fetch("/api/workspaces", { cache: "no-store" });
-  if (!response.ok) return null;
-  const payload = await response.json() as { data?: { activeWorkspaceId?: string } };
-  return payload.data?.activeWorkspaceId || null;
-}
-
-async function saveNormalized(project: Project) {
-  const supabase = createClient();
-  const workspace = await workspaceId();
-  if (!supabase || !workspace) return null;
-  const normalized = normalizeIds({ ...project, workspaceId: workspace });
-  const { data: existingProject } = await supabase
-    .from("projects")
-    .select("settings")
-    .eq("id", normalized.id)
-    .eq("workspace_id", workspace)
-    .maybeSingle();
-  const existingSettings = existingProject?.settings && typeof existingProject.settings === "object"
-    ? existingProject.settings as Record<string, unknown>
-    : {};
-  const settings = {
-    ...existingSettings,
-    subtitle: normalized.subtitle,
-    primaryDestination: normalized.primaryDestination,
-    audience: normalized.audience,
-    phone: normalized.phone,
-    visualDirection: normalized.visualDirection,
-    version: normalized.version,
-    projectPayload: normalized,
+  return {
+    ...project,
+    id: projectId,
+    steps,
+    conversionGoals,
+    entryPoints,
+    presence,
+    commercialConfig,
   };
-  const { error: projectError } = await supabase.from("projects").upsert({
-    id: normalized.id,
-    workspace_id: workspace,
-    name: normalized.name,
-    slug: normalized.slug,
-    description: normalized.description,
-    status: normalized.status,
-    primary_goal: normalized.primaryGoal,
-    category: normalized.category || null,
-    theme: normalized.designSystem,
-    settings,
-    published_at: normalized.publishedAt || null,
-  });
-  if (projectError) throw new Error(projectError.message);
-
-  const { error: brandError } = await supabase.from("brand_profiles").upsert({
-    project_id: normalized.id,
-    primary_logo_asset_id: normalized.brand.primaryLogoAssetId || null,
-    light_logo_asset_id: normalized.brand.lightLogoAssetId || null,
-    dark_logo_asset_id: normalized.brand.darkLogoAssetId || null,
-    favicon_asset_id: normalized.brand.faviconAssetId || null,
-    extracted_colors: normalized.brand.extractedColors,
-    active_palette: normalized.brand.activePalette,
-    palette_variations: normalized.brand.paletteVariations,
-    design_system: normalized.designSystem,
-    brand_personality: normalized.brand.brandPersonality,
-    analysis_metadata: normalized.brand.analysisMetadata || {},
-    analyzed_at: new Date().toISOString(),
-  }, { onConflict: "project_id" });
-  if (brandError) throw new Error(brandError.message);
-
-  await supabase.from("entry_points").delete().eq("project_id", normalized.id);
-  await supabase.from("conversion_goals").delete().eq("project_id", normalized.id);
-  const { error: deleteError } = await supabase.from("journey_steps").delete().eq("project_id", normalized.id);
-  if (deleteError) throw new Error(deleteError.message);
-  const { error: stepsError } = await supabase.from("journey_steps").insert(normalized.steps.map((step) => ({
-    id: step.id,
-    project_id: normalized.id,
-    type: step.type,
-    title: step.title,
-    description: step.description || null,
-    step_order: step.order,
-    is_active: step.isActive,
-    settings: { visualVariant: step.visualVariant, blocks: step.blocks || [], recommendation: step.recommendation, stepSettings: step.settings || {} },
-  })));
-  if (stepsError) throw new Error(stepsError.message);
-
-  if (normalized.conversionGoals?.length) {
-    const { error } = await supabase.from("conversion_goals").insert(normalized.conversionGoals.map((goal) => ({ id: goal.id, project_id: normalized.id, name: goal.name, description: goal.description || null, goal_kind: goal.kind, target_step_id: goal.targetStepId, destination_label: goal.destinationLabel || null, is_primary: goal.isPrimary, is_active: goal.isActive, goal_order: goal.order })));
-    if (error) throw new Error(error.message);
-  }
-  if (normalized.presence?.pages.length) {
-    const { error: pagesError } = await supabase.from("presence_pages").upsert(normalized.presence.pages.map((page) => ({ id: page.id, project_id: normalized.id, page_key: page.key, name: page.name, page_type: page.type, path: page.path, title: page.title || null, description: page.description || null, seo_title: page.seoTitle || null, seo_description: page.seoDescription || null, og_image_asset_id: page.ogImageAssetId || null, default_conversion_goal_id: page.defaultConversionGoalId || null, is_home: page.isHome, is_active: page.isActive, is_indexable: page.isIndexable, version: page.version || 1, settings: page.settings })));
-    if (pagesError) throw new Error(pagesError.message);
-    const sections = normalized.presence.pages.flatMap((page) => page.sections.map((section) => ({ id: section.id, page_id: page.id, section_key: section.key, section_type: section.type, anchor: section.anchor || null, title: section.title || null, eyebrow: section.eyebrow || null, description: section.description || null, content: section.content, style: section.style, settings: section.settings, section_order: section.order, is_active: section.isActive })));
-    if (sections.length) { const { error: sectionsError } = await supabase.from("presence_sections").upsert(sections); if (sectionsError) throw new Error(sectionsError.message); }
-  }
-  if (normalized.entryPoints?.length) {
-    const { error } = await supabase.from("entry_points").insert(normalized.entryPoints.map((entry) => ({ id: entry.id, project_id: normalized.id, entry_key: entry.key, name: entry.name, conversion_goal_id: entry.conversionGoalId || null, target_step_id: entry.targetStepId || null, surface_mode: entry.surfaceMode || "conversion_direct", presence_page_id: entry.presencePageId || null, channel: entry.channel, utm_source: entry.utmSource || null, utm_medium: entry.utmMedium || null, utm_campaign: entry.utmCampaign || null, utm_content: entry.utmContent || null, utm_term: entry.utmTerm || null, is_active: entry.isActive })));
-    if (error) throw new Error(error.message);
-  }
-
-  const optionRows = normalized.steps.flatMap((step) => (step.options || []).map((option, optionOrder) => ({
-    id: option.id, step_id: step.id, label: option.label, description: option.description || null, icon: option.icon || null, value: option.value, option_order: optionOrder,
-    action_type: option.actionType, target_step_id: option.targetStepId || null, conversion_goal_id: option.conversionGoalId || null, action_payload: option.actionPayload || {},
-  })));
-  if (optionRows.length) {
-    const { error } = await supabase.from("step_options").insert(optionRows);
-    if (error) throw new Error(error.message);
-  }
-
-  for (const step of normalized.steps.filter((candidate) => candidate.formFields?.length)) {
-    const formId = uuid();
-    const { error: formError } = await supabase.from("form_definitions").insert({ id: formId, project_id: normalized.id, step_id: step.id, name: step.title, submit_label: step.options?.[0]?.label || "Continuar" });
-    if (formError) throw new Error(formError.message);
-    const { error: fieldsError } = await supabase.from("form_fields").insert((step.formFields || []).map((field, fieldOrder) => ({
-      id: field.id, form_id: formId, label: field.label, field_key: field.key, field_type: field.type, placeholder: field.placeholder || null, required: field.required, field_order: fieldOrder, options: field.options || [],
-    })));
-    if (fieldsError) throw new Error(fieldsError.message);
-  }
-
-  if (normalized.businessProfile) {
-    const profile = normalized.businessProfile;
-    const { error } = await supabase.from("business_profiles").upsert({
-      project_id: normalized.id, business_name: normalized.name, description: normalized.description,
-      website_url: null, category: normalized.category || null, audience: normalized.audience || null,
-      offer_kinds: profile.offerKinds, primary_intents: profile.primaryIntents,
-      confirmation_mode: profile.confirmationMode, capacity_kinds: profile.capacityKinds,
-      completion_channel: profile.completionChannel, completion_destination: normalized.primaryDestination,
-      whatsapp_phone: normalized.phone || null, signals: profile,
-      source: profile.analysisMetadata?.source || "user",
-    }, { onConflict: "project_id" });
-    if (error) throw new Error(error.message);
-  }
-
-  if (normalized.capabilities?.length) {
-    const { error } = await supabase.from("project_capabilities").upsert(normalized.capabilities.map((capability) => ({
-      project_id: normalized.id, capability_key: capability.key, enabled: capability.enabled,
-      source: capability.source, settings: { ...capability.configuration, version: capability.version },
-    })), { onConflict: "project_id,capability_key" });
-    if (error) throw new Error(error.message);
-  }
-
-  if (normalized.dataRequirements?.length) {
-    const { error } = await supabase.from("project_data_requirements").upsert(normalized.dataRequirements.map((requirement) => ({
-      project_id: normalized.id,
-      requirement_key: requirement.key,
-      label: requirement.label,
-      capability_key: requirement.capability,
-      status: requirement.status,
-      severity: requirement.severity,
-      value: requirement.value ?? null,
-      origin: requirement.origin || null,
-      source_id: requirement.sourceId || null,
-      field_metadata: requirement.fieldMetadata || {},
-      reason: requirement.reason,
-    })), { onConflict: "project_id,requirement_key" });
-    if (error) throw new Error(error.message);
-  }
-
-  const blockRows = normalized.steps.flatMap((step) => (step.blocks || []).map((block, blockOrder) => ({
-    id: block.id, project_id: normalized.id, step_id: step.id, block_type: block.type,
-    block_order: blockOrder, content: block.content || {}, settings: { variant: block.variant, style: block.style || {} },
-  })));
-  if (blockRows.length) {
-    const { error } = await supabase.from("content_blocks").insert(blockRows);
-    if (error) throw new Error(error.message);
-  }
-
-  const config = normalized.commercialConfig;
-  if (config?.serviceOfferings?.length) {
-    const { error } = await supabase.from("service_offerings").upsert(config.serviceOfferings.map((service) => ({
-      id: service.id, project_id: normalized.id, name: service.name, slug: service.slug,
-      description: service.description || null, short_description: service.shortDescription || null,
-      service_mode: service.serviceMode, price_mode: service.priceMode, price: service.price ?? null,
-      min_price: service.minPrice ?? null, max_price: service.maxPrice ?? null, currency: service.currency,
-      image_asset_id: service.imageAssetId || null, destination_id: service.destinationId || null,
-      external_url: service.externalUrl || null, is_featured: service.isFeatured, is_active: service.isActive,
-      service_order: service.order, settings: service.settings,
-    })));
-    if (error) throw new Error(error.message);
-  }
-  if (config?.quoteDefinition) {
-    const definition = config.quoteDefinition;
-    const { error } = await supabase.from("quote_definitions").upsert({
-      id: definition.id, project_id: normalized.id, name: definition.title, currency: definition.currency,
-      base_price: definition.baseAmount || null, is_active: definition.isActive,
-      settings: { estimationMode: definition.estimationMode, questions: definition.questions, completionChannel: definition.completionChannel },
-    }, { onConflict: "project_id" });
-    if (error) throw new Error(error.message);
-    await supabase.from("quote_rules").delete().eq("quote_definition_id", definition.id);
-    if (definition.rules.length) {
-      const { error: rulesError } = await supabase.from("quote_rules").insert(definition.rules.map((rule, ruleOrder) => ({
-        id: rule.id, quote_definition_id: definition.id, field_key: rule.condition.field,
-        operator: rule.condition.operator, expected_value: rule.condition.value,
-        operation: rule.operation, price_delta: rule.amount || 0, min_delta: rule.minAmount || null,
-        max_delta: rule.maxAmount || null, rule_order: ruleOrder,
-      })));
-      if (rulesError) throw new Error(rulesError.message);
-    }
-  }
-
-  if (config?.schedulableServices?.length) {
-    const { error } = await supabase.from("schedulable_services").upsert(config.schedulableServices.map((service) => ({
-      id: service.id, project_id: normalized.id, service_offering_id: service.serviceOfferingId || null, name: service.name, duration_minutes: service.durationMinutes,
-      buffer_before_minutes: service.bufferBeforeMinutes, buffer_after_minutes: service.bufferAfterMinutes,
-      confirmation_mode: service.confirmationMode, is_active: service.isActive, settings: { capacity: service.capacity },
-    })));
-    if (error) throw new Error(error.message);
-  }
-  if (config?.resources?.length) {
-    const { error } = await supabase.from("resources").upsert(config.resources.map((resource) => ({
-      id: resource.id, project_id: normalized.id, name: resource.name, resource_type: resource.kind, is_active: resource.isActive,
-    })));
-    if (error) throw new Error(error.message);
-  }
-  if (config?.availabilityRules?.length) {
-    const { error } = await supabase.from("availability_rules").upsert(config.availabilityRules.map((rule) => ({
-      id: rule.id, project_id: normalized.id, resource_id: rule.resourceId || null, weekday: rule.weekday,
-      starts_at: rule.startTime, ends_at: rule.endTime, timezone: rule.timezone, is_active: true,
-    })));
-    if (error) throw new Error(error.message);
-  }
-  if (config?.availabilityExceptions?.length) {
-    const { error } = await supabase.from("availability_exceptions").upsert(config.availabilityExceptions.map((exception) => ({
-      id: exception.id, project_id: normalized.id, resource_id: exception.resourceId || null,
-      starts_at: exception.startsAt, ends_at: exception.endsAt, is_available: exception.isAvailable, reason: exception.reason || null,
-    })));
-    if (error) throw new Error(error.message);
-  }
-  if (config?.catalogCategories?.length) {
-    const { error } = await supabase.from("catalog_categories").upsert(config.catalogCategories.map((category) => ({
-      id: category.id, project_id: normalized.id, name: category.name, category_order: category.order, is_active: category.isActive,
-    })));
-    if (error) throw new Error(error.message);
-  }
-  if (config?.catalogItems?.length) {
-    const { error } = await supabase.from("catalog_items").upsert(config.catalogItems.map((item) => ({
-      id: item.id, project_id: normalized.id, category_id: item.categoryId || null, name: item.name,
-      description: item.description || null, image_asset_id: item.imageAssetId || null, price: item.price || null,
-      currency: item.currency, is_available: item.isAvailable, variants: item.variants, metadata: item.metadata,
-    })));
-    if (error) throw new Error(error.message);
-  }
-  if (config?.reservableUnits?.length) {
-    const { error } = await supabase.from("reservable_units").upsert(config.reservableUnits.map((unit) => ({
-      id: unit.id, project_id: normalized.id, name: unit.name, description: unit.description || null,
-      capacity_adults: unit.capacityAdults, capacity_children: unit.capacityChildren, quantity: unit.quantity,
-      base_price: unit.basePrice || null, currency: unit.currency, is_active: unit.isActive,
-      media_asset_ids: unit.mediaAssetIds, amenities: unit.amenities,
-      settings: { depositAmount: unit.depositAmount, confirmationMode: unit.confirmationMode, rules: unit.rules },
-    })));
-    if (error) throw new Error(error.message);
-  }
-  if (config?.reservationBlocks?.length) {
-    const { error } = await supabase.from("reservation_blocks").upsert(config.reservationBlocks.map((block) => ({
-      id: block.id, project_id: normalized.id, unit_id: block.unitId || null, starts_on: block.startsOn,
-      ends_on: block.endsOn, quantity: block.quantity, reason: block.reason || null,
-    })));
-    if (error) throw new Error(error.message);
-  }
-  // Destinos precisam existir antes das unidades por causa da chave estrangeira.
-  if (config?.locations?.length && config.routingDestinations?.length) {
-    const { error } = await supabase.from("routing_destinations").upsert(config.routingDestinations.map((destination) => ({
-      id: destination.id, project_id: normalized.id, label: destination.label,
-      channel: destination.type === "whatsapp" ? "whatsapp" : destination.type === "email" ? "email" : destination.type === "phone" ? "phone" : ["url", "checkout", "schedule", "form"].includes(destination.type) ? "url" : "internal",
-      value: destination.value || destination.key, is_active: true, settings: { message: destination.message },
-    })));
-    if (error) throw new Error(error.message);
-  }
-  if (config?.locations?.length) {
-    const { error } = await supabase.from("business_locations").upsert(config.locations.map((location) => ({
-      id: location.id, project_id: normalized.id, name: location.name,
-      address_line: location.addressLine || location.address || null, address_number: location.addressNumber || null,
-      address_extra: location.addressExtra || null, neighborhood: location.neighborhood || null,
-      city: location.city || null, state: location.state || null, postal_code: location.postalCode || null,
-      country_code: location.countryCode, latitude: location.latitude ?? null, longitude: location.longitude ?? null,
-      geocoding_status: location.geocodingStatus, geocoding_provider: location.geocodingProvider || null,
-      geocoded_at: location.geocodedAt || null, phone: location.phone || null, whatsapp: location.whatsapp || null,
-      external_url: location.externalUrl || null, timezone: location.timezone, opening_hours: location.openingHours,
-      service_radius_km: location.serviceRadiusKm ?? null, delivery_radius_km: location.deliveryRadiusKm ?? null,
-      supports_delivery: location.supportsDelivery, supports_pickup: location.supportsPickup,
-      supports_in_person: location.supportsInPerson, priority: location.priority, is_active: location.isActive,
-      routing_destination_id: location.routingDestinationId || null, settings: location.settings || {},
-    })));
-    if (error) throw new Error(error.message);
-  }
-  if (config?.routingDestinations?.length) {
-    const { error } = await supabase.from("routing_destinations").upsert(config.routingDestinations.map((destination) => ({
-      id: destination.id, project_id: normalized.id, label: destination.label,
-      channel: destination.type === "whatsapp" ? "whatsapp" : destination.type === "email" ? "email" : destination.type === "phone" ? "phone" : ["url", "checkout", "schedule", "form"].includes(destination.type) ? "url" : "internal",
-      value: destination.value || destination.key, is_active: true, settings: { message: destination.message },
-    })));
-    if (error) throw new Error(error.message);
-  }
-  if (config?.routingRules?.length) {
-    const { error } = await supabase.from("routing_rules").upsert(config.routingRules.map((rule) => ({
-      id: rule.id, project_id: normalized.id, destination_id: rule.destinationId,
-      conditions: [rule.condition], priority: rule.priority, is_active: rule.isActive,
-    })));
-    if (error) throw new Error(error.message);
-  }
-  if (config?.policies?.length) {
-    const { error } = await supabase.from("project_policies").upsert(config.policies.map((policy) => ({
-      id: policy.id, project_id: normalized.id, policy_type: policy.type, title: policy.title,
-      content: policy.content, is_active: policy.isActive, settings: policy.settings,
-    })), { onConflict: "project_id,policy_type" });
-    if (error) throw new Error(error.message);
-  }
-  return normalized;
 }
 
 export const projectRepository = {
@@ -350,40 +181,77 @@ export const projectRepository = {
     if (canUseLocalStore()) return localStore.getProjects();
     if (!isSupabaseConfigured()) return [];
     const response = await fetch("/api/projects", { cache: "no-store" });
-    const payload = await response.json() as { data?: Project[]; error?: { message?: string } };
-    if (!response.ok) throw new Error(payload.error?.message || "Não foi possível carregar os projetos.");
+    const payload = (await response.json()) as {
+      data?: Project[];
+      error?: { message?: string };
+    };
+    if (!response.ok)
+      throw new Error(
+        payload.error?.message || "Não foi possível carregar os projetos.",
+      );
     return payload.data || [];
   },
   async getProject(value: string): Promise<Project | undefined> {
     if (canUseLocalStore()) return localStore.getProject(value);
     if (!isSupabaseConfigured()) return undefined;
-    if (!isUuid(value)) {
-      return (await this.getProjects()).find((project) => project.slug === value);
-    }
-    const response = await fetch(`/api/projects/${encodeURIComponent(value)}`, { cache: "no-store" });
-    const payload = await response.json() as { data?: Project | null; error?: { message?: string } };
-    if (!response.ok) throw new Error(payload.error?.message || "Não foi possível carregar o projeto.");
+    if (!isUuid(value))
+      return (await this.getProjects()).find(
+        (project) => project.slug === value,
+      );
+    const response = await fetch(`/api/projects/${encodeURIComponent(value)}`, {
+      cache: "no-store",
+    });
+    const payload = (await response.json()) as {
+      data?: Project | null;
+      error?: { message?: string };
+    };
+    if (!response.ok)
+      throw new Error(
+        payload.error?.message || "Não foi possível carregar o projeto.",
+      );
     return payload.data || undefined;
   },
   async saveProject(project: Project): Promise<Project> {
     if (canUseLocalStore()) return localStore.saveProject(project);
-    if (!isSupabaseConfigured()) throw new Error("Persistência indisponível. Configure o Supabase.");
-    const remote = await saveNormalized(project);
-    if (!remote) throw new Error("Faça login para salvar o projeto.");
-    return remote;
+    if (!isSupabaseConfigured())
+      throw new Error("Persistência indisponível. Configure o Supabase.");
+    const normalized = normalizeIds(project);
+    const response = await fetch(
+      `/api/projects/${encodeURIComponent(normalized.id)}`,
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(normalized),
+      },
+    );
+    const payload = (await response.json()) as {
+      data?: Project;
+      error?: { message?: string };
+    };
+    if (!response.ok || !payload.data)
+      throw new Error(
+        payload.error?.message || "Não foi possível salvar o projeto.",
+      );
+    return payload.data;
   },
   async deleteProject(id: string) {
     if (canUseLocalStore()) {
       localStore.deleteProject(id);
       return;
     }
-    if (!isSupabaseConfigured()) throw new Error("Persistência indisponível. Configure o Supabase.");
+    if (!isSupabaseConfigured())
+      throw new Error("Persistência indisponível. Configure o Supabase.");
     if (!isUuid(id)) return;
-    const supabase = createClient();
-    if (!supabase) return;
-    const workspace = await workspaceId();
-    if (!workspace) throw new Error("Workspace ativo indisponível.");
-    const { error } = await supabase.from("projects").delete().eq("id", id).eq("workspace_id", workspace);
-    if (error) throw new Error(error.message);
+    const response = await fetch(`/api/projects/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      const payload = (await response.json()) as {
+        error?: { message?: string };
+      };
+      throw new Error(
+        payload.error?.message || "Não foi possível excluir o projeto.",
+      );
+    }
   },
 };

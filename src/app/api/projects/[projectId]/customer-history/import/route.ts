@@ -5,6 +5,7 @@ import { sourceRepository } from "@/server/business-sources/source-repository";
 import { importHistoricalCustomers } from "@/server/customer-identity/customer-import";
 import { apiError, apiSuccess, validationError } from "@/server/http/api-response";
 import { withAuthenticatedActor } from "@/server/http/with-authenticated-actor";
+import { requireEntitlement } from "@/server/entitlements/require-entitlement";
 
 const schema = z.object({
   sourceId: z.string().uuid(),
@@ -30,6 +31,7 @@ export const POST = withAuthenticatedActor(async (request, context: RouteContext
   const externalIndex = index(parsed.data.externalIdColumn);
   if (phoneIndex < 0 && emailIndex < 0) return apiError("As colunas mapeadas não existem no arquivo.", 422, "invalid_mapping");
   const database = createServiceClient()!;
+  await requireEntitlement({database,workspaceId:actor.workspaceId,feature:"customer_history_import"});
   const { data: batch, error } = await database.from("customer_import_batches").insert({ workspace_id: actor.workspaceId, project_id: projectId, business_source_id: source.id, phone_column: parsed.data.phoneColumn || null, email_column: parsed.data.emailColumn || null, external_id_column: parsed.data.externalIdColumn || null, status: "processing", created_by: actor.userId }).select("id").single();
   if (error || !batch) return apiError("Não foi possível iniciar a importação.", 500, "import_failed");
   try {

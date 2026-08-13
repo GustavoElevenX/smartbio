@@ -1,4 +1,4 @@
 import type { Metadata } from "next";
-import { BillingSettings } from "@/components/dashboard/settings-panels";
+import { BillingSettingsReal } from "@/components/entitlements/billing-settings-real";
 export const metadata: Metadata = { title: "Plano e cobrança" };
-export default function BillingPage() { return <BillingSettings />; }
+export default function BillingPage() { return <BillingSettingsReal />; }

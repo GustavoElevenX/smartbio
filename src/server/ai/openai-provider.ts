@@ -36,8 +36,26 @@ import { missingQuestionsPrompt } from "@/server/ai/prompts/missing-questions";
 import { presenceCompositionPrompt } from "@/server/ai/prompts/presence-composition";
 import { sourceExtractionPrompt } from "@/server/ai/prompts/source-extraction";
 import { activationCompositionPrompt } from "@/server/ai/prompts/activation-composition";
+import { createServiceClient } from "@/lib/supabase/server";
+import {
+  requireEntitlement,
+  requireResourceCapacity,
+} from "@/server/entitlements/require-entitlement";
+import type { EntitlementFeature } from "@/server/entitlements/entitlement-catalog";
 
-const questionListSchema = z.object({ questions: z.array(setupQuestionSchema).max(5) });
+const questionListSchema = z.object({
+  questions: z.array(setupQuestionSchema).max(5),
+});
+const operationFeatures: Record<string, EntitlementFeature> = {
+  business_analysis: "ai_business_analysis",
+  missing_questions: "ai_business_analysis",
+  journey_composition: "ai_journey",
+  presence_composition: "ai_presence",
+  "activation.compose": "ai_activation",
+  copy_generation: "ai_optimization",
+  source_extraction: "ai_business_analysis",
+  brand_analysis: "ai_business_analysis",
+};
 
 export class OpenAIVirouProvider implements VirouAIProvider {
   private readonly client: OpenAI;
@@ -57,13 +75,47 @@ export class OpenAIVirouProvider implements VirouAIProvider {
     this.visionModel = env.OPENAI_VISION_MODEL || this.model;
     this.maxOutputTokens = env.OPENAI_MAX_OUTPUT_TOKENS;
     this.promptVersion = env.AI_PROMPT_VERSION;
-    this.client = new OpenAI({ apiKey: env.OPENAI_API_KEY, timeout: this.timeoutMs, maxRetries: 0 });
+    this.client = new OpenAI({
+      apiKey: env.OPENAI_API_KEY,
+      timeout: this.timeoutMs,
+      maxRetries: 0,
+    });
   }
 
-  private async structured<T>({ operation, schemaName, schema, systemPrompt, payload, context, model, userContent }: StructuredAIRequest<T>): Promise<T> {
+  private async structured<T>({
+    operation,
+    schemaName,
+    schema,
+    systemPrompt,
+    payload,
+    context,
+    model,
+    userContent,
+  }: StructuredAIRequest<T>): Promise<T> {
     const startedAt = Date.now();
     const selectedModel = model || this.model;
-    await recordAIUsage({ ...context, operation, provider: "openai", model: selectedModel, promptVersion: this.promptVersion, status: "started", inputSummary: { payloadBytes: JSON.stringify(payload).length } });
+    const database = createServiceClient();
+    if (database) {
+      await requireEntitlement({
+        database,
+        workspaceId: context.workspaceId,
+        feature: operationFeatures[operation] || "ai_optimization",
+      });
+      await requireResourceCapacity({
+        database,
+        workspaceId: context.workspaceId,
+        feature: "ai_generations_month",
+      });
+    }
+    await recordAIUsage({
+      ...context,
+      operation,
+      provider: "openai",
+      model: selectedModel,
+      promptVersion: this.promptVersion,
+      status: "started",
+      inputSummary: { payloadBytes: JSON.stringify(payload).length },
+    });
     let lastError: unknown;
     for (let attempt = 0; attempt <= this.maxRetries; attempt += 1) {
       try {
@@ -73,11 +125,17 @@ export class OpenAIVirouProvider implements VirouAIProvider {
           reasoning: { effort: "low" },
           input: [
             { role: "system", content: systemPrompt },
-            { role: "user", content: userContent || `DADOS_DELIMITADOS_INICIO\n${JSON.stringify(payload)}\nDADOS_DELIMITADOS_FIM` },
+            {
+              role: "user",
+              content:
+                userContent ||
+                `DADOS_DELIMITADOS_INICIO\n${JSON.stringify(payload)}\nDADOS_DELIMITADOS_FIM`,
+            },
           ],
           text: { format: zodTextFormat(schema, schemaName) },
         });
-        if (!response.output_parsed) throw new Error("O provider não retornou uma saída estruturada.");
+        if (!response.output_parsed)
+          throw new Error("O provider não retornou uma saída estruturada.");
         const parsed = schema.parse(response.output_parsed);
         await recordAIUsage({
           ...context,
@@ -89,7 +147,41 @@ export class OpenAIVirouProvider implements VirouAIProvider {
           durationMs: Date.now() - startedAt,
           inputTokens: response.usage?.input_tokens,
           outputTokens: response.usage?.output_tokens,
-          outputSummary: operation === "journey_composition" && parsed && typeof parsed === "object" ? { outputBytes: JSON.stringify(parsed).length, suggestedCapabilities: (parsed as { suggestedCapabilities?: Array<{ key: string }> }).suggestedCapabilities?.map((item) => item.key) || [], appliedCandidates: (parsed as { suggestedCapabilities?: Array<{ key: string; enabled: boolean }> }).suggestedCapabilities?.filter((item) => item.enabled).map((item) => item.key) || [], proposedConfigSections: Object.keys((parsed as { commercialConfigPatch?: Record<string, unknown> }).commercialConfigPatch || {}), requirementsCreated: (parsed as { requirements?: unknown[] }).requirements?.length || 0 } : { outputBytes: JSON.stringify(parsed).length },
+          outputSummary:
+            operation === "journey_composition" &&
+            parsed &&
+            typeof parsed === "object"
+              ? {
+                  outputBytes: JSON.stringify(parsed).length,
+                  suggestedCapabilities:
+                    (
+                      parsed as {
+                        suggestedCapabilities?: Array<{ key: string }>;
+                      }
+                    ).suggestedCapabilities?.map((item) => item.key) || [],
+                  appliedCandidates:
+                    (
+                      parsed as {
+                        suggestedCapabilities?: Array<{
+                          key: string;
+                          enabled: boolean;
+                        }>;
+                      }
+                    ).suggestedCapabilities
+                      ?.filter((item) => item.enabled)
+                      .map((item) => item.key) || [],
+                  proposedConfigSections: Object.keys(
+                    (
+                      parsed as {
+                        commercialConfigPatch?: Record<string, unknown>;
+                      }
+                    ).commercialConfigPatch || {},
+                  ),
+                  requirementsCreated:
+                    (parsed as { requirements?: unknown[] }).requirements
+                      ?.length || 0,
+                }
+              : { outputBytes: JSON.stringify(parsed).length },
         });
         return parsed;
       } catch (error) {
@@ -99,42 +191,123 @@ export class OpenAIVirouProvider implements VirouAIProvider {
       }
     }
     const normalized = normalizeAIError(lastError);
-    await recordAIUsage({ ...context, operation, provider: "openai", model: selectedModel, promptVersion: this.promptVersion, status: "failed", durationMs: Date.now() - startedAt, errorCode: normalized.code });
+    await recordAIUsage({
+      ...context,
+      operation,
+      provider: "openai",
+      model: selectedModel,
+      promptVersion: this.promptVersion,
+      status: "failed",
+      durationMs: Date.now() - startedAt,
+      errorCode: normalized.code,
+    });
     throw normalized;
   }
 
   analyzeBusiness(input: BusinessAnalysisInput) {
-    return this.structured({ operation: "business_analysis", schemaName: "business_analysis", schema: businessAnalysisResultSchema, systemPrompt: businessAnalysisPrompt, payload: { business: input.input, sources: input.sources || [] }, context: input });
+    return this.structured({
+      operation: "business_analysis",
+      schemaName: "business_analysis",
+      schema: businessAnalysisResultSchema,
+      systemPrompt: businessAnalysisPrompt,
+      payload: { business: input.input, sources: input.sources || [] },
+      context: input,
+    });
   }
 
   async generateMissingQuestions(input: MissingQuestionInput) {
-    const result = await this.structured({ operation: "missing_questions", schemaName: "missing_questions", schema: questionListSchema, systemPrompt: missingQuestionsPrompt, payload: { profile: input.profile, requirements: input.requirements || [], answers: input.answers }, context: input });
+    const result = await this.structured({
+      operation: "missing_questions",
+      schemaName: "missing_questions",
+      schema: questionListSchema,
+      systemPrompt: missingQuestionsPrompt,
+      payload: {
+        profile: input.profile,
+        requirements: input.requirements || [],
+        answers: input.answers,
+      },
+      context: input,
+    });
     return result.questions;
   }
 
   composeJourney(input: JourneyAIInput) {
-    return this.structured({ operation: "journey_composition", schemaName: "journey_draft", schema: aiJourneyDraftSchema, systemPrompt: journeyCompositionPrompt, payload: input, context: input });
+    return this.structured({
+      operation: "journey_composition",
+      schemaName: "journey_draft",
+      schema: aiJourneyDraftSchema,
+      systemPrompt: journeyCompositionPrompt,
+      payload: input,
+      context: input,
+    });
   }
 
   composePresence(input: PresenceCompositionInput) {
-    return this.structured({ operation: "presence_composition", schemaName: "presence_draft", schema: aiPresenceDraftSchema, systemPrompt: presenceCompositionPrompt, payload: input, context: input });
+    return this.structured({
+      operation: "presence_composition",
+      schemaName: "presence_draft",
+      schema: aiPresenceDraftSchema,
+      systemPrompt: presenceCompositionPrompt,
+      payload: input,
+      context: input,
+    });
   }
 
   composeActivation(input: ActivationCompositionInput) {
-    return this.structured({ operation: "activation.compose", schemaName: "activation_draft", schema: aiActivationDraftSchema, systemPrompt: activationCompositionPrompt, payload: input, context: input });
+    return this.structured({
+      operation: "activation.compose",
+      schemaName: "activation_draft",
+      schema: aiActivationDraftSchema,
+      systemPrompt: activationCompositionPrompt,
+      payload: input,
+      context: input,
+    });
   }
 
   generateCopy(input: CopyGenerationInput) {
-    return this.structured({ operation: "copy_generation", schemaName: "copy_suggestions", schema: copyGenerationResultSchema, systemPrompt: copyGenerationPrompt, payload: input, context: input });
+    return this.structured({
+      operation: "copy_generation",
+      schemaName: "copy_suggestions",
+      schema: copyGenerationResultSchema,
+      systemPrompt: copyGenerationPrompt,
+      payload: input,
+      context: input,
+    });
   }
 
   extractSource(input: SourceExtractionInput) {
-    const instruction = { type: "input_text" as const, text: `DADOS_DELIMITADOS_INICIO\n${JSON.stringify({ sourceId: input.sourceId, sourceType: input.sourceType, name: input.name, content: input.content })}\nDADOS_DELIMITADOS_FIM` };
-    const visual = input.fileData && input.mimeType?.startsWith("image/") ? { type: "input_image" as const, image_url: `data:${input.mimeType};base64,${input.fileData}`, detail: "high" as const } : undefined;
-    return this.structured({ operation: "source_extraction", schemaName: "extracted_source", schema: extractedBusinessSourceSchema, systemPrompt: sourceExtractionPrompt, payload: input, userContent: visual ? [instruction, visual] : [instruction], context: input, model: visual ? this.visionModel : undefined });
+    const instruction = {
+      type: "input_text" as const,
+      text: `DADOS_DELIMITADOS_INICIO\n${JSON.stringify({ sourceId: input.sourceId, sourceType: input.sourceType, name: input.name, content: input.content })}\nDADOS_DELIMITADOS_FIM`,
+    };
+    const visual =
+      input.fileData && input.mimeType?.startsWith("image/")
+        ? {
+            type: "input_image" as const,
+            image_url: `data:${input.mimeType};base64,${input.fileData}`,
+            detail: "high" as const,
+          }
+        : undefined;
+    return this.structured({
+      operation: "source_extraction",
+      schemaName: "extracted_source",
+      schema: extractedBusinessSourceSchema,
+      systemPrompt: sourceExtractionPrompt,
+      payload: input,
+      userContent: visual ? [instruction, visual] : [instruction],
+      context: input,
+      model: visual ? this.visionModel : undefined,
+    });
   }
 
   analyzeBrand(input: BrandAIInput) {
-    return this.structured({ operation: "brand_analysis", schemaName: "brand_analysis", schema: brandAIResultSchema, systemPrompt: brandAnalysisPrompt, payload: input, context: input });
+    return this.structured({
+      operation: "brand_analysis",
+      schemaName: "brand_analysis",
+      schema: brandAIResultSchema,
+      systemPrompt: brandAnalysisPrompt,
+      payload: input,
+      context: input,
+    });
   }
 }

@@ -20,7 +20,7 @@ export async function ensureUserWorkspace(user: User) {
   if (!supabase) throw new ProductionConfigurationError("A chave de serviço do Supabase é necessária para preparar o workspace.");
 
   const fullName = typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name.trim() : null;
-  const { error: profileError } = await supabase.from("profiles").upsert({ id: user.id, full_name: fullName }, { onConflict: "id" });
+  const { error: profileError } = await supabase.from("profiles").upsert({ id: user.id, full_name: fullName, email: user.email || null, last_sign_in_at: user.last_sign_in_at || null }, { onConflict: "id" });
   if (profileError) throw new WorkspaceRequiredError("Não foi possível preparar o perfil desta conta.");
 
   const { data: existingMembership, error: membershipError } = await supabase
@@ -51,5 +51,7 @@ export async function ensureUserWorkspace(user: User) {
     { onConflict: "workspace_id,user_id" },
   );
   if (insertMembershipError) throw new WorkspaceRequiredError("Não foi possível vincular a conta ao workspace.");
+  const { error: planError } = await supabase.from("workspace_plan_assignments").upsert({ workspace_id: workspace.id, plan_key: "free", source: "system", status: "active" }, { onConflict: "workspace_id" });
+  if (planError) throw new WorkspaceRequiredError("Não foi possível atribuir o plano inicial.");
   return { workspaceId: workspace.id, role: "owner" as const };
 }

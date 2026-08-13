@@ -8,8 +8,6 @@ import {
   CreditCard,
   Globe2,
   LoaderCircle,
-  LockKeyhole,
-  Mail,
   RotateCcw,
   Save,
   Trash2,
@@ -20,7 +18,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select, Textarea } from "@/components/ui/field";
-import { localStore } from "@/lib/local-store";
 import { projectRepository } from "@/lib/repositories/project-repository";
 import { slugify } from "@/lib/utils";
 import type { Project } from "@/types";
@@ -53,253 +50,16 @@ export function SettingsNav({
   );
 }
 
-export function ProfileSettings() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [saved, setSaved] = useState(false);
-  useEffect(() => {
-    const user = localStore.getUser() || {
-      name: "Usuário Virou",
-      email: "voce@empresa.com",
-    };
-    setName(user.name);
-    setEmail(user.email);
-  }, []);
-  function save() {
-    localStore.setUser({ name, email });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1800);
-  }
-  return (
-    <SettingsFrame
-      title="Configurações"
-      description="Gerencie seu perfil e preferências."
-    >
-      <SettingsNav active="profile" />
-      <section className="rounded-[22px] border border-[#e4e3ea] bg-white p-6">
-        <h2 className="font-extrabold">Informações do perfil</h2>
-        <p className="mt-1 text-sm text-[#777781]">
-          Usadas nos convites e atualizações do workspace.
-        </p>
-        <div className="mt-6 grid max-w-2xl gap-5 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="profile-name">Nome completo</Label>
-            <Input
-              id="profile-name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-            />
-          </div>
-          <div>
-            <Label htmlFor="profile-email">E-mail</Label>
-            <Input
-              id="profile-email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </div>
-        </div>
-        <Button onClick={save} className="mt-6">
-          <Save size={16} /> {saved ? "Salvo" : "Salvar alterações"}
-        </Button>
-      </section>
-      <section className="mt-5 rounded-[22px] border border-[#e4e3ea] bg-white p-6">
-        <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-xl bg-[#eeecff] text-[#6154d8]">
-            <LockKeyhole size={18} />
-          </span>
-          <div>
-            <h2 className="font-extrabold">Segurança</h2>
-            <p className="text-xs text-[#777781]">
-              Redefina sua senha por e-mail.
-            </p>
-          </div>
-        </div>
-        <Link
-          href="/forgot-password"
-          className="mt-5 inline-flex min-h-11 items-center rounded-xl border border-[#dedde5] px-4 text-sm font-bold"
-        >
-          Enviar link de redefinição
-        </Link>
-      </section>
-    </SettingsFrame>
-  );
-}
-
-export function WorkspaceSettings() {
-  const [name, setName] = useState("Meu workspace");
-  const [slug, setSlug] = useState("meu-workspace");
-  const [members, setMembers] = useState([
-    { email: "voce@empresa.com", role: "owner" },
-    { email: "marketing@empresa.com", role: "member" },
-  ]);
-  const [invite, setInvite] = useState("");
-  function addMember() {
-    if (!invite.includes("@")) return;
-    setMembers((items) => [...items, { email: invite, role: "member" }]);
-    setInvite("");
-  }
-  return (
-    <SettingsFrame
-      title="Configurações"
-      description="Gerencie seu perfil e preferências."
-    >
-      <SettingsNav active="workspace" />
-      <section className="rounded-[22px] border border-[#e4e3ea] bg-white p-6">
-        <h2 className="font-extrabold">Workspace</h2>
-        <div className="mt-6 grid max-w-2xl gap-5 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="workspace-name">Nome</Label>
-            <Input
-              id="workspace-name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-            />
-          </div>
-          <div>
-            <Label htmlFor="workspace-slug">Identificador</Label>
-            <Input
-              id="workspace-slug"
-              value={slug}
-              onChange={(event) => setSlug(slugify(event.target.value))}
-            />
-          </div>
-        </div>
-        <Button
-          onClick={() =>
-            localStorage.setItem(
-              "smartbio:workspace",
-              JSON.stringify({ name, slug }),
-            )
-          }
-          className="mt-6"
-        >
-          <Save size={16} /> Salvar workspace
-        </Button>
-      </section>
-      <section className="mt-5 rounded-[22px] border border-[#e4e3ea] bg-white p-6">
-        <h2 className="font-extrabold">Membros</h2>
-        <p className="mt-1 text-sm text-[#777781]">
-          Owners gerenciam tudo. Members editam projetos, leads e analytics.
-        </p>
-        <div className="mt-5 flex max-w-2xl gap-2">
-          <Input
-            aria-label="E-mail para convite"
-            value={invite}
-            onChange={(event) => setInvite(event.target.value)}
-            type="email"
-            placeholder="colega@empresa.com"
-          />
-          <Button onClick={addMember}>
-            <Mail size={16} /> Convidar
-          </Button>
-        </div>
-        <div className="mt-6 max-w-2xl divide-y divide-[#e9e8ee]">
-          {members.map((member, index) => (
-            <div key={member.email} className="flex items-center gap-3 py-4">
-              <span className="grid size-9 place-items-center rounded-full bg-[#eeecff] text-xs font-extrabold text-[#6154d8]">
-                {member.email.slice(0, 2).toUpperCase()}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                {member.email}
-              </span>
-              <Select
-                aria-label={`Permissão de ${member.email}`}
-                value={member.role}
-                onChange={(event) =>
-                  setMembers((items) =>
-                    items.map((item, itemIndex) =>
-                      itemIndex === index
-                        ? { ...item, role: event.target.value }
-                        : item,
-                    ),
-                  )
-                }
-                disabled={index === 0}
-                className="min-h-9 w-32 text-xs"
-              >
-                <option value="owner">Owner</option>
-                <option value="member">Member</option>
-              </Select>
-            </div>
-          ))}
-        </div>
-      </section>
-    </SettingsFrame>
-  );
-}
-
-export function BillingSettings() {
-  return (
-    <SettingsFrame
-      title="Configurações"
-      description="Gerencie seu perfil e preferências."
-    >
-      <SettingsNav active="billing" />
-      <section className="overflow-hidden rounded-[24px] border border-[#dcd8ff] bg-white">
-        <div className="bg-[#1c1a24] p-7 text-white">
-          <span className="rounded-full bg-[#6d5ef5] px-3 py-1.5 text-xs font-bold">
-            Plano Free
-          </span>
-          <h2 className="mt-5 text-3xl font-extrabold tracking-[-.04em]">
-            Comece sem custo.
-          </h2>
-          <p className="mt-2 text-sm text-white/60">
-            1 projeto, domínio padrão, analytics básicos e 100 leads/mês.
-          </p>
-        </div>
-        <div className="p-7">
-          <div className="grid gap-4 sm:grid-cols-3">
-            {[
-              ["Projetos", "1 de 1"],
-              ["Leads", "3 de 100"],
-              ["Renovação", "mensal"],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-[16px] bg-[#f5f4f8] p-4">
-                <span className="text-xs text-[#85858f]">{label}</span>
-                <strong className="mt-1 block">{value}</strong>
-              </div>
-            ))}
-          </div>
-          <Link
-            href="/pricing"
-            className="focus-ring mt-6 inline-flex min-h-11 items-center rounded-xl bg-[#17171c] px-4 text-sm font-bold text-white"
-          >
-            Comparar planos
-          </Link>
-          <p className="mt-4 text-xs text-[#85858f]">
-            A cobrança real está desativada neste MVP.
-          </p>
-        </div>
-      </section>
-    </SettingsFrame>
-  );
-}
-
-function SettingsFrame({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="mx-auto max-w-5xl animate-enter">
-      <h1 className="text-3xl font-extrabold tracking-[-.04em]">{title}</h1>
-      <p className="mt-2 text-sm text-[#74747e]">{description}</p>
-      <div className="mt-7">{children}</div>
-    </div>
-  );
-}
-
 export function ProjectSettings({ projectId }: { projectId: string }) {
   const router = useRouter();
   const [project, setProject] = useState<Project | null>();
   const [saved, setSaved] = useState(false);
-  useEffect(() => { void projectRepository.getProject(projectId).then((found) => setProject(found || null)).catch(() => setProject(null)); }, [projectId]);
+  useEffect(() => {
+    void projectRepository
+      .getProject(projectId)
+      .then((found) => setProject(found || null))
+      .catch(() => setProject(null));
+  }, [projectId]);
   if (project === undefined)
     return (
       <div className="grid h-96 place-items-center">
@@ -397,7 +157,10 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
               <option value="published">Publicado</option>
               <option value="archived">Arquivado</option>
             </Select>
-            <p id="project-status-help" className="mt-1 text-[11px] text-[#85858f]">
+            <p
+              id="project-status-help"
+              className="mt-1 text-[11px] text-[#85858f]"
+            >
               Publique pelo editor para executar a validação e criar o snapshot.
             </p>
           </div>
@@ -442,7 +205,10 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
           </span>
           <button
             onClick={() =>
-              void projectRepository.saveProject({ ...project, status: "draft" })
+              void projectRepository.saveProject({
+                ...project,
+                status: "draft",
+              })
             }
             className="focus-ring inline-flex items-center gap-2 rounded-xl border border-[#dedde5] bg-white px-3 py-2 text-xs font-bold"
           >

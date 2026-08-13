@@ -1,4 +1,5 @@
 import "server-only";
+import { EntitlementError } from "@/server/entitlements/entitlement-types";
 
 export class AuthenticationRequiredError extends Error {
   readonly code = "authentication_required";
@@ -45,6 +46,7 @@ export function authErrorStatus(error: unknown) {
     error instanceof WorkspaceAccessDeniedError ||
     error instanceof ProjectNotFoundError ||
     error instanceof ProductionConfigurationError
+    || error instanceof EntitlementError
     ? error.status
     : 500;
 }
@@ -56,6 +58,7 @@ export function authErrorCode(error: unknown) {
     error instanceof WorkspaceAccessDeniedError ||
     error instanceof ProjectNotFoundError ||
     error instanceof ProductionConfigurationError
+    || error instanceof EntitlementError
     ? error.code
     : "internal_error";
 }

@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
-import { WorkspaceSettings } from "@/components/dashboard/settings-panels";
+import { WorkspaceSettingsReal } from "@/components/account/account-settings-real";
 export const metadata: Metadata = { title: "Workspace" };
-export default function WorkspacePage() { return <WorkspaceSettings />; }
+export default function WorkspacePage() {
+  return <WorkspaceSettingsReal />;
+}

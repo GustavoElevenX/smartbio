@@ -3,7 +3,10 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { ProductionConfigurationError } from "@/server/auth/auth-errors";
 import { MemoryRateLimitProvider } from "@/server/rate-limit/memory-rate-limit-provider";
-import type { RateLimitResult, RateLimitRule } from "@/server/rate-limit/rate-limit-provider";
+import type {
+  RateLimitResult,
+  RateLimitRule,
+} from "@/server/rate-limit/rate-limit-provider";
 import { UpstashRateLimitProvider } from "@/server/rate-limit/upstash-rate-limit-provider";
 
 export const rateLimitRules = {
@@ -24,13 +27,18 @@ export const rateLimitRules = {
   publicAttachmentUpload: { limit: 10, windowMs: 10 * 60_000 },
   publicAnalytics: { limit: 120, windowMs: 60_000 },
   activationClaim: { limit: 10, windowMs: 10 * 60_000 },
+  activationHandoff: { limit: 15, windowMs: 10 * 60_000 },
+  adminSensitiveMutation: { limit: 20, windowMs: 10 * 60_000 },
 } satisfies Record<string, RateLimitRule>;
 
 function provider() {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (url && token) return new UpstashRateLimitProvider(url, token);
-  if (process.env.NODE_ENV === "production") throw new ProductionConfigurationError("O rate limit distribuído não está configurado.");
+  if (process.env.NODE_ENV === "production")
+    throw new ProductionConfigurationError(
+      "O rate limit distribuído não está configurado.",
+    );
   return new MemoryRateLimitProvider();
 }
 
@@ -39,12 +47,25 @@ function privateIdentifier(value: string) {
   return createHash("sha256").update(`${secret}:${value}`).digest("hex");
 }
 
-export async function consumeRateLimit(scope: string, identifier: string, rule: RateLimitRule, options: { private?: boolean; failClosed?: boolean } = {}) {
+export async function consumeRateLimit(
+  scope: string,
+  identifier: string,
+  rule: RateLimitRule,
+  options: { private?: boolean; failClosed?: boolean } = {},
+) {
   try {
-    return await provider().consume(`${scope}:${options.private === false ? identifier : privateIdentifier(identifier)}`, rule);
+    return await provider().consume(
+      `${scope}:${options.private === false ? identifier : privateIdentifier(identifier)}`,
+      rule,
+    );
   } catch (error) {
     if (options.failClosed !== false) throw error;
-    return { allowed: true, limit: rule.limit, remaining: rule.limit, resetAt: Date.now() + rule.windowMs } satisfies RateLimitResult;
+    return {
+      allowed: true,
+      limit: rule.limit,
+      remaining: rule.limit,
+      resetAt: Date.now() + rule.windowMs,
+    } satisfies RateLimitResult;
   }
 }
 
@@ -56,7 +77,11 @@ export function rateLimitHeaders(result: RateLimitResult) {
   };
 }
 
-export function applyRateLimitHeaders<T extends Response>(response: T, result: RateLimitResult) {
-  for (const [name, value] of Object.entries(rateLimitHeaders(result))) response.headers.set(name, value);
+export function applyRateLimitHeaders<T extends Response>(
+  response: T,
+  result: RateLimitResult,
+) {
+  for (const [name, value] of Object.entries(rateLimitHeaders(result)))
+    response.headers.set(name, value);
   return response;
 }

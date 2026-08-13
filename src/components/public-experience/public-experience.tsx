@@ -85,14 +85,18 @@ function DynamicIcon({ name }: { name?: string }) {
 }
 
 function emptyRuntime(project: Project): JourneyRuntimeState {
-  const goals = backfillConversionGoals(project).filter((goal) => goal.isActive);
+  const goals = backfillConversionGoals(project).filter(
+    (goal) => goal.isActive,
+  );
   return {
     visitorId: uid("visitor"),
     sessionId: uid("session"),
     currentStepId:
-      (goals.length > 1 ? "__conversion-goals" : project.steps
-        .filter((step) => step.isActive)
-        .toSorted((a, b) => a.order - b.order)[0]?.id) || "",
+      (goals.length > 1
+        ? "__conversion-goals"
+        : project.steps
+            .filter((step) => step.isActive)
+            .toSorted((a, b) => a.order - b.order)[0]?.id) || "",
     answers: {},
     selectedOfferIds: [],
     cart: { items: [], totals: { subtotal: 0, total: 0, currency: "BRL" } },
@@ -100,27 +104,67 @@ function emptyRuntime(project: Project): JourneyRuntimeState {
 }
 
 function shouldSubmitCommercialOperationRemotely() {
-  return isSupabaseConfigured() || !canUseLocalStore();
+  return !canUseLocalStore() && isSupabaseConfigured();
 }
 
 type StoredJourneyRuntime = Partial<JourneyRuntimeState> & {
   navigationHistory?: string[];
 };
 
-function runtimeFromStorage(project: Project, preview: boolean, previewGoalId?: string, previewEntryKey?: string, launchContext?: PresenceLaunchContext) {
+function runtimeFromStorage(
+  project: Project,
+  preview: boolean,
+  previewGoalId?: string,
+  previewEntryKey?: string,
+  launchContext?: PresenceLaunchContext,
+) {
   const fallback = emptyRuntime(project);
   if (typeof window === "undefined") return fallback;
   const params = new URLSearchParams(window.location.search);
   if (previewGoalId) params.set("goal", previewGoalId);
   if (previewEntryKey) params.set("entry", previewEntryKey);
-  const goals = backfillConversionGoals(project).filter((goal) => goal.isActive);
-  const resolved = resolveEntryPoint(project.entryPoints || [], goals, project.steps, params.get("entry"));
-  const requestedGoalId = launchContext?.goalId || (preview ? params.get("goal") : undefined);
-  const previewGoal = requestedGoalId ? goals.find((goal) => goal.id === requestedGoalId) : undefined;
-  const directGoal = resolved.goal || previewGoal || (goals.length === 1 ? goals[0] : undefined);
-  const attribution = { ...resolveAttribution({ explicit: readUtm(params), entry: resolved.entry, referrer: document.referrer, conversionGoalId: directGoal?.id }), presencePageId: launchContext?.pageId, presenceSectionId: launchContext?.sectionId };
-  const seededAnswers = Object.fromEntries(Object.entries({ catalogItemId: launchContext?.catalogItemId, serviceId: launchContext?.serviceId, locationId: launchContext?.locationId }).filter(([, value]) => Boolean(value))) as Record<string, string>;
-  const direct = { ...fallback, currentStepId: resolved.step?.id || directGoal?.targetStepId || fallback.currentStepId, conversionGoalId: directGoal?.id, entryPointId: launchContext?.entryPointId || resolved.entry?.id, attribution, answers: seededAnswers };
+  const goals = backfillConversionGoals(project).filter(
+    (goal) => goal.isActive,
+  );
+  const resolved = resolveEntryPoint(
+    project.entryPoints || [],
+    goals,
+    project.steps,
+    params.get("entry"),
+  );
+  const requestedGoalId =
+    launchContext?.goalId || (preview ? params.get("goal") : undefined);
+  const previewGoal = requestedGoalId
+    ? goals.find((goal) => goal.id === requestedGoalId)
+    : undefined;
+  const directGoal =
+    resolved.goal || previewGoal || (goals.length === 1 ? goals[0] : undefined);
+  const attribution = {
+    ...resolveAttribution({
+      explicit: readUtm(params),
+      entry: resolved.entry,
+      referrer: document.referrer,
+      conversionGoalId: directGoal?.id,
+    }),
+    presencePageId: launchContext?.pageId,
+    presenceSectionId: launchContext?.sectionId,
+  };
+  const seededAnswers = Object.fromEntries(
+    Object.entries({
+      catalogItemId: launchContext?.catalogItemId,
+      serviceId: launchContext?.serviceId,
+      locationId: launchContext?.locationId,
+    }).filter(([, value]) => Boolean(value)),
+  ) as Record<string, string>;
+  const direct = {
+    ...fallback,
+    currentStepId:
+      resolved.step?.id || directGoal?.targetStepId || fallback.currentStepId,
+    conversionGoalId: directGoal?.id,
+    entryPointId: launchContext?.entryPointId || resolved.entry?.id,
+    attribution,
+    answers: seededAnswers,
+  };
   if (preview) return direct;
   try {
     const raw = sessionStorage.getItem(`smartbio:journey:v3:${project.slug}`);
@@ -308,16 +352,45 @@ export function ExperienceCanvas({
   onClose?: () => void;
 }) {
   const activeSteps = useMemo<import("@/types").JourneyStep[]>(() => {
-      const goals = backfillConversionGoals(project).filter((goal) => goal.isActive).sort((a, b) => a.order - b.order);
-      const steps = project.steps
-        .filter((step) => step.isActive)
-        .toSorted((a, b) => a.order - b.order);
-      if (goals.length <= 1) return steps;
-      return [{ id: "__conversion-goals", type: "choice" as const, title: "O que você deseja fazer hoje?", description: "Escolha seu objetivo para seguir pelo caminho mais direto.", order: -1, isActive: true, blocks: [], formFields: [],
-        options: goals.map((goal) => ({ id: `goal-option-${goal.id}`, label: goal.name, description: goal.description, value: goal.kind, actionType: "go_to_step" as const, targetStepId: goal.targetStepId, conversionGoalId: goal.id })) }, ...steps];
-    }, [project]);
+    const goals = backfillConversionGoals(project)
+      .filter((goal) => goal.isActive)
+      .sort((a, b) => a.order - b.order);
+    const steps = project.steps
+      .filter((step) => step.isActive)
+      .toSorted((a, b) => a.order - b.order);
+    if (goals.length <= 1) return steps;
+    return [
+      {
+        id: "__conversion-goals",
+        type: "choice" as const,
+        title: "O que você deseja fazer hoje?",
+        description:
+          "Escolha seu objetivo para seguir pelo caminho mais direto.",
+        order: -1,
+        isActive: true,
+        blocks: [],
+        formFields: [],
+        options: goals.map((goal) => ({
+          id: `goal-option-${goal.id}`,
+          label: goal.name,
+          description: goal.description,
+          value: goal.kind,
+          actionType: "go_to_step" as const,
+          targetStepId: goal.targetStepId,
+          conversionGoalId: goal.id,
+        })),
+      },
+      ...steps,
+    ];
+  }, [project]);
   const [runtime, setRuntime] = useState<JourneyRuntimeState>(() =>
-    runtimeFromStorage(project, preview, previewGoalId, previewEntryKey, launchContext),
+    runtimeFromStorage(
+      project,
+      preview,
+      previewGoalId,
+      previewEntryKey,
+      launchContext,
+    ),
   );
   const [history, setHistory] = useState<string[]>(() =>
     historyFromStorage(project, preview),
@@ -360,10 +433,16 @@ export function ExperienceCanvas({
       stepId: step.id,
       metadata,
       referrer: document.referrer,
-      utmSource: runtime.attribution?.source || params.get("utm_source") || undefined,
-      utmMedium: runtime.attribution?.medium || params.get("utm_medium") || undefined,
-      utmCampaign: runtime.attribution?.campaign || params.get("utm_campaign") || undefined,
-      utmContent: runtime.attribution?.content || params.get("utm_content") || undefined,
+      utmSource:
+        runtime.attribution?.source || params.get("utm_source") || undefined,
+      utmMedium:
+        runtime.attribution?.medium || params.get("utm_medium") || undefined,
+      utmCampaign:
+        runtime.attribution?.campaign ||
+        params.get("utm_campaign") ||
+        undefined,
+      utmContent:
+        runtime.attribution?.content || params.get("utm_content") || undefined,
       utmTerm: runtime.attribution?.term || params.get("utm_term") || undefined,
       deviceType: matchMedia("(max-width: 700px)").matches
         ? "mobile"
@@ -410,7 +489,11 @@ export function ExperienceCanvas({
       emit("page_view");
       emit("session_started");
       if (runtime.entryPointId) emit("entry_point_loaded");
-      if (runtime.conversionGoalId && runtime.currentStepId !== "__conversion-goals") emit("conversion_goal_resolved");
+      if (
+        runtime.conversionGoalId &&
+        runtime.currentStepId !== "__conversion-goals"
+      )
+        emit("conversion_goal_resolved");
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -419,7 +502,9 @@ export function ExperienceCanvas({
       if (step.type === "recommendation") emit("recommendation_viewed");
     }
   }, [runtime.currentStepId]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (submitted) onComplete?.(); }, [onComplete, submitted]);
+  useEffect(() => {
+    if (submitted) onComplete?.();
+  }, [onComplete, submitted]);
 
   function updateAnswer(key: string, value: string | number | boolean) {
     setRuntime((current) => ({
@@ -488,15 +573,47 @@ export function ExperienceCanvas({
     void fetch("/api/leads", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ...lead, conversionGoalId: runtime.conversionGoalId, entryPointId: runtime.entryPointId, destinationId: runtime.routeResult?.destination?.id, attribution: runtime.attribution, honeypot: "" }),
+      body: JSON.stringify({
+        ...lead,
+        conversionGoalId: runtime.conversionGoalId,
+        entryPointId: runtime.entryPointId,
+        destinationId: runtime.routeResult?.destination?.id,
+        attribution: runtime.attribution,
+        honeypot: "",
+      }),
     }).catch(() => undefined);
     return lead;
   }
 
-  function addOpportunity(sourceType: "lead" | "quote" | "booking" | "order" | "reservation" | "routed_contact", sourceId: string, title: string, input: { summary?: string; estimatedValue?: number; currency?: string; destinationId?: string } = {}) {
-    const opportunity = createOpportunity({ workspaceId: project.workspaceId, projectId: project.id, projectName: project.name, sessionId: runtime.sessionId,
-      sourceType, sourceId, title, conversionGoalId: runtime.conversionGoalId, entryPointId: runtime.entryPointId, destinationId: input.destinationId,
-      attribution: runtime.attribution, visitorData: runtime.answers, summary: input.summary, estimatedValue: input.estimatedValue, currency: input.currency });
+  function addOpportunity(
+    sourceType:
+      "lead" | "quote" | "booking" | "order" | "reservation" | "routed_contact",
+    sourceId: string,
+    title: string,
+    input: {
+      summary?: string;
+      estimatedValue?: number;
+      currency?: string;
+      destinationId?: string;
+    } = {},
+  ) {
+    const opportunity = createOpportunity({
+      workspaceId: project.workspaceId,
+      projectId: project.id,
+      projectName: project.name,
+      sessionId: runtime.sessionId,
+      sourceType,
+      sourceId,
+      title,
+      conversionGoalId: runtime.conversionGoalId,
+      entryPointId: runtime.entryPointId,
+      destinationId: input.destinationId,
+      attribution: runtime.attribution,
+      visitorData: runtime.answers,
+      summary: input.summary,
+      estimatedValue: input.estimatedValue,
+      currency: input.currency,
+    });
     localStore.saveOpportunity({ ...opportunity, id: uid("opportunity") });
     emit("opportunity_created", { sourceType, sourceId });
   }
@@ -581,7 +698,15 @@ export function ExperienceCanvas({
           remoteId || request.id,
         );
         emit("quote_submitted", { quoteId: remoteId || request.id });
-        addOpportunity("quote", remoteId || request.id, `Orçamento · ${definition.title}`, { estimatedValue: request.estimatedMax || request.estimatedMin, currency: request.currency });
+        addOpportunity(
+          "quote",
+          remoteId || request.id,
+          `Orçamento · ${definition.title}`,
+          {
+            estimatedValue: request.estimatedMax || request.estimatedMin,
+            currency: request.currency,
+          },
+        );
         setConfirmation(
           "Orçamento enviado. O negócio recebeu suas respostas e fotos.",
         );
@@ -619,7 +744,13 @@ export function ExperienceCanvas({
           const response = await fetch("/api/public/bookings", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ ...booking, conversionGoalId: runtime.conversionGoalId, entryPointId: runtime.entryPointId, attribution: runtime.attribution, honeypot: "" }),
+            body: JSON.stringify({
+              ...booking,
+              conversionGoalId: runtime.conversionGoalId,
+              entryPointId: runtime.entryPointId,
+              attribution: runtime.attribution,
+              honeypot: "",
+            }),
           });
           const payload = (await response.json()) as {
             error?: { message?: string };
@@ -635,7 +766,9 @@ export function ExperienceCanvas({
           booking.id,
         );
         emit("booking_submitted", { bookingId: booking.id });
-        addOpportunity("booking", booking.id, `Agendamento · ${service.name}`, { summary: booking.startsAt });
+        addOpportunity("booking", booking.id, `Agendamento · ${service.name}`, {
+          summary: booking.startsAt,
+        });
         if (booking.status === "confirmed")
           emit("booking_confirmed", { bookingId: booking.id });
         setConfirmation(
@@ -664,7 +797,16 @@ export function ExperienceCanvas({
           const response = await fetch("/api/public/orders", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ ...order, totals: undefined, conversionGoalId: runtime.conversionGoalId, entryPointId: runtime.entryPointId, activationId: launchContext?.activationId, benefitClaimId: launchContext?.benefitClaimId, benefitClaimCode: launchContext?.benefitClaimCode, attribution: runtime.attribution, honeypot: "" }),
+            body: JSON.stringify({
+              ...order,
+              totals: undefined,
+              conversionGoalId: runtime.conversionGoalId,
+              entryPointId: runtime.entryPointId,
+              activationId: launchContext?.activationId,
+              benefitClaimCode: launchContext?.benefitClaimCode,
+              attribution: runtime.attribution,
+              honeypot: "",
+            }),
           });
           const payload = (await response.json()) as {
             error?: { message?: string };
@@ -686,7 +828,15 @@ export function ExperienceCanvas({
           orderId: order.id,
           total: order.totals.total,
         });
-        addOpportunity("order", order.id, `Pedido · ${order.items.length} item(ns)`, { estimatedValue: order.totals.total, currency: order.totals.currency });
+        addOpportunity(
+          "order",
+          order.id,
+          `Pedido · ${order.items.length} item(ns)`,
+          {
+            estimatedValue: order.totals.total,
+            currency: order.totals.currency,
+          },
+        );
         setConfirmation("Pedido enviado com sucesso.");
       } else if (capability === "reservation") {
         const range = runtime.selectedDateRange;
@@ -723,7 +873,13 @@ export function ExperienceCanvas({
           const response = await fetch("/api/public/reservations", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ ...reservation, conversionGoalId: runtime.conversionGoalId, entryPointId: runtime.entryPointId, attribution: runtime.attribution, honeypot: "" }),
+            body: JSON.stringify({
+              ...reservation,
+              conversionGoalId: runtime.conversionGoalId,
+              entryPointId: runtime.entryPointId,
+              attribution: runtime.attribution,
+              honeypot: "",
+            }),
           });
           const payload = (await response.json()) as {
             error?: { message?: string };
@@ -739,7 +895,16 @@ export function ExperienceCanvas({
           reservation.id,
         );
         emit("reservation_submitted", { reservationId: reservation.id, total });
-        addOpportunity("reservation", reservation.id, `Reserva · ${unit.name}`, { estimatedValue: total, currency: unit.currency, summary: `${reservation.checkIn} → ${reservation.checkOut}` });
+        addOpportunity(
+          "reservation",
+          reservation.id,
+          `Reserva · ${unit.name}`,
+          {
+            estimatedValue: total,
+            currency: unit.currency,
+            summary: `${reservation.checkIn} → ${reservation.checkOut}`,
+          },
+        );
         if (reservation.status === "confirmed")
           emit("reservation_confirmed", { reservationId: reservation.id });
         setConfirmation(
@@ -776,7 +941,13 @@ export function ExperienceCanvas({
           destinationId: result.destination?.id,
           fallback: result.fallback,
         });
-        if (result.destination?.type === "whatsapp" && runtime.conversionGoalId) addOpportunity("routed_contact", `${runtime.sessionId}:${result.destination.id}`, `Contato encaminhado · ${result.destination.label}`, { destinationId: result.destination.id, summary: result.reason });
+        if (result.destination?.type === "whatsapp" && runtime.conversionGoalId)
+          addOpportunity(
+            "routed_contact",
+            `${runtime.sessionId}:${result.destination.id}`,
+            `Contato encaminhado · ${result.destination.label}`,
+            { destinationId: result.destination.id, summary: result.reason },
+          );
         setConfirmation(
           result.destination
             ? `Destino encontrado: ${result.destination.label}.`
@@ -808,8 +979,19 @@ export function ExperienceCanvas({
     if (!step) return;
     emit("option_clicked", { optionId: option.id, value: option.value });
     if (option.conversionGoalId) {
-      setRuntime((current) => ({ ...current, conversionGoalId: option.conversionGoalId, attribution: current.attribution ? { ...current.attribution, conversionGoalId: option.conversionGoalId } : current.attribution }));
-      emit("conversion_goal_selected", { conversionGoalId: option.conversionGoalId });
+      setRuntime((current) => ({
+        ...current,
+        conversionGoalId: option.conversionGoalId,
+        attribution: current.attribution
+          ? {
+              ...current.attribution,
+              conversionGoalId: option.conversionGoalId,
+            }
+          : current.attribution,
+      }));
+      emit("conversion_goal_selected", {
+        conversionGoalId: option.conversionGoalId,
+      });
     }
     if (
       step.type === "form" &&
@@ -861,16 +1043,43 @@ export function ExperienceCanvas({
       const message = buildWhatsAppMessage({
         businessName: project.name,
         interest: step.title,
-        activation: launchContext?.activationId ? { name: "Ativação selecionada" } : undefined,
-        benefitClaim: launchContext?.benefitClaimCode ? { code: launchContext.benefitClaimCode } : undefined,
+        activation: launchContext?.activationId
+          ? { name: "Ativação selecionada" }
+          : undefined,
+        benefitClaim: launchContext?.benefitClaimCode
+          ? { code: launchContext.benefitClaimCode }
+          : undefined,
         answers: {
           ...stringAnswers(runtime.answers),
           ...(cart ? { pedido: cart } : {}),
           ...(recommendation ? { recomendacao: recommendation } : {}),
         },
       });
-      if (!preview && launchContext?.activationId && launchContext.benefitClaimId) {
-        await fetch(`/api/public/activations/${launchContext.activationId}/handoff`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ projectId: project.id, sessionId: runtime.sessionId, claimId: launchContext.benefitClaimId, destinationId: String(option.actionPayload?.destinationId || "") || undefined, locationId: runtime.selectedLocationId, entryPointId: runtime.entryPointId, presencePageId: launchContext.pageId, presenceSectionId: launchContext.sectionId, conversionGoalId: runtime.conversionGoalId }) });
+      if (
+        !preview &&
+        launchContext?.activationId &&
+        launchContext.benefitClaimId
+      ) {
+        await fetch(
+          `/api/public/activations/${launchContext.activationId}/handoff`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              projectId: project.id,
+              sessionId: runtime.sessionId,
+              claimId: launchContext.benefitClaimId,
+              idempotencyKey: `handoff:${runtime.sessionId}:${launchContext.benefitClaimId}`,
+              destinationId:
+                String(option.actionPayload?.destinationId || "") || undefined,
+              locationId: runtime.selectedLocationId,
+              entryPointId: runtime.entryPointId,
+              presencePageId: launchContext.pageId,
+              presenceSectionId: launchContext.sectionId,
+              conversionGoalId: runtime.conversionGoalId,
+            }),
+          },
+        );
       }
       if (!preview)
         window.open(
@@ -930,7 +1139,12 @@ export function ExperienceCanvas({
       },
       result ? "qualification" : undefined,
     );
-    addOpportunity("lead", lead.id, `Contato · ${lead.name || "Novo interesse"}`, { summary: runtime.recommendationKey });
+    addOpportunity(
+      "lead",
+      lead.id,
+      `Contato · ${lead.name || "Novo interesse"}`,
+      { summary: runtime.recommendationKey },
+    );
     emit("form_submitted");
     emit("journey_completed");
     setSubmitted(true);
@@ -1267,7 +1481,10 @@ export function PublicExperience({
   if (project === undefined)
     return (
       <div className="grid min-h-screen place-items-center bg-[#f7f7fa] p-6 text-center">
-        <div role="status" className="flex flex-col items-center gap-3 text-sm font-semibold text-[#74747e]">
+        <div
+          role="status"
+          className="flex flex-col items-center gap-3 text-sm font-semibold text-[#74747e]"
+        >
           <LoaderCircle className="animate-spin text-[#6d5ef5]" />
           Carregando experiência…
         </div>

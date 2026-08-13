@@ -28,12 +28,12 @@ export interface ActivationPlacement {
 }
 export interface ConversionActivation {
   id: string; workspaceId: string; projectId: string; activationKey: string; name: string; description?: string; activationType: ConversionActivationType;
-  status: ConversionActivationStatus; conversionGoalId?: string; defaultDestinationId?: string; title?: string; message?: string; startsAt?: string;
+  status: ConversionActivationStatus; conversionGoalId?: string; defaultDestinationId?: string; destinationMode?: "routing" | "fixed_destination" | "goal_default" | "native"; title?: string; message?: string; startsAt?: string;
   endsAt?: string; timezone: string; priority: number; requiresIdentity: boolean; identityMode: "none" | "phone" | "email" | "phone_or_email";
   identityVerification?: "none" | "otp"; completionChannel?: "native" | "whatsapp" | "external_url" | "email" | "phone";
   eligibility: ActivationEligibility; limits: ActivationLimits; settings: Record<string, unknown> & { conversionPolicy?: ActivationConversionPolicy; claimTtlMinutes?: number; claimAfterActivationEnd?: "honor_until_claim_expiry" | "expire_immediately"; termsText?: string; showRemainingUses?: boolean };
-  offers: ActivationOffer[]; placements: ActivationPlacement[]; entryPointIds?: string[]; locationIds?: string[]; publishedSnapshot?: Record<string, unknown>;
-  publishedAt?: string; version: number; createdAt?: string; updatedAt?: string;
+  offers: ActivationOffer[]; placements: ActivationPlacement[]; entryPointIds?: string[]; locationIds?: string[]; publishedSnapshot?: object;
+  publishedAt?: string; version: number; publishedVersion?: number; createdAt?: string; updatedAt?: string;
 }
 export interface PublicActivation extends Pick<ConversionActivation, "id" | "name" | "title" | "message" | "activationType" | "conversionGoalId" | "defaultDestinationId" | "requiresIdentity" | "identityMode" | "completionChannel" | "startsAt" | "endsAt" | "timezone"> { offer?: Pick<ActivationOffer, "id" | "offerType" | "label" | "description" | "percentage" | "amount" | "specialPrice" | "currency" | "minSubtotal" | "maxDiscount" | "scope">; placements: ActivationPlacement[]; remainingRedemptions?: number }
 export interface ActivationPerformance {
@@ -41,4 +41,4 @@ export interface ActivationPerformance {
   opportunities: number; conversions: number; confirmedValue: number;
   rates: { viewToClaim?: number; claimToRedemption?: number; viewToOpportunity?: number; opportunityToConversion?: number };
 }
-export interface CustomerHistoryCoverage { status: "virou_only" | "historical_import" | "external_sync"; lastUpdatedAt?: string; sourceCount: number }
+export interface CustomerHistoryCoverage { status: "virou_only" | "historical_import" | "external_sync"; lastUpdatedAt?: string; sourceCount: number; importedCustomerCount?: number; successfulBatchCount?: number }

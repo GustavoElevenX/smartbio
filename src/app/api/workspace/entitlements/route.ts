@@ -1,0 +1,2 @@
+import{createServiceClient}from"@/lib/supabase/server";import{apiError,apiSuccess}from"@/server/http/api-response";import{withAuthenticatedActor}from"@/server/http/with-authenticated-actor";import{resolveWorkspaceEntitlements}from"@/server/entitlements/entitlement-resolver";
+export const GET=withAuthenticatedActor(async(_request,_context,actor)=>{const database=createServiceClient();if(!database)return apiError("Banco de dados indisponível.",503,"database_required");return apiSuccess(await resolveWorkspaceEntitlements(database,actor.workspaceId));});

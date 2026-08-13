@@ -1,5 +1,6 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
+import { canUseLocalStore } from "@/lib/runtime-mode";
 
 export interface AIUsageRecord {
   workspaceId: string;
@@ -26,6 +27,7 @@ export function getLocalAIUsage() {
 
 export async function recordAIUsage(record: AIUsageRecord) {
   localUsage.push(record);
+  if (canUseLocalStore()) return;
   const supabase = createServiceClient();
   if (!supabase) return;
   const { error } = await supabase.from("ai_generation_runs").insert({

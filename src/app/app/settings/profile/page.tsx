@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
-import { ProfileSettings } from "@/components/dashboard/settings-panels";
+import { ProfileSettingsReal } from "@/components/account/account-settings-real";
 export const metadata: Metadata = { title: "Perfil" };
-export default function ProfilePage() { return <ProfileSettings />; }
+export default function ProfilePage() {
+  return <ProfileSettingsReal />;
+}

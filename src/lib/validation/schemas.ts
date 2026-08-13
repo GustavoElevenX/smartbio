@@ -84,7 +84,7 @@ export const bookingChangeSchema = z.object({
 });
 
 export const orderRequestSchema = z.object({
-  ...conversionContext,
+  conversionGoalId: shortId.optional(), entryPointId: shortId.optional(), destinationId: shortId.optional(), presencePageId: shortId.optional(), presenceSectionId: shortId.optional(), activationId: z.string().uuid().optional(), attribution: conversionContext.attribution,
   projectId: shortId,
   sessionId: shortId,
   idempotencyKey,
