@@ -2,7 +2,7 @@ import type { PresenceSectionType } from "./presence.types";
 import { presenceSectionContentSchemas } from "./presence-section.schema";
 
 export const presenceSectionRegistry: Record<PresenceSectionType, { label: string; description: string; defaultContent: Record<string, unknown> }> = {
-  hero: { label: "Hero", description: "Proposta principal e ações", defaultContent: { badges: [], alignment: "left" } },
+  hero: { label: "Hero", description: "Proposta principal e ações", defaultContent: { variant: "split", badges: [], alignment: "left" } },
   rich_text: { label: "Texto", description: "Conteúdo editorial", defaultContent: { body: "Conte sua história aqui." } },
   benefits: { label: "Benefícios", description: "Benefícios em destaque", defaultContent: { items: Array.from({ length: 3 }, (_, index) => ({ id: `benefit-${index + 1}`, title: `Benefício ${index + 1}`, description: "Descreva o benefício." })) } },
   feature_grid: { label: "Diferenciais", description: "Grade de diferenciais", defaultContent: { columns: 3, items: Array.from({ length: 3 }, (_, index) => ({ id: `feature-${index + 1}`, title: `Diferencial ${index + 1}`, description: "Descreva o diferencial." })) } },
@@ -11,9 +11,9 @@ export const presenceSectionRegistry: Record<PresenceSectionType, { label: strin
   about: { label: "Sobre", description: "História e posicionamento", defaultContent: { body: "Apresente o negócio.", bullets: [] } },
   stats: { label: "Números", description: "Dados confirmados", defaultContent: { items: [] } },
   logo_cloud: { label: "Logos", description: "Clientes e parceiros", defaultContent: { assetIds: [] } },
-  gallery: { label: "Galeria", description: "Imagens do negócio", defaultContent: { assetIds: [], columns: 3, lightbox: true } },
-  portfolio: { label: "Portfólio", description: "Trabalhos realizados", defaultContent: { assetIds: [], columns: 3, lightbox: true } },
-  testimonials: { label: "Depoimentos", description: "Provas sociais confirmadas", defaultContent: { items: [] } },
+  gallery: { label: "Galeria", description: "Imagens do negócio", defaultContent: { assetIds: [], columns: 3, layout: "grid", lightbox: true } },
+  portfolio: { label: "Portfólio", description: "Trabalhos realizados", defaultContent: { assetIds: [], columns: 3, layout: "grid", lightbox: true } },
+  testimonials: { label: "Depoimentos", description: "Provas sociais confirmadas", defaultContent: { layout: "cards", items: [] } },
   faq: { label: "FAQ", description: "Perguntas frequentes", defaultContent: { items: [] } },
   pricing: { label: "Preços", description: "Planos ou ofertas confirmadas", defaultContent: { items: [] } },
   locations: { label: "Unidades", description: "Localizações comerciais", defaultContent: { showOpeningHours: true, showPhone: true, showMapLink: true } },

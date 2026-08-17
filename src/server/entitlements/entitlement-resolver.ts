@@ -20,6 +20,7 @@ interface OverrideRow {
 const metered = new Set<EntitlementFeature>([
   "projects",
   "presence_pages",
+  "presence_sections_per_page",
   "active_activations",
   "team_members",
   "ai_generations_month",

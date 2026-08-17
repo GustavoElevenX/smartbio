@@ -25,6 +25,8 @@ import type {
   ActivationCompositionInput,
   VirouAIProvider,
   SourceExtractionInput,
+  SiteCompositionInput,
+  OptimizationExplanationInput,
   StructuredAIRequest,
 } from "@/server/ai/ai-provider";
 import { recordAIUsage } from "@/server/ai/ai-usage";
@@ -36,6 +38,10 @@ import { missingQuestionsPrompt } from "@/server/ai/prompts/missing-questions";
 import { presenceCompositionPrompt } from "@/server/ai/prompts/presence-composition";
 import { sourceExtractionPrompt } from "@/server/ai/prompts/source-extraction";
 import { activationCompositionPrompt } from "@/server/ai/prompts/activation-composition";
+import { siteCompositionPrompt } from "@/server/ai/prompts/site-composition";
+import { suggestedSiteStructureSchema } from "@/features/site-composer/site-composer.schema";
+import { optimizationAIExplanationSchema } from "@/features/optimization/schema";
+import { optimizationExplanationPrompt } from "@/server/ai/prompts/optimization-explanation";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
   requireEntitlement,
@@ -51,6 +57,8 @@ const operationFeatures: Record<string, EntitlementFeature> = {
   missing_questions: "ai_business_analysis",
   journey_composition: "ai_journey",
   presence_composition: "ai_presence",
+  site_structure_composition: "ai_structure_suggestions",
+  optimization_explanation: "ai_optimization",
   "activation.compose": "ai_activation",
   copy_generation: "ai_optimization",
   source_extraction: "ai_business_analysis",
@@ -248,6 +256,28 @@ export class OpenAIVirouProvider implements VirouAIProvider {
       schemaName: "presence_draft",
       schema: aiPresenceDraftSchema,
       systemPrompt: presenceCompositionPrompt,
+      payload: input,
+      context: input,
+    });
+  }
+
+  composeSiteStructure(input: SiteCompositionInput) {
+    return this.structured({
+      operation: "site_structure_composition",
+      schemaName: "site_structure",
+      schema: suggestedSiteStructureSchema,
+      systemPrompt: siteCompositionPrompt,
+      payload: input,
+      context: input,
+    });
+  }
+
+  explainOptimization(input: OptimizationExplanationInput) {
+    return this.structured({
+      operation: "optimization_explanation",
+      schemaName: "optimization_explanation",
+      schema: optimizationAIExplanationSchema,
+      systemPrompt: optimizationExplanationPrompt,
       payload: input,
       context: input,
     });

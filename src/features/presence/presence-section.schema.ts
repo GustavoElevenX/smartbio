@@ -7,7 +7,7 @@ const featureItemSchema = z.object({ id: z.string().min(1), title: z.string().mi
 const actionPair = { primaryAction: presenceActionSchema.optional(), secondaryAction: presenceActionSchema.optional() };
 
 export const presenceSectionContentSchemas = {
-  hero: z.object({ media: z.object({ assetId: z.uuid().optional(), position: z.enum(["background", "right", "left"]).default("right") }).optional(), ...actionPair, badges: z.array(z.string().max(60)).max(4).default([]), alignment: z.enum(["left", "center"]).default("left") }),
+  hero: z.object({ variant: z.enum(["split", "centered", "background", "editorial", "product_focus", "minimal", "offer_focus"]).default("split"), media: z.object({ assetId: z.uuid().optional(), position: z.enum(["background", "right", "left"]).default("right") }).optional(), ...actionPair, badges: z.array(z.string().max(60)).max(4).default([]), alignment: z.enum(["left", "center"]).default("left") }),
   rich_text: z.object({ body: z.string().max(12000), action: presenceActionSchema.optional() }),
   benefits: z.object({ items: z.array(featureItemSchema).min(3).max(12) }),
   feature_grid: z.object({ items: z.array(featureItemSchema).min(3).max(12), columns: z.union([z.literal(2), z.literal(3), z.literal(4)]).default(3) }),
@@ -16,9 +16,9 @@ export const presenceSectionContentSchemas = {
   about: z.object({ body: z.string().max(8000), bullets: z.array(z.string().max(180)).max(12).default([]), mediaAssetId: z.uuid().optional(), action: presenceActionSchema.optional() }),
   stats: z.object({ items: z.array(z.object({ id: z.string(), value: z.string().max(40), label: z.string().max(100), verificationStatus: verificationSchema, sourceId: z.string().optional() })).max(8) }),
   logo_cloud: z.object({ assetIds: z.array(z.uuid()).max(20), caption: z.string().max(160).optional() }),
-  gallery: z.object({ assetIds: z.array(z.uuid()).max(30), columns: z.union([z.literal(2), z.literal(3), z.literal(4)]).default(3), lightbox: z.boolean().default(true) }),
-  portfolio: z.object({ assetIds: z.array(z.uuid()).max(30), columns: z.union([z.literal(2), z.literal(3), z.literal(4)]).default(3), lightbox: z.boolean().default(true) }),
-  testimonials: z.object({ items: z.array(z.object({ id: z.string(), quote: z.string().max(1200), author: z.string().optional(), role: z.string().optional(), company: z.string().optional(), avatarAssetId: z.uuid().optional(), verificationStatus: verificationSchema, sourceId: z.string().optional() })).max(12) }),
+  gallery: z.object({ assetIds: z.array(z.uuid()).max(30), columns: z.union([z.literal(2), z.literal(3), z.literal(4)]).default(3), layout: z.enum(["grid", "masonry", "carousel"]).default("grid"), lightbox: z.boolean().default(true) }),
+  portfolio: z.object({ assetIds: z.array(z.uuid()).max(30), columns: z.union([z.literal(2), z.literal(3), z.literal(4)]).default(3), layout: z.enum(["grid", "masonry", "carousel"]).default("grid"), lightbox: z.boolean().default(true) }),
+  testimonials: z.object({ layout: z.enum(["cards", "quote", "carousel"]).default("cards"), items: z.array(z.object({ id: z.string(), quote: z.string().max(1200), author: z.string().optional(), role: z.string().optional(), company: z.string().optional(), avatarAssetId: z.uuid().optional(), verificationStatus: verificationSchema, sourceId: z.string().optional() })).max(12) }),
   faq: z.object({ items: z.array(z.object({ id: z.string(), question: z.string().max(240), answer: z.string().max(3000) })).max(30) }),
   pricing: z.object({ items: z.array(z.object({ id: z.string(), name: z.string(), priceLabel: z.string().optional(), description: z.string().optional(), features: z.array(z.string()).max(20), action: presenceActionSchema.optional(), highlighted: z.boolean().optional(), verificationStatus: verificationSchema })).max(8) }),
   locations: z.object({ locationIds: z.array(z.uuid()).optional(), showOpeningHours: z.boolean().default(true), showPhone: z.boolean().default(true), showMapLink: z.boolean().default(true), nearestAction: presenceActionSchema.optional() }),

@@ -9,3 +9,10 @@ export const optimizationEvidenceSchema = z.object({
   currentRate: z.number().nonnegative(),
   comparisonRate: z.number().nonnegative().optional(),
 });
+
+export const optimizationAIExplanationSchema = z.object({
+  explanation: z.string().trim().min(1).max(1000),
+  recommendedAction: z.string().trim().min(1).max(500),
+});
+
+export type OptimizationAIExplanation = z.infer<typeof optimizationAIExplanationSchema>;

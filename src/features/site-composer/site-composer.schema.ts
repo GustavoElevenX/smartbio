@@ -6,6 +6,7 @@ const sectionTypes = Object.keys(presenceSectionContentSchemas) as [PresenceSect
 
 export const suggestSiteStructureInputSchema = z.object({
   instruction: z.string().trim().max(2_000).default(""),
+  intent: z.enum(["suggest_structure", "create_page", "add_section", "reorganize", "improve_cta", "focus_offer", "create_landing"]).default("suggest_structure"),
   target: z.enum(["site", "page"]),
   pageId: z.string().min(1).optional(),
 }).superRefine((value, context) => {
@@ -20,6 +21,11 @@ export const suggestedSectionSchema = z.object({
   conversionGoalId: z.string().optional(),
   priority: z.enum(["essential", "recommended", "optional"]),
   reasoning: z.string().min(1).max(600),
+}).superRefine((section, context) => {
+  const parsed = presenceSectionContentSchemas[section.sectionType].safeParse(section.suggestedContent);
+  if (!parsed.success && Object.keys(section.suggestedContent).length > 0) {
+    parsed.error.issues.forEach((issue) => context.addIssue({ ...issue, path: ["suggestedContent", ...issue.path] }));
+  }
 });
 
 export const suggestedSiteStructureSchema = z.object({

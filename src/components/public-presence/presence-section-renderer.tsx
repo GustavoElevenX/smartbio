@@ -191,36 +191,39 @@ export function PresenceSectionRenderer({
   if (section.type === "hero") {
     const image = asset(project, content.media?.assetId);
     const visual = appearance(project, section);
+    const variant = content.variant || (content.alignment === "center" ? "centered" : "split");
+    const backgroundImage = variant === "background" || content.media?.position === "background" ? image : undefined;
+    const centered = variant === "centered" || content.alignment === "center";
+    const showSideImage = image && !backgroundImage && variant !== "minimal" ? image : undefined;
+    const imageFirst = content.media?.position === "left" || variant === "product_focus";
     return (
       <section
         id={section.anchor}
         data-radius={section.style.radius}
         data-media-treatment={section.style.mediaTreatment}
         style={visual.style}
-        className={`presence-section relative isolate bg-cover bg-center px-5 md:px-8 ${sectionSpacing(page, section)} ${toneClasses(visual.tone)} ${visual.background ? "text-white" : ""}`}
+        data-hero-variant={variant}
+        className={`presence-section relative isolate overflow-hidden bg-cover bg-center px-5 md:px-8 ${variant === "minimal" ? "py-16 md:py-20" : sectionSpacing(page, section)} ${toneClasses(visual.tone)} ${visual.background || backgroundImage ? "text-white" : ""}`}
       >
-        {visual.background ? (
+        {backgroundImage ? <Image src={backgroundImage.url} alt="" fill priority sizes="100vw" className="-z-20 object-cover" /> : null}
+        {visual.background || backgroundImage ? (
           <span
             aria-hidden
             className={`absolute inset-0 -z-10 ${visual.tone === "dark" || visual.tone === "brand" ? "bg-black/55" : "bg-black/45"}`}
           />
         ) : null}
         <div
-          className={`mx-auto grid min-h-[480px] items-center gap-12 ${image && content.alignment !== "center" ? "md:grid-cols-2" : "md:grid-cols-1"} ${sectionWidth(page, section)}`}
+          className={`mx-auto grid items-center ${variant === "minimal" ? "min-h-[360px]" : "min-h-[480px]"} ${variant === "editorial" ? "gap-8 md:grid-cols-[1.2fr_.8fr]" : showSideImage && !centered ? "gap-12 md:grid-cols-2" : "md:grid-cols-1"} ${sectionWidth(page, section)}`}
         >
           <div
-            className={
-              content.alignment === "center"
-                ? "text-center md:col-span-2 md:mx-auto md:max-w-4xl"
-                : ""
-            }
+            className={`${centered ? "text-center md:col-span-2 md:mx-auto md:max-w-4xl" : ""} ${imageFirst && showSideImage ? "md:order-2" : ""} ${variant === "offer_focus" ? "rounded-2xl bg-white p-7 text-[#17161b] shadow-[0_24px_70px_rgba(15,23,42,.22)] md:p-10" : ""}`}
           >
             {section.eyebrow ? (
               <p className="mb-4 text-xs font-black uppercase tracking-[.2em] text-[var(--presence-primary)]">
                 {section.eyebrow}
               </p>
             ) : null}
-            <h1 className="text-balance text-5xl font-black leading-[.98] tracking-[-.04em] md:text-7xl">
+            <h1 className={`text-balance font-black leading-[.98] tracking-[-.04em] ${variant === "editorial" ? "text-5xl md:text-8xl" : variant === "minimal" ? "text-4xl md:text-6xl" : "text-5xl md:text-7xl"}`}>
               {section.title || page.title || project.name}
             </h1>
             <p className="mt-6 max-w-2xl text-pretty text-lg leading-8 text-[var(--presence-section-muted,var(--presence-muted))] md:text-xl">
@@ -246,14 +249,14 @@ export function PresenceSectionRenderer({
               secondary={content.secondaryAction}
             />
           </div>
-          {image && content.alignment !== "center" ? (
+          {showSideImage && !centered ? (
             <div
               data-presence-media
-              className="relative aspect-[4/5] overflow-hidden bg-black/5 shadow-2xl"
+              className={`relative overflow-hidden bg-black/5 shadow-[0_28px_80px_rgba(15,23,42,.24)] ${imageFirst ? "md:order-1" : ""} ${variant === "editorial" ? "aspect-[3/4] md:-rotate-2" : variant === "product_focus" ? "aspect-square" : "aspect-[4/5]"}`}
             >
               <Image
-                src={image.url}
-                alt={image.alt}
+                src={showSideImage.url}
+                alt={showSideImage.alt}
                 fill
                 priority
                 sizes="(max-width: 768px) 100vw, 50vw"
@@ -328,16 +331,14 @@ export function PresenceSectionRenderer({
         (!content.serviceIds?.length || content.serviceIds.includes(item.id)),
     );
     return wrap(
-      <div
-        className={`grid gap-4 ${content.layout === "list" ? "md:grid-cols-1" : "md:grid-cols-3"}`}
-      >
-        {chosen.map((service) => {
+      <div className={`grid gap-4 ${content.layout === "list" ? "md:grid-cols-1" : content.layout === "featured" ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
+        {chosen.map((service, index) => {
           const image = asset(project, service.imageAssetId);
           const activation = publicActivations.find((candidate) => candidate.placements.some((placement) => placement.placementType === "service_badge") && (!candidate.offer?.scope.serviceOfferingIds?.length || candidate.offer.scope.serviceOfferingIds.includes(service.id)));
           return (
             <article
               key={service.id}
-              className="overflow-hidden rounded-3xl border border-black/10 bg-white text-[#17161b] shadow-sm"
+              className={`overflow-hidden rounded-3xl border border-black/10 bg-white text-[#17161b] shadow-sm ${content.layout === "featured" && index === 0 ? "md:col-span-2 md:grid md:grid-cols-2" : content.layout === "list" ? "md:grid md:grid-cols-[minmax(220px,32%)_1fr]" : ""}`}
             >
               {image ? (
                 <div data-presence-media className="relative aspect-[16/10]">
@@ -393,8 +394,8 @@ export function PresenceSectionRenderer({
       .slice(0, content.maxItems || 8);
     const catalogPage = project.presence?.pages.find((candidate) => candidate.isActive && candidate.id !== page.id && (candidate.key.includes("catalog") || candidate.name.toLocaleLowerCase("pt-BR").includes("catálogo")));
     return wrap(
-      <><div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {chosen.map((item) => {
+      <><div className={content.layout === "carousel" ? "flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4" : `grid gap-4 ${content.layout === "featured" ? "grid-cols-1 md:grid-cols-3" : "grid-cols-2 md:grid-cols-4"}`}>
+        {chosen.map((item, index) => {
           const image = asset(project, item.imageAssetId);
           const activation = publicActivations.find((candidate) => candidate.placements.some((placement) => placement.placementType === "product_badge") && (!candidate.offer?.scope.catalogItemIds?.length || candidate.offer.scope.catalogItemIds.includes(item.id)));
           const action: PresenceAction = activation ? { type: "start_activation", label: "Quero aproveitar", activationId: activation.id, style: "primary" } : {
@@ -407,7 +408,7 @@ export function PresenceSectionRenderer({
           return (
             <article
               key={item.id}
-              className="overflow-hidden rounded-3xl border border-black/10 bg-white text-[#17161b]"
+              className={`overflow-hidden rounded-3xl border border-black/10 bg-white text-[#17161b] ${content.layout === "carousel" ? "w-[78%] shrink-0 snap-center sm:w-[46%] md:w-[30%]" : ""} ${content.layout === "featured" && index === 0 ? "md:col-span-2 md:row-span-2" : ""}`}
             >
               {image ? (
                 <div data-presence-media className="relative aspect-square">
@@ -529,17 +530,17 @@ export function PresenceSectionRenderer({
     const images = (content.assetIds || [])
       .map((id: string) => asset(project, id))
       .filter(Boolean);
-    return wrap(<GalleryLightbox images={images} />);
+    return wrap(<GalleryLightbox images={images} layout={content.layout || "grid"} columns={content.columns || 3} />);
   }
   if (section.type === "testimonials")
     return wrap(
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className={content.layout === "carousel" ? "flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4" : content.layout === "quote" ? "mx-auto max-w-4xl" : "grid gap-4 md:grid-cols-3"}>
         {(content.items || [])
           .filter((item: any) => verified(item.verificationStatus))
           .map((item: any) => (
             <figure
               key={item.id}
-              className="rounded-3xl border border-black/10 bg-white p-6 text-[#17161b]"
+              className={`rounded-3xl border border-black/10 bg-white text-[#17161b] ${content.layout === "quote" ? "p-8 text-xl md:p-12 md:text-2xl" : "p-6"} ${content.layout === "carousel" ? "w-[86%] shrink-0 snap-center md:w-[45%]" : ""}`}
             >
               <Quote className="text-[var(--presence-primary)]" />
               <blockquote className="mt-5 leading-7">“{item.quote}”</blockquote>

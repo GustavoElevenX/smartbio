@@ -39,15 +39,32 @@ function ActionEditor({
   onChange(action?: PresenceAction): void;
   labelText?: string;
 }) {
-  const current =
-    action ||
-    ({
+  const defaultAction = {
       type: "start_conversion_goal",
       label: "Começar",
       conversionGoalId: project.conversionGoals?.find((goal) => goal.isActive)
         ?.id,
       style: "primary",
-    } satisfies PresenceAction);
+    } satisfies PresenceAction;
+  if (!action) {
+    return (
+      <fieldset className="rounded-2xl border border-dashed border-[#d8d4e6] p-3">
+        <legend className="px-1 text-xs font-black">{labelText}</legend>
+        <p className="text-xs leading-5 text-[#746f7d]">
+          Nenhuma ação configurada nesta posição.
+        </p>
+        <button
+          type="button"
+          onClick={() => onChange(defaultAction)}
+          className="mt-3 inline-flex min-h-9 items-center rounded-xl bg-[#eeeafe] px-3 text-xs font-black text-[#5e50d1]"
+        >
+          <Plus size={14} className="mr-1.5" />
+          Adicionar ação
+        </button>
+      </fieldset>
+    );
+  }
+  const current = action;
   return (
     <fieldset className="rounded-2xl border border-[#e3e1e9] p-3">
       <legend className="px-1 text-xs font-black">{labelText}</legend>
@@ -519,22 +536,17 @@ function CommercialEditor(props: EditorProps) {
           </label>
         ))}
       </div>
-      <label className={`${label} mt-3`}>
-        Layout
-        <select
-          className={input}
-          value={content.layout || "grid"}
-          onChange={(event) =>
-            patchContent(props, { layout: event.target.value })
-          }
-        >
-          <option value="grid">Grade</option>
-          <option value="list">Lista</option>
-          <option value="featured">Destaque</option>
-        </select>
-      </label>
     </div>
   );
+}
+
+function SectionLayoutEditor(props: EditorProps) {
+  const content = props.section.content as any;
+  if (props.section.type === "hero") return <div className="grid gap-3"><label className={label}>Composição<select className={input} value={content.variant || "split"} onChange={(event) => patchContent(props, { variant: event.target.value })}><option value="split">Dividido</option><option value="centered">Centralizado</option><option value="background">Imagem de fundo</option><option value="editorial">Editorial</option><option value="product_focus">Foco no produto</option><option value="minimal">Minimalista</option><option value="offer_focus">Foco na oferta</option></select></label><label className={label}>Posição da imagem<select className={input} value={content.media?.position || "right"} onChange={(event) => patchContent(props, { media: { ...(content.media || {}), position: event.target.value } })}><option value="right">Direita</option><option value="left">Esquerda</option><option value="background">Fundo</option></select></label></div>;
+  if (props.section.type === "products" || props.section.type === "services") return <label className={label}>Layout<select className={input} value={content.layout || "grid"} onChange={(event) => patchContent(props, { layout: event.target.value })}><option value="grid">Grade</option>{props.section.type === "services" ? <option value="list">Lista</option> : null}<option value="featured">Destaque</option>{props.section.type === "products" ? <option value="carousel">Carrossel</option> : null}</select></label>;
+  if (props.section.type === "testimonials") return <label className={label}>Layout<select className={input} value={content.layout || "cards"} onChange={(event) => patchContent(props, { layout: event.target.value })}><option value="cards">Cards</option><option value="quote">Citação</option><option value="carousel">Carrossel</option></select></label>;
+  if (props.section.type === "gallery" || props.section.type === "portfolio") return <label className={label}>Layout<select className={input} value={content.layout || "grid"} onChange={(event) => patchContent(props, { layout: event.target.value })}><option value="grid">Grade</option><option value="masonry">Mosaico</option><option value="carousel">Carrossel</option></select></label>;
+  return null;
 }
 function MediaEditor(props: EditorProps) {
   const content = props.section.content as any;
@@ -685,7 +697,7 @@ export const sectionEditorRegistry: Record<
   divider: SimpleEditor,
 };
 
-export function SectionInspector(props: EditorProps) {
+export function SectionInspector(props: EditorProps & { appearanceOnly?: boolean }) {
   const Editor = sectionEditorRegistry[props.section.type];
   const backgroundAssets = (props.project.mediaAssets || []).filter(
     (asset) =>
@@ -699,6 +711,7 @@ export function SectionInspector(props: EditorProps) {
     });
   return (
     <div className="flex flex-col gap-4">
+      {!props.appearanceOnly ? <>
       <div className="grid gap-3">
         <label className={label}>
           Sobrancelha
@@ -763,8 +776,9 @@ export function SectionInspector(props: EditorProps) {
       ) : null}
       <div className="h-px bg-[#e8e6ed]" />
       {Editor(props)}
-      <div className="h-px bg-[#e8e6ed]" />
-      <fieldset>
+      </> : null}
+      {props.appearanceOnly ? <SectionLayoutEditor {...props} /> : null}
+      {props.appearanceOnly ? <fieldset>
         <legend className="mb-3 text-xs font-black uppercase tracking-[.12em] text-[#77727e]">
           Aparência
         </legend>
@@ -889,7 +903,7 @@ export function SectionInspector(props: EditorProps) {
             </select>
           </label>
         </div>
-      </fieldset>
+      </fieldset> : null}
     </div>
   );
 }

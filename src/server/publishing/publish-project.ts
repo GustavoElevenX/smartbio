@@ -9,6 +9,8 @@ import { createCommercialNotification } from "@/server/notifications/notificatio
 import { loadProjectForActor } from "@/server/projects/load-project-for-actor";
 import type { DataRequirement, Project } from "@/types";
 import { revalidatePath } from "next/cache";
+import { requireEntitlement } from "@/server/entitlements/require-entitlement";
+import { DEFAULT_CATALOG_THRESHOLDS } from "@/features/site-composer/catalog-strategy";
 
 function addBlocking(
   readiness: ProjectReadinessResult,
@@ -145,6 +147,9 @@ export async function publishProject(
   if (actor.persistence === "database") {
     const supabase = createServiceClient();
     if (!supabase) throw new Error("Supabase não configurado.");
+    if ((prepared.project.commercialConfig?.catalogItems?.length || 0) > DEFAULT_CATALOG_THRESHOLDS.featuredMax) {
+      await requireEntitlement({ database: supabase, workspaceId: actor.workspaceId, feature: "catalog_large" });
+    }
     const { data: row } = await supabase
       .from("projects")
       .select("settings")

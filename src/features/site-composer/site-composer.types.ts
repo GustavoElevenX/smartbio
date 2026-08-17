@@ -32,6 +32,15 @@ export interface SuggestedSection {
   reasoning: string;
 }
 
+export type SiteComposerIntent =
+  | "suggest_structure"
+  | "create_page"
+  | "add_section"
+  | "reorganize"
+  | "improve_cta"
+  | "focus_offer"
+  | "create_landing";
+
 export interface SuggestedPage {
   type: PresencePageType;
   name: string;
@@ -70,6 +79,8 @@ export interface SiteStructureProposal {
   operations: SiteOperation[];
   createdAt: string;
   status: "pending" | "applied" | "dismissed" | "outdated";
+  instruction?: string;
+  usedAI?: boolean;
 }
 
 export interface CatalogStrategyThresholds {

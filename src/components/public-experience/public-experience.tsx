@@ -1041,7 +1041,7 @@ export function ExperienceCanvas({
         : undefined;
       const recommendation =
         step.recommendation?.title || runtime.recommendationKey;
-      const message = buildWhatsAppMessage({
+      let message = buildWhatsAppMessage({
         businessName: project.name,
         interest: step.title,
         activation: launchContext?.activationId
@@ -1081,6 +1081,54 @@ export function ExperienceCanvas({
             }),
           },
         );
+      } else if (!preview) {
+        const handoffFields = project.steps
+          .flatMap((candidate) => candidate.formFields || [])
+          .filter((field) => field.includeInHandoff);
+        const response = await fetch("/api/public/handoff", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            projectId: project.id,
+            sessionId: runtime.sessionId,
+            destinationId:
+              String(option.actionPayload?.destinationId || "") || undefined,
+            context: {
+              projectId: project.id,
+              conversionGoalId: runtime.conversionGoalId,
+              origin: {
+                entryPointId: runtime.entryPointId,
+                source: runtime.attribution?.source,
+                campaign: runtime.attribution?.campaign,
+                pageId: launchContext?.pageId,
+              },
+              identity: {
+                name: String(runtime.answers.name || "") || undefined,
+                phone: String(runtime.answers.phone || "") || undefined,
+                email: String(runtime.answers.email || "") || undefined,
+              },
+              intent: {
+                label: step.title,
+                productIds: runtime.cart.items.map((item) => item.itemId),
+                serviceIds: runtime.selectedOfferIds,
+                locationId: runtime.selectedLocationId,
+              },
+              qualification: handoffFields.map((field) => ({
+                label: field.handoffLabel || field.label,
+                value: String(runtime.answers[field.key] ?? ""),
+                include: Boolean(
+                  runtime.answers[field.key] !== undefined &&
+                    runtime.answers[field.key] !== "",
+                ),
+              })),
+              benefit: launchContext?.benefitClaimCode
+                ? { code: launchContext.benefitClaimCode }
+                : undefined,
+            },
+          }),
+        });
+        const payload = await response.json().catch(() => null) as { data?: { message?: string } } | null;
+        if (response.ok && payload?.data?.message) message = payload.data.message;
       }
       if (!preview)
         window.open(

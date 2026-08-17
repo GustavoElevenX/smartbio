@@ -1,11 +1,13 @@
 import type { z } from "zod";
 import type { ResponseInputContent } from "openai/resources/responses/responses";
-import type { AttributionContext, BrandProfile, BusinessCapabilityProfile, ConversionGoal, ExperienceCompositionInput, MediaAsset, Project, ProjectCapability } from "@/types";
+import type { AttributionContext, BrandProfile, BusinessCapabilityProfile, ConversionGoal, ExperienceCompositionInput, MediaAsset, OptimizationSuggestion, Project, ProjectCapability } from "@/types";
 import type { AIPresenceDraft } from "@/features/presence/ai-presence.schema";
 import type { AIJourneyDraftPayload } from "@/features/composition/composition.schema";
 import type { BrandAIResult, BusinessAnalysisResult, CopyGenerationResult, ExtractedBusinessSource, SetupQuestion } from "@/features/ai-setup/ai-setup.schema";
 import type { AIActivationDraft } from "@/features/activations/ai-activation.schema";
 import type { ConversionActivation } from "@/features/activations/activation.types";
+import type { BusinessShape, SuggestedSiteStructure } from "@/features/site-composer/site-composer.types";
+import type { OptimizationAIExplanation } from "@/features/optimization/schema";
 
 export interface AIRequestContext {
   workspaceId: string;
@@ -68,6 +70,19 @@ export interface PresenceCompositionInput extends AIRequestContext {
   objective?: string;
   campaignContext?: AttributionContext;
 }
+export interface SiteCompositionInput extends AIRequestContext {
+  instruction: string;
+  target: "site" | "page";
+  pageId?: string;
+  businessShape: BusinessShape;
+  plannerSuggestion: SuggestedSiteStructure;
+  currentSite: Project["presence"];
+  business: Pick<Project, "name" | "description" | "category" | "audience" | "primaryGoal" | "visualDirection" | "brand" | "businessProfile" | "conversionGoals" | "commercialConfig">;
+}
+export interface OptimizationExplanationInput extends AIRequestContext {
+  project: Pick<Project, "name" | "category" | "audience" | "primaryGoal">;
+  suggestion: Pick<OptimizationSuggestion, "title" | "explanation" | "evidence">;
+}
 export interface ActivationCompositionInput extends AIRequestContext { businessProfile: unknown; conversionGoals: Project["conversionGoals"]; catalogSummary: Array<{id:string;name:string;price?:number}>; serviceSummary:Array<{id:string;name:string}>; locations:Array<{id:string;name:string}>; presencePages:Array<{id:string;name:string}>; activeActivations:Pick<ConversionActivation,"id"|"name"|"activationType"|"startsAt"|"endsAt">[]; instruction:string }
 
 export interface VirouAIProvider {
@@ -75,6 +90,8 @@ export interface VirouAIProvider {
   generateMissingQuestions(input: MissingQuestionInput): Promise<SetupQuestion[]>;
   composeJourney(input: JourneyAIInput): Promise<AIJourneyDraftPayload>;
   composePresence(input: PresenceCompositionInput): Promise<AIPresenceDraft>;
+  composeSiteStructure(input: SiteCompositionInput): Promise<SuggestedSiteStructure>;
+  explainOptimization(input: OptimizationExplanationInput): Promise<OptimizationAIExplanation>;
   composeActivation(input: ActivationCompositionInput): Promise<AIActivationDraft>;
   generateCopy(input: CopyGenerationInput): Promise<CopyGenerationResult>;
   extractSource(input: SourceExtractionInput): Promise<ExtractedBusinessSource>;

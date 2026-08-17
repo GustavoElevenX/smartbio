@@ -1,6 +1,6 @@
 import type { AnalyticsEvent, ConversionGoal, OptimizationSuggestion } from "@/types";
 import { goalDropoffRule } from "./rules";
-export function buildOptimizationSuggestions(projectId: string, goals: ConversionGoal[], events: AnalyticsEvent[], publishedAt = events[0]?.createdAt): OptimizationSuggestion[] {
+export function buildOptimizationSuggestions(projectId: string, goals: ConversionGoal[], events: AnalyticsEvent[], publishedAt?: string): OptimizationSuggestion[] {
   const totalSessions = new Set(events.map((event) => event.sessionId)).size;
   const periodStart = events[0]?.createdAt || new Date().toISOString();
   const periodEnd = events.at(-1)?.createdAt || periodStart;

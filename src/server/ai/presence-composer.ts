@@ -7,6 +7,7 @@ import type { AuthenticatedActor } from "@/server/auth/setup-actor";
 import { loadProjectForActor } from "@/server/projects/load-project-for-actor";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { Project } from "@/types";
+import { requireEntitlement } from "@/server/entitlements/require-entitlement";
 
 const inputSchema = z.object({ requestedSurface: z.enum(["business_site", "landing_page"]), objective: z.string().max(1000).optional(), campaignContext: z.record(z.string(), z.unknown()).optional(), projectSnapshot: z.custom<Project>().optional() });
 function containsMarkup(value: unknown): boolean { if (typeof value === "string") return /<\/?[a-z][^>]*>|<script|javascript:/i.test(value); if (Array.isArray(value)) return value.some(containsMarkup); return Boolean(value && typeof value === "object" && Object.values(value).some(containsMarkup)); }
@@ -20,6 +21,7 @@ export async function composePresence(actor: AuthenticatedActor, projectId: stri
   let verifiedFacts: Array<{ key: string; value: unknown; sourceId?: string; verificationStatus: string }> = [];
   if (actor.persistence === "database") {
     const database = createServiceClient();
+    if (database) await requireEntitlement({ database, workspaceId: actor.workspaceId, feature: "ai_page_edits" });
     const { data } = database ? await database.from("business_source_facts").select("fact_key,fact_value,source_id,verification_status,business_sources!inner(project_id)").eq("business_sources.project_id", projectId).eq("verification_status", "verified") : { data: [] };
     verifiedFacts = (data || []).map((fact) => ({ key: String(fact.fact_key), value: fact.fact_value, sourceId: fact.source_id ? String(fact.source_id) : undefined, verificationStatus: String(fact.verification_status) }));
   }
