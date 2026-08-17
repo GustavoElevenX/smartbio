@@ -16,8 +16,9 @@ export async function GET(
   const { projectId } = await params;
   const actor = await requireAuthenticatedActor();
   await assertProjectAccess(actor, projectId, "read");
+  const database = actor.persistence === "database" ? createServiceClient() : null;
   return apiSuccess({
-    activations: await new ActivationService(createServiceClient()).list(
+    activations: await new ActivationService(database).list(
       projectId,
     ),
   });

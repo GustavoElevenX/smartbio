@@ -71,6 +71,7 @@ export function LeadsDashboard({ projectId }: { projectId: string }) {
       ),
     [leads, query, status],
   );
+  const answerLabels = useMemo(() => new Map(project?.steps.flatMap((step) => step.formFields || []).map((field) => [field.key, field.label]) || []), [project]);
   function changeStatus(lead: Lead, value: Lead["status"]) {
     void commercialRepository.updateLead(lead.id, { status: value });
     const next = leads.map((item) =>
@@ -324,6 +325,7 @@ export function LeadsDashboard({ projectId }: { projectId: string }) {
                 ["Telefone", selected.phone],
                 ["Origem", selected.source],
                 ["Campanha", selected.campaign],
+                ["Capturado em", formatDate(selected.createdAt)],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-[15px] bg-[#f5f4f8] p-4">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-[#85858f]">
@@ -418,7 +420,7 @@ export function LeadsDashboard({ projectId }: { projectId: string }) {
                     className="rounded-[15px] border border-[#e4e3ea] p-4"
                   >
                     <span className="text-[10px] font-bold uppercase tracking-wider text-[#85858f]">
-                      {key.replaceAll("_", " ")}
+                      {answerLabels.get(key) || key.replaceAll("_", " ")}
                     </span>
                     <strong className="mt-1 block text-sm">{value}</strong>
                   </div>

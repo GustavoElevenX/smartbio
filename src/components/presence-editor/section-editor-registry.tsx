@@ -2,7 +2,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- editors operate on content already validated by the section-specific Zod registry */
 
 import { Plus, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import type { Project } from "@/types";
+import type { ConversionActivation } from "@/features/activations/activation.types";
 import type {
   PresenceAction,
   PresencePage,
@@ -39,6 +41,16 @@ function ActionEditor({
   onChange(action?: PresenceAction): void;
   labelText?: string;
 }) {
+  const [activations, setActivations] = useState<ConversionActivation[]>([]);
+  useEffect(() => {
+    let active = true;
+    void fetch(`/api/projects/${project.id}/activations`, { cache: "no-store" })
+      .then(async (response) => response.ok ? response.json() as Promise<{ data?: { activations?: ConversionActivation[] } }> : undefined)
+      .then((payload) => { if (active) setActivations(payload?.data?.activations || []); })
+      .catch(() => { if (active) setActivations([]); });
+    return () => { active = false; };
+  }, [project.id]);
+  const selectableActivations = activations.filter((item) => (item.status === "active" || item.status === "scheduled") && item.conversionGoalId);
   const defaultAction = {
       type: "start_conversion_goal",
       label: "Começar",
@@ -85,6 +97,7 @@ function ActionEditor({
           <option value="scroll_to_section">Rolar para seção</option>
           <option value="open_url">Abrir URL</option>
           <option value="open_whatsapp">Abrir WhatsApp</option>
+          <option value="start_activation">Iniciar ativação</option>
         </select>
       </label>
       <label className={`${label} mt-3`}>
@@ -119,6 +132,20 @@ function ActionEditor({
                 </option>
               ))}
           </select>
+        </label>
+      ) : null}
+      {current.type === "start_activation" ? (
+        <label className={`${label} mt-3`}>
+          Ativação publicada
+          <select
+            className={input}
+            value={current.activationId || ""}
+            onChange={(event) => onChange({ ...current, activationId: event.target.value || undefined })}
+          >
+            <option value="">Selecione</option>
+            {selectableActivations.map((activation) => <option key={activation.id} value={activation.id}>{activation.name} · {activation.status === "active" ? "ativa" : "agendada"}</option>)}
+          </select>
+          {!selectableActivations.length ? <span className="mt-2 block text-[11px] font-semibold leading-5 text-amber-700">Não há ativação ativa ou agendada com meta de conversão.</span> : null}
         </label>
       ) : null}
       {current.type === "go_to_presence_page" ? (
@@ -168,6 +195,7 @@ function ActionEditor({
         <>
           <label className={`${label} mt-3`}>
             Telefone
+            {project.phone ? <button type="button" className="float-right text-[11px] text-[#5e50d1]" onClick={() => onChange({ ...current, whatsappPhone: project.phone })}>Usar padrão</button> : null}
             <input
               className={input}
               value={current.whatsappPhone || ""}

@@ -1,6 +1,7 @@
 import { evaluateCapabilityRequirements } from "@/features/capabilities/capability-requirements";
 import type { CapabilityKey, DataRequirement, Project } from "@/types";
 import { getPresenceReadinessIssues } from "@/features/presence/presence-readiness";
+import { formFieldIssues } from "@/features/forms/form-field-utils";
 
 export interface ProjectReadinessResult {
   score: number;
@@ -102,6 +103,10 @@ export function getProjectReadiness(project: Project): ProjectReadinessResult {
 
   const stepIds = new Set(project.steps.map((step) => step.id));
   for (const step of project.steps.filter((item) => item.isActive)) {
+    for (const field of step.formFields || []) {
+      const fieldIssue = formFieldIssues(field, step.formFields || [field])[0];
+      if (fieldIssue) issues.push(requirement(project, `step.${step.id}.field.${field.id}`, "Campo de formulário inválido", `${field.label || "Campo sem rótulo"}: ${fieldIssue}`));
+    }
     for (const option of step.options || []) {
       if (!option.actionType) {
         issues.push(requirement(project, `step.${step.id}.cta`, "CTA sem destino", `O CTA “${option.label}” não possui ação.`));
@@ -118,7 +123,10 @@ export function getProjectReadiness(project: Project): ProjectReadinessResult {
       if (option.actionType === "open_url" && !isHttpUrl(option.actionPayload?.url)) {
         issues.push(requirement(project, `step.${step.id}.url.${option.id}`, "URL inválida", `O CTA “${option.label}” precisa de uma URL HTTP ou HTTPS válida.`));
       }
-      if (option.actionType === "open_whatsapp" && !isPhone(option.actionPayload?.phone)) {
+      const whatsappDestination = project.commercialConfig?.routingDestinations?.find(
+        (destination) => destination.id === option.actionPayload?.destinationId && destination.type === "whatsapp",
+      );
+      if (option.actionType === "open_whatsapp" && !isPhone(whatsappDestination?.value || option.actionPayload?.phone || project.phone)) {
         issues.push(requirement(project, `step.${step.id}.phone.${option.id}`, "Telefone inválido", `O CTA “${option.label}” precisa de um telefone real.`));
       }
     }

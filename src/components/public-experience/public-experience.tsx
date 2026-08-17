@@ -1035,13 +1035,16 @@ export function ExperienceCanvas({
     }
     if (option.actionType === "open_whatsapp") {
       emit("whatsapp_clicked");
-      const phone = String(option.actionPayload?.phone || project.phone || "");
+      const configuredDestination = project.commercialConfig?.routingDestinations?.find(
+        (destination) => destination.id === option.actionPayload?.destinationId && destination.type === "whatsapp",
+      );
+      const phone = String(configuredDestination?.value || option.actionPayload?.phone || project.phone || "");
       const cart = runtime.cart.items.length
         ? `Pedido: ${runtime.cart.items.map((item) => `${item.quantity}x ${item.name}`).join(", ")}`
         : undefined;
       const recommendation =
         step.recommendation?.title || runtime.recommendationKey;
-      let message = buildWhatsAppMessage({
+      let message = String(option.actionPayload?.message || "") || buildWhatsAppMessage({
         businessName: project.name,
         interest: step.title,
         activation: launchContext?.activationId
@@ -1224,14 +1227,23 @@ export function ExperienceCanvas({
     "--foreground": palette.foreground,
     "--muted": palette.muted,
     "--muted-fg": palette.mutedForeground,
-    "--border": palette.border,
+    "--border": project.designSystem.cards.style === "flat" ? "transparent" : (project.designSystem.cards.borderColor || palette.border),
     "--destructive": palette.destructive,
     "--card-radius": `${project.designSystem.shape.cardRadius}px`,
     "--button-radius": `${project.designSystem.shape.buttonRadius}px`,
     "--input-radius": `${project.designSystem.shape.inputRadius}px`,
-    "--card-shadow": project.designSystem.elevation.cardShadow,
+    "--card-shadow": project.designSystem.cards.style === "elevated" ? project.designSystem.elevation.cardShadow : project.designSystem.cards.style === "glass" ? "0 16px 45px rgba(15,23,42,.12)" : "none",
   } as React.CSSProperties;
   const blocks = step.blocks || [];
+  const primaryButtonClass = project.designSystem.buttons.style === "outline"
+    ? "border-[var(--primary)] bg-transparent text-[var(--primary)]"
+    : project.designSystem.buttons.style === "soft"
+      ? "border-transparent bg-[var(--muted)] text-[var(--primary)]"
+      : project.designSystem.buttons.style === "glass"
+        ? "border-white/40 bg-white/20 text-[var(--foreground)] backdrop-blur"
+        : project.designSystem.buttons.style === "gradient"
+          ? "border-transparent bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-[var(--primary-fg)]"
+          : "border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-fg)]";
 
   return (
     <div
@@ -1389,7 +1401,7 @@ export function ExperienceCanvas({
                     className={cn(
                       "group flex min-h-14 w-full items-center gap-3 rounded-[var(--button-radius)] border p-3.5 text-left text-sm font-bold transition active:scale-[.99] disabled:opacity-60",
                       index === 0
-                        ? "border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-fg)]"
+                        ? primaryButtonClass
                         : "border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)]",
                     )}
                   >

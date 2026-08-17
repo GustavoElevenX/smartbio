@@ -11,6 +11,7 @@ import type { DataRequirement, Project } from "@/types";
 import { revalidatePath } from "next/cache";
 import { requireEntitlement } from "@/server/entitlements/require-entitlement";
 import { DEFAULT_CATALOG_THRESHOLDS } from "@/features/site-composer/catalog-strategy";
+import { getSectionActions } from "@/features/presence/presence-page-utils";
 
 function addBlocking(
   readiness: ProjectReadinessResult,
@@ -46,6 +47,14 @@ async function serverReadiness(
       actionLabel: "Abrir biblioteca",
       actionPath: `/app/projects/${project.id}/media`,
     });
+  }
+
+  const activationIds = [...new Set((project.presence?.pages || []).flatMap((page) => page.sections.flatMap((section) => getSectionActions(section).filter((action) => action.type === "start_activation").map((action) => action.activationId).filter((id): id is string => Boolean(id)))))];
+  if (activationIds.length) {
+    const { data: activations, error: activationError } = await supabase.from("conversion_activations").select("id,status,conversion_goal_id,published_at").eq("project_id", project.id).in("id", activationIds);
+    if (activationError) throw activationError;
+    const usable = new Set((activations || []).filter((item) => ["active", "scheduled"].includes(item.status) && item.conversion_goal_id && item.published_at).map((item) => item.id));
+    for (const id of activationIds.filter((item) => !usable.has(item))) readiness = addBlocking(readiness, { id: `${project.id}:presence.activation.${id}`, key: `presence.activation.${id}`, label: "CTA sem ativação válida", capability: "project", status: "invalid", severity: "blocking", reason: "Selecione uma ativação ativa ou agendada, publicada e conectada a uma meta de conversão.", actionLabel: "Corrigir", actionPath: `/app/projects/${project.id}/site` });
   }
 
   const sourceIds = [...new Set((project.dataRequirements || [])

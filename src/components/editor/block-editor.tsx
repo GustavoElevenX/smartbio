@@ -3,10 +3,14 @@
 import { Braces, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Label, Select, Textarea } from "@/components/ui/field";
+import { Input, Label, Select, Textarea } from "@/components/ui/field";
 import { parseBlockContent } from "@/components/public-experience/blocks/block-schemas";
 import { uid } from "@/lib/utils";
-import type { ContentBlock, ContentBlockType, JourneyStep } from "@/types";
+import type { ContentBlock, ContentBlockType, JourneyStep, Project } from "@/types";
+
+const blockLabels: Record<ContentBlockType, string> = {
+  text: "Texto", image: "Imagem", video: "Vídeo", choice_grid: "Grade de escolhas", choice_list: "Lista de escolhas", benefits: "Benefícios", testimonial: "Depoimento", form: "Formulário", recommendation_card: "Recomendação", cta_group: "Grupo de botões", location_card: "Unidade", product_cards: "Produtos", schedule_slots: "Horários", media_upload: "Envio de mídia", quantity_selector: "Quantidade", price_estimate: "Estimativa de preço", service_selector: "Seletor de serviços", resource_selector: "Seletor de recursos", calendar: "Calendário", date_range: "Período", guest_selector: "Hóspedes", availability_results: "Disponibilidade", reservable_unit_cards: "Opções de reserva", catalog_categories: "Categorias do catálogo", catalog_item_cards: "Itens do catálogo", cart_summary: "Resumo do carrinho", fulfillment_selector: "Entrega ou retirada", location_selector: "Seletor de unidades", route_result: "Resultado do roteamento", policy_card: "Política", deposit_card: "Sinal", booking_summary: "Resumo da reserva", quote_summary: "Resumo do orçamento",
+};
 
 const addableBlocks: ContentBlockType[] = [
   "text",
@@ -55,9 +59,13 @@ function defaultContent(type: ContentBlockType): Record<string, unknown> {
 
 export function BlockEditor({
   step,
+  project,
+  mode,
   onChange,
 }: {
   step: JourneyStep;
+  project: Project;
+  mode: "quick" | "advanced";
   onChange: (step: JourneyStep) => void;
 }) {
   const [type, setType] = useState<ContentBlockType>("text");
@@ -81,7 +89,7 @@ export function BlockEditor({
       </div>
       <div className="space-y-3">
         {blocks.map((block) => (
-          <JsonBlock
+          mode === "advanced" ? <JsonBlock
             key={block.id}
             block={block}
             onUpdate={(content) => update(block, content)}
@@ -91,7 +99,7 @@ export function BlockEditor({
                 blocks: blocks.filter((item) => item.id !== block.id),
               })
             }
-          />
+          /> : <QuickBlock key={block.id} block={block} step={step} project={project} onUpdate={(content) => update(block, content)} onRemove={() => onChange({ ...step, blocks: blocks.filter((item) => item.id !== block.id) })} />
         ))}
       </div>
       <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
@@ -102,7 +110,7 @@ export function BlockEditor({
         >
           {addableBlocks.map((item) => (
             <option key={item} value={item}>
-              {item.replaceAll("_", " ")}
+              {blockLabels[item]}
             </option>
           ))}
         </Select>
@@ -124,6 +132,27 @@ export function BlockEditor({
       </div>
     </div>
   );
+}
+
+const quickTypes = new Set<ContentBlockType>(["text", "form", "choice_grid", "service_selector", "catalog_categories", "catalog_item_cards", "fulfillment_selector", "location_selector"]);
+
+function QuickBlock({ block, step, project, onUpdate, onRemove }: { block: ContentBlock; step: JourneyStep; project: Project; onUpdate(content: Record<string, unknown>): string; onRemove(): void }) {
+  const content = block.content || {};
+  const [error, setError] = useState("");
+  const commit = (next: Record<string, unknown>) => setError(onUpdate(next));
+  const services = project.commercialConfig?.serviceOfferings?.filter((item) => item.isActive) || [];
+  return <div className="rounded-[15px] border border-[#e3e2e9] bg-[#fafafd] p-3"><div className="mb-3 flex items-center justify-between"><strong className="text-[11px] uppercase tracking-wider text-[#5e52ce]">{blockLabels[block.type]}</strong><button type="button" onClick={onRemove} className="text-[#b84545]" aria-label={`Remover ${blockLabels[block.type]}`}><Trash2 size={15} /></button></div>
+    {block.type === "text" ? <div><Label htmlFor={`block-text-${block.id}`}>Texto</Label><Textarea id={`block-text-${block.id}`} className="min-h-24" value={String(content.text || "")} onChange={(event) => commit({ ...content, text: event.target.value })} /></div> : null}
+    {block.type === "form" ? <p className="text-xs leading-5 text-[#6f6d78]">Usa os {step.formFields?.length || 0} campos configurados no construtor visual desta etapa.</p> : null}
+    {block.type === "choice_grid" ? <p className="text-xs leading-5 text-[#6f6d78]">Usa as {step.options?.length || 0} opções da etapa e seus destinos configurados.</p> : null}
+    {block.type === "service_selector" ? <div className="grid gap-3"><div><Label htmlFor={`service-key-${block.id}`}>Chave da resposta</Label><Input id={`service-key-${block.id}`} value={String(content.fieldKey || "service")} onChange={(event) => commit({ ...content, fieldKey: event.target.value })} /></div><fieldset><legend className="mb-2 text-xs font-bold">Serviços exibidos</legend><div className="grid gap-2">{services.map((service) => { const selected = Array.isArray(content.services) && content.services.some((item) => typeof item === "object" && item && "id" in item && item.id === service.id); return <label key={service.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={selected} onChange={(event) => { const current = Array.isArray(content.services) ? content.services.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object")) : []; const next = event.target.checked ? [...current, { id: service.id, name: service.name }] : current.filter((item) => item.id !== service.id); commit({ ...content, services: next, options: undefined }); }} className="accent-[#6658d9]" />{service.name}</label>; })}</div></fieldset></div> : null}
+    {block.type === "catalog_categories" ? <p className="text-xs leading-5 text-[#6f6d78]">Exibe automaticamente {project.commercialConfig?.catalogCategories?.length || 0} categorias ativas do catálogo.</p> : null}
+    {block.type === "catalog_item_cards" ? <p className="text-xs leading-5 text-[#6f6d78]">Exibe automaticamente {project.commercialConfig?.catalogItems?.filter((item) => item.isAvailable).length || 0} itens disponíveis.</p> : null}
+    {block.type === "fulfillment_selector" ? <p className="text-xs leading-5 text-[#6f6d78]">Mostra as opções de entrega e retirada habilitadas para o catálogo.</p> : null}
+    {block.type === "location_selector" ? <div><Label htmlFor={`location-key-${block.id}`}>Chave da resposta</Label><Input id={`location-key-${block.id}`} value={String(content.fieldKey || "location")} onChange={(event) => commit({ ...content, fieldKey: event.target.value })} /><p className="mt-2 text-xs text-[#777580]">{project.commercialConfig?.locations?.filter((item) => item.isActive).length || 0} unidades ativas disponíveis.</p></div> : null}
+    {!quickTypes.has(block.type) ? <p className="text-xs leading-5 text-[#6f6d78]">Este bloco usa os dados publicados do negócio. Abra o modo Avançado para editar sua configuração técnica.</p> : null}
+    {error ? <small className="mt-2 block text-[#b84545]">{error}</small> : null}
+  </div>;
 }
 
 function JsonBlock({

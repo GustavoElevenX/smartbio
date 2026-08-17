@@ -60,6 +60,6 @@ export function ActivationRuntimeProvider({ projectId, pageId, activations, chil
     {announcement ? <ActivationAnnouncementBar activation={announcement.activation} content={announcement.placement.content} onClick={() => startActivation(announcement.activation.id)} /> : null}
     {children}
     {floating ? <ActivationFloatingCta activation={floating.activation} content={floating.placement.content} onClick={() => startActivation(floating.activation.id)} /> : null}
-    {pending ? <ActivationClaimDialog activation={pending} projectId={projectId} sessionId={runtimeId(projectId)} pageId={pageId} onClose={() => setPending(undefined)} onSuccess={(next) => { setClaim(next); setPending(undefined); launcher.open({ goalId: pending.conversionGoalId, activationId: pending.id, benefitClaimId: next.id, benefitClaimCode: next.code, pageId }); }} /> : null}
+    {pending ? <ActivationClaimDialog activation={pending} projectId={projectId} sessionId={runtimeId(projectId)} pageId={pageId} onClose={() => setPending(undefined)} onContinueWithoutBenefit={() => { const activation = pending; setPending(undefined); launcher.open({ goalId: activation.conversionGoalId, activationId: activation.id, pageId }); }} onSuccess={(next) => { setClaim(next); setPending(undefined); launcher.open({ goalId: pending.conversionGoalId, activationId: pending.id, benefitClaimId: next.id, benefitClaimCode: next.code, pageId }); }} /> : null}
   </Context.Provider>;
 }

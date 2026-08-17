@@ -25,6 +25,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select, Textarea } from "@/components/ui/field";
 import { BlockEditor } from "@/components/editor/block-editor";
+import { FormBuilder } from "@/components/editor/form-builder";
 import { CapabilityPanel } from "@/components/editor/capability-panel";
 import { AIFieldActions } from "@/components/editor/ai-field-actions";
 import { AIScopeActions } from "@/components/editor/ai-scope-actions";
@@ -399,8 +400,8 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
           {project.status === "published" ? "Publicar alterações" : "Publicar"}
         </Button>
       </div>
-      <div className="grid min-h-0 flex-1 xl:grid-cols-[280px_minmax(390px,1fr)_360px]">
-        <aside className="order-2 border-r border-[#e5e4eb] bg-[#fafafd] xl:order-1">
+      <div className="grid min-h-0 min-w-0 flex-1 xl:grid-cols-[280px_minmax(390px,1fr)_360px]">
+        <aside className="order-2 min-w-0 border-r border-[#e5e4eb] bg-[#fafafd] xl:order-1">
           <div className="flex items-center justify-between border-b border-[#e7e6ed] p-4">
             <div>
               <strong className="text-sm">Etapas</strong>
@@ -488,7 +489,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
             </button>
           </div>
         </aside>
-        <section className="order-1 flex min-h-[720px] items-center justify-center overflow-hidden bg-[#efedf4] p-5 xl:order-2 xl:min-h-0">
+        <section className="order-1 flex min-h-[720px] min-w-0 items-center justify-center overflow-hidden bg-[#efedf4] p-5 xl:order-2 xl:min-h-0">
           <div className="relative w-full max-w-[390px]">
             <div className="mb-3 flex items-center justify-between gap-3 text-xs font-semibold text-[#777781]">
               <span className="inline-flex items-center gap-2">
@@ -509,7 +510,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
             </div>
           </div>
         </section>
-        <aside className="order-3 border-l border-[#e5e4eb] bg-white">
+        <aside className="order-3 min-w-0 border-l border-[#e5e4eb] bg-white">
           <div className="flex items-center justify-between border-b border-[#e7e6ed] px-5 py-4">
             <div>
               <strong className="block text-sm">
@@ -654,9 +655,19 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
                                           ? "start_capability"
                                           : (value as typeof option.actionType),
                                       targetStepId: isStep ? value : undefined,
-                                      actionPayload: capability
+                                      actionPayload: (capability
                                         ? { capability }
-                                        : item.actionPayload,
+                                        : value === "open_whatsapp"
+                                          ? (() => {
+                                              const destination = project.commercialConfig?.routingDestinations?.find((candidate) => candidate.type === "whatsapp");
+                                              return {
+                                                ...(destination ? { destinationId: destination.id, phone: destination.value || "" } : { phone: project.phone || "" }),
+                                                message: "",
+                                              };
+                                            })()
+                                          : value === "open_url"
+                                            ? { url: "" }
+                                            : undefined) as Record<string, string | number | boolean> | undefined,
                                     }
                                   : item,
                               ),
@@ -684,11 +695,34 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
                             ))}
                         </Select>
                       </div>
+                      {option.actionType === "open_url" ? (
+                        <div className="mt-3">
+                          <Label htmlFor={`option-url-${option.id}`}>URL de destino</Label>
+                          <Input
+                            id={`option-url-${option.id}`}
+                            type="url"
+                            placeholder="https://exemplo.com"
+                            value={String(option.actionPayload?.url || "")}
+                            onChange={(event) => updateStep({ options: selected.options?.map((item) => item.id === option.id ? { ...item, actionPayload: { ...(item.actionPayload || {}), url: event.target.value } } : item) })}
+                          />
+                          {option.actionPayload?.url && !/^https?:\/\//i.test(String(option.actionPayload.url)) ? <p className="mt-1 text-xs font-semibold text-red-600">Use uma URL completa iniciada por http:// ou https://.</p> : null}
+                        </div>
+                      ) : null}
+                      {option.actionType === "open_whatsapp" ? (
+                        <div className="mt-3 grid gap-3">
+                          {(project.commercialConfig?.routingDestinations || []).some((destination) => destination.type === "whatsapp") ? <div><Label htmlFor={`option-destination-${option.id}`}>Destino configurado</Label><Select id={`option-destination-${option.id}`} value={String(option.actionPayload?.destinationId || "")} onChange={(event) => { const destination = project.commercialConfig?.routingDestinations?.find((item) => item.id === event.target.value); updateStep({ options: selected.options?.map((item) => item.id === option.id ? { ...item, actionPayload: { ...(item.actionPayload || {}), destinationId: destination?.id || "", phone: destination?.value || String(item.actionPayload?.phone || "") } } : item) }); }}><option value="">Telefone manual</option>{(project.commercialConfig?.routingDestinations || []).filter((destination) => destination.type === "whatsapp").map((destination) => <option key={destination.id} value={destination.id}>{destination.label}</option>)}</Select></div> : null}
+                          <div><div className="mb-2 flex items-center justify-between"><Label htmlFor={`option-phone-${option.id}`}>Telefone</Label>{project.phone ? <button type="button" className="text-xs font-bold text-[#6053d5]" onClick={() => updateStep({ options: selected.options?.map((item) => item.id === option.id ? { ...item, actionPayload: { ...(item.actionPayload || {}), phone: project.phone || "", destinationId: "" } } : item) })}>Usar padrão</button> : null}</div><Input id={`option-phone-${option.id}`} inputMode="tel" placeholder="5511999999999" value={String(option.actionPayload?.phone || "")} onChange={(event) => updateStep({ options: selected.options?.map((item) => item.id === option.id ? { ...item, actionPayload: { ...(item.actionPayload || {}), phone: event.target.value, destinationId: "" } } : item) })} /></div>
+                          <div><Label htmlFor={`option-message-${option.id}`}>Mensagem inicial</Label><Textarea id={`option-message-${option.id}`} className="min-h-20" placeholder="Olá! Quero saber mais." value={String(option.actionPayload?.message || "")} onChange={(event) => updateStep({ options: selected.options?.map((item) => item.id === option.id ? { ...item, actionPayload: { ...(item.actionPayload || {}), message: event.target.value } } : item) })} /></div>
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                 </div>
               </div>
             )}
+            {selected.type === "form" ? (
+              <FormBuilder project={activeProject} step={selected} onChange={(next) => updateStep(next)} />
+            ) : null}
             {selected.recommendation && (
               <div className="mt-6 rounded-[16px] border border-[#e3e2e9] p-4">
                 <Label>Título da recomendação</Label>
@@ -721,15 +755,24 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
             )}
             <BlockEditor
               step={selected}
+              project={activeProject}
+              mode={mode}
               onChange={(next) => updateStep(next)}
             />
-            {mode === "advanced" && (
+            {(
               <div className="mt-7 border-t border-[#e5e4eb] pt-6">
                 <div className="flex items-center gap-2">
                   <Palette size={17} className="text-[#6255d8]" />
                   <h3 className="text-sm font-extrabold">
                     Design da experiência
                   </h3>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-2" aria-label="Presets visuais">
+                  {[
+                    { name: "Minimal", colors: ["#17171c", "#f7f7f8"], heading: "Inter", radius: 10 },
+                    { name: "Editorial", colors: ["#5946c8", "#fbf8f2"], heading: "DM Sans", radius: 4 },
+                    { name: "Expressivo", colors: ["#6d3df2", "#f4f0ff"], heading: "Sora", radius: 24 },
+                  ].map((preset) => <button key={preset.name} type="button" onClick={() => commit((current) => ({ ...current, designSystem: { ...current.designSystem, colors: ensureAccessiblePalette(buildPalette(preset.colors)), typography: { ...current.designSystem.typography, headingFont: preset.heading }, shape: { ...current.designSystem.shape, cardRadius: preset.radius, buttonRadius: preset.radius } } }))} className="min-h-10 rounded-xl border border-[#dfdee7] bg-white px-2 text-[11px] font-bold hover:border-[#8f84f7]">{preset.name}</button>)}
                 </div>
                 <div className="mt-5 grid grid-cols-3 gap-2">
                   {["primary", "background", "surface"].map((key) => (
@@ -791,6 +834,18 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
                     ].map((font) => (
                       <option key={font}>{font}</option>
                     ))}
+                  </Select>
+                </div>
+                <div className="mt-5">
+                  <Label htmlFor="body-font">Tipografia do corpo</Label>
+                  <Select id="body-font" value={project.designSystem.typography.bodyFont} onChange={(event) => commit((current) => ({ ...current, designSystem: { ...current.designSystem, typography: { ...current.designSystem.typography, bodyFont: event.target.value } } }))}>
+                    {["Inter", "Manrope", "Plus Jakarta Sans", "Poppins", "Sora", "DM Sans", "Outfit"].map((font) => <option key={font}>{font}</option>)}
+                  </Select>
+                </div>
+                <div className="mt-5">
+                  <Label htmlFor="buttons">Estilo dos botões</Label>
+                  <Select id="buttons" value={project.designSystem.buttons.style} onChange={(event) => commit((current) => ({ ...current, designSystem: { ...current.designSystem, buttons: { ...current.designSystem.buttons, style: event.target.value as Project["designSystem"]["buttons"]["style"] } } }))}>
+                    <option value="solid">Sólido</option><option value="outline">Contornado</option><option value="soft">Suave</option><option value="glass">Translúcido</option><option value="gradient">Gradiente</option>
                   </Select>
                 </div>
                 <div className="mt-5">
