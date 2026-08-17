@@ -731,6 +731,8 @@ export interface FormField {
   placeholder?: string;
   required: boolean;
   options?: string[];
+  includeInHandoff?: boolean;
+  handoffLabel?: string;
 }
 
 export interface ContentBlock {

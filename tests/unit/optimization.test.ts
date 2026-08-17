@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { hasEnoughEvidence } from "@/features/optimization/evidence";
+import { getOptimizationEvidenceState, hasEnoughEvidence } from "@/features/optimization/evidence";
 import { goalDropoffRule } from "@/features/optimization/rules";
 describe("optimization thresholds", () => {
   it("requires 30 business sessions and 15 goal sessions", () => { expect(hasEnoughEvidence(29, 20)).toBe(false); expect(hasEnoughEvidence(30, 14)).toBe(false); expect(hasEnoughEvidence(30, 15)).toBe(true); });
   it("never suggests without enough evidence", () => expect(goalDropoffRule({ projectId: "p", goalId: "g", goalName: "Comprar", totalSessions: 29, goalSessions: 20, actionSessions: 1 })).toBeNull());
+  it.each([
+    [29, 1000, undefined, false],
+    [30, 10, undefined, false],
+    [30, 30, undefined, true],
+    [30, 30, 10, false],
+    [30, 30, 15, true],
+  ])("gates evidence for %i days, %i sessions and %s goal sessions", (days, totalSessions, goalSessions, eligible) => {
+    const publishedAt = "2026-01-01T00:00:00.000Z";
+    const periodEnd = new Date(new Date(publishedAt).getTime() + days * 86_400_000).toISOString();
+    expect(getOptimizationEvidenceState({ publishedAt, periodStart: publishedAt, periodEnd, totalSessions, goalSessions }).eligible).toBe(eligible);
+  });
 });

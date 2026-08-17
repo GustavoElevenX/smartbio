@@ -21,6 +21,8 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Brand } from "@/components/ui/brand";
 import { PublishReadinessModal } from "@/components/publishing/publish-readiness-modal";
 import { PublicPresencePage } from "@/components/public-presence/public-presence-page";
 import { projectRepository } from "@/lib/repositories/project-repository";
@@ -45,6 +47,7 @@ import type {
 } from "@/features/presence/presence.types";
 import type { Project } from "@/types";
 import { SectionInspector } from "./section-editor-registry";
+import type { SiteOperation, SuggestedSiteStructure } from "@/features/site-composer/site-composer.types";
 
 type SaveState = "saved" | "dirty" | "saving" | "error";
 type Device = "desktop" | "tablet" | "mobile";
@@ -54,6 +57,7 @@ type AIProposal = {
   draft: AIPresenceDraft;
   targetSectionId?: string;
 };
+type StructureProposal = { proposalId: string; suggestion: SuggestedSiteStructure; operations: SiteOperation[]; expectedVersion: number };
 
 function materializeAISection(
   draft: AIPresenceDraft["sections"][number],
@@ -96,6 +100,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
   const [pageMenuOpen, setPageMenuOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiProposal, setAiProposal] = useState<AIProposal>();
+  const [structureProposal, setStructureProposal] = useState<StructureProposal>();
   const [aiError, setAiError] = useState("");
   const [undo, setUndo] = useState<PresencePage[][]>([]);
   const [redo, setRedo] = useState<PresencePage[][]>([]);
@@ -384,6 +389,32 @@ export function SiteEditor({ projectId }: { projectId: string }) {
       setAiLoading(false);
     }
   }
+  async function requestStructure() {
+    if (!project) return;
+    setAiLoading(true);
+    setAiError("");
+    try {
+      const response = await fetch(`/api/ai/projects/${project.id}/site/suggest-structure`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ instruction: "Organize o site para apresentar a oferta e conduzir ao objetivo comercial principal.", target: "site" }) });
+      const payload = await response.json() as { data?: StructureProposal; error?: { message?: string } };
+      if (!response.ok || !payload.data) throw new Error(payload.error?.message || "Não foi possível sugerir a estrutura.");
+      setStructureProposal(payload.data);
+    } catch (error) { setAiError(error instanceof Error ? error.message : "Não foi possível sugerir a estrutura."); }
+    finally { setAiLoading(false); }
+  }
+  async function applyStructureProposal() {
+    if (!project || !structureProposal) return;
+    setAiLoading(true);
+    try {
+      const response = await fetch(`/api/projects/${project.id}/site/apply-proposal`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ proposalId: structureProposal.proposalId, selectedOperations: structureProposal.operations.map((operation) => operation.id), expectedVersion: structureProposal.expectedVersion }) });
+      const payload = await response.json() as { data?: { pages?: PresencePage[] }; error?: { message?: string } };
+      if (!response.ok) throw new Error(payload.error?.message || "Não foi possível aplicar a proposta.");
+      const refreshed = await projectRepository.getProject(project.id);
+      if (refreshed) { setProject(refreshed); setPages(refreshed.presence?.pages || []); }
+      setStructureProposal(undefined);
+      setMessage("Proposta aplicada somente ao rascunho. Revise antes de publicar.");
+    } catch (error) { setAiError(error instanceof Error ? error.message : "Não foi possível aplicar a proposta."); }
+    finally { setAiLoading(false); }
+  }
   function applyAIProposal() {
     if (!aiProposal || !activePage) return;
     if (aiProposal.kind === "section" && aiProposal.targetSectionId) {
@@ -475,9 +506,10 @@ export function SiteEditor({ projectId }: { projectId: string }) {
     );
 
   return (
-    <div className="-m-4 min-h-[calc(100vh-73px)] bg-[#efeff3] sm:-m-6 lg:-m-8">
-      <div className="flex h-16 items-center gap-3 border-b border-[#dedde5] bg-white px-4">
-        <div className="min-w-0">
+    <div className="-m-4 min-h-[calc(100vh-73px)] bg-[#f1f5f9] sm:-m-6 lg:-m-8">
+      <div className="flex h-16 items-center gap-2 border-b border-[#dfe6ee] bg-white px-3 sm:gap-3 sm:px-4">
+        <Brand className="mr-1 shrink-0" />
+        <div className="hidden min-w-0 md:block">
           <div className="flex items-center gap-2">
             <h1 className="truncate text-sm font-black">
               Site · {project.name}
@@ -498,8 +530,9 @@ export function SiteEditor({ projectId }: { projectId: string }) {
                   : "Salvo"}
           </p>
         </div>
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex shrink-0 items-center gap-1">
           <Button
+            className="hidden sm:inline-flex"
             size="icon"
             variant="ghost"
             aria-label="Desfazer"
@@ -509,6 +542,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
             <Undo2 size={17} />
           </Button>
           <Button
+            className="hidden sm:inline-flex"
             size="icon"
             variant="ghost"
             aria-label="Refazer"
@@ -528,6 +562,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
             return (
               <Button
                 key={item}
+                className={item === "mobile" ? "" : "hidden sm:inline-flex"}
                 size="icon"
                 variant={device === item ? "secondary" : "ghost"}
                 aria-label={`Visualização ${item}`}
@@ -580,8 +615,8 @@ export function SiteEditor({ projectId }: { projectId: string }) {
           {message}
         </div>
       ) : null}
-      <div className="grid min-h-[calc(100vh-137px)] grid-cols-1 xl:grid-cols-[240px_minmax(520px,1fr)_320px]">
-        <aside className="hidden border-r border-[#dedde5] bg-[#f8f8fa] xl:block">
+      <div className="grid min-h-[calc(100vh-137px)] grid-cols-1 xl:grid-cols-[240px_minmax(380px,1fr)_320px]">
+        <aside className="hidden border-r border-[#dfe6ee] bg-white xl:block">
           <div className="relative flex items-center justify-between border-b border-[#e4e2e9] px-4 py-3">
             <strong className="text-xs uppercase tracking-[.12em] text-[#77727e]">
               Páginas
@@ -620,7 +655,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
                   setSelectedPageId(page.id);
                   setSelectedSectionId(undefined);
                 }}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-bold ${page.id === activePage?.id ? "bg-[#e9e6ff] text-[#5547c8]" : "text-[#5f5b67] hover:bg-[#efeff3]"}`}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-bold ${page.id === activePage?.id ? "bg-[#e8f4ff] text-[#1263c5]" : "text-[#5f6673] hover:bg-[#f1f5f9]"}`}
               >
                 <span className="grid size-7 place-items-center rounded-lg bg-white text-[10px] shadow-sm">
                   {page.isHome ? "⌂" : "P"}
@@ -631,6 +666,27 @@ export function SiteEditor({ projectId }: { projectId: string }) {
                 ) : null}
               </button>
             ))}
+          </div>
+          <div className="mx-3 mt-4 border-t border-[#e3e9ef] pt-4">
+            <div className="flex items-center justify-between px-1">
+              <strong className="text-xs uppercase tracking-[.12em] text-[#697180]">Seções</strong>
+              <span className="text-[10px] font-bold text-[#8b94a1]">{activePage?.sections.length || 0}</span>
+            </div>
+            <div className="mt-2 space-y-1" data-testid="site-section-list">
+              {activePage?.sections.toSorted((a, b) => a.order - b.order).map((section) => (
+                <div key={section.id} draggable onDragStart={() => { draggedSectionId.current = section.id; }} onDragOver={(event) => event.preventDefault()} onDrop={() => dropSection(section.id)}>
+                  <button type="button" onClick={() => setSelectedSectionId(section.id)} onKeyDown={(event) => { if (event.altKey && event.key === "ArrowUp") moveSection(section.id, -1); if (event.altKey && event.key === "ArrowDown") moveSection(section.id, 1); }} className={`flex min-h-10 w-full items-center gap-2 rounded-xl px-2 text-left text-xs font-bold ${section.id === activeSection?.id ? "bg-[#e8f4ff] text-[#1263c5]" : "text-[#505866] hover:bg-[#f1f5f9]"}`}>
+                    <GripVertical size={14} className="cursor-grab text-[#a6afbb]" />
+                    <span className="min-w-0 flex-1 truncate">{section.title || presenceSectionRegistry[section.type].label}</span>
+                    {!section.isActive ? <Eye size={13} className="opacity-40" /> : null}
+                  </button>
+                </div>
+              ))}
+            </div>
+            <details className="mt-3">
+              <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-[#b9cce1] px-3 text-xs font-black text-[#1263c5]"><Plus size={14} />Adicionar seção</summary>
+              <div className="mt-2 grid grid-cols-2 gap-1">{Object.entries(presenceSectionRegistry).map(([type, definition]) => <button type="button" key={type} onClick={() => addSection(type as PresenceSectionType)} className="rounded-lg p-2 text-left text-[11px] font-bold hover:bg-[#eef6ff]">{definition.label}</button>)}</div>
+            </details>
           </div>
           <div className="mx-3 mt-3 border-t border-[#e3e1e8] pt-3">
             <button
@@ -657,9 +713,9 @@ export function SiteEditor({ projectId }: { projectId: string }) {
             </button>
           </div>
         </aside>
-        <section className="min-w-0 bg-[#e8e8ed] p-4 md:p-7">
+        <section className="min-w-0 bg-[#e9eff5] p-4 md:p-7">
           <div
-            className="mx-auto overflow-auto rounded-[22px] border border-[#d7d5de] bg-[#dad9df] p-3 shadow-inner"
+            className="mx-auto overflow-auto rounded-[22px] border border-[#cfdae5] bg-[#dde6ee] p-3 shadow-inner"
             style={{ maxWidth: viewport[device] + 26 }}
           >
             <div
@@ -676,7 +732,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
             </div>
           </div>
         </section>
-        <aside className="border-l border-[#dedde5] bg-white">
+        <aside className="border-l border-[#dfe6ee] bg-white">
           <div className="border-b border-[#e6e4eb] px-4 py-3">
             <div className="flex items-center justify-between">
               <strong className="text-xs uppercase tracking-[.12em] text-[#77727e]">
@@ -722,7 +778,14 @@ export function SiteEditor({ projectId }: { projectId: string }) {
               ) : null}
             </div>
           </div>
-          <div className="max-h-[calc(100vh-185px)] overflow-y-auto p-4">
+          <Tabs defaultValue="content" className="max-h-[calc(100vh-185px)] overflow-y-auto">
+            <TabsList className="sticky top-0 z-10 grid h-auto w-full grid-cols-4 rounded-none border-b border-[#e3e9ef] bg-white p-2">
+              <TabsTrigger value="content" className="px-2 text-xs">Conteúdo</TabsTrigger>
+              <TabsTrigger value="visual" className="px-2 text-xs">Visual</TabsTrigger>
+              <TabsTrigger value="conversion" className="px-2 text-xs">Conversão</TabsTrigger>
+              <TabsTrigger value="data" className="px-2 text-xs">Dados</TabsTrigger>
+            </TabsList>
+            <TabsContent value="content" className="m-0 p-4">
             {activeSection && activePage ? (
               <SectionInspector
                 project={previewProject!}
@@ -795,7 +858,19 @@ export function SiteEditor({ projectId }: { projectId: string }) {
                 </div>
               </details>
             </div>
-          </div>
+            </TabsContent>
+            <TabsContent value="visual" className="m-0 p-4">
+              <div className="rounded-2xl border border-[#dfe7ef] bg-[#f8fbfe] p-4"><strong className="text-sm">Visual controlado</strong><p className="mt-2 text-xs leading-5 text-[#66717e]">Ajuste os presets de largura, espaçamento, fundo e mídia no conteúdo selecionado. CSS arbitrário não é aceito.</p></div>
+            </TabsContent>
+            <TabsContent value="conversion" className="m-0 p-4">
+              <div className="rounded-2xl border border-[#dbe8f5] bg-[#eff7ff] p-4"><strong className="text-sm">Objetivo da página</strong><p className="mt-2 text-xs leading-5 text-[#5d6c7b]">{activePage?.defaultConversionGoalId ? "Esta página está conectada a um objetivo mensurável." : "Conecte esta página a um objetivo antes de publicar."}</p></div>
+              {activePage ? <label className="mt-4 block text-xs font-bold text-[#555f6b]">Objetivo principal<select value={activePage.defaultConversionGoalId || ""} onChange={(event) => updatePage({ ...activePage, defaultConversionGoalId: event.target.value || undefined })} className="mt-2 min-h-11 w-full rounded-xl border border-[#d9e1e9] bg-white px-3 text-sm"><option value="">Selecionar objetivo</option>{project.conversionGoals?.filter((goal) => goal.isActive).map((goal) => <option key={goal.id} value={goal.id}>{goal.name}</option>)}</select></label> : null}
+            </TabsContent>
+            <TabsContent value="data" className="m-0 p-4">
+              <div className="rounded-2xl border border-[#dfe7ef] p-4"><strong className="text-sm">Fontes conectadas</strong><dl className="mt-3 grid grid-cols-2 gap-3 text-xs"><div><dt className="text-[#75808c]">Produtos</dt><dd className="mt-1 font-black">{project.commercialConfig?.catalogItems?.length || 0}</dd></div><div><dt className="text-[#75808c]">Serviços</dt><dd className="mt-1 font-black">{project.commercialConfig?.serviceOfferings?.length || 0}</dd></div><div><dt className="text-[#75808c]">Unidades</dt><dd className="mt-1 font-black">{project.commercialConfig?.locations?.length || 0}</dd></div><div><dt className="text-[#75808c]">Objetivos</dt><dd className="mt-1 font-black">{project.conversionGoals?.length || 0}</dd></div></dl></div>
+              <div className="mt-4 rounded-2xl bg-[linear-gradient(135deg,#edf8ff,#e7f1ff)] p-4"><span className="flex items-center gap-2 text-xs font-black text-[#0f64c8]"><Sparkles size={15} />Sobe IA</span><h3 className="mt-3 font-black">Estrutura baseada no negócio</h3><p className="mt-2 text-xs leading-5 text-[#526476]">Produtos, serviços, objetivos e capacidades orientam a proposta. Nada é aplicado automaticamente.</p><Button className="mt-4 w-full bg-[#1263c5] hover:bg-[#0d54a9]" size="sm" disabled={aiLoading} onClick={() => void requestStructure()}>{aiLoading ? <LoaderCircle className="animate-spin" size={15} /> : <Sparkles size={15} />}Sugerir estrutura</Button></div>
+            </TabsContent>
+          </Tabs>
         </aside>
       </div>
       {aiError ? (
@@ -811,6 +886,17 @@ export function SiteEditor({ projectId }: { projectId: string }) {
           >
             <X size={15} />
           </button>
+        </div>
+      ) : null}
+      {structureProposal ? (
+        <div role="dialog" aria-modal="true" aria-labelledby="structure-proposal-title" className="fixed inset-0 z-50 grid place-items-center bg-[#101827]/55 p-4">
+          <div className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-[28px] bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4"><div><span className="inline-flex items-center gap-2 text-xs font-black text-[#1263c5]"><Sparkles size={15} />Sobe IA</span><h2 id="structure-proposal-title" className="mt-2 text-2xl font-black">Proposta de estrutura</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-[#66717e]">{structureProposal.suggestion.reasoning}</p></div><Button size="icon" variant="ghost" aria-label="Fechar proposta" onClick={() => setStructureProposal(undefined)}><X /></Button></div>
+            <div className="mt-5 grid gap-3 md:grid-cols-2">{structureProposal.suggestion.pages.map((page) => <article key={`${page.type}-${page.pathSuggestion}`} className="rounded-2xl border border-[#dfe7ef] p-4"><div className="flex items-center justify-between"><strong>{page.name}</strong><span className="text-xs font-bold text-[#1263c5]">{page.pathSuggestion}</span></div><p className="mt-2 text-xs leading-5 text-[#687582]">{page.purpose}</p><ol className="mt-3 space-y-1 text-xs">{page.sections.map((section, index) => <li key={`${section.sectionType}-${index}`} className="flex gap-2"><span className="text-[#1263c5]">{index + 1}.</span>{presenceSectionRegistry[section.sectionType].label} — {section.purpose}</li>)}</ol></article>)}</div>
+            {structureProposal.suggestion.warnings.length ? <div className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">{structureProposal.suggestion.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div> : null}
+            <p className="mt-5 text-xs font-bold text-[#65717d]">Prévia: {structureProposal.operations.length} operações selecionadas. A aplicação altera apenas o rascunho e não publica o site.</p>
+            <div className="mt-6 flex flex-wrap justify-end gap-2"><Button variant="ghost" onClick={() => setStructureProposal(undefined)}>Criar do zero</Button><Button variant="secondary" onClick={() => setStructureProposal(undefined)}>Personalizar antes</Button><Button disabled={aiLoading} onClick={() => void applyStructureProposal()}>{aiLoading ? <LoaderCircle className="animate-spin" size={15} /> : null}Usar esta estrutura</Button></div>
+          </div>
         </div>
       ) : null}
       {aiProposal ? (
@@ -961,6 +1047,10 @@ function PageInspectorBase({
           value={page.name}
           onChange={(event) => onChange({ ...page, name: event.target.value })}
         />
+      </label>
+      <label className={label}>
+        Propósito da página
+        <textarea className={`${input} min-h-20 py-2`} value={page.purpose || ""} maxLength={400} onChange={(event) => onChange({ ...page, purpose: event.target.value || undefined })} placeholder="Explique qual decisão esta página deve apoiar." />
       </label>
       <label className={label}>
         Caminho

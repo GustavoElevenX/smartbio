@@ -24,7 +24,7 @@ export const presenceSectionSchema = baseSectionSchema.superRefine((section, con
 });
 
 export const presencePageSchema = z.object({
-  id: z.string().min(1), projectId: z.string().min(1), key: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/), name: z.string().trim().min(1).max(100),
+  id: z.string().min(1), projectId: z.string().min(1), key: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/), name: z.string().trim().min(1).max(100), purpose: z.string().max(400).optional(),
   type: z.enum(["home", "landing", "page"]), path: z.string().startsWith("/"), title: z.string().max(180).optional(), description: z.string().max(1000).optional(),
   seoTitle: z.string().max(70).optional(), seoDescription: z.string().max(170).optional(), ogImageAssetId: z.string().optional(), defaultConversionGoalId: z.string().optional(),
   isHome: z.boolean(), isActive: z.boolean(), isIndexable: z.boolean(), version: z.number().int().positive().optional(), settings: presencePageSettingsSchema,

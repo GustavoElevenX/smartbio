@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- renderer consumes content validated by the section-specific Zod registry */
 import Image from "next/image";
+import Link from "next/link";
 import { Check, ExternalLink, MapPin, Play, Quote } from "lucide-react";
 import type { CSSProperties } from "react";
 import type { Project } from "@/types";
@@ -14,6 +15,7 @@ import { NearestLocationButton } from "./nearest-location-button";
 import type { PublicActivation } from "@/features/activations/activation.types";
 import { ActivationProductBadge } from "@/components/public-activations/activation-product-badge";
 import { ActivationServiceBadge } from "@/components/public-activations/activation-service-badge";
+import { PublicCatalogShell } from "@/components/public-catalog/catalog-shell";
 
 function asset(project: Project, id?: string) {
   const item = project.mediaAssets?.find((candidate) => candidate.id === id);
@@ -377,6 +379,9 @@ export function PresenceSectionRenderer({
     );
   }
   if (section.type === "products") {
+    const allAvailable = (project.commercialConfig?.catalogItems || []).filter((item) => item.isAvailable);
+    const fullCatalog = content.displayMode === "catalog" || page.key.includes("catalog") || page.name.toLocaleLowerCase("pt-BR").includes("catálogo");
+    if (fullCatalog && allAvailable.length > 8) return wrap(<PublicCatalogShell projectId={project.id} pageId={page.id} sectionId={section.id} goalId={content.itemGoalId || page.defaultConversionGoalId} />);
     const chosen = (project.commercialConfig?.catalogItems || [])
       .filter(
         (item) =>
@@ -386,8 +391,9 @@ export function PresenceSectionRenderer({
             (item.categoryId && content.categoryIds.includes(item.categoryId))),
       )
       .slice(0, content.maxItems || 8);
+    const catalogPage = project.presence?.pages.find((candidate) => candidate.isActive && candidate.id !== page.id && (candidate.key.includes("catalog") || candidate.name.toLocaleLowerCase("pt-BR").includes("catálogo")));
     return wrap(
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <><div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {chosen.map((item) => {
           const image = asset(project, item.imageAssetId);
           const activation = publicActivations.find((candidate) => candidate.placements.some((placement) => placement.placementType === "product_badge") && (!candidate.offer?.scope.catalogItemIds?.length || candidate.offer.scope.catalogItemIds.includes(item.id)));
@@ -436,7 +442,7 @@ export function PresenceSectionRenderer({
             </article>
           );
         })}
-      </div>,
+      </div>{allAvailable.length > 8 && catalogPage ? <div className="mt-8 text-center"><Link href={pageHref(project, { type: "go_to_presence_page", label: "Ver catálogo completo", pageId: catalogPage.id }) || `/${project.slug}/p/${catalogPage.key}`} className="inline-flex min-h-12 items-center rounded-[var(--presence-button-radius)] border border-black/15 bg-white px-6 text-sm font-extrabold">Ver catálogo completo</Link></div> : null}</>,
     );
   }
   if (section.type === "about") {

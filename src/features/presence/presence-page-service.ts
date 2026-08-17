@@ -22,7 +22,7 @@ export function createPresencePage(projectId: string, name: string, type: Presen
   const isHome = type === "home" || !existing.length;
   const pageType = isHome ? "home" : type;
   return {
-    id: pageId, projectId, key, name, type: pageType, path: isHome ? "/" : `/${key}`, title: name, isHome, isActive: true, isIndexable: true, version: 1,
+    id: pageId, projectId, key, name, type: pageType, purpose: isHome ? "Apresentar o negócio e conduzir ao objetivo principal." : "Apoiar uma etapa específica da decisão.", path: isHome ? "/" : `/${key}`, title: name, isHome, isActive: true, isIndexable: true, version: 1,
     settings: structuredClone(defaultPresencePageSettings),
     sections: [createPresenceSection(pageId, "hero", 0), createPresenceSection(pageId, "services", 1), createPresenceSection(pageId, "conversion_cta", 2)],
   };

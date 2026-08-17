@@ -102,6 +102,7 @@ export interface PresencePage {
   key: string;
   name: string;
   type: PresencePageType;
+  purpose?: string;
   path: string;
   title?: string;
   description?: string;
