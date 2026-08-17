@@ -17,7 +17,7 @@ export async function generateMetadata({ params, searchParams }: PageProps<"/[sl
   const surface = resolvePublicSurface(project, value(query.entry), null);
   const page = surface.page;
   const title = page?.seoTitle || page?.title || project.name;
-  const description = page?.seoDescription || page?.description || project.description || "Uma experiência criada com Virou.";
+  const description = page?.seoDescription || page?.description || project.description || "Uma experiência criada com Sobe.";
   const canonical = `${baseUrl()}/${project.slug}`;
   const ogAsset = project.mediaAssets?.find((item) => item.id === page?.ogImageAssetId);
   const ogUrl = typeof ogAsset?.metadata?.publicUrl === "string" ? ogAsset.metadata.publicUrl : undefined;

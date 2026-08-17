@@ -1767,7 +1767,7 @@ export function findDemoProject(slugOrId: string) {
               type: "conversion_cta",
               title: "Pronto para escolher?",
               description:
-                "Comece pelo seu objetivo e a Virou conduz o restante.",
+                "Comece pelo seu objetivo e a Sobe conduz o restante.",
               content: {
                 primaryAction: goal
                   ? {

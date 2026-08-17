@@ -193,7 +193,7 @@ export function Overview() {
             Sugestões baseadas em evidência
           </h2>
           <p className="relative mt-3 text-sm leading-6 text-white/60">
-            A Virou só sugere mudanças depois de reunir pelo menos 30 sessões no negócio e 15 na meta analisada.
+            A Sobe só sugere mudanças depois de reunir pelo menos 30 sessões no negócio e 15 na meta analisada.
           </p>
           <Link
             href="/app/projects/demo-vertice/editor"

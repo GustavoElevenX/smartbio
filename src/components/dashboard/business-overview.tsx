@@ -227,7 +227,7 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
             Sua presença ainda não está no ar.
           </h2>
           <p className="mt-3 text-sm leading-7 text-[#716d78]">
-            A Virou pode criar sua primeira versão usando:
+            A Sobe pode criar sua primeira versão usando:
           </p>
           <ul className="mt-4 grid gap-2 text-sm font-bold text-[#514d58] sm:grid-cols-2">
             {[

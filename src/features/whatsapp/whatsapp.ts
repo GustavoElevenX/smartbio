@@ -9,7 +9,7 @@ export function buildWhatsAppMessage(input: {
   items?: Array<{ name: string; quantity: number }>;
   closing?: string;
 }) {
-  const lines = [input.greeting || (input.businessName ? `Olá! Vim pelo site da ${input.businessName}.` : "Olá! Vim pela Virou.")];
+  const lines = [input.greeting || (input.businessName ? `Olá! Vim pelo site da ${input.businessName}.` : "Olá! Vim pela Sobe.")];
   if (input.interest) lines.push("", `Interesse: ${input.interest}`);
   const benefit = input.benefitClaim?.benefitLabel || input.activation?.benefitLabel;
   if (benefit) lines.push("", `Benefício: ${benefit}`);

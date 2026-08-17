@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { CustomerHistoryImport } from "@/components/activations/customer-history-import";
 
-export const metadata: Metadata = { title: "Histórico de clientes · Virou" };
+export const metadata: Metadata = { title: "Histórico de clientes · Sobe" };
 
 export default async function Page({ params }: PageProps<"/app/projects/[projectId]/activations/eligibility">) {
   const { projectId } = await params;

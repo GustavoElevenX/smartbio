@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowLeft,
@@ -1449,8 +1450,11 @@ export function ExperienceCanvas({
         >
           Fale com a gente
         </button>
-        <span className="mx-2 opacity-30">·</span>Feito com{" "}
-        <span className="font-extrabold text-[var(--primary)]">Virou</span>
+        <span className="mx-2 opacity-30">·</span>
+        <Link href="/" className="inline-flex items-center gap-1.5 font-extrabold text-[var(--primary)]">
+          <Image src="/brand/sobe-symbol.png" alt="" width={20} height={20} className="size-5 object-contain" />
+          Feito com Sobe
+        </Link>
       </footer>
     </div>
   );
@@ -1504,7 +1508,7 @@ export function PublicExperience({
             O endereço não existe ou ainda não foi publicado.
           </p>
           <Link href="/" className="mt-6 inline-flex font-bold text-[#5f52d6]">
-            Conhecer a Virou
+            Conhecer a Sobe
           </Link>
         </div>
       </div>

@@ -1,12 +1,12 @@
-# Virou
+# Sobe
 
-Virou is presence and conversion infrastructure for social traffic.
+Sobe is presence and conversion infrastructure for social traffic.
 
 A business can publish a branded commercial presence, landing pages or direct conversion journeys. Content and CTAs connect to conversion goals that execute qualification, quotes, bookings, orders, reservations, routing and other measurable commercial actions.
 
 **Presence → Intent → Action → Opportunity → Conversion.**
 
-> **Virou não é onde seus links ficam. É onde a intenção vira ação.**
+> **Sobe não é onde seus links ficam. É onde a intenção vira ação.**
 
 ## Modelo do produto
 
@@ -47,7 +47,7 @@ No `.env.local`, habilite:
 ```dotenv
 ENABLE_LOCAL_DEV_AUTH=true
 NEXT_PUBLIC_ENABLE_LOCAL_DEV_STORE=true
-NEXT_PUBLIC_APP_NAME=Virou
+NEXT_PUBLIC_APP_NAME=Sobe
 NEXT_PUBLIC_PUBLIC_BASE_URL=http://localhost:3000
 ```
 
@@ -123,4 +123,4 @@ O modelo padrão é `gpt-5.4-mini-2026-03-17` para texto e visão. O snapshot fi
 
 ## Limites atuais
 
-Ficam fora do escopo: WhatsApp Cloud/bots, CRM avançado, gerenciador de anúncios, ERP/estoque, novo billing, domínios customizados, A/B estatístico, automação de e-mail e marketplace. A Virou pode montar contexto e abrir um link do WhatsApp, mas não afirma enviar ou automatizar mensagens.
+Ficam fora do escopo: WhatsApp Cloud/bots, CRM avançado, gerenciador de anúncios, ERP/estoque, novo billing, domínios customizados, A/B estatístico, automação de e-mail e marketplace. A Sobe pode montar contexto e abrir um link do WhatsApp, mas não afirma enviar ou automatizar mensagens.

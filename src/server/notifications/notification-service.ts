@@ -234,8 +234,8 @@ export async function processNotificationOutboxBatch(
           throw new Error("Convite sem destinatário ou URL.");
         await configuredEmailProvider().send({
           to: row.payload.recipientEmail,
-          subject: "Você recebeu um convite para a Virou",
-          html: `<p>Você foi convidado para colaborar em um workspace da Virou.</p><p><a href="${row.payload.acceptanceUrl}">Aceitar convite</a></p><p>Este convite expira em 7 dias.</p>`,
+          subject: "Você recebeu um convite para a Sobe",
+          html: `<p>Você foi convidado para colaborar em um workspace da Sobe.</p><p><a href="${row.payload.acceptanceUrl}">Aceitar convite</a></p><p>Este convite expira em 7 dias.</p>`,
         });
       } else {
         if (!row.project_id) throw new Error("Projeto da notificação ausente.");

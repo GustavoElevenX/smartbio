@@ -78,10 +78,50 @@ export function PresencePageContent({
   page: PresencePage;
   publicActivations?: PublicActivation[];
 }) {
-  const heroOverride = publicActivations.flatMap((activation) => activation.placements.map((placement) => ({ activation, placement }))).filter((item) => item.placement.placementType === "hero_override").toSorted((a,b) => b.placement.priority-a.placement.priority)[0];
+  const heroOverride = publicActivations
+    .flatMap((activation) =>
+      activation.placements.map((placement) => ({ activation, placement })),
+    )
+    .filter((item) => item.placement.placementType === "hero_override")
+    .toSorted((a, b) => b.placement.priority - a.placement.priority)[0];
   const activeSections = page.sections
     .filter((section) => section.isActive)
-    .map((section) => section.type === "hero" && heroOverride ? { ...section, eyebrow: String(heroOverride.placement.content.eyebrow || heroOverride.activation.offer?.label || section.eyebrow || ""), title: String(heroOverride.placement.content.title || heroOverride.activation.title || section.title || ""), description: String(heroOverride.placement.content.message || heroOverride.activation.message || section.description || ""), content: { ...section.content, primaryAction: { type: "start_activation", label: String(heroOverride.placement.content.ctaLabel || "Quero aproveitar"), activationId: heroOverride.activation.id, style: "primary" } } } : section)
+    .map((section) =>
+      section.type === "hero" && heroOverride
+        ? {
+            ...section,
+            eyebrow: String(
+              heroOverride.placement.content.eyebrow ||
+                heroOverride.activation.offer?.label ||
+                section.eyebrow ||
+                "",
+            ),
+            title: String(
+              heroOverride.placement.content.title ||
+                heroOverride.activation.title ||
+                section.title ||
+                "",
+            ),
+            description: String(
+              heroOverride.placement.content.message ||
+                heroOverride.activation.message ||
+                section.description ||
+                "",
+            ),
+            content: {
+              ...section.content,
+              primaryAction: {
+                type: "start_activation",
+                label: String(
+                  heroOverride.placement.content.ctaLabel || "Quero aproveitar",
+                ),
+                activationId: heroOverride.activation.id,
+                style: "primary",
+              },
+            },
+          }
+        : section,
+    )
     .toSorted((a, b) => a.order - b.order);
   const pages = (project.presence?.pages || [])
     .filter((item) => item.isActive)
@@ -225,12 +265,11 @@ export function PresencePageContent({
               © {new Date().getFullYear()} {project.name}
             </span>
             {footer.showVirouBranding ? (
-              <span>
-                Feito com{" "}
-                <strong className="text-[var(--presence-primary)]">
-                  Virou
-                </strong>
-              </span>
+              <Link href="/" className="inline-flex items-center gap-1.5 font-bold text-[var(--presence-primary)]">
+                <span className="font-normal text-[var(--presence-muted)]">Feito com</span>
+                <Image src="/brand/sobe-symbol.png" alt="" width={20} height={20} className="size-5 object-contain" />
+                Sobe
+              </Link>
             ) : null}
           </div>
         </footer>
@@ -280,8 +319,16 @@ export function PublicPresencePage({
         presentation={page.settings.conversionPresentation.mode}
         previewProject={preview ? project : undefined}
       >
-        <ActivationRuntimeProvider projectId={project.id} pageId={page.id} activations={publicActivations}>
-          <PresencePageContent project={project} page={page} publicActivations={publicActivations} />
+        <ActivationRuntimeProvider
+          projectId={project.id}
+          pageId={page.id}
+          activations={publicActivations}
+        >
+          <PresencePageContent
+            project={project}
+            page={page}
+            publicActivations={publicActivations}
+          />
         </ActivationRuntimeProvider>
       </ConversionLauncher>
     </div>

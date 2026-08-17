@@ -1,13 +1,13 @@
 <!-- Product context for design and implementation. Keep aligned with VIROU-INFRAESTRUTURA-CONVERSAO-CODEX.md. -->
-# Virou
+# Sobe
 
 ## Product
 
-Virou is presence and conversion infrastructure for social traffic. It turns attention into an intentional, measurable journey that ends in an action, commercial opportunity, confirmed conversion, and learning loop.
+Sobe is presence and conversion infrastructure for social traffic. It turns attention into an intentional, measurable journey that ends in an action, commercial opportunity, confirmed conversion, and learning loop.
 
 Presence is not a separate website builder product. It is the presentation layer of the conversion infrastructure.
 
-Core promise: **Virou não é onde seus links ficam. É onde a intenção vira ação.**
+Core promise: **Sobe não é onde seus links ficam. É onde a intenção vira ação.**
 
 The product serves Brazilian small and medium businesses that receive traffic from Instagram, ads, LinkedIn, QR codes, and other social entry points. It must support multiple business models without niche templates by reusing the existing qualification, quote, scheduling, catalog/order, reservation, routing, payment, analytics, publication, Supabase, and RLS engines.
 
@@ -34,11 +34,11 @@ Portuguese (Brazil), direct, useful, confident, and commercially literate. Never
 
 ## Brand and UI
 
-- User-facing brand: **Virou**. Internal legacy identifiers may remain for compatibility.
+- User-facing brand: **Sobe**. Internal legacy identifiers may remain for compatibility.
 - Visual character: clear editorial hierarchy, warm white surfaces, ink typography, violet as an intentional accent, and restrained coral/green for status.
 - Prefer a calm workspace over a wall of interchangeable cards. Use tables, flows, and evidence blocks when they clarify relationships.
 - Minimum touch targets: 44px. Keyboard focus, semantic labels, reduced-motion support, empty/loading/error/success states, and responsive layouts are required.
-- Public attribution: “Feito com Virou” and fallback link “Conhecer a Virou”.
+- Public attribution: “Feito com Sobe” and fallback link “Conhecer a Sobe”.
 
 ## Guardrails
 

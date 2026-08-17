@@ -90,7 +90,7 @@ export function PublishReadinessModal({
             Revisão antes de publicar
           </DialogTitle>
           <DialogDescription>
-            A Virou salva o rascunho, valida os dados e cria uma versão recuperável antes de colocar as alterações no ar.
+            A Sobe salva o rascunho, valida os dados e cria uma versão recuperável antes de colocar as alterações no ar.
           </DialogDescription>
         </DialogHeader>
 

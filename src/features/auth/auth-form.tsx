@@ -71,7 +71,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" | "forgot" }) {
   );
 
   const title = mode === "login" ? "Que bom ter você de volta." : mode === "register" ? "Crie sua primeira experiência." : "Recupere seu acesso.";
-  const description = mode === "login" ? "Entre para continuar conduzindo decisões." : mode === "register" ? "Explique seu negócio. A Virou cuida do primeiro caminho." : "Digite seu e-mail e enviaremos as instruções.";
+  const description = mode === "login" ? "Entre para continuar conduzindo decisões." : mode === "register" ? "Explique seu negócio. A Sobe cuida do primeiro caminho." : "Digite seu e-mail e enviaremos as instruções.";
   return (
     <form onSubmit={submit} noValidate>
       <h1 className="text-3xl font-extrabold tracking-[-.045em] sm:text-4xl">{title}</h1>

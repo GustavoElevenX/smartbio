@@ -289,7 +289,7 @@ export function ActivationBuilder({
       <div>
         <h3 className="text-xl font-extrabold">Pronta para virar ação?</h3>
         <p className="mt-2 text-[#6f6f79]">
-          Salve o rascunho. Na página de detalhe, a Virou valida todos os
+          Salve o rascunho. Na página de detalhe, a Sobe valida todos os
           bloqueios antes de ativar.
         </p>
         <div className="mt-5 rounded-xl bg-[#f0edff] p-4 text-sm text-[#5542c7]">

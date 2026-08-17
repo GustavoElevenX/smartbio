@@ -34,7 +34,7 @@ const cardClass =
 
 function whatsappUrl(destination: RoutingDestination, location: string) {
   const phone = String(destination.value || "").replace(/\D/g, "");
-  const template = destination.message || "Olá! A Virou indicou a unidade {{location}}. Quero continuar meu atendimento.";
+  const template = destination.message || "Olá! A Sobe indicou a unidade {{location}}. Quero continuar meu atendimento.";
   const message = encodeURIComponent(template.replaceAll("{{location}}", location));
   return `https://wa.me/${phone}?text=${message}`;
 }

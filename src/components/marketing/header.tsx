@@ -23,7 +23,7 @@ export function MarketingFooter() {
   return <footer className="border-t border-[#e4e3eb] bg-white py-10">
     <div className="container-shell flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
       <Brand />
-      <p className="text-sm text-[#777781]">© 2026 Virou. Onde intenção vira ação.</p>
+      <p className="text-sm text-[#777781]">© 2026 Sobe. Onde intenção vira ação.</p>
       <div className="flex gap-5 text-sm font-medium text-[#5e5e68]"><Link href="/pricing">Planos</Link><Link href="/app">Abrir painel</Link></div>
     </div>
   </footer>;

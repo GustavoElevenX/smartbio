@@ -9,7 +9,7 @@ export class ConsoleEmailProvider implements EmailProvider {
 }
 
 export const emailTemplates = {
-  welcome: (name: string) => ({ subject: "Sua Virou começa aqui", html: `<h1>Olá, ${name}</h1><p>Vamos criar seu melhor próximo passo.</p>` }),
+  welcome: (name: string) => ({ subject: "Sua Sobe começa aqui", html: `<h1>Olá, ${name}</h1><p>Vamos criar seu melhor próximo passo.</p>` }),
   published: (project: string, url: string) => ({ subject: `${project} foi publicado`, html: `<p>Sua experiência está no ar em <a href="${url}">${url}</a>.</p>` }),
   newLead: (project: string, lead: string) => ({ subject: `Novo lead em ${project}`, html: `<p>${lead} concluiu uma jornada.</p>` }),
   invite: (workspace: string) => ({ subject: `Convite para ${workspace}`, html: `<p>Você recebeu um convite para colaborar.</p>` }),

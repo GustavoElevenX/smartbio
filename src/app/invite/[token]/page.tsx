@@ -31,7 +31,7 @@ export default function InvitePage() {
   return (
     <main className="grid min-h-screen place-items-center bg-[#f7f7fa] p-6">
       <section className="w-full max-w-lg rounded-3xl border bg-white p-8 text-center shadow-sm">
-        <p className="text-sm font-bold text-[#6255d8]">Convite Virou</p>
+        <p className="text-sm font-bold text-[#6255d8]">Convite Sobe</p>
         <h1 className="mt-3 text-3xl font-extrabold">
           Colabore neste workspace
         </h1>

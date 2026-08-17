@@ -361,7 +361,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <Menu size={21} />
           </button>
           <div>
-            <strong className="block text-sm">Virou</strong>
+            <Brand size="sm" />
             <span className="hidden text-xs text-[#85858e] sm:block">
               Da atenção à conversão
             </span>
