@@ -59,6 +59,11 @@ npm run dev -- --hostname 127.0.0.1 --port 3000
 
 O modo local usa `localStorage` e dados explicitamente demonstrativos. Em produção, desative o store local e configure Supabase.
 
+Para testar o login real localmente, mantenha `ENABLE_LOCAL_DEV_AUTH=false` e `NEXT_PUBLIC_ENABLE_LOCAL_DEV_STORE=false`.
+No Supabase Auth, configure a Site URL de produção e autorize `https://seu-dominio.com/auth/callback` (além de
+`http://localhost:3000/auth/callback` apenas para desenvolvimento). O `proxy` renova a sessão SSR e as rotas privadas
+validam o usuário no servidor antes de carregar dados.
+
 ## Banco e segurança
 
 As novas entidades estão em migrações aditivas:

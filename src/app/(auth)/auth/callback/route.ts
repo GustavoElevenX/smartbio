@@ -11,10 +11,14 @@ export async function GET(request: NextRequest) {
   if (!code || !url || !anonKey) return NextResponse.redirect(errorUrl);
 
   const response = NextResponse.redirect(new URL(next, request.url));
+  response.headers.set("Cache-Control", "private, no-store");
   const supabase = createServerClient(url, anonKey, {
     cookies: {
       getAll: () => request.cookies.getAll(),
-      setAll: (values) => values.forEach(({ name, value, options }) => response.cookies.set(name, value, options)),
+      setAll: (values, headers) => {
+        values.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+        Object.entries(headers).forEach(([name, value]) => response.headers.set(name, value));
+      },
     },
   });
   const { error } = await supabase.auth.exchangeCodeForSession(code);
