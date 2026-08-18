@@ -6,8 +6,9 @@ import { resolvePublicSurface } from "@/features/presence/resolve-public-surface
 import { loadPublishedPublicProject } from "@/server/projects/load-public-project";
 import { resolvePublicActivations } from "@/server/activations/public-activation-resolver";
 import { createServiceClient } from "@/lib/supabase/server";
+import { resolveAppUrl } from "@/lib/app-url";
 
-const baseUrl = () => (process.env.NEXT_PUBLIC_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
+const baseUrl = resolveAppUrl;
 function value(input: string | string[] | undefined) { return Array.isArray(input) ? input[0] : input; }
 
 export async function generateMetadata({ params, searchParams }: PageProps<"/[slug]">): Promise<Metadata> {

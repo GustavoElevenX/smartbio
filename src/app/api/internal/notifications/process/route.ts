@@ -14,10 +14,18 @@ function authorized(request: Request) {
   return timingSafeEqual(Buffer.from(secret), Buffer.from(value));
 }
 
-export async function POST(request: Request) {
+async function processBatch(request: Request, input: unknown) {
   if (!authorized(request)) return apiError("Não autorizado.", 401, "unauthorized");
-  const parsed = inputSchema.safeParse(await request.json().catch(() => ({})));
+  const parsed = inputSchema.safeParse(input);
   if (!parsed.success) return apiError("Lote inválido.", 422, "validation_error");
   const workerId = `${process.env.VERCEL_REGION || "local"}:${crypto.randomUUID()}`;
   return apiSuccess(await processNotificationOutboxBatch(workerId, parsed.data.limit));
+}
+
+export async function GET(request: Request) {
+  return processBatch(request, {});
+}
+
+export async function POST(request: Request) {
+  return processBatch(request, await request.json().catch(() => ({})));
 }

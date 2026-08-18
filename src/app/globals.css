@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  --font-inter: Inter, "Segoe UI", Arial, ui-sans-serif, system-ui, sans-serif;
   --sobe-blue: #0054fc;
   --sobe-blue-light: #0186fc;
   --sobe-cyan: #01d2df;

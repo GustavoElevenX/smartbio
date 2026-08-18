@@ -13,6 +13,7 @@ import { requireEntitlement } from "@/server/entitlements/require-entitlement";
 import { DEFAULT_CATALOG_THRESHOLDS } from "@/features/site-composer/catalog-strategy";
 import { getSectionActions } from "@/features/presence/presence-page-utils";
 import { recordPlatformGrowthEvent } from "@/server/platform-acquisition/platform-acquisition";
+import { resolveAppUrl } from "@/lib/app-url";
 
 function addBlocking(
   readiness: ProjectReadinessResult,
@@ -193,7 +194,7 @@ export async function publishProject(
     revalidatePath(`/${published.slug}`);
   }
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
+  const appUrl = resolveAppUrl();
   await notify(actor, published, "project.published", {
     name: published.name,
     url: `${appUrl}/${published.slug}`,

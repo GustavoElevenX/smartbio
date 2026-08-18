@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { resolveAppUrl } from "@/lib/app-url";
 import "./globals.css";
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 const description = "Transforme a atenção que sua empresa gera nas redes em uma estrutura digital preparada para levar o cliente à próxima ação.";
 
@@ -19,7 +17,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 export const metadata: Metadata = {
   title: { default: "SOBE — Transforme atração em ação", template: "%s · Sobe" },
   description,
-  metadataBase: new URL(process.env.NEXT_PUBLIC_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
+  metadataBase: new URL(resolveAppUrl()),
   openGraph: { title: "SOBE — Transforme atração em ação", description, type: "website", locale: "pt_BR" },
 };
 
@@ -27,7 +25,7 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, them
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="pt-BR" className={inter.variable} data-scroll-behavior="smooth">
+    <html lang="pt-BR" data-scroll-behavior="smooth">
       <body>
         <script
           dangerouslySetInnerHTML={{

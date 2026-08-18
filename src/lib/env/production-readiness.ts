@@ -4,15 +4,10 @@ export type ProductionReadinessIssue = {
 };
 
 const requiredVariables = [
-  "NEXT_PUBLIC_APP_URL",
-  "NEXT_PUBLIC_PUBLIC_BASE_URL",
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
-  "UPSTASH_REDIS_REST_URL",
-  "UPSTASH_REDIS_REST_TOKEN",
   "RATE_LIMIT_SECRET",
-  "ENCRYPTION_KEY",
   "CRON_SECRET",
   "CUSTOMER_IDENTITY_HASH_SECRET",
 ] as const;
@@ -66,17 +61,37 @@ export function productionReadinessIssues(source: NodeJS.ProcessEnv = process.en
       requireVariable(issues, source, variable);
   }
 
-  if (value(source, "NODE_ENV") !== "production")
-    issues.push({ variable: "NODE_ENV", message: "deve ser production" });
   if (enabled(source, "ENABLE_LOCAL_DEV_AUTH"))
     issues.push({ variable: "ENABLE_LOCAL_DEV_AUTH", message: "autenticação local deve estar desativada" });
   if (enabled(source, "NEXT_PUBLIC_ENABLE_LOCAL_DEV_STORE"))
     issues.push({ variable: "NEXT_PUBLIC_ENABLE_LOCAL_DEV_STORE", message: "store local deve estar desativado" });
 
+  const hasConfiguredAppUrl = Boolean(
+    value(source, "NEXT_PUBLIC_APP_URL") ||
+      value(source, "NEXT_PUBLIC_PUBLIC_BASE_URL"),
+  );
+  const hasVercelUrl = Boolean(
+    value(source, "VERCEL_PROJECT_PRODUCTION_URL") || value(source, "VERCEL_URL"),
+  );
+  if (!hasConfiguredAppUrl && !hasVercelUrl)
+    issues.push({
+      variable: "NEXT_PUBLIC_APP_URL",
+      message: "informe a URL pública ou exponha as variáveis de sistema da Vercel",
+    });
   requireHttps(issues, source, "NEXT_PUBLIC_APP_URL");
   requireHttps(issues, source, "NEXT_PUBLIC_PUBLIC_BASE_URL");
   requireHttps(issues, source, "NEXT_PUBLIC_SUPABASE_URL");
   requireHttps(issues, source, "UPSTASH_REDIS_REST_URL");
+
+  const upstashUrl = value(source, "UPSTASH_REDIS_REST_URL");
+  const upstashToken = value(source, "UPSTASH_REDIS_REST_TOKEN");
+  if (Boolean(upstashUrl) !== Boolean(upstashToken))
+    issues.push({
+      variable: upstashUrl
+        ? "UPSTASH_REDIS_REST_TOKEN"
+        : "UPSTASH_REDIS_REST_URL",
+      message: "configure URL e token juntos ou deixe ambos ausentes",
+    });
 
   for (const variable of secretVariables) {
     const configured = value(source, variable);

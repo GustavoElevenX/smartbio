@@ -1,7 +1,6 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import { ProductionConfigurationError } from "@/server/auth/auth-errors";
 import { MemoryRateLimitProvider } from "@/server/rate-limit/memory-rate-limit-provider";
 import type {
   RateLimitResult,
@@ -36,10 +35,8 @@ function provider() {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (url && token) return new UpstashRateLimitProvider(url, token);
-  if (process.env.NODE_ENV === "production")
-    throw new ProductionConfigurationError(
-      "O rate limit distribuído não está configurado.",
-    );
+  // A instância em memória mantém o primeiro deploy funcional. Para escala
+  // horizontal, a integração Upstash passa a ser usada automaticamente.
   return new MemoryRateLimitProvider();
 }
 

@@ -1,9 +1,10 @@
 import type { MetadataRoute } from "next";
 import { createServiceClient } from "@/lib/supabase/server";
+import { resolveAppUrl } from "@/lib/app-url";
 import type { Project } from "@/types";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = (process.env.NEXT_PUBLIC_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
+  const base = resolveAppUrl();
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return [{ url: base, changeFrequency: "weekly", priority: 1 }];
   const database = createServiceClient();
   if (!database) return [{ url: base, changeFrequency: "weekly", priority: 1 }];

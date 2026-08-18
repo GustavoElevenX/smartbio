@@ -1,3 +1,8 @@
-export function publicProjectUrl(slug: string, baseUrl = process.env.NEXT_PUBLIC_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000") {
-  return new URL(`/${encodeURIComponent(slug)}`, baseUrl).toString();
+import { resolveAppUrl } from "@/lib/app-url";
+
+export function publicProjectUrl(slug: string, baseUrl?: string) {
+  const resolvedBaseUrl =
+    baseUrl ||
+    (typeof window !== "undefined" ? window.location.origin : resolveAppUrl());
+  return new URL(`/${encodeURIComponent(slug)}`, resolvedBaseUrl).toString();
 }
