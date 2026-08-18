@@ -35,7 +35,9 @@ Portuguese (Brazil), direct, useful, confident, and commercially literate. Never
 ## Brand and UI
 
 - User-facing brand: **Sobe**. Internal legacy identifiers may remain for compatibility.
-- Visual character: clear editorial hierarchy, warm white surfaces, ink typography, violet as an intentional accent, and restrained coral/green for status.
+- Visual character: clear editorial hierarchy, off-white `#F7F8FA` canvas, navy `#07172F` typography and structural surfaces, Sobe blue `#0054FC` for primary action/focus, and turquoise/cyan `#02E5CD` / `#01D2DF` for energy, progress, and selected moments.
+- The proprietary brand gradient is `#02E5CD → #01D2DF → #0186FC → #0054FC`. Use it as a signature on rules, ambient fields, and high-impact brand moments; keep operational controls solid and accessible.
+- Preserve semantic red, amber, and green for error, warning, and success. Do not reuse brand colors to blur those meanings.
 - Prefer a calm workspace over a wall of interchangeable cards. Use tables, flows, and evidence blocks when they clarify relationships.
 - Minimum touch targets: 44px. Keyboard focus, semantic labels, reduced-motion support, empty/loading/error/success states, and responsive layouts are required.
 - Public attribution: “Feito com Sobe” and fallback link “Conhecer a Sobe”.

@@ -54,7 +54,7 @@ export function Overview() {
     <div className="animate-enter">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <p className="text-sm font-semibold text-[#6d5ef5]">Visão geral</p>
+          <p className="text-sm font-semibold text-[#0054fc]">Visão geral</p>
           <h1 className="mt-1 text-3xl font-extrabold tracking-[-.04em]">
             O que sua bio conduziu.
           </h1>
@@ -64,14 +64,14 @@ export function Overview() {
         </div>
         <Link
           href="/app/onboarding"
-          className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#17171c] px-4 text-sm font-bold text-white"
+          className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0054fc] px-4 text-sm font-bold text-white shadow-[0_8px_22px_rgba(0,84,252,.2)] transition hover:bg-[#0048d9]"
         >
           <Plus size={17} /> Criar experiência
         </Link>
       </div>
       <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          ["Visitas", stats.views, "Sem comparação ainda", Eye, "#6659df", "#eeecff"],
+          ["Visitas", stats.views, "Sem comparação ainda", Eye, "#0054fc", "#eaf3ff"],
           [
             "Jornadas concluídas",
             stats.completed,
@@ -138,7 +138,7 @@ export function Overview() {
             </div>
             <Link
               href="/app/projects"
-              className="text-xs font-bold text-[#6154da]"
+              className="text-xs font-bold text-[#0054fc]"
             >
               Ver todos
             </Link>
@@ -186,9 +186,10 @@ export function Overview() {
             ))}
           </div>
         </section>
-        <section className="relative overflow-hidden rounded-[24px] bg-[#1d1b25] p-6 text-white">
-          <div className="absolute -right-12 -top-12 size-48 rounded-full bg-[#6d5ef5]/35 blur-3xl" />
-          <Sparkles className="relative text-[#aaa1fa]" size={22} />
+        <section className="relative overflow-hidden rounded-[24px] bg-[#07172f] p-6 text-white">
+          <div className="sobe-gradient-rule absolute inset-x-0 top-0" />
+          <div className="sobe-gradient absolute -right-12 -top-12 size-48 rounded-full opacity-30 blur-3xl" />
+          <Sparkles className="relative text-[#02e5cd]" size={22} />
           <h2 className="relative mt-10 text-2xl font-extrabold tracking-[-.035em]">
             Sugestões baseadas em evidência
           </h2>
@@ -197,7 +198,7 @@ export function Overview() {
           </p>
           <Link
             href="/app/projects/demo-vertice/editor"
-            className="relative mt-6 inline-flex items-center gap-2 text-sm font-bold text-[#beb8ff]"
+            className="relative mt-6 inline-flex items-center gap-2 text-sm font-bold text-[#01d2df]"
           >
             Ver jornada <ArrowUpRight size={16} />
           </Link>
@@ -205,7 +206,7 @@ export function Overview() {
       </div>
       <section className="mt-5 rounded-[24px] border border-[#e5e4eb] bg-white p-6">
         <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-xl bg-[#efedff] text-[#6558db]">
+          <span className="grid size-10 place-items-center rounded-xl bg-[#eaf3ff] text-[#0054fc]">
             <BarChart3 size={19} />
           </span>
           <div>

@@ -111,20 +111,20 @@ const completionOptions: Array<[CompletionChannel, string]> = [
   ["phone", "Ligar"],
 ];
 const defaultBrand: BrandProfile = {
-  extractedColors: ["#6D5EF5", "#FF725E", "#19B88B"],
-  activePalette: buildPalette(["#6D5EF5", "#FF725E", "#19B88B"]),
+  extractedColors: ["#0054FC", "#0186FC", "#01D2DF", "#02E5CD"],
+  activePalette: buildPalette(["#0054FC", "#0186FC", "#01D2DF", "#02E5CD"]),
   paletteVariations: [
     {
       name: "Fiel",
-      palette: buildPalette(["#6D5EF5", "#FF725E", "#19B88B"], "faithful"),
+      palette: buildPalette(["#0054FC", "#0186FC", "#01D2DF", "#02E5CD"], "faithful"),
     },
     {
       name: "Equilibrada",
-      palette: buildPalette(["#6D5EF5", "#FF725E", "#19B88B"], "balanced"),
+      palette: buildPalette(["#0054FC", "#0186FC", "#01D2DF", "#02E5CD"], "balanced"),
     },
     {
       name: "Ousada",
-      palette: buildPalette(["#6D5EF5", "#FF725E", "#19B88B"], "bold"),
+      palette: buildPalette(["#0054FC", "#0186FC", "#01D2DF", "#02E5CD"], "bold"),
     },
   ],
   brandPersonality: ["Minimalista"],
@@ -145,7 +145,7 @@ function ChoiceCard({
     <button
       type="button"
       onClick={onClick}
-      className={`focus-ring relative min-h-[88px] rounded-[18px] border p-4 text-left transition ${active ? "border-[#7164e7] bg-[#f0eeff] shadow-[0_0_0_3px_rgba(113,100,231,.09)]" : "border-[#e0dfe7] bg-white hover:border-[#bebbcf]"}`}
+      className={`focus-ring relative min-h-[88px] rounded-[18px] border p-4 text-left transition ${active ? "border-[#0054fc] bg-[#eaf3ff] shadow-[0_0_0_3px_rgba(113,100,231,.09)]" : "border-[#e0dfe7] bg-white hover:border-[#bebbcf]"}`}
     >
       <strong className="block text-sm">{title}</strong>
       {description ? (
@@ -154,7 +154,7 @@ function ChoiceCard({
         </span>
       ) : null}
       {active ? (
-        <span className="absolute right-3 top-3 grid size-5 place-items-center rounded-full bg-[#685be0] text-white">
+        <span className="absolute right-3 top-3 grid size-5 place-items-center rounded-full bg-[#0054fc] text-white">
           <Check size={12} />
         </span>
       ) : null}
@@ -351,7 +351,7 @@ export function OnboardingWizard() {
     <div className="mx-auto max-w-[1140px] animate-enter">
       <div className="mb-7 flex items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-[#6d5ef5]">
+          <p className="text-sm font-semibold text-[#0054fc]">
             Configuração guiada
           </p>
           <h1 className="mt-1 text-2xl font-extrabold tracking-[-.035em]">
@@ -364,7 +364,7 @@ export function OnboardingWizard() {
           </span>
           <div className="mt-2 h-1.5 w-40 overflow-hidden rounded-full bg-[#e6e4ed]">
             <div
-              className="h-full rounded-full bg-[#6d5ef5] transition-all"
+              className="h-full rounded-full bg-[#0054fc] transition-all"
               style={{ width: `${(stage / 8) * 100}%` }}
             />
           </div>
@@ -375,7 +375,7 @@ export function OnboardingWizard() {
           <main className="p-6 sm:p-10 lg:p-12">
             {stage === 1 ? (
               <section>
-                <p className="text-sm font-bold text-[#675ada]">01 · Negócio</p>
+                <p className="text-sm font-bold text-[#0054fc]">01 · Negócio</p>
                 <h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">
                   Conte o que você resolve.
                 </h2>
@@ -471,7 +471,7 @@ export function OnboardingWizard() {
 
             {stage === 2 ? (
               <section>
-                <p className="text-sm font-bold text-[#675ada]">02 · Oferta</p>
+                <p className="text-sm font-bold text-[#0054fc]">02 · Oferta</p>
                 <h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">
                   O que o cliente encontra?
                 </h2>
@@ -497,7 +497,7 @@ export function OnboardingWizard() {
 
             {stage === 3 ? (
               <section>
-                <p className="text-sm font-bold text-[#675ada]">
+                <p className="text-sm font-bold text-[#0054fc]">
                   03 · Objetivo
                 </p>
                 <h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">
@@ -524,7 +524,7 @@ export function OnboardingWizard() {
 
             {stage === 4 ? (
               <section>
-                <p className="text-sm font-bold text-[#675ada]">
+                <p className="text-sm font-bold text-[#0054fc]">
                   04 · Confirmação
                 </p>
                 <h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">
@@ -546,7 +546,7 @@ export function OnboardingWizard() {
 
             {stage === 5 ? (
               <section>
-                <p className="text-sm font-bold text-[#675ada]">
+                <p className="text-sm font-bold text-[#0054fc]">
                   05 · Capacidade
                 </p>
                 <h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">
@@ -625,7 +625,7 @@ export function OnboardingWizard() {
 
             {stage === 6 ? (
               <section>
-                <p className="text-sm font-bold text-[#675ada]">
+                <p className="text-sm font-bold text-[#0054fc]">
                   06 · Conclusão
                 </p>
                 <h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">
@@ -682,12 +682,12 @@ export function OnboardingWizard() {
 
             {stage === 7 ? (
               <section>
-                <p className="text-sm font-bold text-[#675ada]">07 · Marca</p>
+                <p className="text-sm font-bold text-[#0054fc]">07 · Marca</p>
                 <h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">
                   Dê o tom da experiência.
                 </h2>
                 <div className="mt-7 grid gap-6 sm:grid-cols-[190px_1fr]">
-                  <label className="focus-within:ring-4 flex min-h-[180px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[20px] border-2 border-dashed border-[#d8d5e6] bg-[#faf9fd] p-4 text-center">
+                  <label className="focus-within:ring-4 flex min-h-[180px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[20px] border-2 border-dashed border-[#d8d5e6] bg-[#f7fbff] p-4 text-center">
                     {brand.logoDataUrl ? (
                       <img
                         src={brand.logoDataUrl}
@@ -696,7 +696,7 @@ export function OnboardingWizard() {
                       />
                     ) : (
                       <>
-                        <Upload size={22} className="text-[#6355dc]" />
+                        <Upload size={22} className="text-[#0054fc]" />
                         <strong className="mt-3 text-xs">Enviar logo</strong>
                         <span className="mt-1 text-[11px] text-[#85858e]">
                           PNG, JPG, WebP ou SVG
@@ -720,7 +720,7 @@ export function OnboardingWizard() {
                           type="button"
                           key={item}
                           onClick={() => update("personality", item)}
-                          className={`focus-ring rounded-full border px-3 py-2 text-xs font-semibold ${form.personality === item ? "border-[#7164e7] bg-[#efedff] text-[#584bd0]" : "border-[#dfdee6]"}`}
+                          className={`focus-ring rounded-full border px-3 py-2 text-xs font-semibold ${form.personality === item ? "border-[#0054fc] bg-[#eaf3ff] text-[#0054fc]" : "border-[#dfdee6]"}`}
                         >
                           {item}
                         </button>
@@ -742,7 +742,7 @@ export function OnboardingWizard() {
                               activePalette: variation.palette,
                             }));
                           }}
-                          className={`rounded-xl border p-2 ${form.visualDirection === variation.name ? "border-[#6d5ef5] ring-2 ring-[#6d5ef5]/10" : "border-[#dfdee6]"}`}
+                          className={`rounded-xl border p-2 ${form.visualDirection === variation.name ? "border-[#0054fc] ring-2 ring-[#0054fc]/10" : "border-[#dfdee6]"}`}
                         >
                           <span className="flex h-12 overflow-hidden rounded-lg">
                             {[
@@ -766,7 +766,7 @@ export function OnboardingWizard() {
                   </div>
                 </div>
                 {analyzing ? (
-                  <p className="mt-5 flex items-center gap-2 text-sm font-semibold text-[#5d50d3]">
+                  <p className="mt-5 flex items-center gap-2 text-sm font-semibold text-[#0054fc]">
                     <LoaderCircle size={17} className="animate-spin" />{" "}
                     Analisando identidade…
                   </p>
@@ -776,7 +776,7 @@ export function OnboardingWizard() {
 
             {stage === 8 ? (
               <section>
-                <p className="text-sm font-bold text-[#675ada]">08 · Revisão</p>
+                <p className="text-sm font-bold text-[#0054fc]">08 · Revisão</p>
                 {project ? (
                   <>
                     <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#e8f7ef] px-3 py-2 text-xs font-bold text-[#147a57]">
@@ -816,9 +816,9 @@ export function OnboardingWizard() {
                     <h2 className="mt-3 text-3xl font-extrabold tracking-[-.04em]">
                       Confira como a Sobe entendeu seu negócio.
                     </h2>
-                    <div className="mt-6 rounded-[20px] border border-[#dfdcf2] bg-[#f9f8ff] p-5">
+                    <div className="mt-6 rounded-[20px] border border-[#eaf3ff] bg-[#f7fbff] p-5">
                       <div className="flex flex-wrap items-start justify-between gap-3"><div><strong className="text-sm">Análise opcional com IA</strong><p className="mt-1 text-xs leading-5 text-[#74747e]">Receba sugestões sem substituir nenhum dado preenchido.</p></div><Button type="button" size="sm" variant="secondary" disabled={aiAnalyzing} onClick={() => void analyzeWithAI()}>{aiAnalyzing ? <LoaderCircle size={15} className="animate-spin" /> : <WandSparkles size={15} />}{aiAnalyzing ? "Analisando" : "Analisar e sugerir com IA"}</Button></div>
-                      {aiSuggestions.length ? <div className="mt-4"><p className="mb-2 text-xs font-bold">Escolha o que deseja aplicar:</p><div className="flex flex-wrap gap-2">{aiSuggestions.map((key) => <button type="button" key={key} onClick={() => setSelectedAISuggestions((current) => toggleValue(current, key))} className={`focus-ring rounded-full border px-3 py-2 text-xs font-bold ${selectedAISuggestions.includes(key) ? "border-[#6658d9] bg-[#ebe8ff] text-[#5547c4]" : "border-[#dedce7] bg-white text-[#666670]"}`}>{selectedAISuggestions.includes(key) ? "✓ " : ""}{capabilityRegistry[key].label}</button>)}</div><p className="mt-3 text-xs text-[#777781]">Somente as sugestões marcadas serão acrescentadas ao rascunho.</p></div> : null}
+                      {aiSuggestions.length ? <div className="mt-4"><p className="mb-2 text-xs font-bold">Escolha o que deseja aplicar:</p><div className="flex flex-wrap gap-2">{aiSuggestions.map((key) => <button type="button" key={key} onClick={() => setSelectedAISuggestions((current) => toggleValue(current, key))} className={`focus-ring rounded-full border px-3 py-2 text-xs font-bold ${selectedAISuggestions.includes(key) ? "border-[#0054fc] bg-[#eaf3ff] text-[#0054fc]" : "border-[#dedce7] bg-white text-[#666670]"}`}>{selectedAISuggestions.includes(key) ? "✓ " : ""}{capabilityRegistry[key].label}</button>)}</div><p className="mt-3 text-xs text-[#777781]">Somente as sugestões marcadas serão acrescentadas ao rascunho.</p></div> : null}
                     </div>
                     <div className="mt-7 rounded-[20px] bg-[#f6f5f9] p-5">
                       <strong className="text-sm">Caminhos sugeridos</strong>
@@ -826,7 +826,7 @@ export function OnboardingWizard() {
                         {suggestedCapabilities.map((capability) => (
                           <span
                             key={capability.key}
-                            className="rounded-full bg-white px-3 py-2 text-xs font-bold text-[#5c50cf]"
+                            className="rounded-full bg-white px-3 py-2 text-xs font-bold text-[#0054fc]"
                           >
                             {capabilityRegistry[capability.key].label}
                           </span>
@@ -912,10 +912,10 @@ export function OnboardingWizard() {
             ) : null}
           </main>
 
-          <aside className="relative overflow-hidden border-l border-[#e7e6ed] bg-[#f5f3fb] p-7">
-            <div className="absolute -right-16 -top-16 size-48 rounded-full bg-[#dcd7ff] blur-3xl" />
+          <aside className="relative overflow-hidden border-l border-[#e7e6ed] bg-[#f7fbff] p-7">
+            <div className="absolute -right-16 -top-16 size-48 rounded-full bg-[#9fc3ff] blur-3xl" />
             <div className="relative">
-              <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-bold text-[#6558da] shadow-sm">
+              <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-bold text-[#0054fc] shadow-sm">
                 <Sparkles size={14} /> Conversão em construção
               </span>
               {project ? (

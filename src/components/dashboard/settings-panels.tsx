@@ -39,7 +39,7 @@ export function SettingsNav({
           <Link
             key={String(value)}
             href={`/app/settings/${String(value)}`}
-            className={`focus-ring inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-xl px-4 text-sm font-bold ${active === value ? "bg-[#17171c] text-white" : "border border-[#dfdee6] bg-white text-[#686873]"}`}
+            className={`focus-ring inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-xl px-4 text-sm font-bold ${active === value ? "bg-[#0054fc] text-white" : "border border-[#dfdee6] bg-white text-[#686873]"}`}
           >
             <ItemIcon size={16} />
             {String(label)}
@@ -116,7 +116,7 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
       </p>
       <section className="mt-7 rounded-[22px] border border-[#e4e3ea] bg-white p-6">
         <h2 className="flex items-center gap-2 font-extrabold">
-          <Globe2 size={18} className="text-[#6255d8]" /> Informações públicas
+          <Globe2 size={18} className="text-[#0054fc]" /> Informações públicas
         </h2>
         <div className="mt-6 grid gap-5 sm:grid-cols-2">
           <div>
@@ -170,7 +170,7 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
               <input
                 type="checkbox"
                 defaultChecked
-                className="accent-[#6d5ef5]"
+                className="accent-[#0054fc]"
               />
               <span className="text-sm">Permitir mecanismos de busca</span>
             </label>
@@ -193,7 +193,7 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
           Cada publicação gera um snapshot no banco.
         </p>
         <div className="mt-5 flex items-center gap-4 rounded-[16px] bg-[#f5f4f8] p-4">
-          <span className="grid size-10 place-items-center rounded-xl bg-[#e7e3ff] font-extrabold text-[#5e50d2]">
+          <span className="grid size-10 place-items-center rounded-xl bg-[#eaf3ff] font-extrabold text-[#0054fc]">
             v{project.version}
           </span>
           <span className="flex-1">

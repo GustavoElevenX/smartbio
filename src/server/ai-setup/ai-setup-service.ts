@@ -21,6 +21,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { assertProjectAccess } from "@/server/auth/project-access";
 import { loadProjectForActor } from "@/server/projects/load-project-for-actor";
 import { createPresencePage } from "@/features/presence/presence-page-service";
+import { uploadMedia } from "@/server/media/media-service";
 import type { DataRequirement, ExperienceCompositionInput, Project } from "@/types";
 
 export class AISetupNotFoundError extends Error {}
@@ -52,9 +53,73 @@ function resolvedRequirements(requirements: DataRequirement[], answers: Record<s
   });
 }
 
+function scalarFactValue(value: unknown): string | number | boolean | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
 function mergeProjectRequirements(project: Project, session: AISetupSession) {
   const byKey = new Map(session.missingRequirements.map((item) => [item.key, item]));
   return (project.dataRequirements || []).map((item) => byKey.get(item.key) || item);
+}
+
+function applyBrandIdentity(project: Project, session: AISetupSession): Project {
+  const identity = session.initialInput.brandIdentity;
+  if (!identity) return project;
+  return {
+    ...project,
+    visualDirection: identity.visualDirection,
+    brand: {
+      ...project.brand,
+      extractedColors: identity.extractedColors,
+      activePalette: identity.activePalette,
+      paletteVariations: identity.paletteVariations,
+      brandPersonality: identity.brandPersonality,
+      analysisMetadata: {
+        confidence: identity.analysisMetadata.confidence,
+        orientation: identity.analysisMetadata.orientation,
+        luminance: identity.analysisMetadata.luminance,
+        colorCount: identity.analysisMetadata.colorCount,
+      },
+    },
+    designSystem: {
+      ...project.designSystem,
+      colors: identity.activePalette,
+      spacing: { ...project.designSystem.spacing, density: identity.density },
+      typography: {
+        ...project.designSystem.typography,
+        scale: identity.brandPersonality.some((item) => item.toLowerCase().includes("vibr")) ? "expressive" : project.designSystem.typography.scale,
+      },
+    },
+  };
+}
+
+async function materializeBrandLogo(actor: AISetupActor, session: AISetupSession, projectId: string) {
+  const identity = session.initialInput.brandIdentity;
+  if (!identity || actor.persistence !== "database") return;
+  const database = createServiceClient();
+  if (!database) throw new Error("Supabase não configurado.");
+  const { data: current } = await database.from("brand_profiles").select("primary_logo_asset_id").eq("project_id", projectId).maybeSingle();
+  if (current?.primary_logo_asset_id) return;
+  const source = await sourceRepository.get(actor, identity.sourceId);
+  if (!source?.storagePath || !source.mimeType) throw new Error("A logo analisada não está mais disponível.");
+  const { data: stored, error: downloadError } = await database.storage.from("business-sources").download(source.storagePath);
+  if (downloadError || !stored) throw new Error("Não foi possível recuperar a logo analisada.");
+  const logo = new File([await stored.arrayBuffer()], source.name, { type: source.mimeType });
+  const asset = await uploadMedia(actor, projectId, logo, { assetType: "logo", altText: `Logo de ${session.initialInput.businessName}`, tags: ["marca", "logo-principal"] });
+  const { error: brandError } = await database.from("brand_profiles").update({ primary_logo_asset_id: asset.id }).eq("project_id", projectId);
+  if (brandError) throw new Error("A logo foi enviada, mas não pôde ser vinculada à marca.");
+  const { data: projectRow } = await database.from("projects").select("settings").eq("id", projectId).single();
+  const settings = projectRow?.settings && typeof projectRow.settings === "object" ? projectRow.settings as Record<string, unknown> : {};
+  const payload = settings.projectPayload && typeof settings.projectPayload === "object" ? settings.projectPayload as Project : undefined;
+  if (payload) {
+    await database.from("projects").update({ settings: { ...settings, projectPayload: { ...payload, brand: { ...payload.brand, primaryLogoAssetId: asset.id } } } }).eq("id", projectId);
+  }
 }
 
 export class AISetupService {
@@ -77,7 +142,8 @@ export class AISetupService {
     };
     const created = await this.repository.create(actor, session);
     if (actor.persistence === "database") {
-      await sourceRepository.attachToSession(actor, sources.map((source) => source.id), created.id);
+      const sourceIds = [...sources.map((source) => source.id), ...(initialInput.brandIdentity?.sourceId ? [initialInput.brandIdentity.sourceId] : [])];
+      await sourceRepository.attachToSession(actor, sourceIds, created.id);
     }
     await this.repository.addMessage(actor, created.id, "user", initialInput.description, { kind: "business_description" });
     return created;
@@ -106,7 +172,7 @@ export class AISetupService {
         const parsed = extractedBusinessSourceSchema.safeParse(source.extractedData);
         if (!parsed.success) continue;
         const reviewed = await sourceRepository.listFacts(actor, source.id);
-        sourceData.push({ ...parsed.data, facts: reviewed.filter((fact) => fact.verificationStatus !== "rejected").map((fact) => ({ key: fact.key, value: fact.value, origin: source.type === "website" ? "website" as const : "document" as const, sourceId: source.id, evidenceExcerpt: fact.evidenceExcerpt, confidence: fact.confidence || 0, verificationStatus: fact.verificationStatus === "verified" ? "verified" as const : fact.verificationStatus === "invalid" ? "invalid" as const : "needs_confirmation" as const })) });
+        sourceData.push({ ...parsed.data, facts: reviewed.filter((fact) => fact.verificationStatus !== "rejected").map((fact) => ({ key: fact.key, value: scalarFactValue(fact.value), origin: source.type === "website" ? "website" as const : "document" as const, sourceId: source.id, evidenceExcerpt: fact.evidenceExcerpt ?? null, confidence: fact.confidence || 0, verificationStatus: fact.verificationStatus === "verified" ? "verified" as const : fact.verificationStatus === "invalid" ? "invalid" as const : "needs_confirmation" as const })) });
       }
     }
 
@@ -214,6 +280,7 @@ export class AISetupService {
         if (cta && page.defaultConversionGoalId) cta.content = { primaryAction: { type: "start_conversion_goal", label: project.primaryGoal || "Começar", conversionGoalId: page.defaultConversionGoalId, style: "primary" } };
         project = { ...project, presence: { pages: [page] } };
       }
+      project = applyBrandIdentity(project, session);
       const next = await this.repository.update(actor, {
         ...session,
         status: "review",
@@ -252,6 +319,7 @@ export class AISetupService {
       p_actor_id: actor.userId,
     });
     if (error) throw new Error("Não foi possível vincular as fontes ao projeto.");
+    await materializeBrandLogo(actor, session, projectId);
     let applied = { applied: 0, skipped: 0 };
     if (applyVerifiedFacts) {
       const sources = await sourceRepository.list(actor, projectId);

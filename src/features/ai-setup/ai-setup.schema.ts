@@ -35,31 +35,88 @@ export const setupQuestionSchema = z.object({
 
 export const extractedFactSchema = z.object({
   key: z.string().min(1).max(160),
-  value: z.unknown().nullable(),
+  value: z.union([z.string(), z.number(), z.boolean()]).nullable(),
   origin: dataOriginSchema,
   sourceId: z.string(),
-  evidenceExcerpt: z.string().max(500).optional(),
+  evidenceExcerpt: z.string().max(500).nullable(),
   confidence: z.number().min(0).max(1),
   verificationStatus: verificationStatusSchema,
+});
+
+const extractedAttributeSchema = z.object({
+  key: z.string().min(1).max(120),
+  value: z.string().max(1000),
+});
+
+const extractedEntitySchema = z.object({
+  name: z.string().max(240).nullable(),
+  description: z.string().max(1200).nullable(),
+  attributes: z.array(extractedAttributeSchema).max(30),
+});
+
+export const brandPaletteSchema = z.object({
+  sourceColors: z.array(z.string()).max(6),
+  primary: z.string(),
+  primaryForeground: z.string(),
+  secondary: z.string(),
+  secondaryForeground: z.string(),
+  accent: z.string(),
+  accentForeground: z.string(),
+  background: z.string(),
+  surface: z.string(),
+  surfaceElevated: z.string(),
+  foreground: z.string(),
+  muted: z.string(),
+  mutedForeground: z.string(),
+  border: z.string(),
+  success: z.string(),
+  warning: z.string(),
+  destructive: z.string(),
+  gradientStart: z.string(),
+  gradientEnd: z.string(),
+});
+
+export const brandIdentitySchema = z.object({
+  sourceId: z.string(),
+  fileName: z.string().min(1).max(240),
+  extractedColors: z.array(z.string()).min(1).max(6),
+  activePalette: brandPaletteSchema,
+  paletteVariations: z.array(z.object({
+    name: z.enum(["Fiel", "Equilibrada", "Ousada"]),
+    palette: brandPaletteSchema,
+  })).length(3),
+  brandPersonality: z.array(z.string().min(1).max(80)).max(6),
+  visualDirection: z.string().min(1).max(240),
+  density: z.enum(["compact", "balanced", "spacious"]),
+  contrast: z.enum(["soft", "balanced", "strong"]),
+  typographySuggestion: z.string().max(160),
+  imageUsage: z.string().max(240),
+  analysisMetadata: z.object({
+    confidence: z.number().min(0).max(1),
+    orientation: z.enum(["horizontal", "vertical", "square"]),
+    luminance: z.enum(["light", "dark", "mixed"]),
+    colorCount: z.number().int().min(1).max(6),
+    aiEnhanced: z.boolean(),
+  }),
 });
 
 export const extractedBusinessSourceSchema = z.object({
   summary: z.string().max(1000),
   facts: z.array(extractedFactSchema).max(200),
-  services: z.array(z.record(z.string(), z.unknown())).max(100),
-  products: z.array(z.record(z.string(), z.unknown())).max(300),
+  services: z.array(extractedEntitySchema).max(100),
+  products: z.array(extractedEntitySchema).max(300),
   categories: z.array(z.string().max(160)).max(100),
-  schedules: z.array(z.record(z.string(), z.unknown())).max(100),
-  prices: z.array(z.record(z.string(), z.unknown())).max(200).default([]),
-  locations: z.array(z.record(z.string(), z.unknown())).max(100),
-  openingHours: z.array(z.record(z.string(), z.unknown())).max(100).default([]),
-  contacts: z.array(z.record(z.string(), z.unknown())).max(100).default([]),
+  schedules: z.array(extractedEntitySchema).max(100),
+  prices: z.array(extractedEntitySchema).max(200),
+  locations: z.array(extractedEntitySchema).max(100),
+  openingHours: z.array(extractedEntitySchema).max(100),
+  contacts: z.array(extractedEntitySchema).max(100),
   policies: z.array(z.string().max(1000)).max(100),
-  accommodations: z.array(z.record(z.string(), z.unknown())).max(100),
-  reservableUnits: z.array(z.record(z.string(), z.unknown())).max(100).default([]),
-  frequentlyAskedQuestions: z.array(z.record(z.string(), z.unknown())).max(100).default([]),
-  brandStatements: z.array(z.record(z.string(), z.unknown())).max(100).default([]),
-  destinations: z.array(z.record(z.string(), z.unknown())).max(100),
+  accommodations: z.array(extractedEntitySchema).max(100),
+  reservableUnits: z.array(extractedEntitySchema).max(100),
+  frequentlyAskedQuestions: z.array(extractedEntitySchema).max(100),
+  brandStatements: z.array(extractedEntitySchema).max(100),
+  destinations: z.array(extractedEntitySchema).max(100),
   warnings: z.array(z.string().max(400)).max(50),
 });
 
@@ -79,6 +136,7 @@ export const setupInitialInputSchema = z.object({
   websiteUrl: z.url().optional(),
   phone: z.string().trim().max(40).optional(),
   logoReference: z.string().trim().max(500).optional(),
+  brandIdentity: brandIdentitySchema.optional(),
 });
 
 export const sourceReferenceSchema = z.object({
@@ -124,4 +182,5 @@ export type ExtractedBusinessSource = z.infer<typeof extractedBusinessSourceSche
 export type BusinessAnalysisResult = z.infer<typeof businessAnalysisResultSchema>;
 export type CopyGenerationResult = z.infer<typeof copyGenerationResultSchema>;
 export type BrandAIResult = z.infer<typeof brandAIResultSchema>;
+export type BrandIdentity = z.infer<typeof brandIdentitySchema>;
 export type SourceReference = z.infer<typeof sourceReferenceSchema>;

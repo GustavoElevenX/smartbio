@@ -103,11 +103,11 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
       {/*
       <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_1.15fr]">
         <div className="rounded-[24px] border border-[#e4e2e9] bg-white p-6">
-          <Zap className="text-[#6657d8]" size={20} />
+          <Zap className="text-[#0054fc]" size={20} />
           <h2 className="mt-5 text-xl font-black">Ativações</h2>
           <p className="mt-2 text-sm text-[#74717d]">{activationStats.active} ativas · {activationStats.scheduled} agendadas</p>
           <p className="mt-5 text-sm leading-6 text-[#686570]">Faça o site acompanhar promoções, lançamentos, agenda e o que precisa vender agora.</p>
-          <Link href={`/app/projects/${project.id}/activations`} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#dedbe8] px-4 text-sm font-bold text-[#5c4ed0]">Ver ativações <ArrowRight size={15}/></Link>
+          <Link href={`/app/projects/${project.id}/activations`} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#dedbe8] px-4 text-sm font-bold text-[#0054fc]">Ver ativações <ArrowRight size={15}/></Link>
         </div>
         <div className="rounded-[24px] bg-[#1d1b26] p-6 text-white">
           <h2 className="text-xl font-black">O que você quer melhorar agora?</h2>
@@ -123,7 +123,7 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
     <div className="animate-enter">
       <header className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div>
-          <p className="text-sm font-bold text-[#6657d8]">{project.name}</p>
+          <p className="text-sm font-bold text-[#0054fc]">{project.name}</p>
           <h1 className="mt-2 max-w-3xl text-3xl font-black tracking-[-.045em] sm:text-4xl">
             Sua presença está transformando atenção em oportunidade?
           </h1>
@@ -133,7 +133,7 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
         </div>
         <Link
           href={`/app/projects/${project.id}/site`}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#17171c] px-4 text-sm font-bold text-white"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0054fc] px-4 text-sm font-bold text-white"
         >
           <Globe2 size={17} />
           Editar site
@@ -152,7 +152,7 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
               key={String(label)}
               className="rounded-[20px] border border-[#e4e2e9] bg-white p-5"
             >
-              <CardIcon size={18} className="text-[#6657d8]" />
+              <CardIcon size={18} className="text-[#0054fc]" />
               <strong className="mt-7 block text-3xl">{Number(value)}</strong>
               <span className="mt-1 text-sm font-bold text-[#6f6b76]">
                 {String(label)}
@@ -163,11 +163,11 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
       </div>
       <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_1.15fr]">
         <div className="rounded-[24px] border border-[#e4e2e9] bg-white p-6">
-          <Zap className="text-[#6657d8]" size={20} />
+          <Zap className="text-[#0054fc]" size={20} />
           <h2 className="mt-5 text-xl font-black">Ativações</h2>
           <p className="mt-2 text-sm text-[#74717d]">{activationStats.active} ativas · {activationStats.scheduled} agendadas</p>
           <p className="mt-5 text-sm leading-6 text-[#686570]">Faça o site acompanhar promoções, lançamentos, agenda e o que precisa vender agora.</p>
-          <Link href={`/app/projects/${project.id}/activations`} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#dedbe8] px-4 text-sm font-bold text-[#5c4ed0]">Ver ativações <ArrowRight size={15} /></Link>
+          <Link href={`/app/projects/${project.id}/activations`} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#dedbe8] px-4 text-sm font-bold text-[#0054fc]">Ver ativações <ArrowRight size={15} /></Link>
         </div>
         <div className="rounded-[24px] bg-[#1d1b26] p-6 text-white">
           <h2 className="text-xl font-black">O que você quer melhorar agora?</h2>
@@ -186,7 +186,7 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
             </div>
             <Link
               href={`/app/projects/${project.id}/analytics`}
-              className="text-xs font-black text-[#5c4ed0]"
+              className="text-xs font-black text-[#0054fc]"
             >
               Ver analytics <ArrowRight className="inline" size={14} />
             </Link>
@@ -213,7 +213,7 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
                   key={String(text)}
                   className="rounded-2xl bg-[#f6f5f8] p-4"
                 >
-                  <ItemIcon size={16} className="text-[#6657d8]" />
+                  <ItemIcon size={16} className="text-[#0054fc]" />
                   <strong className="mt-5 block text-sm">{String(text)}</strong>
                 </div>
               );
@@ -222,7 +222,7 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
         </section>
       ) : (
         <section className="mt-6 rounded-[26px] border border-dashed border-[#cbc7d5] bg-white p-8 sm:p-10">
-          <Sparkles className="text-[#6657d8]" />
+          <Sparkles className="text-[#0054fc]" />
           <h2 className="mt-5 text-2xl font-black">
             Sua presença ainda não está no ar.
           </h2>
@@ -242,7 +242,7 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
           </ul>
           <Link
             href="/app/onboarding/ai"
-            className="mt-7 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#17171c] px-4 text-sm font-bold text-white"
+            className="mt-7 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0054fc] px-4 text-sm font-bold text-white"
           >
             Criar com IA <ArrowRight size={16} />
           </Link>

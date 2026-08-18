@@ -3,17 +3,18 @@ import { ArrowRight } from "lucide-react";
 import { Brand } from "@/components/ui/brand";
 
 export function MarketingHeader() {
-  return <header className="fixed inset-x-0 top-0 z-50 border-b border-black/[.055] bg-[#f7f7fa]/85 backdrop-blur-xl">
+  return <header className="fixed inset-x-0 top-0 z-50 border-b border-[#dfe6ee] bg-[#f7f8fa]/88 backdrop-blur-xl">
+    <div className="sobe-gradient-rule absolute inset-x-0 bottom-[-1px] opacity-70" />
     <div className="container-shell flex h-[72px] items-center justify-between">
       <Brand />
       <nav className="hidden items-center gap-7 text-sm font-medium text-[#5d5d68] md:flex" aria-label="Principal">
-        <Link href="/#como-funciona" className="hover:text-[#17171c]">Como funciona</Link>
-        <Link href="/#exemplos" className="hover:text-[#17171c]">Exemplos</Link>
-        <Link href="/pricing" className="hover:text-[#17171c]">Planos</Link>
+        <Link href="/#como-funciona" className="hover:text-[#07172f]">Como funciona</Link>
+        <Link href="/#exemplos" className="hover:text-[#07172f]">Exemplos</Link>
+        <Link href="/pricing" className="hover:text-[#07172f]">Planos</Link>
       </nav>
       <div className="flex items-center gap-2">
         <Link href="/app" className="focus-ring hidden rounded-xl px-3 py-2 text-sm font-semibold text-[#555560] hover:bg-white sm:inline-flex">Abrir painel</Link>
-        <Link href="/app/onboarding" className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#17171c] px-4 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(23,23,28,.16)] transition hover:bg-[#2b2b31]">Começar grátis <ArrowRight size={16} /></Link>
+        <Link href="/app/onboarding" className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0054fc] px-4 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(0,84,252,.22)] transition hover:bg-[#0048d9]">Começar grátis <ArrowRight size={16} /></Link>
       </div>
     </div>
   </header>;

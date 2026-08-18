@@ -30,7 +30,7 @@ const statusLabel = {
 const statusStyle = {
   new: "bg-[#e8edff] text-[#425fbd]",
   contacted: "bg-[#fff4dc] text-[#9a6a10]",
-  qualified: "bg-[#eeeaff] text-[#604bc5]",
+  qualified: "bg-[#eaf3ff] text-[#0054fc]",
   converted: "bg-[#e7f7ef] text-[#147b58]",
   lost: "bg-[#f0eff3] text-[#72727b]",
 };
@@ -110,7 +110,7 @@ export function LeadsDashboard({ projectId }: { projectId: string }) {
           >
             <ArrowLeft size={14} /> Projetos
           </Link>
-          <p className="text-sm font-semibold text-[#6d5ef5]">{project.name}</p>
+          <p className="text-sm font-semibold text-[#0054fc]">{project.name}</p>
           <h1 className="mt-1 text-3xl font-extrabold tracking-[-.04em]">
             Leads capturados
           </h1>
@@ -163,7 +163,7 @@ export function LeadsDashboard({ projectId }: { projectId: string }) {
           <button
             key={item}
             onClick={() => setStatus(status === item ? "all" : item)}
-            className={`rounded-[17px] border bg-white p-4 text-left transition ${status === item ? "border-[#7669e6] ring-4 ring-[#7669e6]/10" : "border-[#e4e3ea]"}`}
+            className={`rounded-[17px] border bg-white p-4 text-left transition ${status === item ? "border-[#0186fc] ring-4 ring-[#0186fc]/10" : "border-[#e4e3ea]"}`}
           >
             <span className="text-xs font-semibold text-[#777781]">
               {statusLabel[item]}
@@ -199,7 +199,7 @@ export function LeadsDashboard({ projectId }: { projectId: string }) {
         {filtered.length === 0 ? (
           <div className="grid min-h-72 place-items-center p-8 text-center">
             <div>
-              <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-[#eeecff] text-[#6558db]">
+              <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-[#eaf3ff] text-[#0054fc]">
                 <Users />
               </span>
               <h2 className="mt-4 font-extrabold">Nenhum lead encontrado</h2>
@@ -212,7 +212,7 @@ export function LeadsDashboard({ projectId }: { projectId: string }) {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[850px] text-left">
               <thead>
-                <tr className="border-b border-[#e8e7ed] bg-[#fafafd] text-[11px] font-bold uppercase tracking-wider text-[#85858f]">
+                <tr className="border-b border-[#e8e7ed] bg-[#f7fbff] text-[11px] font-bold uppercase tracking-wider text-[#85858f]">
                   <th className="px-5 py-3">Lead</th>
                   <th className="px-5 py-3">Interesse</th>
                   <th className="px-5 py-3">Origem</th>
@@ -225,7 +225,7 @@ export function LeadsDashboard({ projectId }: { projectId: string }) {
                 {filtered.map((lead) => (
                   <tr
                     key={lead.id}
-                    className="border-b border-[#eeedf2] last:border-0 hover:bg-[#fbfbfd]"
+                    className="border-b border-[#eeedf2] last:border-0 hover:bg-[#f7fbff]"
                   >
                     <td className="px-5 py-4">
                       <strong className="block text-sm">
@@ -359,8 +359,8 @@ export function LeadsDashboard({ projectId }: { projectId: string }) {
               )}
             </div>
             {selected.commercialAction ? (
-              <div className="mt-7 rounded-[18px] border border-[#dcd8ff] bg-[#f0eeff] p-5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#6558db]">
+              <div className="mt-7 rounded-[18px] border border-[#9fc3ff] bg-[#eaf3ff] p-5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#0054fc]">
                   Contexto comercial
                 </span>
                 <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
@@ -428,8 +428,8 @@ export function LeadsDashboard({ projectId }: { projectId: string }) {
               </div>
             </div>
             {selected.recommendation && (
-              <div className="mt-6 rounded-[18px] border border-[#dcd8ff] bg-[#f0eeff] p-5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#6558db]">
+              <div className="mt-6 rounded-[18px] border border-[#9fc3ff] bg-[#eaf3ff] p-5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#0054fc]">
                   Recomendação recebida
                 </span>
                 <strong className="mt-2 block text-lg">
@@ -470,7 +470,7 @@ export function LeadsDashboard({ projectId }: { projectId: string }) {
                     key={`${item.label}-${index}`}
                     className="flex items-center gap-3 text-xs"
                   >
-                    <span className="grid size-6 place-items-center rounded-full bg-[#6d5ef5] text-white">
+                    <span className="grid size-6 place-items-center rounded-full bg-[#0054fc] text-white">
                       <span className="size-1.5 rounded-full bg-white" />
                     </span>
                     <span className="flex-1">{item.label}</span>
@@ -487,7 +487,7 @@ export function LeadsDashboard({ projectId }: { projectId: string }) {
             <a
               href={`/${project.slug}`}
               target="_blank"
-              className="mt-6 inline-flex items-center gap-2 text-xs font-bold text-[#6255d8]"
+              className="mt-6 inline-flex items-center gap-2 text-xs font-bold text-[#0054fc]"
             >
               Abrir experiência <ExternalLink size={14} />
             </a>

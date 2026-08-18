@@ -1,15 +1,65 @@
 @import "tailwindcss";
 
 :root {
-  --ink: #17171c;
-  --muted-ink: #686873;
-  --canvas: #f7f7fa;
+  --sobe-blue: #0054fc;
+  --sobe-blue-light: #0186fc;
+  --sobe-cyan: #01d2df;
+  --sobe-turquoise: #02e5cd;
+  --sobe-navy: #07172f;
+  --sobe-off-white: #f7f8fa;
+  --sobe-gradient: linear-gradient(110deg, #02e5cd 0%, #01d2df 32%, #0186fc 66%, #0054fc 100%);
+  --ink: var(--sobe-navy);
+  --muted-ink: #536178;
+  --canvas: var(--sobe-off-white);
   --surface: #ffffff;
-  --line: #e7e6ee;
-  --brand: #6d5ef5;
-  --brand-2: #ff725e;
-  --brand-soft: #efedff;
+  --line: #dfe6ee;
+  --brand: var(--sobe-blue);
+  --brand-hover: #0048d9;
+  --brand-2: var(--sobe-turquoise);
+  --brand-soft: #eaf3ff;
+  --accent-soft: #e9fffc;
   --success: #14966b;
+  --background: var(--canvas);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--brand);
+  --primary-foreground: #ffffff;
+  --secondary: #eef4fa;
+  --secondary-foreground: var(--ink);
+  --muted: #eef2f6;
+  --muted-foreground: var(--muted-ink);
+  --accent: var(--accent-soft);
+  --accent-foreground: var(--ink);
+  --destructive: #c43c3c;
+  --destructive-foreground: #ffffff;
+  --border: var(--line);
+  --input: #d5dee9;
+  --ring: var(--sobe-blue-light);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 }
 
 * { box-sizing: border-box; }
@@ -20,24 +70,27 @@ body {
   background: var(--canvas);
   font-family: Inter, "DM Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   text-rendering: optimizeLegibility;
+  caret-color: var(--brand);
 }
 button, input, textarea, select { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button:not(:disabled), a { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .55; }
-::selection { background: #dcd8ff; color: #2d246c; }
+::selection { background: #aef5ed; color: var(--sobe-navy); }
 
 .container-shell { width: min(1180px, calc(100% - 40px)); margin-inline: auto; }
 .focus-ring:focus-visible { outline: 3px solid color-mix(in srgb, var(--brand) 36%, transparent); outline-offset: 3px; }
 .glass { background: color-mix(in srgb, white 78%, transparent); backdrop-filter: blur(18px); border: 1px solid color-mix(in srgb, white 70%, transparent); }
 .text-balance { text-wrap: balance; }
 .animate-enter { animation: enter .42s cubic-bezier(.2,.8,.2,1) both; }
+.sobe-gradient { background-image: var(--sobe-gradient); }
+.sobe-gradient-rule { height: 3px; background-image: var(--sobe-gradient); }
 .marketing-grid {
-  background-image: linear-gradient(rgba(109,94,245,.055) 1px, transparent 1px), linear-gradient(90deg, rgba(109,94,245,.055) 1px, transparent 1px);
+  background-image: linear-gradient(rgba(0,84,252,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(0,84,252,.06) 1px, transparent 1px);
   background-size: 48px 48px;
 }
 .dot-grid { background-image: radial-gradient(currentColor 1px, transparent 1px); background-size: 18px 18px; }
-.scrollbar-thin { scrollbar-width: thin; scrollbar-color: #cbc9d6 transparent; }
+.scrollbar-thin { scrollbar-width: thin; scrollbar-color: #9fb1c7 transparent; }
 
 .presence-page :is(h1, h2, h3, h4) { font-family: var(--presence-heading-font), Inter, ui-sans-serif, system-ui, sans-serif; }
 .presence-page :is(a, button) { border-radius: var(--presence-button-radius); }

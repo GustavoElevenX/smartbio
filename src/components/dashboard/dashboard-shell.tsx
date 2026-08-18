@@ -210,8 +210,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <div className="p-3">
         <Popover>
           <PopoverTrigger asChild>
-            <button className="focus-ring flex w-full items-center gap-3 rounded-xl border border-[#e4e3ea] bg-white p-3 text-left shadow-sm">
-              <span className="grid size-8 place-items-center rounded-lg bg-[#e9e6ff] text-xs font-extrabold text-[#5748d2]">
+            <button className="focus-ring flex w-full items-center gap-3 rounded-xl border border-[#dfe6ee] bg-white p-3 text-left shadow-sm">
+              <span className="grid size-8 place-items-center rounded-lg bg-[#e9fffc] text-xs font-extrabold text-[#0054fc]">
                 {activeWorkspace?.name.slice(0, 2).toUpperCase() || "SB"}
               </span>
               <span className="min-w-0 flex-1">
@@ -271,8 +271,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               className={cn(
                 "focus-ring flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition",
                 active
-                  ? "bg-[#eae7ff] text-[#5548c8]"
-                  : "text-[#666670] hover:bg-[#eeeeF3] hover:text-[#27272c]",
+                  ? "bg-[#eaf3ff] text-[#0054fc]"
+                  : "text-[#536178] hover:bg-[#eef4fa] hover:text-[#07172f]",
               )}
             >
               <Icon size={18} />
@@ -286,8 +286,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           className={cn(
             "focus-ring flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold",
             pathname.startsWith("/app/settings")
-              ? "bg-[#eae7ff] text-[#5548c8]"
-              : "text-[#666670] hover:bg-[#eeeef3]",
+              ? "bg-[#eaf3ff] text-[#0054fc]"
+              : "text-[#536178] hover:bg-[#eef4fa]",
           )}
         >
           <Settings size={18} />
@@ -295,31 +295,32 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </Link>
         <Link
           href="/pricing"
-          className="focus-ring flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-[#666670] hover:bg-[#eeeef3]"
+          className="focus-ring flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-[#536178] hover:bg-[#eef4fa]"
         >
           <CreditCard size={18} />
           Planos
         </Link>
       </nav>
       <div className="p-3">
-        <div className="rounded-[18px] bg-[#1d1c23] p-4 text-white">
-          <HelpCircle size={19} className="text-[#aea5ff]" />
+        <div className="relative overflow-hidden rounded-[18px] bg-[#07172f] p-4 text-white">
+          <div className="sobe-gradient-rule absolute inset-x-0 top-0" />
+          <HelpCircle size={19} className="text-[#02e5cd]" />
           <strong className="mt-5 block text-sm">Precisa de ajuda?</strong>
           <p className="mt-1 text-xs leading-5 text-white/55">
             Consulte o guia de configuração.
           </p>
           <Link
             href="/app/onboarding"
-            className="mt-3 inline-flex text-xs font-bold text-[#bdb6ff]"
+            className="mt-3 inline-flex text-xs font-bold text-[#01d2df]"
           >
             Abrir guia →
           </Link>
         </div>
         <button
           onClick={logout}
-          className="focus-ring mt-2 flex w-full items-center gap-3 rounded-xl p-3 text-left text-sm text-[#696973] hover:bg-[#eeeef3]"
+          className="focus-ring mt-2 flex w-full items-center gap-3 rounded-xl p-3 text-left text-sm text-[#536178] hover:bg-[#eef4fa]"
         >
-          <span className="grid size-8 place-items-center rounded-full bg-[#e2dfff] text-xs font-extrabold text-[#5649c9]">
+          <span className="grid size-8 place-items-center rounded-full bg-[#eaf3ff] text-xs font-extrabold text-[#0054fc]">
             {user.name.slice(0, 2).toUpperCase()}
           </span>
           <span className="min-w-0 flex-1">
@@ -334,8 +335,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     </>
   );
   return (
-    <div className="min-h-screen bg-[#f7f7fa]">
-      <aside className="fixed inset-y-0 left-0 z-50 hidden w-[250px] flex-col border-r border-[#e5e4ec] bg-[#f9f9fb] lg:flex">
+    <div className="min-h-screen bg-[#f7f8fa]">
+      <aside className="fixed inset-y-0 left-0 z-50 hidden w-[250px] flex-col border-r border-[#dfe6ee] bg-[#f7f8fa] lg:flex">
         {sidebar}
       </aside>
       {open && (
@@ -344,14 +345,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           onClick={() => setOpen(false)}
         >
           <aside
-            className="flex h-full w-[280px] flex-col bg-[#f9f9fb]"
+            className="flex h-full w-[280px] flex-col bg-[#f7f8fa]"
             onClick={(event) => event.stopPropagation()}
           >
             {sidebar}
           </aside>
         </div>
       )}
-      <header className="fixed inset-x-0 top-0 z-40 flex h-[73px] items-center justify-between border-b border-[#e5e4ec] bg-white/90 px-4 backdrop-blur-xl lg:left-[250px] lg:px-7">
+      <header className="fixed inset-x-0 top-0 z-40 flex h-[73px] items-center justify-between border-b border-[#dfe6ee] bg-white/90 px-4 backdrop-blur-xl lg:left-[250px] lg:px-7">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setOpen(true)}
@@ -371,7 +372,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <NotificationBell />
           <Link
             href="/app/projects/new"
-            className="focus-ring inline-flex min-h-10 items-center rounded-xl bg-[#17171c] px-4 text-sm font-bold text-white"
+            className="focus-ring inline-flex min-h-10 items-center rounded-xl bg-[#0054fc] px-4 text-sm font-bold text-white shadow-[0_8px_22px_rgba(0,84,252,.2)] transition hover:bg-[#0048d9]"
           >
             Novo negócio
           </Link>

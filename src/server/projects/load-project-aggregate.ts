@@ -26,7 +26,7 @@ export async function loadProjectAggregate(
   if (!supabase) return null;
   const tables = [
     ["projects", "id,workspace_id,name,slug,description,status,primary_goal,category,theme,settings,published_at,created_at,updated_at"],
-    ["brand_profiles", "extracted_colors,active_palette,palette_variations,design_system,brand_personality,analysis_metadata"],
+    ["brand_profiles", "primary_logo_asset_id,light_logo_asset_id,dark_logo_asset_id,favicon_asset_id,extracted_colors,active_palette,palette_variations,design_system,brand_personality,analysis_metadata"],
     ["business_profiles", "signals"],
     ["project_capabilities", "capability_key,enabled,source,settings"],
     ["project_data_requirements", "id,requirement_key,label,capability_key,status,severity,value,origin,source_id,field_metadata,reason"],
@@ -48,7 +48,7 @@ export async function loadProjectAggregate(
     ["routing_rules", "id,destination_id,conditions,priority,is_active"],
     ["business_locations", "id,name,address_line,address_number,address_extra,neighborhood,city,state,postal_code,country_code,latitude,longitude,geocoding_status,geocoding_provider,geocoded_at,phone,whatsapp,external_url,timezone,opening_hours,service_radius_km,delivery_radius_km,supports_delivery,supports_pickup,supports_in_person,priority,is_active,routing_destination_id,settings"],
     ["project_policies", "id,policy_type,title,content,is_active,settings"],
-    ["journey_steps", "id,type,title,description,step_order,is_active,settings,content_blocks(id,block_type,block_order,content,settings),step_options(id,label,description,icon,value,option_order,action_type,target_step_id,conversion_goal_id,action_payload),form_definitions(form_fields(id,label,field_key,field_type,placeholder,required,field_order,options))"],
+    ["journey_steps", "id,type,title,description,step_order,is_active,settings,content_blocks(id,block_type,block_order,content,settings),step_options!step_options_step_id_fkey(id,label,description,icon,value,option_order,action_type,target_step_id,conversion_goal_id,action_payload),form_definitions(form_fields(id,label,field_key,field_type,placeholder,required,field_order,options))"],
   ] as const;
   const results = await Promise.all(tables.map(([table, columns]) => {
     let query = supabase.from(table).select(columns);

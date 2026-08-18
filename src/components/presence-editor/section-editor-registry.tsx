@@ -19,7 +19,7 @@ interface EditorProps {
   onChange(section: PresenceSection): void;
 }
 const input =
-  "mt-1 min-h-10 w-full rounded-xl border border-[#dedce7] bg-white px-3 text-sm outline-none focus:border-[#786be2] focus:ring-4 focus:ring-[#786be2]/10";
+  "mt-1 min-h-10 w-full rounded-xl border border-[#dedce7] bg-white px-3 text-sm outline-none focus:border-[#0186fc] focus:ring-4 focus:ring-[#0186fc]/10";
 const label = "block text-xs font-extrabold text-[#55515e]";
 function patchContent(props: EditorProps, patch: Record<string, unknown>) {
   props.onChange({
@@ -68,7 +68,7 @@ function ActionEditor({
         <button
           type="button"
           onClick={() => onChange(defaultAction)}
-          className="mt-3 inline-flex min-h-9 items-center rounded-xl bg-[#eeeafe] px-3 text-xs font-black text-[#5e50d1]"
+          className="mt-3 inline-flex min-h-9 items-center rounded-xl bg-[#f7fbff] px-3 text-xs font-black text-[#0054fc]"
         >
           <Plus size={14} className="mr-1.5" />
           Adicionar ação
@@ -195,7 +195,7 @@ function ActionEditor({
         <>
           <label className={`${label} mt-3`}>
             Telefone
-            {project.phone ? <button type="button" className="float-right text-[11px] text-[#5e50d1]" onClick={() => onChange({ ...current, whatsappPhone: project.phone })}>Usar padrão</button> : null}
+            {project.phone ? <button type="button" className="float-right text-[11px] text-[#0054fc]" onClick={() => onChange({ ...current, whatsappPhone: project.phone })}>Usar padrão</button> : null}
             <input
               className={input}
               value={current.whatsappPhone || ""}

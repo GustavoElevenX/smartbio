@@ -97,7 +97,7 @@ export function RedemptionValidator() {
     <div>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <Brand size="sm" className="text-[#6048df]" />
+          <Brand size="sm" className="text-[#0054fc]" />
           <h1 className="mt-2 text-4xl font-black tracking-[-.05em]">
             Validar benefício
           </h1>
@@ -129,7 +129,7 @@ export function RedemptionValidator() {
             type="button"
             onClick={validate}
             disabled={code.length !== 7 || Boolean(busy)}
-            className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#5638d6] font-extrabold text-white disabled:opacity-50"
+            className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0054fc] font-extrabold text-white disabled:opacity-50"
           >
             {busy === "validate" ? (
               <Loader2 className="animate-spin" size={18} />
@@ -157,7 +157,7 @@ export function RedemptionValidator() {
               type="button"
               onClick={consume}
               disabled={Boolean(busy) || (Boolean(subtotal) && !calculation)}
-              className="mt-4 inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#5638d6] px-5 font-extrabold text-white disabled:opacity-50"
+              className="mt-4 inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#0054fc] px-5 font-extrabold text-white disabled:opacity-50"
             >
               {busy === "consume" ? <Loader2 className="animate-spin" /> : null}
               Confirmar resgate

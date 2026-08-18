@@ -88,7 +88,7 @@ export async function analyzeBrandFile(file: File): Promise<BrandProfile> {
   const width = image.naturalWidth * ratio; const height = image.naturalHeight * ratio;
   context.drawImage(image, (size - width) / 2, (size - height) / 2, width, height);
   const extracted = quantize(context.getImageData(0, 0, size, size).data);
-  const colors = extracted.length ? extracted : ["#6D5EF5", "#FF725E", "#19B88B"];
+  const colors = extracted.length ? extracted : ["#0054FC", "#0186FC", "#01D2DF", "#02E5CD"];
   const baseLuminance = colors.reduce((sum, color) => sum + luminance(color), 0) / colors.length;
   const avgSaturation = colors.reduce((sum, color) => sum + saturation(color), 0) / colors.length;
 

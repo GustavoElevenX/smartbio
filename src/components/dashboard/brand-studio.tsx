@@ -74,7 +74,7 @@ export function BrandStudio({ projectId }: { projectId: string }) {
   if (project === undefined)
     return (
       <div className="grid min-h-[600px] place-items-center">
-        <LoaderCircle className="animate-spin text-[#6d5ef5]" />
+        <LoaderCircle className="animate-spin text-[#0054fc]" />
       </div>
     );
   if (!project)
@@ -111,7 +111,7 @@ export function BrandStudio({ projectId }: { projectId: string }) {
           >
             <ArrowLeft size={14} /> Projetos
           </Link>
-          <p className="text-sm font-semibold text-[#6d5ef5]">{project.name}</p>
+          <p className="text-sm font-semibold text-[#0054fc]">{project.name}</p>
           <h1 className="mt-1 text-3xl font-extrabold tracking-[-.04em]">
             Brand Studio
           </h1>
@@ -133,7 +133,7 @@ export function BrandStudio({ projectId }: { projectId: string }) {
           </span>
           <Link
             href={`/app/projects/${project.id}/editor`}
-            className="focus-ring inline-flex min-h-11 items-center rounded-xl bg-[#17171c] px-4 text-sm font-bold text-white"
+            className="focus-ring inline-flex min-h-11 items-center rounded-xl bg-[#0054fc] px-4 text-sm font-bold text-white"
           >
             Voltar ao editor
           </Link>
@@ -151,7 +151,7 @@ export function BrandStudio({ projectId }: { projectId: string }) {
               <button
                 key={value}
                 onClick={() => setTab(value as typeof tab)}
-                className={`min-h-14 border-b-2 px-4 text-xs font-bold ${tab === value ? "border-[#6d5ef5] text-[#5d50d2]" : "border-transparent text-[#74747e]"}`}
+                className={`min-h-14 border-b-2 px-4 text-xs font-bold ${tab === value ? "border-[#0054fc] text-[#0054fc]" : "border-transparent text-[#74747e]"}`}
               >
                 {label}
               </button>
@@ -161,14 +161,14 @@ export function BrandStudio({ projectId }: { projectId: string }) {
             {tab === "identity" && (
               <div>
                 <div className="flex items-center gap-2">
-                  <ImagePlus size={18} className="text-[#6255d8]" />
+                  <ImagePlus size={18} className="text-[#0054fc]" />
                   <h2 className="font-extrabold">Logos e favicon</h2>
                 </div>
                 <p className="mt-2 text-sm leading-6 text-[#74747e]">
                   O original é preservado. O corte existe apenas no preview.
                 </p>
                 <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                  <label className="focus-within:ring-4 focus-within:ring-[#6d5ef5]/10 flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-[20px] border-2 border-dashed border-[#d8d6e3] bg-[#faf9fd] p-4">
+                  <label className="focus-within:ring-4 focus-within:ring-[#0054fc]/10 flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-[20px] border-2 border-dashed border-[#d8d6e3] bg-[#f7fbff] p-4">
                     {project.brand.logoDataUrl ? (
                       <img
                         src={project.brand.logoDataUrl}
@@ -176,7 +176,7 @@ export function BrandStudio({ projectId }: { projectId: string }) {
                         className="max-h-24 max-w-full object-contain"
                       />
                     ) : (
-                      <Upload className="text-[#6558db]" />
+                      <Upload className="text-[#0054fc]" />
                     )}
                     <strong className="mt-3 text-xs">Logo principal</strong>
                     <span className="mt-1 text-[10px] text-[#85858f]">
@@ -200,7 +200,7 @@ export function BrandStudio({ projectId }: { projectId: string }) {
                       />
                     ) : (
                       <>
-                        <Upload className="text-[#aaa1fa]" />
+                        <Upload className="text-[#02e5cd]" />
                         <strong className="mt-3 text-xs">Versão clara</strong>
                         <span className="mt-1 text-[10px] text-white/45">
                           Opcional para fundos escuros
@@ -229,7 +229,7 @@ export function BrandStudio({ projectId }: { projectId: string }) {
                   </label>
                 </div>
                 {analyzing && (
-                  <div className="mt-4 flex items-center gap-2 rounded-xl bg-[#efedff] p-3 text-xs font-bold text-[#5c4fd1]">
+                  <div className="mt-4 flex items-center gap-2 rounded-xl bg-[#eaf3ff] p-3 text-xs font-bold text-[#0054fc]">
                     <LoaderCircle size={16} className="animate-spin" />{" "}
                     Extraindo paleta e verificando contraste…
                   </div>
@@ -278,7 +278,7 @@ export function BrandStudio({ projectId }: { projectId: string }) {
             {tab === "colors" && (
               <div>
                 <div className="flex items-center gap-2">
-                  <Palette size={18} className="text-[#6255d8]" />
+                  <Palette size={18} className="text-[#0054fc]" />
                   <h2 className="font-extrabold">Paleta semântica</h2>
                 </div>
                 <p className="mt-2 text-sm leading-6 text-[#74747e]">
@@ -304,7 +304,7 @@ export function BrandStudio({ projectId }: { projectId: string }) {
                             visualDirection: variation.name,
                           })
                         }
-                        className={`rounded-[16px] border p-3 text-left ${project.visualDirection === variation.name ? "border-[#6d5ef5] bg-[#f0eeff]" : "border-[#e0dfe7]"}`}
+                        className={`rounded-[16px] border p-3 text-left ${project.visualDirection === variation.name ? "border-[#0054fc] bg-[#eaf3ff]" : "border-[#e0dfe7]"}`}
                       >
                         <div className="flex gap-1">
                           {[
@@ -369,7 +369,7 @@ export function BrandStudio({ projectId }: { projectId: string }) {
                         },
                       });
                   }}
-                  className="mt-6 inline-flex items-center gap-2 text-xs font-bold text-[#6255d8]"
+                  className="mt-6 inline-flex items-center gap-2 text-xs font-bold text-[#0054fc]"
                 >
                   <RefreshCw size={14} /> Restaurar sugestões automáticas
                 </button>
@@ -378,7 +378,7 @@ export function BrandStudio({ projectId }: { projectId: string }) {
             {tab === "typography" && (
               <div>
                 <div className="flex items-center gap-2">
-                  <Sparkles size={18} className="text-[#6255d8]" />
+                  <Sparkles size={18} className="text-[#0054fc]" />
                   <h2 className="font-extrabold">Tipografia</h2>
                 </div>
                 <p className="mt-2 text-sm leading-6 text-[#74747e]">
@@ -489,7 +489,7 @@ export function BrandStudio({ projectId }: { projectId: string }) {
                   </div>
                 </div>
                 <div className="mt-7 rounded-[20px] border border-[#e3e2e9] p-6">
-                  <span className="text-xs font-bold text-[#6558db]">
+                  <span className="text-xs font-bold text-[#0054fc]">
                     Prévia tipográfica
                   </span>
                   <h3
@@ -515,7 +515,7 @@ export function BrandStudio({ projectId }: { projectId: string }) {
             {tab === "style" && (
               <div>
                 <div className="flex items-center gap-2">
-                  <Sparkles size={18} className="text-[#6255d8]" />
+                  <Sparkles size={18} className="text-[#0054fc]" />
                   <h2 className="font-extrabold">
                     Forma, profundidade e movimento
                   </h2>
@@ -546,7 +546,7 @@ export function BrandStudio({ projectId }: { projectId: string }) {
                           },
                         })
                       }
-                      className="w-full accent-[#6d5ef5]"
+                      className="w-full accent-[#0054fc]"
                     />
                   </div>
                   <div>

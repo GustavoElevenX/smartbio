@@ -47,13 +47,13 @@ export function saturation(hex: string) {
 }
 
 export function buildPalette(colors: string[], mode: "faithful" | "balanced" | "bold" = "balanced"): BrandPalette {
-  const source = colors.length ? colors : ["#6D5EF5", "#FF725E", "#19B88B"];
+  const source = colors.length ? colors : ["#0054FC", "#0186FC", "#01D2DF", "#02E5CD"];
   const primary = source[0];
   const secondary = source[1] || mix(primary, "#FFFFFF", 0.28);
   const accent = source[2] || mix(primary, "#FFB020", 0.48);
   const isDark = mode === "bold" && luminance(primary) < 0.45;
-  const background = isDark ? mix(primary, "#090A0E", 0.86) : mode === "faithful" ? mix(primary, "#FFFFFF", 0.94) : "#F7F7FA";
-  const foreground = isDark ? "#F8F8FB" : "#17171C";
+  const background = isDark ? mix(primary, "#090A0E", 0.86) : mode === "faithful" ? mix(primary, "#FFFFFF", 0.94) : "#f7f8fa";
+  const foreground = isDark ? "#F8F8FB" : "#07172f";
   const surface = isDark ? mix(primary, "#11131A", 0.8) : "#FFFFFF";
   return {
     sourceColors: source.slice(0, 6),

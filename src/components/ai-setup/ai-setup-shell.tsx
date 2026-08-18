@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { MessagesSquare, PanelRight } from "lucide-react";
 import { AIConversation, type InitialSetupForm } from "@/components/ai-setup/ai-conversation";
 import { Button } from "@/components/ui/button";
-import { aiSetupSessionSchema, type AISetupSession, type SourceReference } from "@/features/ai-setup/ai-setup.schema";
+import { aiSetupSessionSchema, type AISetupSession, type BrandIdentity, type SourceReference } from "@/features/ai-setup/ai-setup.schema";
 import { forgetAISetupSession, readRememberedAISetupSession, rememberAISetupSession } from "@/features/ai-setup/ai-setup-state";
 import { projectRepository } from "@/lib/repositories/project-repository";
 import type { Project } from "@/types";
@@ -29,6 +29,8 @@ export function AISetupShell({ startFresh = false }: AISetupShellProps) {
   const router = useRouter();
   const [form, setForm] = useState<InitialSetupForm>(initialForm);
   const [sources, setSources] = useState<SourceReference[]>([]);
+  const [brandIdentity, setBrandIdentity] = useState<BrandIdentity>();
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string>();
   const [session, setSession] = useState<AISetupSession | null>(null);
   const [busy, setBusy] = useState(false);
   const [busyQuestion, setBusyQuestion] = useState<string>();
@@ -43,6 +45,7 @@ export function AISetupShell({ startFresh = false }: AISetupShellProps) {
     setSession(parsed);
     setForm({ requestedSurface: parsed.initialInput.requestedSurface || "recommend", businessName: parsed.initialInput.businessName, description: parsed.initialInput.description, websiteUrl: parsed.initialInput.websiteUrl || "", phone: parsed.initialInput.phone || "" });
     setSources(parsed.sources);
+    setBrandIdentity(parsed.initialInput.brandIdentity);
     setProjectId(parsed.projectId);
     if (parsed.projectDraft) setGenerationStatus("ready");
     rememberAISetupSession(parsed);
@@ -78,7 +81,7 @@ export function AISetupShell({ startFresh = false }: AISetupShellProps) {
     }
     setBusy(true); setError("");
     try {
-      const created = await apiCall<AISetupSession>("/api/ai/setup/start", { method: "POST", body: JSON.stringify({ input: { requestedSurface: form.requestedSurface, businessName: form.businessName.trim(), description: form.description.trim(), websiteUrl: form.websiteUrl.trim() || undefined, phone: form.phone.trim() || undefined }, sources }) });
+      const created = await apiCall<AISetupSession>("/api/ai/setup/start", { method: "POST", body: JSON.stringify({ input: { requestedSurface: form.requestedSurface, businessName: form.businessName.trim(), description: form.description.trim(), websiteUrl: form.websiteUrl.trim() || undefined, phone: form.phone.trim() || undefined, brandIdentity }, sources }) });
       adopt(created);
       adopt(await apiCall<AISetupSession>(`/api/ai/setup/${created.id}/analyze`, { method: "POST", body: "{}" }));
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Não foi possível analisar o negócio."); }
@@ -109,11 +112,11 @@ export function AISetupShell({ startFresh = false }: AISetupShellProps) {
 
   return (
     <div className="animate-enter">
-      <div className="mb-5 flex items-end justify-between gap-4"><div><p className="text-xs font-extrabold uppercase tracking-[.14em] text-[#6d5ef5]">Novo negócio · IA</p><h2 className="mt-1 text-xl font-extrabold tracking-[-.03em]">Onboarding adaptativo</h2></div><p className="hidden max-w-md text-right text-xs leading-5 text-[#7b7985] md:block">Funciona em modo local e usa Supabase/OpenAI automaticamente quando o ambiente estiver configurado.</p></div>
+      <div className="mb-5 flex items-end justify-between gap-4"><div><p className="text-xs font-extrabold uppercase tracking-[.14em] text-[#0054fc]">Novo negócio · IA</p><h2 className="mt-1 text-xl font-extrabold tracking-[-.03em]">Onboarding adaptativo</h2></div><p className="hidden max-w-md text-right text-xs leading-5 text-[#7b7985] md:block">Funciona em modo local e usa Supabase/OpenAI automaticamente quando o ambiente estiver configurado.</p></div>
       <div className="mb-3 grid grid-cols-2 rounded-xl bg-[#e9e7ef] p-1 lg:hidden"><Button type="button" size="sm" variant={mobilePanel === "conversation" ? "primary" : "ghost"} onClick={() => setMobilePanel("conversation")}><MessagesSquare data-icon size={15} /> Conversa</Button><Button type="button" size="sm" variant={mobilePanel === "preview" ? "primary" : "ghost"} onClick={() => setMobilePanel("preview")}><PanelRight data-icon size={15} /> Prévia</Button></div>
       <div className="overflow-hidden rounded-[28px] border border-[#e3e1e9] bg-white shadow-[0_20px_65px_rgba(29,26,52,.07)] lg:grid lg:min-h-[720px] lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_370px]">
-        <div className={mobilePanel === "conversation" ? "block" : "hidden lg:block"}><AIConversation form={form} sources={sources} session={session} busy={busy || restoring} busyQuestion={busyQuestion} generationStatus={generationStatus} projectId={projectId} error={error} onFormChange={setForm} onSourcesChange={setSources} onAnalyze={analyze} onAnswer={answer} onGenerate={generate} onOpenEditor={() => projectId && router.push(`/app/projects/${projectId}/editor`)} /></div>
-        <div className={mobilePanel === "preview" ? "block" : "hidden lg:block"}><SetupPreview session={session} businessName={form.businessName} description={form.description} /></div>
+        <div className={mobilePanel === "conversation" ? "block" : "hidden lg:block"}><AIConversation form={form} sources={sources} brandIdentity={brandIdentity} logoPreviewUrl={logoPreviewUrl} session={session} busy={busy || restoring} busyQuestion={busyQuestion} generationStatus={generationStatus} projectId={projectId} error={error} onFormChange={setForm} onSourcesChange={setSources} onBrandIdentityChange={(brand, previewUrl) => { setBrandIdentity(brand); setLogoPreviewUrl(previewUrl); }} onAnalyze={analyze} onAnswer={answer} onGenerate={generate} onOpenEditor={() => projectId && router.push(`/app/projects/${projectId}/editor`)} /></div>
+        <div className={mobilePanel === "preview" ? "block" : "hidden lg:block"}><SetupPreview session={session} businessName={form.businessName} description={form.description} brandIdentity={brandIdentity} logoPreviewUrl={logoPreviewUrl} /></div>
       </div>
     </div>
   );

@@ -29,9 +29,9 @@ export default function InvitePage() {
     router.refresh();
   }
   return (
-    <main className="grid min-h-screen place-items-center bg-[#f7f7fa] p-6">
+    <main className="grid min-h-screen place-items-center bg-[#f7f8fa] p-6">
       <section className="w-full max-w-lg rounded-3xl border bg-white p-8 text-center shadow-sm">
-        <p className="text-sm font-bold text-[#6255d8]">Convite Sobe</p>
+        <p className="text-sm font-bold text-[#0054fc]">Convite Sobe</p>
         <h1 className="mt-3 text-3xl font-extrabold">
           Colabore neste workspace
         </h1>
@@ -41,7 +41,7 @@ export default function InvitePage() {
         <button
           type="button"
           onClick={() => void accept()}
-          className="mt-7 min-h-12 rounded-xl bg-[#17171c] px-5 font-bold text-white"
+          className="mt-7 min-h-12 rounded-xl bg-[#0054fc] px-5 font-bold text-white"
         >
           Aceitar convite
         </button>

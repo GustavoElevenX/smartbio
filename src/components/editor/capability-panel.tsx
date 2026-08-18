@@ -74,9 +74,9 @@ export function CapabilityPanel({
   }
 
   return (
-    <div className="mb-6 rounded-[18px] border border-[#dedde6] bg-[#fafafd] p-4">
+    <div className="mb-6 rounded-[18px] border border-[#dedde6] bg-[#f7fbff] p-4">
       <div className="flex items-start gap-3">
-        <span className="grid size-9 place-items-center rounded-xl bg-[#eae7ff] text-[#5f52d6]">
+        <span className="grid size-9 place-items-center rounded-xl bg-[#eaf3ff] text-[#0054fc]">
           <SlidersHorizontal size={17} />
         </span>
         <span>
@@ -99,7 +99,7 @@ export function CapabilityPanel({
               className="rounded-xl border border-[#e4e3ea] bg-white"
             >
               <div className="flex items-center gap-2 p-3">
-                <Icon size={16} className="text-[#6558da]" />
+                <Icon size={16} className="text-[#0054fc]" />
                 <span className="min-w-0 flex-1">
                   <strong className="block text-xs">{definition.label}</strong>
                   {!definition.enabledByFeature ? (
@@ -116,7 +116,7 @@ export function CapabilityPanel({
                     onChange={(event) =>
                       updateCapability(key, { enabled: event.target.checked })
                     }
-                    className="accent-[#6d5ef5]"
+                    className="accent-[#0054fc]"
                   />{" "}
                   Ativa
                 </label>

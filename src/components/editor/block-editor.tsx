@@ -84,7 +84,7 @@ export function BlockEditor({
   return (
     <div className="mt-6 border-t border-[#e5e4eb] pt-6">
       <div className="mb-3 flex items-center gap-2">
-        <Braces size={16} className="text-[#6255d8]" />
+        <Braces size={16} className="text-[#0054fc]" />
         <Label>Blocos desta etapa</Label>
       </div>
       <div className="space-y-3">
@@ -141,11 +141,11 @@ function QuickBlock({ block, step, project, onUpdate, onRemove }: { block: Conte
   const [error, setError] = useState("");
   const commit = (next: Record<string, unknown>) => setError(onUpdate(next));
   const services = project.commercialConfig?.serviceOfferings?.filter((item) => item.isActive) || [];
-  return <div className="rounded-[15px] border border-[#e3e2e9] bg-[#fafafd] p-3"><div className="mb-3 flex items-center justify-between"><strong className="text-[11px] uppercase tracking-wider text-[#5e52ce]">{blockLabels[block.type]}</strong><button type="button" onClick={onRemove} className="text-[#b84545]" aria-label={`Remover ${blockLabels[block.type]}`}><Trash2 size={15} /></button></div>
+  return <div className="rounded-[15px] border border-[#e3e2e9] bg-[#f7fbff] p-3"><div className="mb-3 flex items-center justify-between"><strong className="text-[11px] uppercase tracking-wider text-[#0054fc]">{blockLabels[block.type]}</strong><button type="button" onClick={onRemove} className="text-[#b84545]" aria-label={`Remover ${blockLabels[block.type]}`}><Trash2 size={15} /></button></div>
     {block.type === "text" ? <div><Label htmlFor={`block-text-${block.id}`}>Texto</Label><Textarea id={`block-text-${block.id}`} className="min-h-24" value={String(content.text || "")} onChange={(event) => commit({ ...content, text: event.target.value })} /></div> : null}
     {block.type === "form" ? <p className="text-xs leading-5 text-[#6f6d78]">Usa os {step.formFields?.length || 0} campos configurados no construtor visual desta etapa.</p> : null}
     {block.type === "choice_grid" ? <p className="text-xs leading-5 text-[#6f6d78]">Usa as {step.options?.length || 0} opções da etapa e seus destinos configurados.</p> : null}
-    {block.type === "service_selector" ? <div className="grid gap-3"><div><Label htmlFor={`service-key-${block.id}`}>Chave da resposta</Label><Input id={`service-key-${block.id}`} value={String(content.fieldKey || "service")} onChange={(event) => commit({ ...content, fieldKey: event.target.value })} /></div><fieldset><legend className="mb-2 text-xs font-bold">Serviços exibidos</legend><div className="grid gap-2">{services.map((service) => { const selected = Array.isArray(content.services) && content.services.some((item) => typeof item === "object" && item && "id" in item && item.id === service.id); return <label key={service.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={selected} onChange={(event) => { const current = Array.isArray(content.services) ? content.services.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object")) : []; const next = event.target.checked ? [...current, { id: service.id, name: service.name }] : current.filter((item) => item.id !== service.id); commit({ ...content, services: next, options: undefined }); }} className="accent-[#6658d9]" />{service.name}</label>; })}</div></fieldset></div> : null}
+    {block.type === "service_selector" ? <div className="grid gap-3"><div><Label htmlFor={`service-key-${block.id}`}>Chave da resposta</Label><Input id={`service-key-${block.id}`} value={String(content.fieldKey || "service")} onChange={(event) => commit({ ...content, fieldKey: event.target.value })} /></div><fieldset><legend className="mb-2 text-xs font-bold">Serviços exibidos</legend><div className="grid gap-2">{services.map((service) => { const selected = Array.isArray(content.services) && content.services.some((item) => typeof item === "object" && item && "id" in item && item.id === service.id); return <label key={service.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={selected} onChange={(event) => { const current = Array.isArray(content.services) ? content.services.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object")) : []; const next = event.target.checked ? [...current, { id: service.id, name: service.name }] : current.filter((item) => item.id !== service.id); commit({ ...content, services: next, options: undefined }); }} className="accent-[#0054fc]" />{service.name}</label>; })}</div></fieldset></div> : null}
     {block.type === "catalog_categories" ? <p className="text-xs leading-5 text-[#6f6d78]">Exibe automaticamente {project.commercialConfig?.catalogCategories?.length || 0} categorias ativas do catálogo.</p> : null}
     {block.type === "catalog_item_cards" ? <p className="text-xs leading-5 text-[#6f6d78]">Exibe automaticamente {project.commercialConfig?.catalogItems?.filter((item) => item.isAvailable).length || 0} itens disponíveis.</p> : null}
     {block.type === "fulfillment_selector" ? <p className="text-xs leading-5 text-[#6f6d78]">Mostra as opções de entrega e retirada habilitadas para o catálogo.</p> : null}
@@ -177,9 +177,9 @@ function JsonBlock({
     }
   }
   return (
-    <div className="rounded-[15px] border border-[#e3e2e9] bg-[#fafafd] p-3">
+    <div className="rounded-[15px] border border-[#e3e2e9] bg-[#f7fbff] p-3">
       <div className="mb-2 flex items-center justify-between">
-        <strong className="text-[11px] uppercase tracking-wider text-[#5e52ce]">
+        <strong className="text-[11px] uppercase tracking-wider text-[#0054fc]">
           {block.type.replaceAll("_", " ")}
         </strong>
         <button

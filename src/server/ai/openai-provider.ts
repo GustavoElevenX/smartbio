@@ -331,13 +331,22 @@ export class OpenAIVirouProvider implements VirouAIProvider {
   }
 
   analyzeBrand(input: BrandAIInput) {
+    const instruction = {
+      type: "input_text" as const,
+      text: `DADOS_DELIMITADOS_INICIO\n${JSON.stringify({ businessName: input.businessName, businessDescription: input.businessDescription, extractedColors: input.extractedColors, logoDescription: input.logoDescription })}\nDADOS_DELIMITADOS_FIM`,
+    };
+    const visual = input.fileData && input.mimeType?.startsWith("image/")
+      ? { type: "input_image" as const, image_url: `data:${input.mimeType};base64,${input.fileData}`, detail: "high" as const }
+      : undefined;
     return this.structured({
       operation: "brand_analysis",
       schemaName: "brand_analysis",
       schema: brandAIResultSchema,
       systemPrompt: brandAnalysisPrompt,
       payload: input,
+      userContent: visual ? [instruction, visual] : [instruction],
       context: input,
+      model: visual ? this.visionModel : undefined,
     });
   }
 }

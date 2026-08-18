@@ -36,7 +36,7 @@ export function ProjectsList() {
     <div className="animate-enter">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-semibold text-[#6d5ef5]">Negócios</p>
+          <p className="text-sm font-semibold text-[#0054fc]">Negócios</p>
           <h1 className="mt-1 text-3xl font-extrabold tracking-[-.04em]">
             Experiências do workspace
           </h1>
@@ -46,7 +46,7 @@ export function ProjectsList() {
         </div>
         <Link
           href="/app/projects/new"
-          className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#17171c] px-4 text-sm font-bold text-white"
+          className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0054fc] px-4 text-sm font-bold text-white"
         >
           <Plus size={17} /> Novo negócio
         </Link>
@@ -105,7 +105,7 @@ export function ProjectsList() {
                   href={`/${project.slug}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#6053d6]"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0054fc]"
                 >
                   Abrir <ExternalLink size={13} />
                 </a>

@@ -78,7 +78,7 @@ function toneClasses(tone: ReturnType<typeof sectionTone>) {
     : tone === "brand"
       ? "bg-[var(--presence-primary)] text-white"
       : tone === "dark"
-        ? "bg-[#17161b] text-white"
+        ? "bg-[#07172f] text-white"
         : tone === "default"
           ? ""
           : "";
@@ -216,7 +216,7 @@ export function PresenceSectionRenderer({
           className={`mx-auto grid items-center ${variant === "minimal" ? "min-h-[360px]" : "min-h-[480px]"} ${variant === "editorial" ? "gap-8 md:grid-cols-[1.2fr_.8fr]" : showSideImage && !centered ? "gap-12 md:grid-cols-2" : "md:grid-cols-1"} ${sectionWidth(page, section)}`}
         >
           <div
-            className={`${centered ? "text-center md:col-span-2 md:mx-auto md:max-w-4xl" : ""} ${imageFirst && showSideImage ? "md:order-2" : ""} ${variant === "offer_focus" ? "rounded-2xl bg-white p-7 text-[#17161b] shadow-[0_24px_70px_rgba(15,23,42,.22)] md:p-10" : ""}`}
+            className={`${centered ? "text-center md:col-span-2 md:mx-auto md:max-w-4xl" : ""} ${imageFirst && showSideImage ? "md:order-2" : ""} ${variant === "offer_focus" ? "rounded-2xl bg-white p-7 text-[#07172f] shadow-[0_24px_70px_rgba(15,23,42,.22)] md:p-10" : ""}`}
           >
             {section.eyebrow ? (
               <p className="mb-4 text-xs font-black uppercase tracking-[.2em] text-[var(--presence-primary)]">
@@ -234,7 +234,7 @@ export function PresenceSectionRenderer({
                 {content.badges.map((badge: string) => (
                   <span
                     key={badge}
-                    className="rounded-full border border-black/10 bg-white/85 px-3 py-1 text-xs font-bold text-[#17161b]"
+                    className="rounded-full border border-black/10 bg-white/85 px-3 py-1 text-xs font-bold text-[#07172f]"
                   >
                     {badge}
                   </span>
@@ -311,7 +311,7 @@ export function PresenceSectionRenderer({
         {(content.items || []).map((item: any) => (
           <article
             key={item.id}
-            className="rounded-3xl border border-black/10 bg-white/80 p-6 text-[#17161b] shadow-sm"
+            className="rounded-3xl border border-black/10 bg-white/80 p-6 text-[#07172f] shadow-sm"
           >
             <span className="grid size-10 place-items-center rounded-xl bg-[var(--presence-primary)]/10 text-[var(--presence-primary)]">
               <Check size={18} />
@@ -338,7 +338,7 @@ export function PresenceSectionRenderer({
           return (
             <article
               key={service.id}
-              className={`overflow-hidden rounded-3xl border border-black/10 bg-white text-[#17161b] shadow-sm ${content.layout === "featured" && index === 0 ? "md:col-span-2 md:grid md:grid-cols-2" : content.layout === "list" ? "md:grid md:grid-cols-[minmax(220px,32%)_1fr]" : ""}`}
+              className={`overflow-hidden rounded-3xl border border-black/10 bg-white text-[#07172f] shadow-sm ${content.layout === "featured" && index === 0 ? "md:col-span-2 md:grid md:grid-cols-2" : content.layout === "list" ? "md:grid md:grid-cols-[minmax(220px,32%)_1fr]" : ""}`}
             >
               {image ? (
                 <div data-presence-media className="relative aspect-[16/10]">
@@ -408,7 +408,7 @@ export function PresenceSectionRenderer({
           return (
             <article
               key={item.id}
-              className={`overflow-hidden rounded-3xl border border-black/10 bg-white text-[#17161b] ${content.layout === "carousel" ? "w-[78%] shrink-0 snap-center sm:w-[46%] md:w-[30%]" : ""} ${content.layout === "featured" && index === 0 ? "md:col-span-2 md:row-span-2" : ""}`}
+              className={`overflow-hidden rounded-3xl border border-black/10 bg-white text-[#07172f] ${content.layout === "carousel" ? "w-[78%] shrink-0 snap-center sm:w-[46%] md:w-[30%]" : ""} ${content.layout === "featured" && index === 0 ? "md:col-span-2 md:row-span-2" : ""}`}
             >
               {image ? (
                 <div data-presence-media className="relative aspect-square">
@@ -493,7 +493,7 @@ export function PresenceSectionRenderer({
           .map((item: any) => (
             <div
               key={item.id}
-              className="rounded-3xl border border-black/10 bg-white/80 p-6 text-[#17161b]"
+              className="rounded-3xl border border-black/10 bg-white/80 p-6 text-[#07172f]"
             >
               <strong className="text-3xl font-black text-[var(--presence-primary)]">
                 {item.value}
@@ -540,7 +540,7 @@ export function PresenceSectionRenderer({
           .map((item: any) => (
             <figure
               key={item.id}
-              className={`rounded-3xl border border-black/10 bg-white text-[#17161b] ${content.layout === "quote" ? "p-8 text-xl md:p-12 md:text-2xl" : "p-6"} ${content.layout === "carousel" ? "w-[86%] shrink-0 snap-center md:w-[45%]" : ""}`}
+              className={`rounded-3xl border border-black/10 bg-white text-[#07172f] ${content.layout === "quote" ? "p-8 text-xl md:p-12 md:text-2xl" : "p-6"} ${content.layout === "carousel" ? "w-[86%] shrink-0 snap-center md:w-[45%]" : ""}`}
             >
               <Quote className="text-[var(--presence-primary)]" />
               <blockquote className="mt-5 leading-7">“{item.quote}”</blockquote>
@@ -579,7 +579,7 @@ export function PresenceSectionRenderer({
           .map((item: any) => (
             <article
               key={item.id}
-              className={`rounded-3xl border p-6 ${item.highlighted ? "border-[var(--presence-primary)] bg-[var(--presence-primary)] text-white" : "border-black/10 bg-white text-[#17161b]"}`}
+              className={`rounded-3xl border p-6 ${item.highlighted ? "border-[var(--presence-primary)] bg-[var(--presence-primary)] text-white" : "border-black/10 bg-white text-[#07172f]"}`}
             >
               <h3 className="text-xl font-black">{item.name}</h3>
               {item.priceLabel ? (
@@ -622,7 +622,7 @@ export function PresenceSectionRenderer({
           {locations.map((location) => (
             <article
               key={location.id}
-              className="rounded-3xl border border-black/10 bg-white p-6 text-[#17161b]"
+              className="rounded-3xl border border-black/10 bg-white p-6 text-[#07172f]"
             >
               <MapPin className="text-[var(--presence-primary)]" />
               <h3 className="mt-4 text-lg font-black">{location.name}</h3>
@@ -671,7 +671,7 @@ export function PresenceSectionRenderer({
     return wrap(
       <div
         data-presence-surface
-        className="grid gap-8 rounded-[32px] border border-black/10 bg-white p-7 text-[#17161b] md:grid-cols-2 md:p-10"
+        className="grid gap-8 rounded-[32px] border border-black/10 bg-white p-7 text-[#07172f] md:grid-cols-2 md:p-10"
       >
         <div className="space-y-3">
           {content.email ? (
@@ -731,7 +731,7 @@ export function PresenceSectionRenderer({
         href={content.url}
         target="_blank"
         rel="noreferrer"
-        className="group grid aspect-video place-items-center rounded-[32px] bg-[#17161b] text-white"
+        className="group grid aspect-video place-items-center rounded-[32px] bg-[#07172f] text-white"
       >
         <span className="grid size-20 place-items-center rounded-full bg-white text-black transition group-hover:scale-105">
           <Play />

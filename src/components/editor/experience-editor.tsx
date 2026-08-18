@@ -178,20 +178,20 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
   if (project === undefined)
     return (
       <div className="grid min-h-[600px] place-items-center">
-        <LoaderCircle className="animate-spin text-[#6d5ef5]" />
+        <LoaderCircle className="animate-spin text-[#0054fc]" />
       </div>
     );
   if (!project)
     return (
       <div className="grid min-h-[560px] place-items-center rounded-[24px] border border-[#e4e3ea] bg-white text-center">
         <div>
-          <Layers3 className="mx-auto text-[#7468df]" />
+          <Layers3 className="mx-auto text-[#0186fc]" />
           <h1 className="mt-4 text-xl font-extrabold">
             Projeto não encontrado
           </h1>
           <Link
             href="/app/projects"
-            className="mt-4 inline-flex text-sm font-bold text-[#6255d8]"
+            className="mt-4 inline-flex text-sm font-bold text-[#0054fc]"
           >
             Voltar aos projetos
           </Link>
@@ -401,7 +401,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
         </Button>
       </div>
       <div className="grid min-h-0 min-w-0 flex-1 xl:grid-cols-[280px_minmax(390px,1fr)_360px]">
-        <aside className="order-2 min-w-0 border-r border-[#e5e4eb] bg-[#fafafd] xl:order-1">
+        <aside className="order-2 min-w-0 border-r border-[#e5e4eb] bg-[#f7fbff] xl:order-1">
           <div className="flex items-center justify-between border-b border-[#e7e6ed] p-4">
             <div>
               <strong className="text-sm">Etapas</strong>
@@ -412,7 +412,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
             <div className="relative">
               <button
                 onClick={() => setAddOpen((value) => !value)}
-                className="focus-ring grid size-9 place-items-center rounded-xl bg-[#17171c] text-white"
+                className="focus-ring grid size-9 place-items-center rounded-xl bg-[#0054fc] text-white"
                 aria-label="Adicionar etapa"
               >
                 <Plus size={17} />
@@ -437,10 +437,10 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
               <button
                 key={step.id}
                 onClick={() => setSelectedId(step.id)}
-                className={`focus-ring flex w-full items-center gap-3 rounded-[15px] border p-3 text-left transition ${step.id === selected.id ? "border-[#8c82e9] bg-[#efedff]" : "border-transparent bg-white hover:border-[#dedde5]"}`}
+                className={`focus-ring flex w-full items-center gap-3 rounded-[15px] border p-3 text-left transition ${step.id === selected.id ? "border-[#0054fc] bg-[#eaf3ff]" : "border-transparent bg-white hover:border-[#dedde5]"}`}
               >
                 <span
-                  className={`grid size-8 place-items-center rounded-[10px] text-xs font-extrabold ${step.id === selected.id ? "bg-[#6d5ef5] text-white" : "bg-[#eeedf2] text-[#6c6c76]"}`}
+                  className={`grid size-8 place-items-center rounded-[10px] text-xs font-extrabold ${step.id === selected.id ? "bg-[#0054fc] text-white" : "bg-[#eeedf2] text-[#6c6c76]"}`}
                 >
                   {index + 1}
                 </span>
@@ -527,7 +527,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
                 onChange={(event) =>
                   updateStep({ isActive: event.target.checked })
                 }
-                className="accent-[#6d5ef5]"
+                className="accent-[#0054fc]"
               />{" "}
               Ativa
             </label>
@@ -582,7 +582,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
                         ],
                       })
                     }
-                    className="mb-2 text-xs font-bold text-[#6053d5]"
+                    className="mb-2 text-xs font-bold text-[#0054fc]"
                   >
                     + Adicionar
                   </button>
@@ -591,10 +591,10 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
                   {selected.options.map((option, optionIndex) => (
                     <div
                       key={option.id}
-                      className="rounded-[15px] border border-[#e3e2e9] bg-[#fafafd] p-3"
+                      className="rounded-[15px] border border-[#e3e2e9] bg-[#f7fbff] p-3"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="grid size-6 place-items-center rounded-lg bg-[#e9e6ff] text-[10px] font-extrabold text-[#5d4fd2]">
+                        <span className="grid size-6 place-items-center rounded-lg bg-[#eaf3ff] text-[10px] font-extrabold text-[#0054fc]">
                           {optionIndex + 1}
                         </span>
                         <Input
@@ -711,7 +711,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
                       {option.actionType === "open_whatsapp" ? (
                         <div className="mt-3 grid gap-3">
                           {(project.commercialConfig?.routingDestinations || []).some((destination) => destination.type === "whatsapp") ? <div><Label htmlFor={`option-destination-${option.id}`}>Destino configurado</Label><Select id={`option-destination-${option.id}`} value={String(option.actionPayload?.destinationId || "")} onChange={(event) => { const destination = project.commercialConfig?.routingDestinations?.find((item) => item.id === event.target.value); updateStep({ options: selected.options?.map((item) => item.id === option.id ? { ...item, actionPayload: { ...(item.actionPayload || {}), destinationId: destination?.id || "", phone: destination?.value || String(item.actionPayload?.phone || "") } } : item) }); }}><option value="">Telefone manual</option>{(project.commercialConfig?.routingDestinations || []).filter((destination) => destination.type === "whatsapp").map((destination) => <option key={destination.id} value={destination.id}>{destination.label}</option>)}</Select></div> : null}
-                          <div><div className="mb-2 flex items-center justify-between"><Label htmlFor={`option-phone-${option.id}`}>Telefone</Label>{project.phone ? <button type="button" className="text-xs font-bold text-[#6053d5]" onClick={() => updateStep({ options: selected.options?.map((item) => item.id === option.id ? { ...item, actionPayload: { ...(item.actionPayload || {}), phone: project.phone || "", destinationId: "" } } : item) })}>Usar padrão</button> : null}</div><Input id={`option-phone-${option.id}`} inputMode="tel" placeholder="5511999999999" value={String(option.actionPayload?.phone || "")} onChange={(event) => updateStep({ options: selected.options?.map((item) => item.id === option.id ? { ...item, actionPayload: { ...(item.actionPayload || {}), phone: event.target.value, destinationId: "" } } : item) })} /></div>
+                          <div><div className="mb-2 flex items-center justify-between"><Label htmlFor={`option-phone-${option.id}`}>Telefone</Label>{project.phone ? <button type="button" className="text-xs font-bold text-[#0054fc]" onClick={() => updateStep({ options: selected.options?.map((item) => item.id === option.id ? { ...item, actionPayload: { ...(item.actionPayload || {}), phone: project.phone || "", destinationId: "" } } : item) })}>Usar padrão</button> : null}</div><Input id={`option-phone-${option.id}`} inputMode="tel" placeholder="5511999999999" value={String(option.actionPayload?.phone || "")} onChange={(event) => updateStep({ options: selected.options?.map((item) => item.id === option.id ? { ...item, actionPayload: { ...(item.actionPayload || {}), phone: event.target.value, destinationId: "" } } : item) })} /></div>
                           <div><Label htmlFor={`option-message-${option.id}`}>Mensagem inicial</Label><Textarea id={`option-message-${option.id}`} className="min-h-20" placeholder="Olá! Quero saber mais." value={String(option.actionPayload?.message || "")} onChange={(event) => updateStep({ options: selected.options?.map((item) => item.id === option.id ? { ...item, actionPayload: { ...(item.actionPayload || {}), message: event.target.value } } : item) })} /></div>
                         </div>
                       ) : null}
@@ -762,17 +762,17 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
             {(
               <div className="mt-7 border-t border-[#e5e4eb] pt-6">
                 <div className="flex items-center gap-2">
-                  <Palette size={17} className="text-[#6255d8]" />
+                  <Palette size={17} className="text-[#0054fc]" />
                   <h3 className="text-sm font-extrabold">
                     Design da experiência
                   </h3>
                 </div>
                 <div className="mt-4 grid grid-cols-3 gap-2" aria-label="Presets visuais">
                   {[
-                    { name: "Minimal", colors: ["#17171c", "#f7f7f8"], heading: "Inter", radius: 10 },
-                    { name: "Editorial", colors: ["#5946c8", "#fbf8f2"], heading: "DM Sans", radius: 4 },
-                    { name: "Expressivo", colors: ["#6d3df2", "#f4f0ff"], heading: "Sora", radius: 24 },
-                  ].map((preset) => <button key={preset.name} type="button" onClick={() => commit((current) => ({ ...current, designSystem: { ...current.designSystem, colors: ensureAccessiblePalette(buildPalette(preset.colors)), typography: { ...current.designSystem.typography, headingFont: preset.heading }, shape: { ...current.designSystem.shape, cardRadius: preset.radius, buttonRadius: preset.radius } } }))} className="min-h-10 rounded-xl border border-[#dfdee7] bg-white px-2 text-[11px] font-bold hover:border-[#8f84f7]">{preset.name}</button>)}
+                    { name: "Minimal", colors: ["#07172f", "#f7f7f8"], heading: "Inter", radius: 10 },
+                    { name: "Editorial", colors: ["#0054fc", "#fbf8f2"], heading: "DM Sans", radius: 4 },
+                    { name: "Expressivo", colors: ["#0054fc", "#f7fbff"], heading: "Sora", radius: 24 },
+                  ].map((preset) => <button key={preset.name} type="button" onClick={() => commit((current) => ({ ...current, designSystem: { ...current.designSystem, colors: ensureAccessiblePalette(buildPalette(preset.colors)), typography: { ...current.designSystem.typography, headingFont: preset.heading }, shape: { ...current.designSystem.shape, cardRadius: preset.radius, buttonRadius: preset.radius } } }))} className="min-h-10 rounded-xl border border-[#dfdee7] bg-white px-2 text-[11px] font-bold hover:border-[#0186fc]">{preset.name}</button>)}
                 </div>
                 <div className="mt-5 grid grid-cols-3 gap-2">
                   {["primary", "background", "surface"].map((key) => (
@@ -873,7 +873,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
                         },
                       }))
                     }
-                    className="w-full accent-[#6d5ef5]"
+                    className="w-full accent-[#0054fc]"
                   />
                 </div>
                 <div className="mt-5">
@@ -912,7 +912,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
                       },
                     }))
                   }
-                  className="mt-5 inline-flex items-center gap-2 text-xs font-bold text-[#6255d8]"
+                  className="mt-5 inline-flex items-center gap-2 text-xs font-bold text-[#0054fc]"
                 >
                   <Sparkles size={14} /> Restaurar sugestão automática
                 </button>
@@ -921,7 +921,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
             <div className="mt-7 grid grid-cols-2 gap-2">
               <Link
                 href={`/app/projects/${project.id}/operations`}
-                className="focus-ring col-span-2 flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#17171c] text-xs font-bold text-white"
+                className="focus-ring col-span-2 flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0054fc] text-xs font-bold text-white"
               >
                 <Layers3 size={15} /> Operação comercial
               </Link>

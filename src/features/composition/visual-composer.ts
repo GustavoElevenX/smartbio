@@ -40,7 +40,7 @@ function defaultIdentity(input: ExperienceCompositionInput) {
     };
   }
   return {
-    colors: ["#5D50D6", "#FF806B", "#20A985"],
+    colors: ["#0054fc", "#FF806B", "#20A985"],
     personality: ["Equilibrada", "Clara", "Confiante"],
     subtitle: "Da atenção ao próximo passo comercial.",
   };
@@ -66,7 +66,7 @@ export function defaultProjectSubtitle(input: ExperienceCompositionInput) {
 
 export class VisualComposer {
   compose(input: ExperienceCompositionInput, brand: BrandProfile, journey: JourneyStep[]): ProjectDesignSystem {
-    const palette = brand.activePalette || buildPalette(["#6D5EF5", "#FF725E", "#19B88B"]);
+    const palette = brand.activePalette || buildPalette(["#0054FC", "#0186FC", "#01D2DF", "#02E5CD"]);
     const personality = input.brandPersonality?.[0]?.toLowerCase() || "equilibrada";
     const dark = input.preferredTheme === "dark" || personality.includes("premium");
     const directionIndex = Math.abs(hash(`${input.businessName}:${input.businessDescription}:${journey.map((step) => step.type).join(":")}`)) % 4;

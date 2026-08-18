@@ -57,6 +57,8 @@ export interface BrandAIInput extends AIRequestContext {
   businessDescription: string;
   extractedColors: string[];
   logoDescription?: string;
+  fileData?: string;
+  mimeType?: string;
 }
 
 export interface PresenceCompositionInput extends AIRequestContext {

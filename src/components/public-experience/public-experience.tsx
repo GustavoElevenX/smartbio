@@ -1544,21 +1544,21 @@ export function PublicExperience({
   }, [preview, slug]);
   if (project === undefined)
     return (
-      <div className="grid min-h-screen place-items-center bg-[#f7f7fa] p-6 text-center">
+      <div className="grid min-h-screen place-items-center bg-[#f7f8fa] p-6 text-center">
         <div
           role="status"
           className="flex flex-col items-center gap-3 text-sm font-semibold text-[#74747e]"
         >
-          <LoaderCircle className="animate-spin text-[#6d5ef5]" />
+          <LoaderCircle className="animate-spin text-[#0054fc]" />
           Carregando experiência…
         </div>
       </div>
     );
   if (!project || (!preview && project.status !== "published"))
     return (
-      <div className="grid min-h-screen place-items-center bg-[#f7f7fa] p-6 text-center">
+      <div className="grid min-h-screen place-items-center bg-[#f7f8fa] p-6 text-center">
         <div>
-          <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-[#e9e6ff] text-[#5f52d6]">
+          <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-[#eaf3ff] text-[#0054fc]">
             <Compass />
           </span>
           <h1 className="mt-5 text-2xl font-extrabold">
@@ -1567,7 +1567,7 @@ export function PublicExperience({
           <p className="mt-2 text-sm text-[#74747e]">
             O endereço não existe ou ainda não foi publicado.
           </p>
-          <Link href="/" className="mt-6 inline-flex font-bold text-[#5f52d6]">
+          <Link href="/" className="mt-6 inline-flex font-bold text-[#0054fc]">
             Conhecer a Sobe
           </Link>
         </div>

@@ -23,26 +23,44 @@ export const GET = withAuthenticatedActor(async (_request, _context, actor) => {
   }
   const client = createServiceClient();
   if (!client) throw new Error("Supabase não configurado.");
-  const { data, error } = await client
+  const { data: memberships, error } = await client
     .from("workspace_members")
-    .select(
-      "workspace_id,role,workspaces!inner(id,name,workspace_plan_assignments!inner(plan_key))",
-    )
+    .select("workspace_id,role,created_at")
     .eq("user_id", actor.userId)
     .order("created_at", { ascending: true });
   if (error) throw new Error("Não foi possível carregar os workspaces.");
-  const workspaces = (data || []).map((membership) => {
-    const workspace = Array.isArray(membership.workspaces)
-      ? membership.workspaces[0]
-      : membership.workspaces;
-    const assignments = workspace.workspace_plan_assignments;
-    const assignment = Array.isArray(assignments)
-      ? assignments[0]
-      : assignments;
+  const workspaceIds = (memberships || []).map(
+    (membership) => membership.workspace_id,
+  );
+  const [workspaceResult, assignmentResult] = workspaceIds.length
+    ? await Promise.all([
+        client.from("workspaces").select("id,name,plan").in("id", workspaceIds),
+        client
+          .from("workspace_plan_assignments")
+          .select("workspace_id,plan_key,status")
+          .in("workspace_id", workspaceIds)
+          .eq("status", "active"),
+      ])
+    : [{ data: [], error: null }, { data: [], error: null }];
+  if (workspaceResult.error)
+    throw new Error("Não foi possível carregar os workspaces.");
+  const workspaceById = new Map(
+    (workspaceResult.data || []).map((workspace) => [workspace.id, workspace]),
+  );
+  const assignmentByWorkspace = new Map(
+    (assignmentResult.data || []).map((assignment) => [
+      assignment.workspace_id,
+      assignment,
+    ]),
+  );
+  const workspaces = (memberships || []).flatMap((membership) => {
+    const workspace = workspaceById.get(membership.workspace_id);
+    if (!workspace) return [];
+    const assignment = assignmentByWorkspace.get(membership.workspace_id);
     return {
       id: workspace.id,
       name: workspace.name,
-      plan: assignment.plan_key,
+      plan: assignment?.plan_key || workspace.plan || "free",
       role: membership.role,
     };
   });

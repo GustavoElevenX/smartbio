@@ -10,7 +10,7 @@ import type { PresencePage } from "@/features/presence/presence.types";
 
 export const projectAggregateSelect = `
   id,workspace_id,name,slug,description,status,primary_goal,category,theme,settings,published_at,created_at,updated_at,
-  brand_profiles(extracted_colors,active_palette,palette_variations,design_system,brand_personality,analysis_metadata),
+  brand_profiles(primary_logo_asset_id,light_logo_asset_id,dark_logo_asset_id,favicon_asset_id,extracted_colors,active_palette,palette_variations,design_system,brand_personality,analysis_metadata),
   business_profiles(signals),project_capabilities(capability_key,enabled,source,settings),
   project_data_requirements(id,requirement_key,label,capability_key,status,severity,value,origin,source_id,field_metadata,reason),
   conversion_goals(id,name,description,goal_kind,target_step_id,destination_label,is_primary,is_active,goal_order,created_at,updated_at),
@@ -30,7 +30,7 @@ export const projectAggregateSelect = `
   project_policies(id,policy_type,title,content,is_active,settings),
   journey_steps(id,type,title,description,step_order,is_active,settings,
     content_blocks(id,block_type,block_order,content,settings),
-    step_options(id,label,description,icon,value,option_order,action_type,target_step_id,conversion_goal_id,action_payload),
+    step_options!step_options_step_id_fkey(id,label,description,icon,value,option_order,action_type,target_step_id,conversion_goal_id,action_payload),
     form_definitions(form_fields(id,label,field_key,field_type,placeholder,required,field_order,options))
   )`;
 
@@ -88,12 +88,16 @@ export function projectFromNormalizedRow(
   );
   const extracted = Array.isArray(brandRow?.extracted_colors)
     ? brandRow.extracted_colors.map(String)
-    : ["#6D5EF5", "#19B88B", "#FF725E"];
+    : ["#0054FC", "#0186FC", "#01D2DF", "#02E5CD"];
   const colors = {
     ...buildPalette(extracted),
     ...((brandRow?.active_palette as object) || {}),
   };
   const brand: BrandProfile = {
+    primaryLogoAssetId: brandRow?.primary_logo_asset_id ? String(brandRow.primary_logo_asset_id) : undefined,
+    lightLogoAssetId: brandRow?.light_logo_asset_id ? String(brandRow.light_logo_asset_id) : undefined,
+    darkLogoAssetId: brandRow?.dark_logo_asset_id ? String(brandRow.dark_logo_asset_id) : undefined,
+    faviconAssetId: brandRow?.favicon_asset_id ? String(brandRow.favicon_asset_id) : undefined,
     extractedColors: extracted,
     activePalette: colors,
     paletteVariations: Array.isArray(brandRow?.palette_variations)

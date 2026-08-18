@@ -30,7 +30,7 @@ export const POST = withAuthenticatedActor(async (request, _context, actor) => {
       buckets.set(hex, (buckets.get(hex) || 0) + (extreme ? 0.15 : 1));
     }
     const colors = [...buckets.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([color]) => color);
-    const source = colors.length ? colors : ["#6D5EF5"];
+    const source = colors.length ? colors : ["#0054fc"];
     return applyRateLimitHeaders(NextResponse.json({ colors: source, variations: [{ name: "Fiel", palette: buildPalette(source, "faithful") }, { name: "Equilibrada", palette: buildPalette(source, "balanced") }, { name: "Ousada", palette: buildPalette(source, "bold") }], confidence: Math.min(0.97, 0.64 + source.length * 0.05) }), rate);
   } catch {
     return NextResponse.json({ ok: false, error: { code: "processing_failed", message: "Não foi possível processar a logo." } }, { status: 422 });

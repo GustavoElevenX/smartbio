@@ -34,6 +34,26 @@ export const GET = withAuthenticatedActor(async (_request, _context, actor) => {
     )
     .eq("id", actor.userId)
     .single();
+  if (error?.code === "42703") {
+    const legacy = await database
+      .from("profiles")
+      .select("id,full_name,avatar_url")
+      .eq("id", actor.userId)
+      .single();
+    if (legacy.error)
+      return apiError(
+        "Não foi possível carregar o perfil.",
+        500,
+        "profile_failed",
+      );
+    return apiSuccess({
+      ...legacy.data,
+      email: actor.email,
+      last_seen_at: null,
+      last_sign_in_at: null,
+      account_status: "active",
+    });
+  }
   if (error)
     return apiError(
       "Não foi possível carregar o perfil.",
@@ -65,7 +85,7 @@ export const PATCH = withAuthenticatedActor(
         avatar_url: parsed.data.avatarUrl,
       })
       .eq("id", actor.userId)
-      .select("id,full_name,avatar_url,email")
+      .select("id,full_name,avatar_url")
       .single();
     if (error)
       return apiError(
@@ -73,6 +93,6 @@ export const PATCH = withAuthenticatedActor(
         500,
         "profile_update_failed",
       );
-    return apiSuccess(data);
+    return apiSuccess({ ...data, email: actor.email });
   },
 );

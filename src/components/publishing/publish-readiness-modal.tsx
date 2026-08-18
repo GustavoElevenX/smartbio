@@ -86,7 +86,7 @@ export function PublishReadinessModal({
       <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto rounded-[24px] border-[#dedce8] p-0">
         <DialogHeader className="border-b border-[#e8e6ed] px-6 py-5 pr-12">
           <DialogTitle className="flex items-center gap-2 text-xl font-extrabold tracking-[-.03em]">
-            <ShieldCheck className="text-[#6658d9]" size={22} />
+            <ShieldCheck className="text-[#0054fc]" size={22} />
             Revisão antes de publicar
           </DialogTitle>
           <DialogDescription>
@@ -97,7 +97,7 @@ export function PublishReadinessModal({
         <div className="px-6 py-5">
           {loading ? (
             <div className="flex min-h-40 items-center justify-center gap-2 text-sm font-semibold text-[#666170]">
-              <LoaderCircle className="animate-spin text-[#6658d9]" size={19} /> Validando projeto
+              <LoaderCircle className="animate-spin text-[#0054fc]" size={19} /> Validando projeto
             </div>
           ) : null}
 
@@ -121,7 +121,7 @@ export function PublishReadinessModal({
                       <div key={item.key} className="rounded-[16px] border border-[#eadeda] p-4">
                         <strong className="block text-sm">{item.label}</strong>
                         <p className="mt-1 text-xs leading-5 text-[#74717b]">{item.reason}</p>
-                        {item.actionPath ? <Link href={item.actionPath} onClick={() => onOpenChange(false)} className="mt-2 inline-flex text-xs font-extrabold text-[#6254d3]">{item.actionLabel || "Corrigir"} →</Link> : null}
+                        {item.actionPath ? <Link href={item.actionPath} onClick={() => onOpenChange(false)} className="mt-2 inline-flex text-xs font-extrabold text-[#0054fc]">{item.actionLabel || "Corrigir"} →</Link> : null}
                       </div>
                     ))}
                   </div>

@@ -292,7 +292,7 @@ export function ActivationBuilder({
           Salve o rascunho. Na página de detalhe, a Sobe valida todos os
           bloqueios antes de ativar.
         </p>
-        <div className="mt-5 rounded-xl bg-[#f0edff] p-4 text-sm text-[#5542c7]">
+        <div className="mt-5 rounded-xl bg-[#eaf3ff] p-4 text-sm text-[#0054fc]">
           <strong>Copy segura:</strong>{" "}
           {state.eligibility === "first_purchase_business_verified"
             ? "A publicação será bloqueada até existir cobertura histórica."
@@ -304,28 +304,28 @@ export function ActivationBuilder({
     <div className="-m-4 min-h-[calc(100vh-73px)] bg-white sm:-m-6 lg:-m-8">
       <header className="flex min-h-[72px] items-center justify-between gap-3 border-b border-[#e5e4ec] px-5">
         <div>
-          <p className="text-xs font-bold text-[#6b57dc]">Ativações</p>
+          <p className="text-xs font-bold text-[#0054fc]">Ativações</p>
           <h1 className="text-xl font-extrabold">Nova ativação</h1>
         </div>
         <button
           type="button"
           onClick={save}
           disabled={saving}
-          className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#6b55e5] px-4 text-sm font-bold text-[#5946ce] disabled:opacity-50"
+          className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#0054fc] px-4 text-sm font-bold text-[#0054fc] disabled:opacity-50"
         >
           {saving ? <Loader2 className="animate-spin" size={17} /> : null}Salvar
           rascunho
         </button>
       </header>
       <div className="grid min-h-[calc(100vh-145px)] lg:grid-cols-[230px_minmax(0,1fr)_350px]">
-        <aside className="border-r border-[#e8e7ed] bg-[#fafafd] p-4">
+        <aside className="border-r border-[#e8e7ed] bg-[#f7fbff] p-4">
           <nav className="space-y-1" aria-label="Passos da ativação">
             {steps.map((label, index) => (
               <button
                 key={label}
                 type="button"
                 onClick={() => setStep(index)}
-                className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-bold ${step === index ? "bg-[#ebe7ff] text-[#5845d1]" : "text-[#62626c] hover:bg-[#f0eff4]"}`}
+                className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-bold ${step === index ? "bg-[#f7fbff] text-[#0054fc]" : "text-[#62626c] hover:bg-[#f0eff4]"}`}
               >
                 <span
                   className={`grid size-7 shrink-0 place-items-center rounded-full border text-xs ${index < step ? "border-emerald-600 bg-emerald-600 text-white" : "border-[#d3d1da]"}`}
@@ -339,14 +339,14 @@ export function ActivationBuilder({
         </aside>
         <main className="p-5 sm:p-8">
           <div className="mx-auto max-w-3xl">
-            <p className="text-sm font-bold text-[#6653d8]">
+            <p className="text-sm font-bold text-[#0054fc]">
               Passo {step + 1} de 10
             </p>
             <h2 className="mt-2 text-3xl font-extrabold tracking-[-.04em]">
               {steps[step]}
             </h2>
             {step === 0 ? (
-              <div className="mt-6 rounded-2xl border border-[#dedbe9] bg-[#faf9ff] p-4">
+              <div className="mt-6 rounded-2xl border border-[#dedbe9] bg-[#f7fbff] p-4">
                 <label className="text-sm font-bold">Descrever com IA</label>
                 <div className="mt-2 flex gap-2">
                   <input
@@ -390,7 +390,7 @@ export function ActivationBuilder({
                 <button
                   type="button"
                   onClick={() => setStep((value) => Math.min(9, value + 1))}
-                  className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#5d46df] px-5 font-bold text-white"
+                  className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0054fc] px-5 font-bold text-white"
                 >
                   Próximo
                   <ArrowRight size={17} />
@@ -400,7 +400,7 @@ export function ActivationBuilder({
                   type="button"
                   onClick={save}
                   disabled={saving}
-                  className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#5d46df] px-5 font-bold text-white"
+                  className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0054fc] px-5 font-bold text-white"
                 >
                   Salvar rascunho
                   <ArrowRight size={17} />
@@ -409,7 +409,7 @@ export function ActivationBuilder({
             </footer>
           </div>
         </main>
-        <aside className="hidden border-l border-[#e8e7ed] bg-[#fafafd] p-5 lg:block">
+        <aside className="hidden border-l border-[#e8e7ed] bg-[#f7fbff] p-5 lg:block">
           <h2 className="font-extrabold">Preview ao vivo</h2>
           <p className="mt-1 text-sm text-[#777780]">
             A Presence original permanece intacta.

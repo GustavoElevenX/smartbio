@@ -104,7 +104,7 @@ export function ActivationValidatorSettings({
           type="button"
           disabled={name.trim().length < 2 || busy === "create"}
           onClick={() => void create()}
-          className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#5c47dd] px-4 text-sm font-bold text-white disabled:opacity-50"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0054fc] px-4 text-sm font-bold text-white disabled:opacity-50"
         >
           {busy === "create" ? (
             <Loader2 className="animate-spin" size={16} />
@@ -171,7 +171,7 @@ export function ActivationValidatorSettings({
       )}
       <Link
         href="/redeem"
-        className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[#18171e] px-4 text-sm font-bold text-white"
+        className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[#07172f] px-4 text-sm font-bold text-white"
       >
         Abrir validação interna
       </Link>

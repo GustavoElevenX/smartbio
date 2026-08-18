@@ -578,7 +578,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
     return (
       <div className="grid min-h-[620px] place-items-center rounded-[28px] border border-[#e2e0e8] bg-white p-8 text-center shadow-sm">
         <div className="max-w-md">
-          <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-[#ebe8ff] text-[#5e50d1]">
+          <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-[#eaf3ff] text-[#0054fc]">
             <Monitor />
           </span>
           <h1 className="mt-5 text-3xl font-black tracking-[-.04em]">
@@ -718,10 +718,10 @@ export function SiteEditor({ projectId }: { projectId: string }) {
       <div className="fixed inset-x-3 bottom-3 z-30 grid grid-cols-3 rounded-2xl border border-[#d7e0e9] bg-white/95 p-1.5 shadow-[0_18px_50px_rgba(15,23,42,.22)] backdrop-blur xl:hidden">
         <button type="button" onClick={() => setMobilePanel("pages")} className="min-h-11 rounded-xl text-xs font-black text-[#53606d] hover:bg-[#eef6ff]">Páginas</button>
         <button type="button" onClick={() => setMobilePanel("sections")} className="min-h-11 rounded-xl text-xs font-black text-[#53606d] hover:bg-[#eef6ff]">Seções</button>
-        <button type="button" onClick={() => setMobilePanel("properties")} className="min-h-11 rounded-xl bg-[#1263c5] text-xs font-black text-white">Propriedades</button>
+        <button type="button" onClick={() => setMobilePanel("properties")} className="min-h-11 rounded-xl bg-[#0054fc] text-xs font-black text-white">Propriedades</button>
       </div>
-      {mobilePanel === "pages" ? <MobileDrawer title="Páginas" onClose={() => setMobilePanel(undefined)}><div className="space-y-1">{pages.map((page) => <button key={page.id} type="button" onClick={() => { setSelectedPageId(page.id); setSelectedSectionId(undefined); setMobilePanel(undefined); }} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-bold ${page.id === activePage?.id ? "bg-[#e8f4ff] text-[#1263c5]" : "hover:bg-[#f1f5f9]"}`}><span>{page.isHome ? "⌂" : page.type === "landing" ? "LP" : "P"}</span><span className="min-w-0 flex-1 truncate">{page.name}</span></button>)}</div><div className="mt-4 grid grid-cols-2 gap-2"><Button variant="secondary" onClick={() => { addPage("page"); setMobilePanel(undefined); }}><Plus />Página</Button><Button variant="secondary" onClick={() => { addPage("landing"); setMobilePanel(undefined); }}><Plus />Landing</Button></div></MobileDrawer> : null}
-      {mobilePanel === "sections" ? <MobileDrawer title="Seções" onClose={() => setMobilePanel(undefined)}><div className="space-y-1">{activePage?.sections.toSorted((a, b) => a.order - b.order).map((section) => <button key={section.id} type="button" onClick={() => { setSelectedSectionId(section.id); setMobilePanel("properties"); }} className={`flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-xs font-bold ${section.id === activeSection?.id ? "bg-[#e8f4ff] text-[#1263c5]" : "hover:bg-[#f1f5f9]"}`}><GripVertical size={14} /><span className="min-w-0 flex-1 truncate">{section.title || presenceSectionRegistry[section.type].label}</span></button>)}</div><details className="mt-4"><summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-[#b9cce1] px-3 text-xs font-black text-[#1263c5]"><Plus size={14} />Adicionar seção</summary><SectionLibrary onAdd={(type) => { addSection(type); setMobilePanel("properties"); }} /></details></MobileDrawer> : null}
+      {mobilePanel === "pages" ? <MobileDrawer title="Páginas" onClose={() => setMobilePanel(undefined)}><div className="space-y-1">{pages.map((page) => <button key={page.id} type="button" onClick={() => { setSelectedPageId(page.id); setSelectedSectionId(undefined); setMobilePanel(undefined); }} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-bold ${page.id === activePage?.id ? "bg-[#e8f4ff] text-[#0054fc]" : "hover:bg-[#f1f5f9]"}`}><span>{page.isHome ? "⌂" : page.type === "landing" ? "LP" : "P"}</span><span className="min-w-0 flex-1 truncate">{page.name}</span></button>)}</div><div className="mt-4 grid grid-cols-2 gap-2"><Button variant="secondary" onClick={() => { addPage("page"); setMobilePanel(undefined); }}><Plus />Página</Button><Button variant="secondary" onClick={() => { addPage("landing"); setMobilePanel(undefined); }}><Plus />Landing</Button></div></MobileDrawer> : null}
+      {mobilePanel === "sections" ? <MobileDrawer title="Seções" onClose={() => setMobilePanel(undefined)}><div className="space-y-1">{activePage?.sections.toSorted((a, b) => a.order - b.order).map((section) => <button key={section.id} type="button" onClick={() => { setSelectedSectionId(section.id); setMobilePanel("properties"); }} className={`flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-xs font-bold ${section.id === activeSection?.id ? "bg-[#e8f4ff] text-[#0054fc]" : "hover:bg-[#f1f5f9]"}`}><GripVertical size={14} /><span className="min-w-0 flex-1 truncate">{section.title || presenceSectionRegistry[section.type].label}</span></button>)}</div><details className="mt-4"><summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-[#b9cce1] px-3 text-xs font-black text-[#0054fc]"><Plus size={14} />Adicionar seção</summary><SectionLibrary onAdd={(type) => { addSection(type); setMobilePanel("properties"); }} /></details></MobileDrawer> : null}
       <div className="grid min-h-[calc(100vh-137px)] grid-cols-1 pb-20 xl:grid-cols-[240px_minmax(380px,1fr)_320px] xl:pb-0">
         <aside className="hidden border-r border-[#dfe6ee] bg-white xl:block">
           <div className="relative flex items-center justify-between border-b border-[#e4e2e9] px-4 py-3">
@@ -762,7 +762,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
                   setSelectedPageId(page.id);
                   setSelectedSectionId(undefined);
                 }}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-bold ${page.id === activePage?.id ? "bg-[#e8f4ff] text-[#1263c5]" : "text-[#5f6673] hover:bg-[#f1f5f9]"}`}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-bold ${page.id === activePage?.id ? "bg-[#e8f4ff] text-[#0054fc]" : "text-[#5f6673] hover:bg-[#f1f5f9]"}`}
               >
                 <span className="grid size-7 place-items-center rounded-lg bg-white text-[10px] shadow-sm">
                   {page.isHome ? "⌂" : "P"}
@@ -782,7 +782,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
             <div className="mt-2 space-y-1" data-testid="site-section-list">
               {activePage?.sections.toSorted((a, b) => a.order - b.order).map((section) => (
                 <div key={section.id} draggable onDragStart={() => { draggedSectionId.current = section.id; }} onDragOver={(event) => event.preventDefault()} onDrop={() => dropSection(section.id)}>
-                  <button type="button" onClick={() => setSelectedSectionId(section.id)} onKeyDown={(event) => { if (event.altKey && event.key === "ArrowUp") moveSection(section.id, -1); if (event.altKey && event.key === "ArrowDown") moveSection(section.id, 1); }} className={`flex min-h-10 w-full items-center gap-2 rounded-xl px-2 text-left text-xs font-bold ${section.id === activeSection?.id ? "bg-[#e8f4ff] text-[#1263c5]" : "text-[#505866] hover:bg-[#f1f5f9]"}`}>
+                  <button type="button" onClick={() => setSelectedSectionId(section.id)} onKeyDown={(event) => { if (event.altKey && event.key === "ArrowUp") moveSection(section.id, -1); if (event.altKey && event.key === "ArrowDown") moveSection(section.id, 1); }} className={`flex min-h-10 w-full items-center gap-2 rounded-xl px-2 text-left text-xs font-bold ${section.id === activeSection?.id ? "bg-[#e8f4ff] text-[#0054fc]" : "text-[#505866] hover:bg-[#f1f5f9]"}`}>
                     <GripVertical size={14} className="cursor-grab text-[#a6afbb]" />
                     <span className="min-w-0 flex-1 truncate">{section.title || presenceSectionRegistry[section.type].label}</span>
                     {!section.isActive ? <Eye size={13} className="opacity-40" /> : null}
@@ -791,7 +791,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
               ))}
             </div>
             <details className="mt-3">
-              <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-[#b9cce1] px-3 text-xs font-black text-[#1263c5]"><Plus size={14} />Adicionar seção</summary>
+              <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-[#b9cce1] px-3 text-xs font-black text-[#0054fc]"><Plus size={14} />Adicionar seção</summary>
               <SectionLibrary onAdd={addSection} />
             </details>
           </div>
@@ -931,7 +931,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
                       <button
                         type="button"
                         onClick={() => setSelectedSectionId(section.id)}
-                        className={`flex min-h-10 w-full items-center gap-2 rounded-xl px-2 text-left text-xs font-bold ${section.id === activeSection?.id ? "bg-[#ebe8ff] text-[#5547c8]" : "hover:bg-[#f2f1f5]"}`}
+                        className={`flex min-h-10 w-full items-center gap-2 rounded-xl px-2 text-left text-xs font-bold ${section.id === activeSection?.id ? "bg-[#eaf3ff] text-[#0054fc]" : "hover:bg-[#f2f1f5]"}`}
                       >
                         <GripVertical
                           size={14}
@@ -949,7 +949,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
                   ))}
               </div>
               <details className="mt-3">
-                <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-[#cbc8d4] px-3 text-xs font-black text-[#5c50c7]">
+                <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-[#cbc8d4] px-3 text-xs font-black text-[#0054fc]">
                   <Plus size={14} />
                   Adicionar seção
                 </summary>
@@ -967,15 +967,15 @@ export function SiteEditor({ projectId }: { projectId: string }) {
             </TabsContent>
             <TabsContent value="data" className="m-0 p-4">
               <div className="rounded-2xl border border-[#dfe7ef] p-4"><strong className="text-sm">Fontes conectadas</strong><dl className="mt-3 grid grid-cols-2 gap-3 text-xs"><div><dt className="text-[#75808c]">Produtos</dt><dd className="mt-1 font-black">{project.commercialConfig?.catalogItems?.length || 0}</dd></div><div><dt className="text-[#75808c]">Serviços</dt><dd className="mt-1 font-black">{project.commercialConfig?.serviceOfferings?.length || 0}</dd></div><div><dt className="text-[#75808c]">Unidades</dt><dd className="mt-1 font-black">{project.commercialConfig?.locations?.length || 0}</dd></div><div><dt className="text-[#75808c]">Objetivos</dt><dd className="mt-1 font-black">{project.conversionGoals?.length || 0}</dd></div></dl></div>
-              <div className="mt-4 rounded-2xl bg-[linear-gradient(135deg,#edf8ff,#e7f1ff)] p-4"><span className="flex items-center gap-2 text-xs font-black text-[#0f64c8]"><Sparkles />Sobe IA</span><h3 className="mt-3 font-black">O que você quer fazer?</h3><p className="mt-2 text-xs leading-5 text-[#526476]">Explique o foco, a oferta, o público ou a página. Planner e IA usam os dados reais do negócio; nada é publicado automaticamente.</p><textarea aria-label="Instrução para a Sobe IA" value={aiInstruction} onChange={(event) => setAiInstruction(event.target.value)} placeholder="Ex.: Quero uma landing para revendedores e menos destaque para o FAQ." className="mt-4 min-h-28 w-full resize-y rounded-xl border border-[#b9d2eb] bg-white p-3 text-sm leading-6 outline-none focus:border-[#1263c5] focus:ring-4 focus:ring-[#1263c5]/10" /><div className="mt-3 flex flex-wrap gap-2">{copilotActions.map((action) => <button key={action.intent} type="button" onClick={() => setAiIntent(action.intent)} className={`min-h-9 rounded-full border px-3 text-[11px] font-black ${aiIntent === action.intent ? "border-[#1263c5] bg-[#1263c5] text-white" : "border-[#b9d2eb] bg-white text-[#36536f]"}`}>{action.label}</button>)}</div><Button className="mt-4 w-full bg-[#1263c5] hover:bg-[#0d54a9]" size="sm" disabled={aiLoading} onClick={() => void requestStructure(aiIntent)}>{aiLoading ? <LoaderCircle className="animate-spin" /> : <Sparkles />}Gerar proposta</Button></div>
+              <div className="mt-4 rounded-2xl bg-[linear-gradient(135deg,#edf8ff,#e7f1ff)] p-4"><span className="flex items-center gap-2 text-xs font-black text-[#0f64c8]"><Sparkles />Sobe IA</span><h3 className="mt-3 font-black">O que você quer fazer?</h3><p className="mt-2 text-xs leading-5 text-[#526476]">Explique o foco, a oferta, o público ou a página. Planner e IA usam os dados reais do negócio; nada é publicado automaticamente.</p><textarea aria-label="Instrução para a Sobe IA" value={aiInstruction} onChange={(event) => setAiInstruction(event.target.value)} placeholder="Ex.: Quero uma landing para revendedores e menos destaque para o FAQ." className="mt-4 min-h-28 w-full resize-y rounded-xl border border-[#b9d2eb] bg-white p-3 text-sm leading-6 outline-none focus:border-[#0054fc] focus:ring-4 focus:ring-[#0054fc]/10" /><div className="mt-3 flex flex-wrap gap-2">{copilotActions.map((action) => <button key={action.intent} type="button" onClick={() => setAiIntent(action.intent)} className={`min-h-9 rounded-full border px-3 text-[11px] font-black ${aiIntent === action.intent ? "border-[#0054fc] bg-[#0054fc] text-white" : "border-[#b9d2eb] bg-white text-[#36536f]"}`}>{action.label}</button>)}</div><Button className="mt-4 w-full bg-[#0054fc] hover:bg-[#0d54a9]" size="sm" disabled={aiLoading} onClick={() => void requestStructure(aiIntent)}>{aiLoading ? <LoaderCircle className="animate-spin" /> : <Sparkles />}Gerar proposta</Button></div>
             </TabsContent>
             <TabsContent value="quality" className="m-0 p-4">
-              <div className="rounded-2xl bg-[#f5f3ff] p-4"><strong className="text-sm">Quality Assistant</strong><p className="mt-2 text-xs leading-5 text-[#666174]">Diagnóstico da página ativa. Ele orienta; não altera nem publica nada sozinho.</p></div>
-              <div className="mt-4 flex flex-col gap-2">{qualityWarnings.length ? qualityWarnings.map((warning) => <div key={warning.code} className="rounded-xl border border-[#e3dff2] bg-white p-3"><strong className="text-xs">{warning.message}</strong><p className="mt-1 text-[11px] text-[#746f7d]">Selecione a seção relacionada ou peça uma proposta à Sobe IA.</p></div>) : <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-bold text-emerald-800">Nenhum problema estrutural detectado nesta página.</div>}</div>
+              <div className="rounded-2xl bg-[#f7fbff] p-4"><strong className="text-sm">Quality Assistant</strong><p className="mt-2 text-xs leading-5 text-[#666174]">Diagnóstico da página ativa. Ele orienta; não altera nem publica nada sozinho.</p></div>
+              <div className="mt-4 flex flex-col gap-2">{qualityWarnings.length ? qualityWarnings.map((warning) => <div key={warning.code} className="rounded-xl border border-[#eaf3ff] bg-white p-3"><strong className="text-xs">{warning.message}</strong><p className="mt-1 text-[11px] text-[#746f7d]">Selecione a seção relacionada ou peça uma proposta à Sobe IA.</p></div>) : <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-bold text-emerald-800">Nenhum problema estrutural detectado nesta página.</div>}</div>
             </TabsContent>
             <TabsContent value="performance" className="m-0 p-4">
               <div className="rounded-2xl bg-[#eef6ff] p-4"><strong className="text-sm">Performance Copilot</strong><p className="mt-2 text-xs leading-5 text-[#566a7e]">Sugestões só aparecem após 30 dias, 30 sessões e 15 sessões da meta principal quando aplicável.</p></div>
-              {!performance?.publishedAt ? <p className="mt-4 rounded-xl border border-[#dfe7ef] p-4 text-xs leading-5 text-[#697684]">Publique o site para iniciar a janela de aprendizado.</p> : performance.evidence ? <div className="mt-4 flex flex-col gap-3"><p className={`rounded-xl p-3 text-xs font-bold ${performance.evidence.eligible ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900"}`}>{performance.evidence.message}</p><EvidenceBar label="Dias" progress={performance.evidence.daysProgress} value={`${performance.evidence.completeDays}/30`} /><EvidenceBar label="Sessões" progress={performance.evidence.sessionsProgress} value={`${Math.round(performance.evidence.sessionsProgress * 30)}/30`} />{performance.evidence.goalSessionsProgress != null ? <EvidenceBar label={performance.primaryGoalName || "Meta principal"} progress={performance.evidence.goalSessionsProgress} value={`${Math.round(performance.evidence.goalSessionsProgress * 15)}/15`} /> : null}{performance.suggestions.map((suggestion) => { const explanation = performanceExplanations[suggestion.id]; const proposalInstruction = `Proponha uma alteração para “${suggestion.title}”. Evidência observada: ${suggestion.explanation}.${explanation ? ` Leitura: ${explanation.explanation} Próxima ação: ${explanation.recommendedAction}` : ""}`; return <article key={suggestion.id} className="rounded-xl border border-[#dfe7ef] p-3"><strong className="text-xs">{suggestion.title}</strong><p className="mt-2 text-[11px] leading-5 text-[#697684]">{suggestion.explanation}</p>{explanation ? <div className="mt-3 rounded-xl bg-[#f5f3ff] p-3"><span className="text-[10px] font-black uppercase tracking-[.08em] text-[#6559bd]">{explanation.usedAI ? "Leitura da Sobe IA" : "Leitura determinística"}</span><p className="mt-2 text-[11px] leading-5 text-[#5f5970]">{explanation.explanation}</p><p className="mt-2 text-[11px] font-bold text-[#4e4861]">Próxima ação: {explanation.recommendedAction}</p></div> : null}<div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="ghost" disabled={performanceLoadingId === suggestion.id} onClick={() => void explainPerformanceSuggestion(suggestion.id)}>{performanceLoadingId === suggestion.id ? <LoaderCircle className="animate-spin" /> : <Sparkles />}{explanation ? "Atualizar explicação" : "Explicar com IA"}</Button><Button size="sm" variant="secondary" disabled={aiLoading} onClick={() => { setAiInstruction(proposalInstruction); setAiIntent("reorganize"); void requestStructure("reorganize", proposalInstruction); }}>Criar proposta</Button></div></article>; })}</div> : <p className="mt-4 text-xs text-[#697684]">Carregando evidência…</p>}
+              {!performance?.publishedAt ? <p className="mt-4 rounded-xl border border-[#dfe7ef] p-4 text-xs leading-5 text-[#697684]">Publique o site para iniciar a janela de aprendizado.</p> : performance.evidence ? <div className="mt-4 flex flex-col gap-3"><p className={`rounded-xl p-3 text-xs font-bold ${performance.evidence.eligible ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900"}`}>{performance.evidence.message}</p><EvidenceBar label="Dias" progress={performance.evidence.daysProgress} value={`${performance.evidence.completeDays}/30`} /><EvidenceBar label="Sessões" progress={performance.evidence.sessionsProgress} value={`${Math.round(performance.evidence.sessionsProgress * 30)}/30`} />{performance.evidence.goalSessionsProgress != null ? <EvidenceBar label={performance.primaryGoalName || "Meta principal"} progress={performance.evidence.goalSessionsProgress} value={`${Math.round(performance.evidence.goalSessionsProgress * 15)}/15`} /> : null}{performance.suggestions.map((suggestion) => { const explanation = performanceExplanations[suggestion.id]; const proposalInstruction = `Proponha uma alteração para “${suggestion.title}”. Evidência observada: ${suggestion.explanation}.${explanation ? ` Leitura: ${explanation.explanation} Próxima ação: ${explanation.recommendedAction}` : ""}`; return <article key={suggestion.id} className="rounded-xl border border-[#dfe7ef] p-3"><strong className="text-xs">{suggestion.title}</strong><p className="mt-2 text-[11px] leading-5 text-[#697684]">{suggestion.explanation}</p>{explanation ? <div className="mt-3 rounded-xl bg-[#f7fbff] p-3"><span className="text-[10px] font-black uppercase tracking-[.08em] text-[#0054fc]">{explanation.usedAI ? "Leitura da Sobe IA" : "Leitura determinística"}</span><p className="mt-2 text-[11px] leading-5 text-[#5f5970]">{explanation.explanation}</p><p className="mt-2 text-[11px] font-bold text-[#4e4861]">Próxima ação: {explanation.recommendedAction}</p></div> : null}<div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="ghost" disabled={performanceLoadingId === suggestion.id} onClick={() => void explainPerformanceSuggestion(suggestion.id)}>{performanceLoadingId === suggestion.id ? <LoaderCircle className="animate-spin" /> : <Sparkles />}{explanation ? "Atualizar explicação" : "Explicar com IA"}</Button><Button size="sm" variant="secondary" disabled={aiLoading} onClick={() => { setAiInstruction(proposalInstruction); setAiIntent("reorganize"); void requestStructure("reorganize", proposalInstruction); }}>Criar proposta</Button></div></article>; })}</div> : <p className="mt-4 text-xs text-[#697684]">Carregando evidência…</p>}
             </TabsContent>
           </Tabs>
         </aside>
@@ -998,10 +998,10 @@ export function SiteEditor({ projectId }: { projectId: string }) {
       {structureProposal ? (
         <div role="dialog" aria-modal="true" aria-labelledby="structure-proposal-title" className="fixed inset-0 z-50 grid place-items-center bg-[#101827]/55 p-4">
           <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-5 shadow-[0_28px_90px_rgba(15,23,42,.34)] md:p-7">
-            <div className="flex items-start justify-between gap-4"><div><span className="inline-flex items-center gap-2 text-xs font-black text-[#1263c5]"><Sparkles />Sobe IA · {structureProposal.usedAI ? "planner + IA contextual" : "planner determinístico"}</span><h2 id="structure-proposal-title" className="mt-2 text-2xl font-black">Revise a proposta</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-[#66717e]">{structureProposal.suggestion.reasoning}</p></div><Button size="icon" variant="ghost" aria-label="Fechar proposta" onClick={() => setStructureProposal(undefined)}><X /></Button></div>
-            <div className="mt-5 grid gap-3 md:grid-cols-2">{structureProposal.suggestion.pages.map((page) => <article key={`${page.type}-${page.pathSuggestion}`} className="rounded-2xl border border-[#dfe7ef] p-4"><div className="flex items-center justify-between gap-3"><strong>{page.name}</strong><span className="text-xs font-bold text-[#1263c5]">{page.pathSuggestion}</span></div><p className="mt-2 text-xs leading-5 text-[#687582]">{page.purpose}</p><ol className="mt-3 flex flex-col gap-1 text-xs">{page.sections.map((section, index) => <li key={`${section.sectionType}-${index}`} className="flex gap-2"><span className="text-[#1263c5]">{index + 1}.</span><span>{presenceSectionRegistry[section.sectionType].label} — {section.purpose}</span></li>)}</ol></article>)}</div>
+            <div className="flex items-start justify-between gap-4"><div><span className="inline-flex items-center gap-2 text-xs font-black text-[#0054fc]"><Sparkles />Sobe IA · {structureProposal.usedAI ? "planner + IA contextual" : "planner determinístico"}</span><h2 id="structure-proposal-title" className="mt-2 text-2xl font-black">Revise a proposta</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-[#66717e]">{structureProposal.suggestion.reasoning}</p></div><Button size="icon" variant="ghost" aria-label="Fechar proposta" onClick={() => setStructureProposal(undefined)}><X /></Button></div>
+            <div className="mt-5 grid gap-3 md:grid-cols-2">{structureProposal.suggestion.pages.map((page) => <article key={`${page.type}-${page.pathSuggestion}`} className="rounded-2xl border border-[#dfe7ef] p-4"><div className="flex items-center justify-between gap-3"><strong>{page.name}</strong><span className="text-xs font-bold text-[#0054fc]">{page.pathSuggestion}</span></div><p className="mt-2 text-xs leading-5 text-[#687582]">{page.purpose}</p><ol className="mt-3 flex flex-col gap-1 text-xs">{page.sections.map((section, index) => <li key={`${section.sectionType}-${index}`} className="flex gap-2"><span className="text-[#0054fc]">{index + 1}.</span><span>{presenceSectionRegistry[section.sectionType].label} — {section.purpose}</span></li>)}</ol></article>)}</div>
             {structureProposal.suggestion.warnings.length ? <div className="mt-4 flex flex-col gap-1 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">{structureProposal.suggestion.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div> : null}
-            <div className="mt-5 rounded-2xl border border-[#dfe7ef] bg-[#f8fafc] p-4"><div className="flex items-center justify-between gap-3"><strong className="text-sm">Diff semântico</strong><button type="button" className="text-xs font-black text-[#1263c5]" onClick={() => setSelectedOperationIds(new Set(selectedOperationIds.size === structureProposal.operations.length ? [] : structureProposal.operations.map((operation) => operation.id)))}>{selectedOperationIds.size === structureProposal.operations.length ? "Desmarcar tudo" : "Selecionar tudo"}</button></div><div className={`mt-3 flex flex-col gap-2 ${customizingProposal ? "" : "max-h-52 overflow-hidden"}`}>{structureProposal.operations.map((operation) => <label key={operation.id} className="flex min-h-11 items-center gap-3 rounded-xl border border-[#dde6ee] bg-white px-3 py-2 text-xs font-bold"><input type="checkbox" checked={selectedOperationIds.has(operation.id)} onChange={(event) => setSelectedOperationIds((current) => { const next = new Set(current); if (event.target.checked) next.add(operation.id); else next.delete(operation.id); return next; })} /><span className={`grid size-6 shrink-0 place-items-center rounded-lg ${operation.type === "remove_section" ? "bg-red-50 text-red-700" : operation.type === "move_section" ? "bg-amber-50 text-amber-800" : "bg-blue-50 text-[#1263c5]"}`}>{operationSymbol(operation)}</span><span>{operationDescription(operation)}</span></label>)}</div>{structureProposal.operations.length > 4 ? <button type="button" onClick={() => setCustomizingProposal((value) => !value)} className="mt-3 text-xs font-black text-[#1263c5]">{customizingProposal ? "Mostrar menos" : "Ver e personalizar todas as operações"}</button> : null}</div>
+            <div className="mt-5 rounded-2xl border border-[#dfe7ef] bg-[#f8fafc] p-4"><div className="flex items-center justify-between gap-3"><strong className="text-sm">Diff semântico</strong><button type="button" className="text-xs font-black text-[#0054fc]" onClick={() => setSelectedOperationIds(new Set(selectedOperationIds.size === structureProposal.operations.length ? [] : structureProposal.operations.map((operation) => operation.id)))}>{selectedOperationIds.size === structureProposal.operations.length ? "Desmarcar tudo" : "Selecionar tudo"}</button></div><div className={`mt-3 flex flex-col gap-2 ${customizingProposal ? "" : "max-h-52 overflow-hidden"}`}>{structureProposal.operations.map((operation) => <label key={operation.id} className="flex min-h-11 items-center gap-3 rounded-xl border border-[#dde6ee] bg-white px-3 py-2 text-xs font-bold"><input type="checkbox" checked={selectedOperationIds.has(operation.id)} onChange={(event) => setSelectedOperationIds((current) => { const next = new Set(current); if (event.target.checked) next.add(operation.id); else next.delete(operation.id); return next; })} /><span className={`grid size-6 shrink-0 place-items-center rounded-lg ${operation.type === "remove_section" ? "bg-red-50 text-red-700" : operation.type === "move_section" ? "bg-amber-50 text-amber-800" : "bg-blue-50 text-[#0054fc]"}`}>{operationSymbol(operation)}</span><span>{operationDescription(operation)}</span></label>)}</div>{structureProposal.operations.length > 4 ? <button type="button" onClick={() => setCustomizingProposal((value) => !value)} className="mt-3 text-xs font-black text-[#0054fc]">{customizingProposal ? "Mostrar menos" : "Ver e personalizar todas as operações"}</button> : null}</div>
             <p className="mt-4 text-xs font-bold text-[#65717d]">{selectedOperationIds.size} de {structureProposal.operations.length} operações selecionadas. A aplicação altera apenas o rascunho e nunca publica o site.</p>
             <div className="mt-6 flex flex-wrap justify-end gap-2"><Button variant="ghost" onClick={() => setStructureProposal(undefined)}>Descartar</Button><Button variant="secondary" onClick={() => setCustomizingProposal(true)}>Personalizar antes</Button><Button disabled={aiLoading || !selectedOperationIds.size} onClick={() => void applyStructureProposal()}>{aiLoading ? <LoaderCircle className="animate-spin" /> : null}Aplicar ao rascunho</Button></div>
           </div>
@@ -1017,7 +1017,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
           <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-[26px] bg-white p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <span className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[.12em] text-[#6556d5]">
+                <span className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[.12em] text-[#0054fc]">
                   <Sparkles size={14} />
                   Proposta da IA
                 </span>
@@ -1037,7 +1037,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
                 <X />
               </Button>
             </div>
-            <div className="mt-5 rounded-2xl bg-[#f5f3ff] p-4">
+            <div className="mt-5 rounded-2xl bg-[#f7fbff] p-4">
               <strong>{aiProposal.draft.page.name}</strong>
               <ol className="mt-3 space-y-2">
                 {aiProposal.draft.sections.map((section, index) => (
@@ -1045,7 +1045,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
                     key={`${section.key}-${index}`}
                     className="flex gap-3 text-sm"
                   >
-                    <span className="grid size-6 shrink-0 place-items-center rounded-full bg-white text-xs font-black text-[#6556d5]">
+                    <span className="grid size-6 shrink-0 place-items-center rounded-full bg-white text-xs font-black text-[#0054fc]">
                       {index + 1}
                     </span>
                     <span>
@@ -1097,7 +1097,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
 }
 
 function EvidenceBar({ label, progress, value }: { label: string; progress: number; value: string }) {
-  return <div><div className="mb-1 flex items-center justify-between gap-3 text-[11px] font-bold text-[#5f6d7b]"><span>{label}</span><span>{value}</span></div><div className="h-2 overflow-hidden rounded-full bg-[#dfe8f1]"><div className="h-full rounded-full bg-[#1263c5]" style={{ width: `${Math.round(progress * 100)}%` }} /></div></div>;
+  return <div><div className="mb-1 flex items-center justify-between gap-3 text-[11px] font-bold text-[#5f6d7b]"><span>{label}</span><span>{value}</span></div><div className="h-2 overflow-hidden rounded-full bg-[#dfe8f1]"><div className="h-full rounded-full bg-[#0054fc]" style={{ width: `${Math.round(progress * 100)}%` }} /></div></div>;
 }
 
 function PageInspectorBase({
@@ -1110,7 +1110,7 @@ function PageInspectorBase({
   onChange(page: PresencePage): void;
 }) {
   const input =
-    "mt-1 min-h-10 w-full rounded-xl border border-[#dedce7] bg-white px-3 text-sm outline-none focus:border-[#786be2] focus:ring-4 focus:ring-[#786be2]/10";
+    "mt-1 min-h-10 w-full rounded-xl border border-[#dedce7] bg-white px-3 text-sm outline-none focus:border-[#0186fc] focus:ring-4 focus:ring-[#0186fc]/10";
   const label = "block text-xs font-extrabold text-[#55515e]";
   const issues = getPresenceReadinessIssues(project);
   const readiness = Math.max(
@@ -1121,10 +1121,10 @@ function PageInspectorBase({
   );
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl bg-[#f5f3ff] p-4">
+      <div className="rounded-2xl bg-[#f7fbff] p-4">
         <div className="flex items-end justify-between">
           <div>
-            <span className="text-[10px] font-black uppercase tracking-[.12em] text-[#6a5bd6]">
+            <span className="text-[10px] font-black uppercase tracking-[.12em] text-[#0054fc]">
               Prontidão
             </span>
             <strong className="mt-1 block text-sm">
@@ -1137,7 +1137,7 @@ function PageInspectorBase({
         </div>
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white">
           <div
-            className="h-full rounded-full bg-[#6a5bd6]"
+            className="h-full rounded-full bg-[#0054fc]"
             style={{ width: `${readiness}%` }}
           />
         </div>
@@ -1260,7 +1260,7 @@ function PageInspector(props: {
 }) {
   const { page, onChange } = props;
   const input =
-    "mt-1 min-h-10 w-full rounded-xl border border-[#dedce7] bg-white px-3 text-sm outline-none focus:border-[#786be2] focus:ring-4 focus:ring-[#786be2]/10";
+    "mt-1 min-h-10 w-full rounded-xl border border-[#dedce7] bg-white px-3 text-sm outline-none focus:border-[#0186fc] focus:ring-4 focus:ring-[#0186fc]/10";
   const label = "block text-xs font-extrabold text-[#55515e]";
   const toggle =
     "flex min-h-10 items-center justify-between gap-4 text-xs font-extrabold";

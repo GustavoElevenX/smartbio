@@ -12,8 +12,9 @@ const links = [
 ];
 export function AdminShell({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <div className="min-h-screen bg-[#f5f5f7] text-[#19181f]">
-      <header className="border-b bg-[#18171e] px-6 py-4 text-white">
+    <div className="min-h-screen bg-[#f7f8fa] text-[#07172f]">
+      <header className="relative border-b bg-[#07172f] px-6 py-4 text-white">
+        <div className="sobe-gradient-rule absolute inset-x-0 bottom-0" />
         <div className="flex items-center gap-3">
           <Brand className="text-white" />
           <span className="text-sm font-semibold text-white/55">Platform Admin</span>
@@ -26,7 +27,7 @@ export function AdminShell({ children }: Readonly<{ children: ReactNode }>) {
               <Link
                 key={href}
                 href={href}
-                className="block rounded-xl px-4 py-3 text-sm font-bold hover:bg-[#efecff]"
+                className="block rounded-xl px-4 py-3 text-sm font-bold transition hover:bg-[#eaf3ff] hover:text-[#0054fc]"
               >
                 {label}
               </Link>

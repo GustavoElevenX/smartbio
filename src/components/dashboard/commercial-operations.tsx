@@ -112,7 +112,7 @@ export function CommercialOperations({ projectId }: { projectId: string }) {
           >
             <ArrowLeft size={14} /> Projetos
           </Link>
-          <p className="text-sm font-semibold text-[#6d5ef5]">{project.name}</p>
+          <p className="text-sm font-semibold text-[#0054fc]">{project.name}</p>
           <h1 className="mt-1 text-3xl font-extrabold tracking-[-.04em]">
             Operação comercial
           </h1>
@@ -141,13 +141,13 @@ export function CommercialOperations({ projectId }: { projectId: string }) {
               onClick={() =>
                 setKind((current) => (current === item ? "all" : item))
               }
-              className={`rounded-[19px] border bg-white p-5 text-left ${kind === item ? "border-[#7669e6] ring-4 ring-[#7669e6]/10" : "border-[#e4e3ea]"}`}
+              className={`rounded-[19px] border bg-white p-5 text-left ${kind === item ? "border-[#0186fc] ring-4 ring-[#0186fc]/10" : "border-[#e4e3ea]"}`}
             >
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-[#73737d]">
                   {labels[item]}
                 </span>
-                <Icon size={18} className="text-[#6558db]" />
+                <Icon size={18} className="text-[#0054fc]" />
               </div>
               <strong className="mt-5 block text-3xl">{count}</strong>
             </button>
@@ -159,7 +159,7 @@ export function CommercialOperations({ projectId }: { projectId: string }) {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left">
               <thead>
-                <tr className="border-b border-[#e8e7ed] bg-[#fafafd] text-[11px] font-bold uppercase tracking-wider text-[#85858f]">
+                <tr className="border-b border-[#e8e7ed] bg-[#f7fbff] text-[11px] font-bold uppercase tracking-wider text-[#85858f]">
                   <th className="px-5 py-3">Tipo</th>
                   <th className="px-5 py-3">Contato</th>
                   <th className="px-5 py-3">Valor/data</th>
@@ -177,7 +177,7 @@ export function CommercialOperations({ projectId }: { projectId: string }) {
                     >
                       <td className="px-5 py-4">
                         <span className="inline-flex items-center gap-2 text-sm font-bold">
-                          <Icon size={16} className="text-[#6558db]" />{" "}
+                          <Icon size={16} className="text-[#0054fc]" />{" "}
                           {labels[operation.kind]}
                         </span>
                       </td>
@@ -221,7 +221,7 @@ export function CommercialOperations({ projectId }: { projectId: string }) {
         ) : (
           <div className="grid min-h-72 place-items-center p-8 text-center">
             <div>
-              <PackageOpen className="mx-auto text-[#6558db]" />
+              <PackageOpen className="mx-auto text-[#0054fc]" />
               <h2 className="mt-4 font-extrabold">Nenhuma solicitação ainda</h2>
               <p className="mt-2 text-sm text-[#7b7b85]">
                 As conversões concluídas aparecem aqui com status atualizável.
