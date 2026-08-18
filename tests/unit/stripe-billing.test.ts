@@ -152,6 +152,22 @@ describe("Stripe billing domain", () => {
     expect(body.error.message).toContain("cobranças reais");
   });
 
+  it("retorna diagnóstico seguro quando a Stripe não fornece code", async () => {
+    const response = billingErrorResponse({
+      type: "StripeInvalidRequestError",
+      statusCode: 400,
+      requestId: "req_safe",
+      param: "subscription_data[billing_mode][type]",
+      message: "provider detail that must stay private",
+    });
+    const body = await response.json();
+    expect(body.error.message).toContain("StripeInvalidRequestError");
+    expect(body.error.message).toContain("HTTP 400");
+    expect(body.error.message).toContain("subscription_data[billing_mode][type]");
+    expect(body.error.message).toContain("req_safe");
+    expect(JSON.stringify(body)).not.toContain("provider detail");
+  });
+
   it("tolera ambiente dev sem Stripe configurada", () => {
     expect(readBillingConfig({ NODE_ENV: "development" })).toMatchObject({
       enabled: false,

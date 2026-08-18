@@ -86,8 +86,14 @@ function stripeFailureResponse(error: StripeRequestFailure) {
       "stripe_live_charges_disabled",
     );
   }
+  const diagnostic = [
+    error.type,
+    error.statusCode ? `HTTP ${error.statusCode}` : undefined,
+    error.param ? `parâmetro ${error.param}` : undefined,
+    error.requestId ? `requisição ${error.requestId}` : undefined,
+  ].filter(Boolean).join(" · ");
   return new BillingOperationError(
-    `A Stripe recusou a criação do Checkout${error.code ? ` (${error.code})` : ""}.`,
+    `A Stripe recusou a criação do Checkout${error.code ? ` (${error.code})` : ""}. ${diagnostic}`,
     502,
     "stripe_request_failed",
   );
