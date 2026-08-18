@@ -98,7 +98,7 @@ export function ProfileSettingsReal() {
             <Label htmlFor="profile-email">E-mail</Label>
             <Input id="profile-email" value={profile.email} disabled />
             <p className="mt-1 text-xs text-[#777781]">
-              Alterações de e-mail seguem o fluxo seguro do Supabase Auth.
+              O e-mail da conta não pode ser alterado nesta tela.
             </p>
           </div>
           <div className="sm:col-span-2">

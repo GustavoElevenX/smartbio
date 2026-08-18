@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createServerClient } from "@supabase/ssr";
+import { isAuthSessionMissingError } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
@@ -10,6 +11,8 @@ import {
   WorkspaceAccessDeniedError,
 } from "@/server/auth/auth-errors";
 import type { PlatformAdminActor } from "./platform-admin-actor";
+
+const solePlatformAdminEmail = "l.gustavo2212@hotmail.com";
 
 export async function requirePlatformAdmin(
   required?: "super_admin",
@@ -37,8 +40,18 @@ export async function requirePlatformAdmin(
     data: { user },
     error: authError,
   } = await auth.auth.getUser();
+  if (authError && !isAuthSessionMissingError(authError)) {
+    throw new ProductionConfigurationError(
+      "Não foi possível validar a sessão administrativa agora.",
+    );
+  }
   if (authError || !user) throw new AuthenticationRequiredError();
   if (!user.email_confirmed_at) throw new EmailNotConfirmedError();
+  if (user.email?.trim().toLowerCase() !== solePlatformAdminEmail) {
+    throw new WorkspaceAccessDeniedError(
+      "A administração está restrita ao proprietário da SOBE.",
+    );
+  }
 
   const db = createServiceClient();
   if (!db) throw new ProductionConfigurationError();
@@ -47,7 +60,12 @@ export async function requirePlatformAdmin(
     .select("role,is_active")
     .eq("user_id", user.id)
     .maybeSingle();
-  if (error || !data?.is_active || (required && data.role !== required)) {
+  if (error) {
+    throw new ProductionConfigurationError(
+      "Não foi possível consultar as permissões administrativas agora.",
+    );
+  }
+  if (!data?.is_active || (required && data.role !== required)) {
     throw new WorkspaceAccessDeniedError("Acesso administrativo negado.");
   }
   return { userId: user.id, email: user.email || "", role: data.role };

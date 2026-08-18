@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/field";
+import { adminFeatureLabel, adminValueLabel } from "@/lib/admin-labels";
 
 interface EntitlementInput {
   feature_key: string;
@@ -71,7 +72,7 @@ export function PlanCatalogEditor({ plan }: { plan: PlanInput }) {
     const payload = await response.json();
     setStatus(
       response.ok
-        ? "Plano atualizado. O resolver já usa a nova configuração."
+        ? "Plano atualizado. O sistema já usa a nova configuração."
         : payload.error?.message || "Não foi possível atualizar o plano.",
     );
     if (response.ok) router.refresh();
@@ -82,7 +83,7 @@ export function PlanCatalogEditor({ plan }: { plan: PlanInput }) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-gray-500">
-            {plan.plan_key}
+            {adminValueLabel(plan.plan_key)}
           </p>
           <h2 className="text-xl font-extrabold">{plan.name}</h2>
         </div>
@@ -151,10 +152,10 @@ export function PlanCatalogEditor({ plan }: { plan: PlanInput }) {
                       })
                     }
                   />
-                  <span className="break-all">{item.feature_key}</span>
+                  <span>{adminFeatureLabel(item.feature_key)}</span>
                 </label>
                 <Input
-                  aria-label={`Limite de ${item.feature_key}`}
+                  aria-label={`Limite de ${adminFeatureLabel(item.feature_key)}`}
                   className="min-h-9"
                   type="number"
                   min="0"

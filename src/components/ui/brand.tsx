@@ -1,7 +1,36 @@
 import Image from "next/image";
 import Link from "next/link";
+import primaryLogo from "../../../imagens/logos/Logo Simbolo Sobe.png";
 import { cn } from "@/lib/utils";
 
-export function Brand({ compact = false, size = "md", className }: { compact?: boolean; size?: "sm" | "md"; className?: string }) {
-  return <Link href="/" className={cn("focus-ring inline-flex items-center rounded-lg font-black tracking-[-.04em]", size === "sm" ? "gap-1.5" : "gap-2.5", className)} aria-label="Sobe, início"><Image src="/brand/sobe-symbol.png" alt="" width={40} height={40} priority className={cn("object-contain", size === "sm" ? "size-6" : "size-9")} />{!compact && <span className={size === "sm" ? "text-sm" : "text-[19px]"}>Sobe</span>}</Link>;
+type BrandProps = {
+  tone?: "light" | "dark";
+  compact?: boolean;
+  size?: "sm" | "md";
+  className?: string;
+  preload?: boolean;
+  asLink?: boolean;
+};
+
+export const sobePrimaryLogo = primaryLogo;
+
+export function Brand({ tone, compact = false, size = "md", className, preload = false, asLink = true }: BrandProps) {
+  const brand = (
+    <span className={cn("brand", tone && `brand--${tone}`, compact && "brand--compact", size === "sm" && "brand--sm", !asLink && className)} aria-label="SOBE">
+      <span className="brand__asset" aria-hidden="true">
+        <Image
+          className="brand__art"
+          src={primaryLogo}
+          alt=""
+          sizes={compact ? "64px" : size === "sm" ? "28px" : "(max-width: 760px) 38px, 44px"}
+          preload={preload}
+          quality={90}
+        />
+      </span>
+      {!compact && <span className="brand__name">SOBE</span>}
+    </span>
+  );
+
+  if (!asLink) return brand;
+  return <Link href="/" className={cn("focus-ring inline-flex rounded-lg", className)} aria-label="Sobe, início">{brand}</Link>;
 }

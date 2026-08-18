@@ -3,13 +3,13 @@
 import Link from "next/link";
 import {
   BarChart3,
+  BriefcaseBusiness,
   Copy,
   ExternalLink,
   MoreHorizontal,
   Palette,
   Pencil,
   Plus,
-  Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { projectRepository } from "@/lib/repositories/project-repository";
@@ -144,10 +144,10 @@ export function ProjectsList() {
                 </button>
               </div>
               <Link
-                href={`/app/projects/${project.id}/leads`}
+                href={`/app/projects/${project.id}/opportunities`}
                 className="mt-3 flex items-center gap-2 text-xs font-semibold text-[#74747e]"
               >
-                <Users size={14} /> Ver leads deste projeto
+                <BriefcaseBusiness size={14} /> Ver oportunidades
               </Link>
               <Link
                 href={`/app/projects/${project.id}/operations`}

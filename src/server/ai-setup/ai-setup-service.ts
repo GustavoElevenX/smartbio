@@ -18,6 +18,8 @@ import { sourceRepository } from "@/server/business-sources/source-repository";
 import { applyExtractedFacts } from "@/server/business-sources/apply-extracted-facts";
 import { reconcileProjectRequirements } from "@/server/business-sources/reconcile-project-requirements";
 import { createServiceClient } from "@/lib/supabase/server";
+import { activateTrialAfterFirstStructure } from "@/server/entitlements/trial-service";
+import { recordPlatformGrowthEvent } from "@/server/platform-acquisition/platform-acquisition";
 import { assertProjectAccess } from "@/server/auth/project-access";
 import { loadProjectForActor } from "@/server/projects/load-project-for-actor";
 import { createPresencePage } from "@/features/presence/presence-page-service";
@@ -328,6 +330,14 @@ export class AISetupService {
       if (factIds.length) applied = await applyExtractedFacts(actor, { projectId, factIds });
     }
     const requirements = await reconcileProjectRequirements(actor, projectId);
+    await activateTrialAfterFirstStructure(client, actor.workspaceId);
+    await recordPlatformGrowthEvent(client, {
+      eventName: "onboarding_completed",
+      userId: actor.userId,
+      workspaceId: actor.workspaceId,
+      metadata: { projectId },
+      idempotencyKey: `onboarding_completed:${actor.userId}`,
+    }).catch(() => undefined);
     const completed = await this.repository.update(actor, { ...session, status: "completed", projectId });
     return {
       session: completed,

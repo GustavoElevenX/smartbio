@@ -26,6 +26,7 @@ export const rateLimitRules = {
   publicFormSubmit: { limit: 20, windowMs: 60_000 },
   publicAttachmentUpload: { limit: 10, windowMs: 10 * 60_000 },
   publicAnalytics: { limit: 120, windowMs: 60_000 },
+  platformTracking: { limit: 120, windowMs: 60_000 },
   activationClaim: { limit: 10, windowMs: 10 * 60_000 },
   activationHandoff: { limit: 15, windowMs: 10 * 60_000 },
   adminSensitiveMutation: { limit: 20, windowMs: 10 * 60_000 },

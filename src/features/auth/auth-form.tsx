@@ -10,6 +10,8 @@ import { localStore } from "@/lib/local-store";
 import { canUseLocalStore } from "@/lib/runtime-mode";
 import { safeNextPath } from "@/lib/safe-next";
 import { createClient } from "@/lib/supabase/client";
+import { trackMarketingEvent } from "@/components/marketing/marketing-analytics";
+import { useEffect, useRef } from "react";
 
 export function AuthForm({ mode }: { mode: "login" | "register" | "forgot" }) {
   const router = useRouter();
@@ -20,11 +22,23 @@ export function AuthForm({ mode }: { mode: "login" | "register" | "forgot" }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
+  const registerStarted = useRef(false);
+
+  useEffect(() => {
+    if (mode === "register") trackMarketingEvent("register_viewed", { idempotencyKey: crypto.randomUUID() });
+  }, [mode]);
+
+  function markRegisterStarted() {
+    if (mode !== "register" || registerStarted.current) return;
+    registerStarted.current = true;
+    trackMarketingEvent("register_started", { idempotencyKey: crypto.randomUUID() });
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setLoading(true);
     setError("");
+    if (mode === "register") trackMarketingEvent("register_submitted", { idempotencyKey: crypto.randomUUID() });
     try {
       const supabase = createClient();
       if (mode === "forgot") {
@@ -35,8 +49,9 @@ export function AuthForm({ mode }: { mode: "login" | "register" | "forgot" }) {
       if (password.length < 8) throw new Error("validation");
       if (supabase) {
         if (mode === "register") {
-          const { error: signUpError } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name }, emailRedirectTo: `${location.origin}/auth/callback?next=/app/onboarding` } });
+          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name }, emailRedirectTo: `${location.origin}/auth/callback?next=/app/onboarding` } });
           if (signUpError) throw new Error("signup");
+          if (signUpData.session) await fetch("/api/platform/link-signup", { method: "POST" }).catch(() => undefined);
           setSent(true);
           return;
         }
@@ -77,8 +92,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" | "forgot" }) {
       <h1 className="text-3xl font-extrabold tracking-[-.045em] sm:text-4xl">{title}</h1>
       <p className="mt-3 text-sm leading-6 text-[#70707a]">{description}</p>
       <div className="mt-8 flex flex-col gap-5">
-        {mode === "register" ? <div><Label htmlFor="name">Seu nome</Label><Input id="name" value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" required /></div> : null}
-        <div><Label htmlFor="email">E-mail</Label><Input id="email" value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" required /></div>
+        {mode === "register" ? <div><Label htmlFor="name">Seu nome</Label><Input id="name" value={name} onChange={(event) => { markRegisterStarted(); setName(event.target.value); }} autoComplete="name" required /></div> : null}
+        <div><Label htmlFor="email">E-mail</Label><Input id="email" value={email} onChange={(event) => { markRegisterStarted(); setEmail(event.target.value); }} type="email" autoComplete="email" required /></div>
         {mode !== "forgot" ? <div><div className="flex items-center justify-between"><Label htmlFor="password">Senha</Label>{mode === "login" ? <Link href="/forgot-password" className="mb-2 text-xs font-bold text-[#0054fc]">Esqueci minha senha</Link> : null}</div><div className="relative"><Input id="password" value={password} onChange={(event) => setPassword(event.target.value)} type={showPassword ? "text" : "password"} autoComplete={mode === "login" ? "current-password" : "new-password"} required className="pr-12" /><button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"} className="focus-ring absolute right-2 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-lg text-[#777781]">{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></div> : null}
       </div>
       {error ? <div role="alert" className="mt-5 rounded-xl border border-[#ffd1d1] bg-[#fff1f1] p-3 text-sm font-medium text-[#a83333]">{error}</div> : null}

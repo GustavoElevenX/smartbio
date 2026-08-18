@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/server";
+import { adminValueLabel } from "@/lib/admin-labels";
 
 export default async function Page({
   params,
@@ -56,7 +57,7 @@ export default async function Page({
       </Link>
       <h1 className="mt-4 text-3xl font-extrabold">{project.name}</h1>
       <p className="mt-2 text-gray-600">
-        {workspace?.name} · {project.status} · atualizado em{" "}
+        {workspace?.name} · {adminValueLabel(project.status)} · atualizado em{" "}
         {new Date(project.updated_at).toLocaleString("pt-BR")}
       </p>
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
@@ -86,7 +87,7 @@ export default async function Page({
           href={`/admin/workspaces/${project.workspace_id}`}
           className="rounded-xl border bg-white px-4 py-3 text-sm font-bold"
         >
-          Ver workspace
+          Ver espaço de trabalho
         </Link>
       </div>
     </div>

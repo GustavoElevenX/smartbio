@@ -12,7 +12,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  images: { remotePatterns: [{ protocol: "https", hostname: "**" }] },
+  images: { qualities: [75, 90], remotePatterns: [{ protocol: "https", hostname: "**" }] },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

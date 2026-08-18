@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { SupportSessionStarter } from "@/components/platform-admin/support-session-starter";
+import { adminValueLabel } from "@/lib/admin-labels";
 export default async function Page() {
   const { data } = await createServiceClient()!
     .from("platform_support_sessions")
@@ -20,7 +21,7 @@ export default async function Page() {
           <div key={s.id} className="rounded-2xl border bg-white p-5">
             <div className="flex justify-between">
               <strong>{s.workspace_id}</strong>
-              <span>{s.status}</span>
+              <span>{adminValueLabel(s.status)}</span>
             </div>
             <p className="mt-2 text-sm">{s.reason}</p>
             <p className="mt-2 text-xs text-[#77747f]">

@@ -35,14 +35,14 @@ export function SupportSessionStarter() {
       <h2 className="font-extrabold">Iniciar suporte</h2>
       <div className="mt-4 grid gap-4 md:grid-cols-3">
         <div>
-          <Label>Workspace UUID</Label>
+          <Label>Identificador do espaço de trabalho</Label>
           <Input
             value={workspaceId}
             onChange={(e) => setWorkspaceId(e.target.value)}
           />
         </div>
         <div>
-          <Label>Projeto UUID (opcional)</Label>
+          <Label>Identificador do negócio (opcional)</Label>
           <Input
             value={projectId}
             onChange={(e) => setProjectId(e.target.value)}

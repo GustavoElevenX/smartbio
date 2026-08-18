@@ -1,6 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 import { safeNextPath } from "@/lib/safe-next";
+import { createServiceClient } from "@/lib/supabase/server";
+import { ensureUserWorkspace } from "@/server/auth/workspace-bootstrap";
+import {
+  linkAuthAttribution,
+  PLATFORM_SESSION_COOKIE,
+  PLATFORM_VISITOR_COOKIE,
+  recordPlatformGrowthEvent,
+} from "@/server/platform-acquisition/platform-acquisition";
 
 export async function GET(request: NextRequest) {
   const next = safeNextPath(request.nextUrl.searchParams.get("next"));
@@ -21,6 +29,27 @@ export async function GET(request: NextRequest) {
       },
     },
   });
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
-  return error ? NextResponse.redirect(errorUrl) : response;
+  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error || !data.user) return NextResponse.redirect(errorUrl);
+  const database = createServiceClient();
+  if (database) {
+    try {
+      const workspace = await ensureUserWorkspace(data.user);
+      await linkAuthAttribution(database, {
+        userId: data.user.id,
+        workspaceId: workspace.workspaceId,
+        visitorCookie: request.cookies.get(PLATFORM_VISITOR_COOKIE)?.value,
+        sessionCookie: request.cookies.get(PLATFORM_SESSION_COOKIE)?.value,
+      });
+      await recordPlatformGrowthEvent(database, {
+        eventName: "email_confirmed",
+        userId: data.user.id,
+        workspaceId: workspace.workspaceId,
+        idempotencyKey: `email_confirmed:${data.user.id}`,
+      });
+    } catch (trackingError) {
+      console.warn("platform_attribution_link_failed", trackingError);
+    }
+  }
+  return response;
 }

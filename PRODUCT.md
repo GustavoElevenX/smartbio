@@ -7,7 +7,9 @@ Sobe is presence and conversion infrastructure for social traffic. It turns atte
 
 Presence is not a separate website builder product. It is the presentation layer of the conversion infrastructure.
 
-Core promise: **Sobe não é onde seus links ficam. É onde a intenção vira ação.**
+Core promise: **A SOBE transforma a atenção que sua empresa gera nas redes em uma estrutura digital preparada para levar o cliente à próxima ação.**
+
+The link in bio is one entry point into that structure, not the whole product. Commercial messaging must begin with the lost-attention problem and the next action the business wants to generate, not with a list of tools.
 
 The product serves Brazilian small and medium businesses that receive traffic from Instagram, ads, LinkedIn, QR codes, and other social entry points. It must support multiple business models without niche templates by reusing the existing qualification, quote, scheduling, catalog/order, reservation, routing, payment, analytics, publication, Supabase, and RLS engines.
 
@@ -31,6 +33,16 @@ The product serves Brazilian small and medium businesses that receive traffic fr
 ## Voice and language
 
 Portuguese (Brazil), direct, useful, confident, and commercially literate. Never claim guaranteed results or automated WhatsApp behavior. Never invent prices, phone numbers, addresses, percentages, growth, or customer facts. Clearly label demo/example data.
+
+## Commercial model
+
+- One public plan: **SOBE Pro — R$ 69,90/month**, launch price. Do not show crossed-out prices or promise a lifetime price.
+- Public limits: **1 business · 5 published pages · 3 members · 50 AI actions/month**.
+- Trial: **7 days, no card**, 1 published page, 1 member and 10 AI actions total. Logo color extraction, brand identity, journey, lead capture and analytics remain available; “Feito com SOBE” is required.
+- The trial clock starts only after onboarding is completed and the first structure is generated. Before that, the workspace is active but has no expiration date.
+- After expiration, the dashboard and saved structure remain available while public pages and their public actions are disabled. Trial data is retained for 30 days for reactivation.
+- Customer-facing language says **AI actions**, never requests, tokens or generations. One intentional customer action equals one AI action.
+- Internal fair-use guardrails: about 100 MB/workspace, 1,000 new leads/month and 10,000 tracked visits/month. These are operational protections, not sales-page copy.
 
 ## Brand and UI
 

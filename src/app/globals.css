@@ -92,6 +92,18 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .dot-grid { background-image: radial-gradient(currentColor 1px, transparent 1px); background-size: 18px 18px; }
 .scrollbar-thin { scrollbar-width: thin; scrollbar-color: #9fb1c7 transparent; }
 
+.brand { display: inline-flex; align-items: center; gap: 10px; color: inherit; line-height: 1; }
+.brand__asset { position: relative; display: block; width: 38px; height: 38px; flex: 0 0 38px; }
+.brand__art { position: static; width: 100%; height: 100%; object-fit: contain; filter: none; }
+.brand__name { font-size: 22px; font-weight: 800; letter-spacing: .08em; }
+.brand--light .brand__name { color: white; }
+.brand--dark .brand__name { color: var(--sobe-navy); }
+.brand--compact { gap: 0; }
+.brand--compact .brand__asset { width: 46px; height: 46px; flex-basis: 46px; }
+.brand--sm { gap: 7px; }
+.brand--sm .brand__asset { width: 28px; height: 28px; flex-basis: 28px; }
+.brand--sm .brand__name { font-size: 14px; }
+
 .presence-page :is(h1, h2, h3, h4) { font-family: var(--presence-heading-font), Inter, ui-sans-serif, system-ui, sans-serif; }
 .presence-page :is(a, button) { border-radius: var(--presence-button-radius); }
 .presence-page ::selection { background: color-mix(in srgb, var(--presence-primary) 28%, transparent); color: var(--presence-fg); }

@@ -15,7 +15,7 @@ export const GET = withAuthenticatedActor(async (_request, _context, actor) => {
         {
           id: actor.workspaceId,
           name: "Meu workspace",
-          plan: "free",
+          plan: "trial",
           role: actor.role,
         },
       ],
@@ -60,7 +60,7 @@ export const GET = withAuthenticatedActor(async (_request, _context, actor) => {
     return {
       id: workspace.id,
       name: workspace.name,
-      plan: assignment?.plan_key || workspace.plan || "free",
+      plan: assignment?.plan_key || workspace.plan || "trial",
       role: membership.role,
     };
   });

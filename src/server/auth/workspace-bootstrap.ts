@@ -51,7 +51,7 @@ export async function ensureUserWorkspace(user: User) {
     { onConflict: "workspace_id,user_id" },
   );
   if (insertMembershipError) throw new WorkspaceRequiredError("Não foi possível vincular a conta ao workspace.");
-  const { error: planError } = await supabase.from("workspace_plan_assignments").upsert({ workspace_id: workspace.id, plan_key: "free", source: "system", status: "active" }, { onConflict: "workspace_id" });
+  const { error: planError } = await supabase.from("workspace_plan_assignments").upsert({ workspace_id: workspace.id, plan_key: "trial", source: "system", status: "active", ends_at: null, reason: "trial_waiting_for_first_structure" }, { onConflict: "workspace_id" });
   if (planError) throw new WorkspaceRequiredError("Não foi possível atribuir o plano inicial.");
   return { workspaceId: workspace.id, role: "owner" as const };
 }

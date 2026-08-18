@@ -1,0 +1,227 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-17T22:16:09.6158703-03:00",
+  "title": "Design System: SOBE",
+  "extensions": {
+    "colorMeta": {
+      "mineral-night": {
+        "role": "neutral",
+        "displayName": "Noite Mineral",
+        "tonalRamp": ["oklch(15% 0.053 258.1)", "oklch(27% 0.053 258.1)", "oklch(39% 0.053 258.1)", "oklch(51% 0.053 258.1)", "oklch(63% 0.053 258.1)", "oklch(75% 0.053 258.1)", "oklch(87% 0.053 258.1)", "oklch(95% 0.053 258.1)"]
+      },
+      "raised-mineral": {
+        "role": "neutral",
+        "displayName": "Mineral Elevado",
+        "tonalRamp": ["oklch(15% 0.071 257.1)", "oklch(27% 0.071 257.1)", "oklch(39% 0.071 257.1)", "oklch(51% 0.071 257.1)", "oklch(63% 0.071 257.1)", "oklch(75% 0.071 257.1)", "oklch(87% 0.071 257.1)", "oklch(95% 0.071 257.1)"]
+      },
+      "cloud-white": {
+        "role": "neutral",
+        "displayName": "Branco de Nuvem",
+        "tonalRamp": ["oklch(15% 0.003 264.5)", "oklch(27% 0.003 264.5)", "oklch(39% 0.003 264.5)", "oklch(51% 0.003 264.5)", "oklch(63% 0.003 264.5)", "oklch(75% 0.003 264.5)", "oklch(87% 0.003 264.5)", "oklch(95% 0.003 264.5)"]
+      },
+      "stage-silver": {
+        "role": "neutral",
+        "displayName": "Prata de Palco",
+        "tonalRamp": ["oklch(15% 0.010 247.9)", "oklch(27% 0.010 247.9)", "oklch(39% 0.010 247.9)", "oklch(51% 0.010 247.9)", "oklch(63% 0.010 247.9)", "oklch(75% 0.010 247.9)", "oklch(87% 0.010 247.9)", "oklch(95% 0.010 247.9)"]
+      },
+      "storm-slate": {
+        "role": "neutral",
+        "displayName": "Ardósia de Tempestade",
+        "tonalRamp": ["oklch(15% 0.031 252.3)", "oklch(27% 0.031 252.3)", "oklch(39% 0.031 252.3)", "oklch(51% 0.031 252.3)", "oklch(63% 0.031 252.3)", "oklch(75% 0.031 252.3)", "oklch(87% 0.031 252.3)", "oklch(95% 0.031 252.3)"]
+      },
+      "brand-blue": {
+        "role": "primary",
+        "displayName": "Azul Sobe",
+        "tonalRamp": ["oklch(15% 0.257 262.6)", "oklch(27% 0.257 262.6)", "oklch(39% 0.257 262.6)", "oklch(51% 0.257 262.6)", "oklch(63% 0.257 262.6)", "oklch(75% 0.257 262.6)", "oklch(87% 0.257 262.6)", "oklch(95% 0.257 262.6)"]
+      },
+      "active-blue": {
+        "role": "secondary",
+        "displayName": "Azul Ativo",
+        "tonalRamp": ["oklch(15% 0.200 254.2)", "oklch(27% 0.200 254.2)", "oklch(39% 0.200 254.2)", "oklch(51% 0.200 254.2)", "oklch(63% 0.200 254.2)", "oklch(75% 0.200 254.2)", "oklch(87% 0.200 254.2)", "oklch(95% 0.200 254.2)"]
+      },
+      "brand-on-primary": {
+        "role": "neutral",
+        "displayName": "Branco de Contraste",
+        "tonalRamp": ["oklch(15% 0 0)", "oklch(27% 0 0)", "oklch(39% 0 0)", "oklch(51% 0 0)", "oklch(63% 0 0)", "oklch(75% 0 0)", "oklch(87% 0 0)", "oklch(95% 0 0)"]
+      },
+      "route-cyan": {
+        "role": "secondary",
+        "displayName": "Ciano de Percurso",
+        "tonalRamp": ["oklch(15% 0.134 202.7)", "oklch(27% 0.134 202.7)", "oklch(39% 0.134 202.7)", "oklch(51% 0.134 202.7)", "oklch(63% 0.134 202.7)", "oklch(75% 0.134 202.7)", "oklch(87% 0.134 202.7)", "oklch(95% 0.134 202.7)"]
+      },
+      "finish-turquoise": {
+        "role": "secondary",
+        "displayName": "Turquesa de Conclusão",
+        "tonalRamp": ["oklch(15% 0.148 181.7)", "oklch(27% 0.148 181.7)", "oklch(39% 0.148 181.7)", "oklch(51% 0.148 181.7)", "oklch(63% 0.148 181.7)", "oklch(75% 0.148 181.7)", "oklch(87% 0.148 181.7)", "oklch(95% 0.148 181.7)"]
+      },
+      "light-ink": {
+        "role": "neutral",
+        "displayName": "Tinta Clara",
+        "tonalRamp": ["oklch(15% 0.025 259.3)", "oklch(27% 0.025 259.3)", "oklch(39% 0.025 259.3)", "oklch(51% 0.025 259.3)", "oklch(63% 0.025 259.3)", "oklch(75% 0.025 259.3)", "oklch(87% 0.025 259.3)", "oklch(95% 0.025 259.3)"]
+      },
+      "light-copy": {
+        "role": "neutral",
+        "displayName": "Cópia Clara",
+        "tonalRamp": ["oklch(15% 0.032 250.2)", "oklch(27% 0.032 250.2)", "oklch(39% 0.032 250.2)", "oklch(51% 0.032 250.2)", "oklch(63% 0.032 250.2)", "oklch(75% 0.032 250.2)", "oklch(87% 0.032 250.2)", "oklch(95% 0.032 250.2)"]
+      },
+      "dark-copy": {
+        "role": "neutral",
+        "displayName": "Cópia Escura",
+        "tonalRamp": ["oklch(15% 0.026 252.0)", "oklch(27% 0.026 252.0)", "oklch(39% 0.026 252.0)", "oklch(51% 0.026 252.0)", "oklch(63% 0.026 252.0)", "oklch(75% 0.026 252.0)", "oklch(87% 0.026 252.0)", "oklch(95% 0.026 252.0)"]
+      },
+      "mineral-muted": {
+        "role": "neutral",
+        "displayName": "Ardósia Mineral",
+        "tonalRamp": ["oklch(15% 0.039 254.6)", "oklch(27% 0.039 254.6)", "oklch(39% 0.039 254.6)", "oklch(51% 0.039 254.6)", "oklch(63% 0.039 254.6)", "oklch(75% 0.039 254.6)", "oklch(87% 0.039 254.6)", "oklch(95% 0.039 254.6)"]
+      },
+      "technical-line": {
+        "role": "neutral",
+        "displayName": "Linha Técnica",
+        "tonalRamp": ["oklch(15% 0.037 248.3 / 0.22)", "oklch(27% 0.037 248.3 / 0.22)", "oklch(39% 0.037 248.3 / 0.22)", "oklch(51% 0.037 248.3 / 0.22)", "oklch(63% 0.037 248.3 / 0.22)", "oklch(75% 0.037 248.3 / 0.22)", "oklch(87% 0.037 248.3 / 0.22)", "oklch(95% 0.037 248.3 / 0.22)"]
+      },
+      "rail-line": {
+        "role": "neutral",
+        "displayName": "Linha de Trilho",
+        "tonalRamp": ["oklch(15% 0.015 251.2)", "oklch(27% 0.015 251.2)", "oklch(39% 0.015 251.2)", "oklch(51% 0.015 251.2)", "oklch(63% 0.015 251.2)", "oklch(75% 0.015 251.2)", "oklch(87% 0.015 251.2)", "oklch(95% 0.015 251.2)"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Hero e encerramento; a maior massa editorial da superfície." },
+      "headline": { "displayName": "Headline", "purpose": "Títulos de seção com quebras curtas e deliberadas." },
+      "title": { "displayName": "Title", "purpose": "Etapas, capacidades e perguntas." },
+      "lead": { "displayName": "Lead", "purpose": "Aberturas e explicações de seção com largura controlada." },
+      "body": { "displayName": "Body", "purpose": "Explicações funcionais curtas." },
+      "label": { "displayName": "Technical Label", "purpose": "Metadados, sequência e estado em caixa alta." },
+      "button": { "displayName": "Action Label", "purpose": "Verbos de ação curtos em controles decisivos." }
+    },
+    "shadows": [
+      { "name": "action-glow", "value": "0 18px 42px rgba(0,84,252,.2)", "purpose": "Brilho baixo sob o CTA principal em repouso." },
+      { "name": "cut-stage", "value": "0 32px 90px rgba(19,35,50,.13)", "purpose": "Separa o estágio recortado da superfície clara." },
+      { "name": "mineral-canvas", "value": "0 36px 100px rgba(0,0,0,.3)", "purpose": "Profundidade máxima para a demonstração dentro do palco escuro." },
+      { "name": "simulation-screen", "value": "0 28px 60px rgba(0,0,0,.32)", "purpose": "Faz a placa clara flutuar dentro do canvas mineral." },
+      { "name": "completion-node", "value": "0 12px 34px rgba(2,229,205,.2), 0 0 0 12px rgba(2,229,205,.08)", "purpose": "Halo funcional de uma ação final ou confirmação." }
+    ],
+    "motion": [
+      { "name": "state-fast", "value": "180ms ease", "purpose": "Hover e resposta funcional de links, botões, FAQ e opções." },
+      { "name": "progressive-route", "value": "420ms cubic-bezier(.16,1,.3,1)", "purpose": "Preenchimento dos três trilhos de progresso." },
+      { "name": "simulation-screen", "value": "520ms cubic-bezier(.16,1,.3,1)", "purpose": "Entrada recortada de cada estado da simulação." },
+      { "name": "hero-reveal", "value": "720ms–1100ms cubic-bezier(.16,1,.3,1)", "purpose": "Revelação única de título, cópia, trilho e arte do hero." },
+      { "name": "reduced-motion", "value": "0.01ms", "purpose": "Fallback global que preserva conteúdo e ordem de leitura sem reprodução automática." }
+    ],
+    "breakpoints": [
+      { "name": "compact-navigation", "value": "1080px" },
+      { "name": "mobile-stack", "value": "760px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Ação decisiva em Azul Sobe com canto superior direito recortado.",
+      "html": "<button class=\"ds-btn-primary\">Criar meu roteiro <svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M5 12h14M13 6l6 6-6 6\"/></svg></button>",
+      "css": ".ds-btn-primary { min-height: 58px; display: inline-flex; align-items: center; justify-content: center; gap: 18px; padding: 0 25px; color: var(--sobe-off-white, #f7f8fa); border: 0; background: var(--sobe-blue, #0054fc); clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%); font-family: Inter, Arial, sans-serif; font-size: 15px; font-weight: 780; box-shadow: 0 18px 42px rgba(0,84,252,.2); cursor: pointer; transition: background 180ms ease, transform 180ms ease, box-shadow 180ms ease; } .ds-btn-primary svg { width: 18px; fill: none; stroke: currentColor; stroke-width: 2; transition: transform 180ms ease; } .ds-btn-primary:hover { background: var(--sobe-blue-light, #0186fc); transform: translateY(-2px); box-shadow: 0 24px 54px rgba(0,84,252,.28); } .ds-btn-primary:hover svg { transform: translateX(4px); } .ds-btn-primary:active { transform: translateY(0); } .ds-btn-primary:focus-visible { outline: 3px solid var(--sobe-blue, #0054fc); outline-offset: 4px; }"
+    },
+    {
+      "name": "Technical Text Link",
+      "kind": "button",
+      "refersTo": "button-text",
+      "description": "Ação secundária textual com sublinhado técnico e seta direcional.",
+      "html": "<a class=\"ds-text-link\" href=\"#\">Ver como funciona <svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M5 12h14M13 6l6 6-6 6\"/></svg></a>",
+      "css": ".ds-text-link { min-height: 48px; display: inline-flex; align-items: center; gap: 12px; color: var(--sobe-off-white, #f7f8fa); border-bottom: 1px solid rgba(255,255,255,.44); font-family: Inter, Arial, sans-serif; font-size: 15px; font-weight: 680; text-decoration: none; transition: color 180ms ease, border-color 180ms ease; } .ds-text-link svg { width: 17px; fill: none; stroke: currentColor; stroke-width: 2; } .ds-text-link:hover { color: var(--sobe-blue, #0054fc); border-color: var(--sobe-blue, #0054fc); } .ds-text-link:active { opacity: .8; } .ds-text-link:focus-visible { outline: 3px solid var(--sobe-blue, #0054fc); outline-offset: 4px; }"
+    },
+    {
+      "name": "Desktop Navigation",
+      "kind": "nav",
+      "description": "Barra mineral de três zonas com navegação central e ação recortada.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Principal\"><strong>SOBE</strong><div><a href=\"#\">Como funciona</a><a href=\"#\">Possibilidades</a><a href=\"#\">Dúvidas</a></div><a class=\"ds-nav-cta\" href=\"#\">Criar meu roteiro →</a></nav>",
+      "css": ".ds-nav { min-height: 84px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 32px; padding: 0 24px; color: white; border-bottom: 1px solid rgba(255,255,255,.14); background: var(--sobe-navy, #07172f); font-family: Inter, Arial, sans-serif; } .ds-nav strong { font-size: 20px; font-weight: 800; letter-spacing: .08em; } .ds-nav div { display: flex; gap: 36px; } .ds-nav a { color: rgba(247,248,250,.72); font-size: 14px; font-weight: 600; text-decoration: none; transition: color 180ms ease; } .ds-nav a:hover { color: white; } .ds-nav a:focus-visible { outline: 3px solid var(--sobe-blue, #0054fc); outline-offset: 4px; } .ds-nav .ds-nav-cta { justify-self: end; min-height: 46px; display: inline-flex; align-items: center; padding: 0 19px; color: white; background: var(--sobe-blue, #0054fc); clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%); font-weight: 750; } .ds-nav .ds-nav-cta:hover { background: var(--sobe-blue-light, #0186fc); transform: translateY(-2px); } .ds-nav .ds-nav-cta:active { transform: none; }"
+    },
+    {
+      "name": "Scattered Signal Tag",
+      "kind": "chip",
+      "description": "Sinal técnico de atenção dispersa conectado visualmente a um percurso.",
+      "html": "<span class=\"ds-signal-tag\"><i aria-hidden=\"true\"></i> Pedir orçamento</span>",
+      "css": ".ds-signal-tag { display: inline-flex; align-items: center; gap: 9px; padding: 10px 15px 10px 12px; color: #1d3043; border: 1px solid rgba(56,78,100,.27); background: rgba(248,250,252,.88); clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%); font-family: Inter, Arial, sans-serif; font-size: 14px; font-weight: 640; letter-spacing: -.01em; white-space: nowrap; } .ds-signal-tag i { width: 6px; height: 6px; border: 1px solid rgba(24,36,53,.36); border-radius: 50%; background: var(--sobe-cyan, #01d2df); }"
+    },
+    {
+      "name": "Intent Option",
+      "kind": "button",
+      "description": "Escolha contextual plana que vira Azul Ativo quando selecionada.",
+      "html": "<button class=\"ds-intent-option\" aria-pressed=\"false\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M6 3h9l3 3v15H6zM9 11h6M9 15h6\"/></svg><span><b>Pedir orçamento</b><small>Conte o que precisa para solicitar uma avaliação.</small></span></button>",
+      "css": ".ds-intent-option { min-height: 118px; display: grid; grid-template-columns: 23px 1fr; gap: 10px; align-content: start; padding: 16px 13px; color: #304154; border: 1px solid #c1ccd7; background: transparent; font-family: Inter, Arial, sans-serif; text-align: left; cursor: pointer; transition: border-color 180ms ease, background 180ms ease, transform 180ms ease; } .ds-intent-option svg { width: 19px; height: 19px; fill: none; stroke: var(--sobe-cyan, #01d2df); stroke-width: 1.8; } .ds-intent-option span { display: grid; gap: 6px; } .ds-intent-option b { color: #172231; font-size: 13px; line-height: 1.28; } .ds-intent-option small { color: #5b6c7e; font-size: 10px; line-height: 1.38; } .ds-intent-option:hover { border-color: var(--sobe-blue-light, #0186fc); background: rgba(1,134,252,.06); transform: translateY(-2px); } .ds-intent-option[aria-pressed=\"true\"] { border-color: var(--sobe-blue-light, #0186fc); background: rgba(1,134,252,.1); box-shadow: inset 0 -2px 0 var(--sobe-blue-light, #0186fc); transform: translateY(-3px); } .ds-intent-option:active { transform: translateY(0); } .ds-intent-option:focus-visible { outline: 3px solid var(--sobe-blue, #0054fc); outline-offset: 4px; }"
+    },
+    {
+      "name": "Context Route",
+      "kind": "custom",
+      "description": "Sequência de três nós que explicita contexto e termina em turquesa.",
+      "html": "<div class=\"ds-context-route\"><span><i>1</i>Serviço</span><span><i>2</i>Prazo</span><span><i>3</i>Contato</span></div>",
+      "css": ".ds-context-route { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); width: min(520px, 100%); padding-top: 8px; font-family: Inter, Arial, sans-serif; } .ds-context-route::before { content: \"\"; position: absolute; top: 26px; left: 16%; right: 16%; height: 2px; background: linear-gradient(90deg, var(--sobe-turquoise, #02e5cd), var(--sobe-cyan, #01d2df), var(--sobe-blue-light, #0186fc), var(--sobe-blue, #0054fc)); } .ds-context-route span { position: relative; z-index: 1; display: grid; justify-items: center; gap: 11px; color: #26384b; font-size: 13px; font-weight: 700; } .ds-context-route i { width: 37px; height: 37px; display: grid; place-items: center; color: white; border-radius: 50%; background: var(--sobe-navy, #07172f); font-size: 11px; font-style: normal; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 7px var(--sobe-off-white, #f7f8fa); } .ds-context-route span:last-child i { color: var(--sobe-navy, #07172f); background: var(--sobe-turquoise, #02e5cd); }"
+    },
+    {
+      "name": "Action Node",
+      "kind": "button",
+      "refersTo": "action-node",
+      "description": "Nó circular turquesa reservado ao avanço ou à conclusão da rota.",
+      "html": "<button class=\"ds-action-node\" aria-label=\"Avançar\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M5 12h14M13 6l6 6-6 6\"/></svg></button>",
+      "css": ".ds-action-node { width: 68px; height: 68px; display: grid; place-items: center; color: var(--sobe-navy, #07172f); border: 0; border-radius: 50%; background: var(--sobe-turquoise, #02e5cd); box-shadow: 0 12px 34px rgba(2,229,205,.2), 0 0 0 12px rgba(2,229,205,.08); cursor: pointer; transition: background 180ms ease, transform 180ms ease, box-shadow 180ms ease; } .ds-action-node svg { width: 25px; fill: none; stroke: currentColor; stroke-width: 2; } .ds-action-node:hover { background: var(--sobe-cyan, #01d2df); transform: translateX(3px); box-shadow: 0 18px 44px rgba(1,210,223,.26), 0 0 0 12px rgba(2,229,205,.08); } .ds-action-node:active { transform: translateX(0); } .ds-action-node:focus-visible { outline: 3px solid var(--sobe-blue, #0054fc); outline-offset: 4px; }"
+    },
+    {
+      "name": "Capability Rail Item",
+      "kind": "card",
+      "description": "Módulo plano de trilho com nó, ícone fino, título e uma frase.",
+      "html": "<article class=\"ds-capability\"><i aria-hidden=\"true\"></i><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M4 12h16M12 4v16\"/></svg><strong>Qualificação</strong><p>Organize as informações necessárias antes do contato.</p></article>",
+      "css": ".ds-capability { position: relative; width: 260px; min-height: 250px; padding: 72px 30px 36px; color: #101722; border-top: 1px solid #cbd3dc; border-right: 1px solid #cbd3dc; border-bottom: 1px solid #cbd3dc; background: var(--sobe-off-white, #f7f8fa); font-family: Inter, Arial, sans-serif; } .ds-capability::before { content: \"\"; position: absolute; top: 36px; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, var(--sobe-turquoise, #02e5cd), var(--sobe-cyan, #01d2df), var(--sobe-blue-light, #0186fc), var(--sobe-blue, #0054fc)); } .ds-capability > i { position: absolute; top: 31px; left: 30px; z-index: 1; width: 11px; height: 11px; border: 2px solid var(--sobe-blue-light, #0186fc); border-radius: 50%; background: var(--sobe-off-white, #f7f8fa); } .ds-capability svg { width: 26px; height: 26px; fill: none; stroke: var(--sobe-blue, #0054fc); stroke-width: 1.6; } .ds-capability strong { display: block; margin-top: 28px; font-size: 24px; letter-spacing: -.025em; } .ds-capability p { margin: 10px 0 0; color: #607080; font-size: 15px; line-height: 1.5; }"
+    },
+    {
+      "name": "FAQ Disclosure",
+      "kind": "custom",
+      "description": "Divulgação nativa, plana e direta com indicador de abertura rotativo.",
+      "html": "<details class=\"ds-faq\"><summary>Preciso trocar minhas ferramentas?<span aria-hidden=\"true\">+</span></summary><p>Não. A jornada organiza o caminho e conecta o que já funciona na operação.</p></details>",
+      "css": ".ds-faq { width: min(680px, 100%); color: #131b26; border-top: 1px solid #c9d2dc; border-bottom: 1px solid #c9d2dc; font-family: Inter, Arial, sans-serif; } .ds-faq summary { min-height: 92px; display: flex; align-items: center; justify-content: space-between; gap: 24px; cursor: pointer; list-style: none; font-size: 20px; font-weight: 680; } .ds-faq summary::-webkit-details-marker { display: none; } .ds-faq summary span { color: #405064; font-size: 28px; font-weight: 400; transition: color 180ms ease, transform 180ms ease; } .ds-faq summary:hover span { color: var(--sobe-blue, #0054fc); } .ds-faq[open] summary span { transform: rotate(45deg); } .ds-faq p { max-width: 620px; margin: 0; padding: 0 54px 28px 0; color: #5b6a7a; font-size: 16px; line-height: 1.62; } .ds-faq summary:focus-visible { outline: 3px solid var(--sobe-blue, #0054fc); outline-offset: 4px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Arquitetura da Atenção",
+    "overview": "A SOBE transforma atenção difusa em uma decisão legível. O mundo visual é uma noite mineral atravessada por nuvens brancas, cortes prateados e um percurso luminoso: ciano organiza a intenção, turquesa marca a chegada e Azul Sobe confirma a ação. A interface deve parecer esculpida e precisa, não uma coleção genérica de componentes SaaS.\n\nA composição alterna palcos escuros de concentração com superfícies claras de explicação. Tipografia grande e compacta, linhas técnicas finas, placas com cantos recortados e poucos pontos de brilho conduzem a leitura. O hero canônico coloca headline e CTAs à esquerda, o portal de nuvens à direita e a sequência Atração → Intenção → Ação na base. O portal rasterizado é `/public/visuals/attention-gate.png`; texto, controles e diagramas permanecem HTML/CSS/SVG responsivos.\n\nA marca usa sempre o arquivo oficial exato `imagens/logos/Logo Simbolo Sobe.png`, importado por `next/image` no componente `Brand`. O símbolo aparece inteiro, sem máscara, filtro, caixa ou recoloração, e é acompanhado pelo nome textual “SOBE” quando o componente não está compacto. A entrega usa a otimização nativa em qualidade 90; não crie WebP manual, vetor aproximado ou versão por IA.",
+    "keyCharacteristics": [
+      "Noite mineral profunda e nuvens brancas realistas, com contraste alto e atmosfera editorial.",
+      "Azul Sobe raro e funcional para ação e seleção; ciano para percurso e conexão; turquesa para chegada e conclusão.",
+      "Placas e controles com cantos chanfrados, linhas técnicas finas e nós circulares pontuais.",
+      "Hierarquia tipográfica de uma única família, grande, compacta e direta.",
+      "Sequências visuais que sempre terminam em um próximo passo compreensível.",
+      "Movimento curto de revelação e progressão, com fallback completo para movimento reduzido."
+    ],
+    "rules": [
+      { "name": "The Three-Signal Rule", "body": "Azul Sobe significa ação ou ênfase decisiva; azul ativo significa resposta à interação; ciano e turquesa descrevem percurso e chegada. Não troque essas funções apenas para criar variedade.", "section": "colors" },
+      { "name": "The Mineral Contrast Rule", "body": "Toda área escura concentra uma decisão ou mecanismo; toda área clara devolve explicação e respiro. Não use a alternância como decoração sem função narrativa.", "section": "colors" },
+      { "name": "The Tight Headline Rule", "body": "Títulos grandes usam entrelinha comprimida e tracking negativo; mantenha quebras intencionais e nunca reduza contraste para obter leveza.", "section": "typography" },
+      { "name": "The One-Family Rule", "body": "Inter é a voz integral desta superfície. Novas telas diferenciam papéis por escala e peso, não por famílias tipográficas adicionais.", "section": "typography" },
+      { "name": "The One-Route Rule", "body": "Cada seção deve apresentar uma progressão dominante. Evite grades uniformes quando um trilho, sequência ou palco único explica melhor a transformação.", "section": "layout" },
+      { "name": "The Focused Depth Rule", "body": "Sombra sinaliza ação, recorte ou conclusão. Se um elemento não participa da progressão, ele deve permanecer plano.", "section": "elevation" },
+      { "name": "The Cut-Corner Rule", "body": "Um canto chanfrado indica placa, comando ou matéria esculpida. Não converta a interface em uma coleção de cápsulas arredondadas.", "section": "shapes" },
+      { "name": "The Thin-Rail Rule", "body": "Percursos usam linha fina, poucos nós e uma única direção. Ornamento repetitivo ou excesso de setas enfraquece a arquitetura.", "section": "shapes" }
+    ],
+    "dos": [
+      "Do usar “Arquitetura da Atenção” como norte criativo e a sequência Atração → Intenção → Ação como gramática narrativa.",
+      "Do usar o arquivo oficial exato `imagens/logos/Logo Simbolo Sobe.png` por meio do componente `Brand`.",
+      "Do reservar Azul Sobe para ação decisiva, azul ativo para resposta à interação, ciano para percurso e turquesa para chegada.",
+      "Do alternar palcos minerais escuros e superfícies claras conforme a função narrativa.",
+      "Do manter títulos grandes, compactos, legíveis e com quebras deliberadas.",
+      "Do escrever em português do Brasil, com verbos concretos e foco em resultado comercial.",
+      "Do explicar capacidades e o mecanismo de forma abstrata e verdadeira quando não houver prova comercial real.",
+      "Do manter texto, controles e diagramas em HTML/CSS/SVG responsivo; somente a atmosfera do portal é raster.",
+      "Do respeitar foco visível, elementos semânticos e `prefers-reduced-motion` em toda extensão do sistema."
+    ],
+    "donts": [
+      "Don't usar hero SaaS com mockup de celular, dashboard flutuante ou parede de cards.",
+      "Don't recriar, vetorizar, recolorir, filtrar ou substituir a logo oficial por uma aproximação ou derivação.",
+      "Don't inventar clientes, marcas, depoimentos, métricas, resultados ou estudos de caso.",
+      "Don't usar Casa de Sucos Mix, Vértice, Clínica Aurora, Chalés Serra Clara ou qualquer outro exemplo fictício em superfícies públicas.",
+      "Don't apresentar a SOBE como mero agregador de links; a mensagem central é organização da intenção até a próxima ação.",
+      "Don't trocar as funções dos sinais da marca, adicionar cores de destaque concorrentes ou usar glow como ornamento.",
+      "Don't arredondar sistematicamente placas e painéis; preserve os cantos recortados e trilhos técnicos.",
+      "Don't rasterizar texto ou interface, esconder conteúdo essencial em animação, sequestrar scroll ou exigir movimento para compreender a jornada."
+    ]
+  }
+}

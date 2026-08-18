@@ -10,6 +10,7 @@ import { assertProjectAccess } from "@/server/auth/project-access";
 import { requireResourceCapacity } from "@/server/entitlements/require-entitlement";
 import { loadProjectForActor } from "@/server/projects/load-project-for-actor";
 import type { Project } from "@/types";
+import { recordPlatformGrowthEvent } from "@/server/platform-acquisition/platform-acquisition";
 
 const projectSchema = z.custom<Project>(
   (value) =>
@@ -150,6 +151,34 @@ export const PUT = withAuthenticatedActor(
         500,
         "brand_save_failed",
       );
+
+    if (!existing) {
+      await recordPlatformGrowthEvent(db, {
+        eventName: "project_created",
+        userId: actor.userId,
+        workspaceId: actor.workspaceId,
+        metadata: { projectId: project.id, projectName: project.name },
+        idempotencyKey: `project_created:${project.id}`,
+      }).catch(() => undefined);
+      await recordPlatformGrowthEvent(db, {
+        eventName: "onboarding_completed",
+        userId: actor.userId,
+        workspaceId: actor.workspaceId,
+        metadata: { projectId: project.id },
+        idempotencyKey: `onboarding_completed:${actor.userId}`,
+      }).catch(() => undefined);
+    }
+    await Promise.all(
+      (project.presence?.pages || []).map((page) =>
+        recordPlatformGrowthEvent(db, {
+          eventName: "presence_page_created",
+          userId: actor.userId,
+          workspaceId: actor.workspaceId,
+          metadata: { projectId: project.id, pageId: page.id, pageName: page.name },
+          idempotencyKey: `presence_page_created:${page.id}`,
+        }).catch(() => undefined),
+      ),
+    );
 
     if (actor.mode === "platform_support") {
       const beforePayload = previousSettings.projectPayload as

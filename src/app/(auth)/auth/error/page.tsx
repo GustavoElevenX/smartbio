@@ -8,6 +8,8 @@ const messages: Record<string, string> = {
   invalid_callback: "O link é inválido ou expirou. Solicite uma nova confirmação e tente novamente.",
   workspace_required: "Sua conta foi confirmada, mas o workspace não pôde ser preparado.",
   configuration: "A autenticação ainda não foi configurada neste ambiente.",
+  admin_access_denied: "Esta conta não possui acesso à administração da plataforma.",
+  service_unavailable: "Não foi possível validar sua sessão agora. Verifique sua conexão e tente novamente.",
 };
 
 export default async function AuthErrorPage({ searchParams }: { searchParams: Promise<{ code?: string }> }) {

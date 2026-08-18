@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
+import { adminActionLabel, adminValueLabel } from "@/lib/admin-labels";
 export default async function Page({
   searchParams,
 }: {
@@ -24,8 +25,8 @@ export default async function Page({
           <thead>
             <tr className="border-b">
               <th className="p-4">Ação</th>
-              <th>Admin</th>
-              <th>Workspace</th>
+              <th>Administrador</th>
+              <th>Espaço de trabalho</th>
               <th>Motivo</th>
               <th>Data</th>
             </tr>
@@ -33,8 +34,8 @@ export default async function Page({
           <tbody>
             {(data || []).map((r) => (
               <tr key={r.id} className="border-b">
-                <td className="p-4 font-bold">{r.action}</td>
-                <td>{r.admin_user_id}</td>
+                <td className="p-4 font-bold">{adminActionLabel(r.action)}</td>
+                <td>{adminValueLabel(r.admin_role)}</td>
                 <td>{r.workspace_id || "—"}</td>
                 <td>{r.reason || "—"}</td>
                 <td>{new Date(r.created_at).toLocaleString("pt-BR")}</td>

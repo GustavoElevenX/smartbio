@@ -12,6 +12,7 @@ import { revalidatePath } from "next/cache";
 import { requireEntitlement } from "@/server/entitlements/require-entitlement";
 import { DEFAULT_CATALOG_THRESHOLDS } from "@/features/site-composer/catalog-strategy";
 import { getSectionActions } from "@/features/presence/presence-page-utils";
+import { recordPlatformGrowthEvent } from "@/server/platform-acquisition/platform-acquisition";
 
 function addBlocking(
   readiness: ProjectReadinessResult,
@@ -182,6 +183,13 @@ export async function publishProject(
       .eq("id", projectId)
       .eq("workspace_id", actor.workspaceId);
     if (error) throw new Error("Não foi possível publicar o projeto.");
+    await recordPlatformGrowthEvent(supabase, {
+      eventName: "project_published",
+      userId: actor.userId,
+      workspaceId: actor.workspaceId,
+      metadata: { projectId: published.id, slug: published.slug },
+      idempotencyKey: `project_published:${published.id}:${published.version}`,
+    }).catch(() => undefined);
     revalidatePath(`/${published.slug}`);
   }
 

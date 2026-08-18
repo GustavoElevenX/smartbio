@@ -65,7 +65,10 @@ export async function resolveWorkspaceEntitlements(
         source = "override";
       }
       const used = metered.has(feature)
-        ? await resolveFeatureUsage(database, workspaceId, feature)
+        ? await resolveFeatureUsage(database, workspaceId, feature, {
+            key: assignment.plan_key,
+            assignedAt: assignment.starts_at,
+          })
         : undefined;
       features[feature] = {
         enabled,

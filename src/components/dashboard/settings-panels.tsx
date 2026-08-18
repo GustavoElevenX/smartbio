@@ -94,7 +94,7 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
   async function remove() {
     if (
       !project ||
-      !confirm(`Excluir “${project.name}” permanentemente deste modo local?`)
+      !confirm(`Excluir “${project.name}” permanentemente?`)
     )
       return;
     await projectRepository.deleteProject(project.id);
@@ -159,7 +159,7 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
             </Select>
             <p
               id="project-status-help"
-              className="mt-1 text-[11px] text-[#85858f]"
+              className="mt-1 text-xs text-[#85858f]"
             >
               Publique pelo editor para executar a validação e criar o snapshot.
             </p>

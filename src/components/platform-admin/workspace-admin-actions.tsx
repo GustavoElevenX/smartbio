@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/field";
+import { adminFeatureLabel, adminValueLabel } from "@/lib/admin-labels";
 
 export function WorkspaceAdminActions({
   workspaceId,
@@ -36,9 +37,9 @@ export function WorkspaceAdminActions({
       <section className="rounded-2xl border bg-white p-6 lg:col-span-2">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 className="font-extrabold">Acesso ao workspace</h2>
+        <h2 className="font-extrabold">Acesso ao espaço de trabalho</h2>
             <p className="mt-1 text-sm text-gray-600">
-              Status atual: <strong>{accountStatus}</strong>. Suspender bloqueia
+              Situação atual: <strong>{adminValueLabel(accountStatus)}</strong>. Suspender bloqueia
               o acesso sem apagar projetos ou dados.
             </p>
           </div>
@@ -58,8 +59,8 @@ export function WorkspaceAdminActions({
             }
           >
             {accountStatus === "active"
-              ? "Suspender workspace"
-              : "Reativar workspace"}
+              ? "Suspender espaço de trabalho"
+              : "Reativar espaço de trabalho"}
           </Button>
         </div>
       </section>
@@ -72,9 +73,8 @@ export function WorkspaceAdminActions({
               value={planKey}
               onChange={(e) => setPlanKey(e.target.value)}
             >
-              <option value="free">Free</option>
-              <option value="pro">Pro</option>
-              <option value="business">Business</option>
+              <option value="trial">Período de teste</option>
+              <option value="pro">SOBE Pro</option>
             </Select>
           </div>
           <div>
@@ -82,7 +82,7 @@ export function WorkspaceAdminActions({
             <Input
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Cliente beta"
+              placeholder="Cliente em validação"
             />
           </div>
           <div className="flex gap-2">
@@ -115,14 +115,13 @@ export function WorkspaceAdminActions({
         </div>
       </section>
       <section className="rounded-2xl border bg-white p-6">
-        <h2 className="font-extrabold">Novo override</h2>
+        <h2 className="font-extrabold">Nova exceção de recurso</h2>
         <div className="mt-4 grid gap-3">
           <div>
             <Label>Recurso</Label>
-            <Input
-              value={feature}
-              onChange={(e) => setFeature(e.target.value)}
-            />
+            <Select value={feature} onChange={(e) => setFeature(e.target.value)}>
+              {["active_activations", "presence_pages", "team_members", "ai_generations_month", "media_storage_mb"].map((key) => <option key={key} value={key}>{adminFeatureLabel(key)}</option>)}
+            </Select>
           </div>
           <div>
             <Label>Limite</Label>
@@ -143,7 +142,7 @@ export function WorkspaceAdminActions({
               })
             }
           >
-            Criar override
+            Criar exceção
           </Button>
         </div>
       </section>

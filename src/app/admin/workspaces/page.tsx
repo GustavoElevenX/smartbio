@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase/server";
 import { PlatformAdminRepository } from "@/server/platform-admin/platform-admin-repository";
+import { adminValueLabel } from "@/lib/admin-labels";
 
 interface WorkspaceHealth {
   workspace_id: string;
@@ -42,7 +43,7 @@ export default async function Page({
   );
   return (
     <div>
-      <h1 className="text-3xl font-extrabold">Workspaces</h1>
+      <h1 className="text-3xl font-extrabold">Espaços de trabalho</h1>
       <p className="mt-2 text-sm text-gray-600">
         Saúde calculada no servidor para os últimos 30 dias.
       </p>
@@ -50,16 +51,16 @@ export default async function Page({
         <table className="w-full min-w-[70rem] text-left text-sm">
           <thead>
             <tr className="border-b">
-              <th className="p-4">Workspace</th>
+              <th className="p-4">Espaço de trabalho</th>
               <th>Plano</th>
               <th>Origem</th>
               <th>Negócios</th>
               <th>Publicados</th>
-              <th>Oportunidades 30d</th>
-              <th>Conversões 30d</th>
+              <th>Oportunidades em 30 dias</th>
+              <th>Conversões em 30 dias</th>
               <th>Último uso</th>
               <th>Saúde</th>
-              <th>Status</th>
+              <th>Situação</th>
             </tr>
           </thead>
           <tbody>
@@ -77,8 +78,8 @@ export default async function Page({
                       {workspace.name}
                     </Link>
                   </td>
-                  <td>{assignment?.plan_key || "—"}</td>
-                  <td>{assignment?.source || "—"}</td>
+                  <td>{adminValueLabel(assignment?.plan_key)}</td>
+                  <td>{adminValueLabel(assignment?.source)}</td>
                   <td>{state?.projects ?? 0}</td>
                   <td>{state?.published_projects ?? 0}</td>
                   <td>{state?.opportunities_30d ?? 0}</td>
@@ -89,7 +90,7 @@ export default async function Page({
                       : "—"}
                   </td>
                   <td>{healthLabels[state?.health_state || ""] || "—"}</td>
-                  <td>{workspace.account_status}</td>
+                  <td>{adminValueLabel(workspace.account_status)}</td>
                 </tr>
               );
             })}
@@ -104,7 +105,7 @@ export default async function Page({
 function Pages({ page, count }: { page: number; count: number }) {
   return (
     <div className="mt-4 flex gap-3 text-sm">
-      <span>{count} workspaces</span>
+      <span>{count} espaços de trabalho</span>
       {page > 1 && <Link href={`?page=${page - 1}`}>← Anterior</Link>}
       {page * 25 < count && <Link href={`?page=${page + 1}`}>Próxima →</Link>}
     </div>

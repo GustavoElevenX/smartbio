@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isWorkspacePublicAccessActive } from "@/server/entitlements/trial-service";
 import { buildPalette } from "@/features/brand-intelligence/colors";
 import type {
   BrandProfile,
@@ -744,9 +745,13 @@ export async function getPublishedProject(
     data.settings && typeof data.settings === "object"
       ? (data.settings as Record<string, unknown>)
       : {};
-  return settings.publishedPayload &&
+  const project = settings.publishedPayload &&
     typeof settings.publishedPayload === "object"
     ? (settings.publishedPayload as Project)
+    : null;
+  if (!project) return null;
+  return (await isWorkspacePublicAccessActive(supabase, project.workspaceId))
+    ? project
     : null;
 }
 

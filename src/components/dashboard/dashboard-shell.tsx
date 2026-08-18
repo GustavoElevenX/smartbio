@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/popover";
 import { features } from "@/lib/constants";
 import { SupportModeBanner } from "@/components/platform-admin/support-mode-banner";
+import { PlanStatusBanner } from "@/components/entitlements/plan-status-banner";
 
 interface WorkspaceSummary {
   id: string;
@@ -50,7 +51,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [user, setUser] = useState({ name: "Você", email: "modo local" });
+  const [user, setUser] = useState({ name: "Você", email: "" });
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState("");
   const [switchingWorkspace, setSwitchingWorkspace] = useState<string>();
@@ -219,7 +220,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   {activeWorkspace?.name || "Meu workspace"}
                 </strong>
                 <small className="block text-[#85858e]">
-                  Plano {activeWorkspace?.plan || "free"} ·{" "}
+                  {activeWorkspace?.plan === "trial" ? "Teste grátis" : "SOBE Pro"} ·{" "}
                   {activeWorkspace?.role === "owner" ? "Owner" : "Membro"}
                 </small>
               </span>
@@ -298,7 +299,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           className="focus-ring flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-[#536178] hover:bg-[#eef4fa]"
         >
           <CreditCard size={18} />
-          Planos
+          Plano e cobrança
         </Link>
       </nav>
       <div className="p-3">
@@ -327,7 +328,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <strong className="block truncate text-xs text-[#34343a]">
               {user.name}
             </strong>
-            <small className="block truncate">{user.email}</small>
+            {user.email ? (
+              <small className="block truncate">{user.email}</small>
+            ) : null}
           </span>
           <LogOut size={16} />
         </button>
@@ -381,6 +384,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <main className="min-h-screen pt-[73px] lg:pl-[250px]">
         <div className="mx-auto w-full max-w-[1500px] p-4 sm:p-6 lg:p-8">
           <SupportModeBanner />
+          <PlanStatusBanner />
           {children}
         </div>
       </main>

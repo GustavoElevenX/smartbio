@@ -1,5 +1,7 @@
 # Entitlement enforcement matrix
 
+Commercial truth: the only public paid offer is `pro` (**SOBE Pro**, R$ 69,90/month). New workspaces receive `trial`; its seven-day clock begins in `finalizeProject` after the first generated structure is persisted. An expired assignment disables every entitlement and all public project reads, while authenticated dashboard access remains available.
+
 | Feature | Endpoint/action | Enforcement |
 |---|---|---|
 | projects | `POST /api/projects/compose` | capacity |
