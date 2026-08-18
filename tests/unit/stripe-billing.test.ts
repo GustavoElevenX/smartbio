@@ -3,7 +3,11 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { productionReadinessIssues } from "@/lib/env/production-readiness";
 import { readBillingConfig } from "@/server/billing/billing-config";
-import { assertBillingMutationActor, billingEntitlementAction } from "@/server/billing/billing-service";
+import {
+  assertBillingMutationActor,
+  billingEntitlementAction,
+  billingErrorResponse,
+} from "@/server/billing/billing-service";
 import type { AuthenticatedActor } from "@/server/auth/setup-actor";
 
 const source = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
@@ -118,6 +122,34 @@ describe("Stripe billing domain", () => {
     expect(statusRoute).toContain("getBillingStatus");
     expect(statusRoute).not.toContain("STRIPE_API_KEY");
     expect(ui).toContain("paymentMethod.brand");
+  });
+
+  it("traduz falha de permissão Stripe sem expor a mensagem do provedor", async () => {
+    const response = billingErrorResponse({
+      type: "StripePermissionError",
+      statusCode: 403,
+      requestId: "req_safe",
+      message: "provider detail that must stay private",
+    });
+    const body = await response.json();
+    expect(response.status).toBe(503);
+    expect(body.error).toEqual({
+      code: "stripe_permission_denied",
+      message: "A chave Stripe não possui permissão para criar o Checkout.",
+    });
+    expect(JSON.stringify(body)).not.toContain("provider detail");
+  });
+
+  it("diferencia conta ainda restrita a cobranças de teste", async () => {
+    const response = billingErrorResponse({
+      type: "StripeInvalidRequestError",
+      code: "testmode_charges_only",
+      statusCode: 400,
+      requestId: "req_safe",
+    });
+    const body = await response.json();
+    expect(body.error.code).toBe("stripe_live_charges_disabled");
+    expect(body.error.message).toContain("cobranças reais");
   });
 
   it("tolera ambiente dev sem Stripe configurada", () => {

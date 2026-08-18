@@ -25,6 +25,74 @@ export class BillingOperationError extends Error {
   }
 }
 
+type StripeRequestFailure = {
+  type: string;
+  code?: string;
+  statusCode?: number;
+  requestId?: string;
+  param?: string;
+};
+
+function stripeRequestFailure(error: unknown): StripeRequestFailure | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  const candidate = error as Record<string, unknown>;
+  const type = typeof candidate.type === "string" ? candidate.type : undefined;
+  const requestId = typeof candidate.requestId === "string" ? candidate.requestId : undefined;
+  if (!type?.startsWith("Stripe") && !requestId) return undefined;
+  return {
+    type: type || "StripeError",
+    code: typeof candidate.code === "string" ? candidate.code : undefined,
+    statusCode: typeof candidate.statusCode === "number" ? candidate.statusCode : undefined,
+    requestId,
+    param: typeof candidate.param === "string" ? candidate.param : undefined,
+  };
+}
+
+function stripeFailureResponse(error: StripeRequestFailure) {
+  console.error("billing_operation_failed", {
+    provider: "stripe",
+    type: error.type,
+    code: error.code,
+    statusCode: error.statusCode,
+    requestId: error.requestId,
+    param: error.param,
+  });
+
+  if (error.statusCode === 401 || error.type === "StripeAuthenticationError") {
+    return new BillingOperationError(
+      "A chave Stripe de produção é inválida ou expirou.",
+      503,
+      "stripe_authentication_failed",
+    );
+  }
+  if (error.statusCode === 403 || error.type === "StripePermissionError") {
+    return new BillingOperationError(
+      "A chave Stripe não possui permissão para criar o Checkout.",
+      503,
+      "stripe_permission_denied",
+    );
+  }
+  if (error.code === "resource_missing" || error.code === "livemode_mismatch") {
+    return new BillingOperationError(
+      "A Stripe não encontrou o recurso de produção configurado. Confira o Price ID LIVE.",
+      503,
+      "stripe_live_resource_missing",
+    );
+  }
+  if (error.code === "testmode_charges_only") {
+    return new BillingOperationError(
+      "A conta Stripe ainda não está habilitada para cobranças reais.",
+      503,
+      "stripe_live_charges_disabled",
+    );
+  }
+  return new BillingOperationError(
+    `A Stripe recusou a criação do Checkout${error.code ? ` (${error.code})` : ""}.`,
+    502,
+    "stripe_request_failed",
+  );
+}
+
 export interface BillingStatusDto {
   enabled: boolean;
   configured: boolean;
@@ -553,6 +621,8 @@ export async function processStripeWebhook(payload: string, signature: string) {
 }
 
 export function billingErrorResponse(error: unknown) {
+  const stripeFailure = stripeRequestFailure(error);
+  if (stripeFailure) return billingErrorResponse(stripeFailureResponse(stripeFailure));
   if (error instanceof BillingOperationError)
     return Response.json(
       { ok: false, error: { code: error.code, message: error.message } },
