@@ -61,6 +61,16 @@ export function productionReadinessIssues(source: NodeJS.ProcessEnv = process.en
       requireVariable(issues, source, variable);
   }
 
+  if (enabled(source, "NEXT_PUBLIC_FEATURE_BILLING")) {
+    for (const variable of [
+      "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+      "STRIPE_API_KEY",
+      "STRIPE_WEBHOOK_SECRET",
+      "STRIPE_PRO_PRICE_ID",
+      "STRIPE_PRO_PRODUCT_ID",
+    ]) requireVariable(issues, source, variable);
+  }
+
   if (enabled(source, "ENABLE_LOCAL_DEV_AUTH"))
     issues.push({ variable: "ENABLE_LOCAL_DEV_AUTH", message: "autenticação local deve estar desativada" });
   if (enabled(source, "NEXT_PUBLIC_ENABLE_LOCAL_DEV_STORE"))

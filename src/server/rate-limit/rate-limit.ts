@@ -29,6 +29,7 @@ export const rateLimitRules = {
   activationClaim: { limit: 10, windowMs: 10 * 60_000 },
   activationHandoff: { limit: 15, windowMs: 10 * 60_000 },
   adminSensitiveMutation: { limit: 20, windowMs: 10 * 60_000 },
+  billingMutation: { limit: 12, windowMs: 10 * 60_000 },
 } satisfies Record<string, RateLimitRule>;
 
 function provider() {

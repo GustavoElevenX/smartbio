@@ -2,7 +2,7 @@
 
 ## 1. Gerar o arquivo de importação
 
-Com o `.env` local contendo as chaves reais do Supabase e, opcionalmente, da OpenAI:
+Com o `.env` local contendo as chaves reais do Supabase e, opcionalmente, da OpenAI e Stripe:
 
 ```bash
 npm run vercel:env:generate
@@ -15,6 +15,7 @@ O comando cria `.env.vercel`, que é ignorado pelo Git e contém apenas pares v�
 - gera segredos aleatórios fortes quando necessário;
 - desativa mapas e e-mail automaticamente enquanto os respectivos provedores não estiverem configurados;
 - preserva os segredos gerados se o comando for executado novamente.
+- habilita billing somente quando todas as cinco variáveis Stripe estiverem presentes e copia esses valores sem gerar credenciais;
 
 Na Vercel, abra **Settings → Environment Variables**, importe `.env.vercel` e marque **Production**, **Preview** e **Development**. Nunca importe `.env` ou `.env.example`.
 
@@ -43,5 +44,6 @@ Ao adicionar um domínio próprio, atualize essas duas URLs. Você também pode 
 - **Upstash Redis:** recomendado para limites de uso distribuídos. Ao cadastrar `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN`, a aplicação passa a usá-lo automaticamente.
 - **Resend:** exige `RESEND_API_KEY` e `EMAIL_FROM`; depois, ative `NEXT_PUBLIC_FEATURE_NOTIFICATIONS=true` e use `EMAIL_PROVIDER=resend`.
 - **Google Maps:** exige `GOOGLE_MAPS_SERVER_API_KEY` e `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY`; depois, ative `NEXT_PUBLIC_FEATURE_GEO_ROUTING=true`.
+- **Stripe Billing:** exige `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRO_PRICE_ID` e `STRIPE_PRO_PRODUCT_ID`. Consulte `docs/STRIPE-BILLING.md` antes do deploy.
 
 Alterações em variáveis só entram em vigor em um novo deploy.

@@ -29,10 +29,14 @@ export const serverEnvSchema = z.object({
   ENCRYPTION_KEY: optionalText,
   CRON_SECRET: optionalText,
   SENTRY_DSN: optionalText,
+  STRIPE_API_KEY: optionalText,
+  STRIPE_WEBHOOK_SECRET: optionalText,
+  STRIPE_PRO_PRICE_ID: optionalText,
+  STRIPE_PRO_PRODUCT_ID: optionalText,
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
-export type ServerFeature = "ai" | "email" | "maps" | "supabase" | "rateLimit" | "customerIdentity";
+export type ServerFeature = "ai" | "email" | "maps" | "supabase" | "rateLimit" | "customerIdentity" | "billing";
 
 export function readServerEnv(source: NodeJS.ProcessEnv = process.env): ServerEnv {
   return serverEnvSchema.parse(source);
@@ -59,6 +63,12 @@ export function validateServerFeature(feature: ServerFeature, source: NodeJS.Pro
     if (!env.UPSTASH_REDIS_REST_TOKEN) missing.push("UPSTASH_REDIS_REST_TOKEN");
   }
   if (feature === "customerIdentity" && source.NODE_ENV === "production" && !env.CUSTOMER_IDENTITY_HASH_SECRET) missing.push("CUSTOMER_IDENTITY_HASH_SECRET");
+  if (feature === "billing") {
+    if (!env.STRIPE_API_KEY) missing.push("STRIPE_API_KEY");
+    if (!env.STRIPE_WEBHOOK_SECRET) missing.push("STRIPE_WEBHOOK_SECRET");
+    if (!env.STRIPE_PRO_PRICE_ID) missing.push("STRIPE_PRO_PRICE_ID");
+    if (!env.STRIPE_PRO_PRODUCT_ID) missing.push("STRIPE_PRO_PRODUCT_ID");
+  }
   if (missing.length) throw new Error(`Configuração ausente para ${feature}: ${missing.join(", ")}.`);
   return env;
 }

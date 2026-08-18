@@ -95,6 +95,24 @@ if (mapsEnabled) {
   set("NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY", mapsBrowserKey);
 }
 
+const stripeVariables = [
+  "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+  "STRIPE_API_KEY",
+  "STRIPE_WEBHOOK_SECRET",
+  "STRIPE_PRO_PRICE_ID",
+  "STRIPE_PRO_PRODUCT_ID",
+] as const;
+const stripeConfigured = stripeVariables.every((name) => Boolean(source(name)));
+const stripePartiallyConfigured = stripeVariables.some((name) => Boolean(source(name)));
+if (stripePartiallyConfigured && !stripeConfigured) {
+  const stripeMissing = stripeVariables.filter((name) => !source(name));
+  console.error(`Para habilitar billing, preencha no .env local: ${stripeMissing.join(", ")}.`);
+  process.exit(1);
+}
+set("NEXT_PUBLIC_FEATURE_BILLING", String(stripeConfigured));
+if (stripeConfigured)
+  for (const name of stripeVariables) set(name, source(name));
+
 set("DEFAULT_COUNTRY", source("DEFAULT_COUNTRY") || "BR");
 set("DEFAULT_TIMEZONE", source("DEFAULT_TIMEZONE") || "America/Sao_Paulo");
 set("SENTRY_DSN", source("SENTRY_DSN"));
@@ -116,7 +134,6 @@ const featureDefaults: Record<string, string> = {
   NEXT_PUBLIC_FEATURE_EXTERNAL_PAYMENTS: "true",
   NEXT_PUBLIC_FEATURE_CALENDAR_SYNC: "false",
   NEXT_PUBLIC_FEATURE_CHAT: "false",
-  NEXT_PUBLIC_FEATURE_BILLING: "false",
   NEXT_PUBLIC_FEATURE_CUSTOM_DOMAINS: "false",
   NEXT_PUBLIC_FEATURE_MULTI_UNIT: "true",
   NEXT_PUBLIC_FEATURE_CONVERSION_GOALS: "true",

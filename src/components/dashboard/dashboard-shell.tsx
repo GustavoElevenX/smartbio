@@ -295,7 +295,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           Configurações
         </Link>
         <Link
-          href="/pricing"
+          href="/app/settings/billing"
           className="focus-ring flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-[#536178] hover:bg-[#eef4fa]"
         >
           <CreditCard size={18} />
