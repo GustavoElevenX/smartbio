@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { calculateSetupReadiness } from "@/server/ai-setup/readiness";
 import { planAdaptiveQuestions } from "@/server/ai-setup/question-planner";
-import type { DataRequirement } from "@/types";
+import { stageGeneratedDraft } from "@/features/ai-setup/stage-generated-draft";
+import type { AISetupSession } from "@/features/ai-setup/ai-setup.schema";
+import type { DataRequirement, Project } from "@/types";
 
 const requirements: DataRequirement[] = [
   { id: "one", key: "quote.services", label: "Serviços do orçamento", capability: "quote", status: "missing", severity: "blocking", reason: "Quais serviços podem receber orçamento?" },
@@ -24,5 +26,28 @@ describe("onboarding adaptativo", () => {
     expect(readiness.readyToGenerate).toBe(true);
     expect(readiness.blocking).toBe(2);
     expect(readiness.progress).toBe(50);
+  });
+
+  it("mantém o projeto gerado apenas como rascunho até ele existir no banco", () => {
+    const session: AISetupSession = {
+      id: crypto.randomUUID(),
+      workspaceId: crypto.randomUUID(),
+      status: "generating",
+      initialInput: { businessName: "Aurora", description: "Consultoria financeira personalizada." },
+      answers: {},
+      missingRequirements: [],
+      questions: [],
+      sources: [],
+      usedFallback: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    const projectDraft = { id: crypto.randomUUID() } as Project;
+
+    const staged = stageGeneratedDraft(session, projectDraft, false);
+
+    expect(staged.projectDraft).toBe(projectDraft);
+    expect(staged.projectId).toBeUndefined();
+    expect(staged.status).toBe("review");
   });
 });

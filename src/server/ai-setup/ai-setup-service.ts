@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { extractedBusinessSourceSchema, type AISetupSession, type ExtractedBusinessSource, type SetupQuestion, type SourceReference } from "@/features/ai-setup/ai-setup.schema";
 import { materializeSetupAnswers } from "@/features/ai-setup/materialize-setup-answers";
+import { stageGeneratedDraft } from "@/features/ai-setup/stage-generated-draft";
 import { RuleBasedBusinessAnalyzer } from "@/features/business-understanding/rule-based-business-analyzer";
 import { capabilityPlanner } from "@/features/capabilities/capability-planner";
 import { draftCapabilityRequirements } from "@/features/capabilities/capability-requirements";
@@ -283,13 +284,11 @@ export class AISetupService {
         project = { ...project, presence: { pages: [page] } };
       }
       project = applyBrandIdentity(project, session);
-      const next = await this.repository.update(actor, {
-        ...session,
-        status: "review",
-        projectId: project.id,
-        projectDraft: project,
-        usedFallback: session.usedFallback || !isAIConfigured(),
-      });
+      const next = await this.repository.update(actor, stageGeneratedDraft(
+        session,
+        project,
+        session.usedFallback || !isAIConfigured(),
+      ));
       await this.repository.addMessage(actor, id, "assistant", "A jornada foi composta como rascunho e está pronta para revisão no editor.", { kind: "generation", projectId: project.id });
       return next;
     } catch (error) {
@@ -301,7 +300,10 @@ export class AISetupService {
   async complete(actor: AISetupActor, id: string, projectId?: string) {
     const session = await this.get(actor, id);
     if (!session.projectDraft) throw new Error("Gere a jornada antes de concluir o onboarding.");
-    return this.repository.update(actor, { ...session, status: "completed", projectId: projectId || session.projectId });
+    const persistedProjectId = projectId || session.projectId;
+    if (!persistedProjectId) throw new Error("Salve o negócio antes de concluir a configuração.");
+    await assertProjectAccess(actor, persistedProjectId, "write");
+    return this.repository.update(actor, { ...session, status: "completed", projectId: persistedProjectId });
   }
 
   async finalizeProject(actor: AISetupActor, id: string, projectId: string, applyVerifiedFacts: boolean) {

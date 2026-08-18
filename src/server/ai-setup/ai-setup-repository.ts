@@ -10,6 +10,11 @@ declare global {
 
 const sessions = globalThis.__smartBioAISetupSessions ??= new Map<string, AISetupSession>();
 
+function persistenceFailure(operation: string, error: { code?: string } | null, userMessage: string): never {
+  console.error("ai_setup_persistence_failed", { operation, code: error?.code });
+  throw new Error(userMessage);
+}
+
 function rowToSession(row: Record<string, unknown>): AISetupSession {
   return aiSetupSessionSchema.parse({
     id: row.id,
@@ -59,7 +64,7 @@ export class AISetupRepository {
     const client = createServiceClient();
     if (!client) throw new Error("Persistência do onboarding indisponível.");
     const { data, error } = await client.from("ai_setup_sessions").insert(sessionToRow(session, actor)).select("*").single();
-    if (error) throw new Error(error.message);
+    if (error) persistenceFailure("create_session", error, "Não foi possível iniciar a configuração.");
     return rowToSession(data);
   }
 
@@ -77,7 +82,7 @@ export class AISetupRepository {
       .eq("workspace_id", actor.workspaceId)
       .eq("created_by", actor.userId)
       .maybeSingle();
-    if (error) throw new Error(error.message);
+    if (error) persistenceFailure("load_session", error, "Não foi possível carregar a configuração.");
     return data ? rowToSession(data) : null;
   }
 
@@ -98,7 +103,7 @@ export class AISetupRepository {
       .eq("created_by", actor.userId)
       .select("*")
       .single();
-    if (error) throw new Error(error.message);
+    if (error) persistenceFailure("update_session", error, "Não foi possível salvar o andamento da configuração.");
     return rowToSession(data);
   }
 
@@ -112,7 +117,7 @@ export class AISetupRepository {
       content,
       metadata,
     });
-    if (error) throw new Error(error.message);
+    if (error) persistenceFailure("add_message", error, "Não foi possível salvar a mensagem da configuração.");
   }
 }
 
