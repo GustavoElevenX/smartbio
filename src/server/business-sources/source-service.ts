@@ -6,7 +6,7 @@ import type { AuthenticatedActor } from "@/server/auth/setup-actor";
 import { extractSourceFacts } from "@/server/business-sources/source-extractor";
 import { parseSource } from "@/server/business-sources/source-parser";
 import { sourceRepository } from "@/server/business-sources/source-repository";
-import { importWebsite } from "@/server/business-sources/website-source";
+import { assertSafeWebsiteUrl, importWebsite } from "@/server/business-sources/website-source";
 import { notifyProjectEvent } from "@/server/notifications/notification-service";
 import { requireEntitlement } from "@/server/entitlements/require-entitlement";
 import type { BusinessSource } from "@/types";
@@ -17,6 +17,66 @@ function detectedType(buffer: Buffer, name: string): { type: "pdf" | "image" | "
 async function assertLinks(actor: AuthenticatedActor, projectId?: string, setupSessionId?: string) { if (projectId) await assertProjectAccess(actor, projectId, "write"); if (setupSessionId) { const client = createServiceClient(); if (!client) throw new Error("Supabase não configurado."); const { data } = await client.from("ai_setup_sessions").select("id").eq("id", setupSessionId).eq("workspace_id", actor.workspaceId).eq("created_by", actor.userId).maybeSingle(); if (!data) throw new Error("Sessão de onboarding não encontrada."); } }
 async function finishProcessing(actor: AuthenticatedActor, source: BusinessSource, parsed: { text?: string; fileData?: string; mimeType?: string; metadata?: Record<string, unknown> }) { await sourceRepository.update(actor, source.id, { status: "processing", processing_error: null }); try { const extracted = await extractSourceFacts(actor, source, parsed); const facts = await sourceRepository.replaceFacts(actor, source, extracted.facts.map((fact) => ({ key: fact.key, type: fact.key.split(/[.[\]]/)[0] || "fact", value: fact.value, evidenceExcerpt: fact.evidenceExcerpt || undefined, confidence: fact.confidence, verificationStatus: fact.verificationStatus }))); const updated = await sourceRepository.update(actor, source.id, { status: "processed", extracted_text: parsed.text || null, extracted_data: { ...extracted, ...parsed.metadata, factCount: facts.length }, processing_error: null }); return { source: updated, facts }; } catch (error) { await sourceRepository.update(actor, source.id, { status: "failed", processing_error: error instanceof Error ? error.message.slice(0, 500) : "Falha no processamento." }); if (source.projectId) await notifyProjectEvent(source.projectId, "source.processing_failed", "business_source", source.id, { source: source.name }).catch(() => undefined); throw error; } }
 export async function uploadBusinessSource(actor: AuthenticatedActor, file: File, input: { projectId?: string; setupSessionId?: string }) { if (actor.persistence === "memory") throw new Error("Configure o Supabase para enviar arquivos privados."); await assertLinks(actor, input.projectId, input.setupSessionId); const client = createServiceClient()!; await requireEntitlement({ database: client, workspaceId: actor.workspaceId, feature: "ai_business_analysis" }); if (!file.size || file.size > MAX_FILE_SIZE) throw new Error("O arquivo deve ter no máximo 15 MB."); const buffer = Buffer.from(await file.arrayBuffer()); const detected = detectedType(buffer, file.name); const id = randomUUID(); const name = cleanName(file.name); const path = `${actor.workspaceId}/${id}/${name}`; const checksum = createHash("sha256").update(buffer).digest("hex"); const source = await sourceRepository.create(actor, { id, projectId: input.projectId, setupSessionId: input.setupSessionId, type: detected.type, name, storagePath: path, mimeType: detected.mimeType, fileSize: buffer.byteLength, checksum }); const { error } = await client.storage.from("business-sources").upload(path, buffer, { contentType: detected.mimeType, upsert: false }); if (error) { await sourceRepository.update(actor, id, { status: "failed", processing_error: "Falha ao salvar o arquivo privado." }); throw new Error("Não foi possível armazenar o arquivo."); } await sourceRepository.update(actor, id, { status: "uploaded" }); return finishProcessing(actor, source, await parseSource(buffer, detected.type, detected.mimeType)); }
-export async function importWebsiteSource(actor: AuthenticatedActor, input: { url: string; projectId?: string; setupSessionId?: string }) { if (actor.persistence === "memory") throw new Error("Configure o Supabase para importar sites com rastreabilidade."); await assertLinks(actor, input.projectId, input.setupSessionId); const client = createServiceClient()!; await requireEntitlement({ database: client, workspaceId: actor.workspaceId, feature: "ai_business_analysis" }); const imported = await importWebsite(input.url); const source = await sourceRepository.create(actor, { id: randomUUID(), projectId: input.projectId, setupSessionId: input.setupSessionId, type: "website", name: new URL(input.url).hostname, sourceUrl: input.url }); return finishProcessing(actor, source, { text: imported.text, metadata: { pages: imported.pages.map((page) => page.url) } }); }
+export async function createWebsiteSource(
+  actor: AuthenticatedActor,
+  input: { url: string; projectId?: string; setupSessionId?: string },
+) {
+  if (actor.persistence === "memory") {
+    throw new Error("Configure o Supabase para importar sites com rastreabilidade.");
+  }
+  await assertLinks(actor, input.projectId, input.setupSessionId);
+  const client = createServiceClient()!;
+  await requireEntitlement({
+    database: client,
+    workspaceId: actor.workspaceId,
+    feature: "ai_business_analysis",
+  });
+  const url = await assertSafeWebsiteUrl(input.url);
+  return sourceRepository.create(actor, {
+    id: randomUUID(),
+    projectId: input.projectId,
+    setupSessionId: input.setupSessionId,
+    type: "website",
+    name: url.hostname,
+    sourceUrl: url.toString(),
+  });
+}
+
+export async function processWebsiteSource(actor: AuthenticatedActor, sourceId: string) {
+  const source = await sourceRepository.get(actor, sourceId);
+  if (!source?.sourceUrl || source.type !== "website") {
+    throw new Error("Fonte de site não encontrada.");
+  }
+  await sourceRepository.update(actor, source.id, {
+    status: "processing",
+    processing_error: null,
+  });
+  try {
+    const imported = await importWebsite(source.sourceUrl);
+    return await finishProcessing(actor, source, {
+      text: imported.text,
+      metadata: { pages: imported.pages.map((page) => page.url) },
+    });
+  } catch (error) {
+    await sourceRepository
+      .update(actor, source.id, {
+        status: "failed",
+        processing_error:
+          error instanceof Error
+            ? error.message.slice(0, 500)
+            : "Falha no processamento do site.",
+      })
+      .catch(() => undefined);
+    throw error;
+  }
+}
+
+export async function importWebsiteSource(
+  actor: AuthenticatedActor,
+  input: { url: string; projectId?: string; setupSessionId?: string },
+) {
+  const source = await createWebsiteSource(actor, input);
+  return processWebsiteSource(actor, source.id);
+}
 
 export async function reprocessBusinessSource(actor: AuthenticatedActor, sourceId: string) { const source = await sourceRepository.get(actor, sourceId); if (!source) throw new Error("Fonte não encontrada."); if (source.projectId) await assertProjectAccess(actor, source.projectId, "write"); if (source.type === "website" && source.sourceUrl) { const imported = await importWebsite(source.sourceUrl); return finishProcessing(actor, source, { text: imported.text, metadata: { pages: imported.pages.map((page) => page.url) } }); } if (!source.storagePath) throw new Error("Arquivo original indisponível para reprocessamento."); const client = createServiceClient()!; const { data, error } = await client.storage.from("business-sources").download(source.storagePath); if (error || !data) throw new Error("Não foi possível baixar o arquivo original."); const buffer = Buffer.from(await data.arrayBuffer()); return finishProcessing(actor, source, await parseSource(buffer, source.type as "pdf" | "image" | "csv" | "text", source.mimeType || "application/octet-stream")); }

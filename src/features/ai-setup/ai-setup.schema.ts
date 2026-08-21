@@ -144,6 +144,7 @@ export const sourceReferenceSchema = z.object({
   name: z.string().min(1).max(240),
   type: z.enum(["website", "text", "pdf", "image", "csv"]),
   status: z.enum(["pending", "uploaded", "processing", "processed", "failed"]),
+  processingError: z.string().max(500).optional(),
 });
 
 export const aiSetupSessionSchema = z.object({

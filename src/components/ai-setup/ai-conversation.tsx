@@ -42,6 +42,9 @@ interface AIConversationProps {
 export function AIConversation({ form, sources, brandIdentity, logoPreviewUrl, session, busy, busyQuestion, generationStatus, projectId, error, onFormChange, onSourcesChange, onBrandIdentityChange, onAnalyze, onAnswer, onGenerate, onOpenEditor }: AIConversationProps) {
   const analyzed = Boolean(session?.extractedProfile);
   const ready = generationStatus === "ready" || session?.status === "completed" || session?.status === "review";
+  const sourcesProcessing = sources.some((source) =>
+    ["pending", "uploaded", "processing"].includes(source.status),
+  );
   return (
     <main className="min-w-0 p-5 sm:p-7 xl:p-9">
       <div className="mx-auto max-w-[780px]">
@@ -63,7 +66,7 @@ export function AIConversation({ form, sources, brandIdentity, logoPreviewUrl, s
             <div className="mt-4"><Label htmlFor="ai-phone">WhatsApp ou telefone (opcional)</Label><Input id="ai-phone" type="tel" autoComplete="tel" value={form.phone} onChange={(event) => onFormChange({ ...form, phone: event.target.value })} placeholder="5511999999999" disabled={analyzed || busy} /></div>
             <div className="mt-5"><BrandIdentityUploader brand={brandIdentity} previewUrl={logoPreviewUrl} businessName={form.businessName} businessDescription={form.description} onChange={onBrandIdentityChange} disabled={analyzed || busy} /></div>
             <div className="mt-4"><SourceUploader sources={sources} setupSessionId={session?.id} projectId={projectId} onChange={onSourcesChange} disabled={analyzed || busy} /></div>
-            {!analyzed ? <Button type="button" size="lg" className="mt-5 w-full sm:w-auto" onClick={() => void onAnalyze()} disabled={busy}>{busy ? <LoaderCircle data-icon size={17} className="animate-spin" /> : <WandSparkles data-icon size={17} />} {busy ? "Analisando o negócio…" : "Analisar meu negócio"}</Button> : null}
+            {!analyzed ? <Button type="button" size="lg" className="mt-5 w-full sm:w-auto" onClick={() => void onAnalyze()} disabled={busy || sourcesProcessing}>{busy || sourcesProcessing ? <LoaderCircle data-icon size={17} className="animate-spin" /> : <WandSparkles data-icon size={17} />} {sourcesProcessing ? "Importando materiais…" : busy ? "Analisando o negócio…" : "Analisar meu negócio"}</Button> : null}
           </Card>
 
           {analyzed && session ? <><AIMessage role="user">{form.description}</AIMessage><AIMessage role="assistant">Encontrei os principais caminhos comerciais. Agora vou confirmar somente os dados que alteram a experiência.</AIMessage><ConfirmExtractedData session={session} /></> : null}
