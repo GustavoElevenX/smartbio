@@ -36,6 +36,8 @@ function setupSession(): AISetupSession {
     workspaceId: "local-workspace",
     status: "review",
     initialInput,
+    visitorActions: [],
+    actionsConfirmed: false,
     answers,
     missingRequirements: draftCapabilityRequirements(project.capabilities || []).map((requirement) => ({
       ...requirement,

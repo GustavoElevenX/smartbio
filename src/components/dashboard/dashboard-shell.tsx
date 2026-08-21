@@ -4,25 +4,19 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3,
+  Bell,
   BriefcaseBusiness,
   Check,
   ChevronDown,
   CreditCard,
-  Database,
-  FileSearch,
   FolderKanban,
   Globe2,
   HelpCircle,
-  Images,
   LayoutDashboard,
-  Link2,
   Loader2,
   LogOut,
   Menu,
-  Palette,
-  PencilRuler,
   Settings,
-  Target,
   X,
   Zap,
 } from "lucide-react";
@@ -39,6 +33,7 @@ import {
 import { features } from "@/lib/constants";
 import { SupportModeBanner } from "@/components/platform-admin/support-mode-banner";
 import { PlanStatusBanner } from "@/components/entitlements/plan-status-banner";
+import { projectRepository } from "@/lib/repositories/project-repository";
 
 interface WorkspaceSummary {
   id: string;
@@ -56,8 +51,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [activeWorkspaceId, setActiveWorkspaceId] = useState("");
   const [switchingWorkspace, setSwitchingWorkspace] = useState<string>();
   const projectId = pathname.match(/^\/app\/projects\/([^/]+)/)?.[1];
-  const items = [
-    { href: "/app", label: "Visão geral", icon: LayoutDashboard, exact: true },
+  const [projectName, setProjectName] = useState("");
+  const workspaceItems = [
+    { href: "/app", label: "Início", icon: LayoutDashboard, exact: true },
     {
       href: "/app/projects",
       label: "Negócios",
@@ -67,10 +63,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     {
       href: "/app/notifications",
       label: "Notificações",
-      icon: BriefcaseBusiness,
+      icon: Bell,
       exact: true,
     },
-    ...(projectId
+  ];
+  const projectItems = projectId
       ? [
           {
             href: `/app/projects/${projectId}`,
@@ -78,77 +75,41 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             icon: LayoutDashboard,
             exact: true,
           },
-          {
-            href: `/app/projects/${projectId}/conversion`,
-            label: "Conversão",
-            icon: Target,
-          },
           ...(features.presence
             ? [
                 {
                   href: `/app/projects/${projectId}/site`,
-                  label: "Site",
+                  label: "Minha página",
                   icon: Globe2,
                 },
               ]
             : []),
+          {
+            href: `/app/projects/${projectId}/opportunities`,
+            label: "Leads",
+            icon: BriefcaseBusiness,
+          },
+          {
+            href: `/app/projects/${projectId}/analytics`,
+            label: "Resultados",
+            icon: BarChart3,
+          },
           ...(features.activations
             ? [
                 {
                   href: `/app/projects/${projectId}/activations`,
-                  label: "Ativações",
+                  label: "Campanhas",
                   icon: Zap,
                 },
               ]
             : []),
           {
-            href: `/app/projects/${projectId}/editor`,
-            label: "Jornada",
-            icon: PencilRuler,
-          },
-          {
-            href: `/app/projects/${projectId}/entries`,
-            label: "Entradas",
-            icon: Link2,
-          },
-          {
-            href: `/app/projects/${projectId}/opportunities`,
-            label: "Oportunidades",
-            icon: BriefcaseBusiness,
-          },
-          {
-            href: `/app/projects/${projectId}/analytics`,
-            label: "Analytics",
-            icon: BarChart3,
-          },
-          {
-            href: `/app/projects/${projectId}/data`,
-            label: "Dados comerciais",
-            icon: Database,
-          },
-          {
-            href: `/app/projects/${projectId}/sources`,
-            label: "Fontes e importações",
-            icon: FileSearch,
-          },
-          {
-            href: `/app/projects/${projectId}/media`,
-            label: "Mídia",
-            icon: Images,
-          },
-          {
-            href: `/app/projects/${projectId}/brand`,
-            label: "Marca",
-            icon: Palette,
-          },
-          {
             href: `/app/projects/${projectId}/settings`,
-            label: "Configurações",
+            label: "Configurações do negócio",
             icon: Settings,
           },
         ]
-      : []),
-  ];
+      : [];
   useEffect(() => {
     void fetch("/api/account/profile")
       .then((response) => response.json())
@@ -168,6 +129,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       setWorkspaces(payload.data?.workspaces || []);
     });
   }, []);
+  useEffect(() => {
+    if (!projectId) { setProjectName(""); return; }
+    void projectRepository.getProject(projectId).then((project) => setProjectName(project?.name || "Negócio")).catch(() => setProjectName("Negócio"));
+  }, [projectId]);
   const activeWorkspace =
     workspaces.find((workspace) => workspace.id === activeWorkspaceId) ||
     workspaces[0];
@@ -258,8 +223,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </PopoverContent>
         </Popover>
       </div>
-      <nav className="flex-1 space-y-1 px-3 py-2">
-        {items.map((item) => {
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
+        {workspaceItems.map((item) => {
           const active = item.exact
             ? pathname === item.href
             : pathname.startsWith(item.href);
@@ -281,6 +246,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </Link>
           );
         })}
+        {projectId ? <><div className="my-3 h-px bg-[#dfe6ee]" /><div className="px-3 pb-2 pt-1"><span className="text-xs font-extrabold uppercase tracking-[.12em] text-[#8796a6]">Negócio</span><strong className="mt-1 block truncate text-sm text-[#07172f]">{projectName || "Carregando…"}</strong></div>{projectItems.map((item) => { const active = item.exact ? pathname === item.href : pathname.startsWith(item.href); const Icon = item.icon; return <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className={cn("focus-ring flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition", active ? "bg-[#eaf3ff] text-[#0054fc]" : "text-[#536178] hover:bg-[#eef4fa] hover:text-[#07172f]")}><Icon size={18} />{item.label}</Link>; })}</> : null}
         <div className="my-3 h-px bg-[#e7e6ed]" />
         <Link
           href="/app/settings/profile"

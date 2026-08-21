@@ -10,9 +10,10 @@ import { aiSetupSessionSchema, type AISetupSession, type BrandIdentity, type Sou
 import { forgetAISetupSession, readRememberedAISetupSession, rememberAISetupSession } from "@/features/ai-setup/ai-setup-state";
 import { projectRepository } from "@/lib/repositories/project-repository";
 import type { Project } from "@/types";
+import type { VisitorActionSelection } from "@/features/ai-setup/visitor-actions";
 
 const SetupPreview = dynamic(() => import("@/components/ai-setup/setup-preview"), { ssr: false });
-const initialForm: InitialSetupForm = { requestedSurface: "recommend", businessName: "", description: "", websiteUrl: "", phone: "" };
+const initialForm: InitialSetupForm = { businessName: "", description: "", websiteUrl: "", phone: "" };
 
 async function apiCall<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { ...init, headers: { "content-type": "application/json", ...init?.headers } });
@@ -43,7 +44,7 @@ export function AISetupShell({ startFresh = false }: AISetupShellProps) {
   function adopt(next: AISetupSession) {
     const parsed = aiSetupSessionSchema.parse(next);
     setSession(parsed);
-    setForm({ requestedSurface: parsed.initialInput.requestedSurface || "recommend", businessName: parsed.initialInput.businessName, description: parsed.initialInput.description, websiteUrl: parsed.initialInput.websiteUrl || "", phone: parsed.initialInput.phone || "" });
+    setForm({ businessName: parsed.initialInput.businessName, description: parsed.initialInput.description, websiteUrl: parsed.initialInput.websiteUrl || "", phone: parsed.initialInput.phone || "" });
     setSources(parsed.sources);
     setBrandIdentity(parsed.initialInput.brandIdentity);
     setProjectId(parsed.projectId);
@@ -81,7 +82,9 @@ export function AISetupShell({ startFresh = false }: AISetupShellProps) {
     }
     setBusy(true); setError("");
     try {
-      const created = await apiCall<AISetupSession>("/api/ai/setup/start", { method: "POST", body: JSON.stringify({ input: { requestedSurface: form.requestedSurface, businessName: form.businessName.trim(), description: form.description.trim(), websiteUrl: form.websiteUrl.trim() || undefined, phone: form.phone.trim() || undefined, brandIdentity }, sources }) });
+      const website = form.websiteUrl.trim();
+      const websiteUrl = website.startsWith("@") ? `https://instagram.com/${website.slice(1)}` : website || undefined;
+      const created = await apiCall<AISetupSession>("/api/ai/setup/start", { method: "POST", body: JSON.stringify({ input: { requestedSurface: "recommend", businessName: form.businessName.trim(), description: form.description.trim(), websiteUrl, phone: form.phone.trim() || undefined, brandIdentity }, sources }) });
       adopt(created);
       adopt(await apiCall<AISetupSession>(`/api/ai/setup/${created.id}/analyze`, { method: "POST", body: "{}" }));
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Não foi possível analisar o negócio."); }
@@ -96,6 +99,14 @@ export function AISetupShell({ startFresh = false }: AISetupShellProps) {
     finally { setBusyQuestion(undefined); }
   }
 
+  async function confirmActions(actions: VisitorActionSelection[]) {
+    if (!session) return;
+    setBusy(true); setError("");
+    try { adopt(await apiCall<AISetupSession>(`/api/ai/setup/${session.id}/actions`, { method: "POST", body: JSON.stringify({ actions }) })); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : "Não foi possível confirmar as ações."); }
+    finally { setBusy(false); }
+  }
+
   async function generate() {
     if (!session) return;
     setBusy(true); setGenerationStatus("generating"); setError("");
@@ -106,16 +117,17 @@ export function AISetupShell({ startFresh = false }: AISetupShellProps) {
       const saved = await projectRepository.saveProject(project);
       const finalized = await apiCall<{ session: AISetupSession }>(`/api/ai/setup/${session.id}/finalize-project`, { method: "POST", body: JSON.stringify({ projectId: saved.id, applyVerifiedFacts: true }) });
       adopt(finalized.session); setProjectId(saved.id); setGenerationStatus("ready");
-    } catch (caught) { setGenerationStatus("idle"); setError(caught instanceof Error ? caught.message : "Não foi possível gerar a jornada."); }
+      router.push(`/app/projects/${saved.id}/launch`);
+    } catch (caught) { setGenerationStatus("idle"); setError(caught instanceof Error ? caught.message : "Não foi possível criar a primeira versão."); }
     finally { setBusy(false); }
   }
 
   return (
     <div className="animate-enter">
-      <div className="mb-5"><p className="text-xs font-extrabold uppercase tracking-[.14em] text-[#0054fc]">Novo negócio · IA</p><h2 className="mt-1 text-xl font-extrabold tracking-[-.03em]">Onboarding adaptativo</h2></div>
+      <div className="mb-5"><h2 className="text-xl font-extrabold tracking-[-.03em] text-[#07172f]">Novo negócio</h2><p className="mt-1 text-sm text-[#687582]">Da descrição à primeira versão pronta para testar.</p></div>
       <div className="mb-3 grid grid-cols-2 rounded-xl bg-[#e9e7ef] p-1 lg:hidden"><Button type="button" size="sm" variant={mobilePanel === "conversation" ? "primary" : "ghost"} onClick={() => setMobilePanel("conversation")}><MessagesSquare data-icon size={15} /> Conversa</Button><Button type="button" size="sm" variant={mobilePanel === "preview" ? "primary" : "ghost"} onClick={() => setMobilePanel("preview")}><PanelRight data-icon size={15} /> Prévia</Button></div>
       <div className="overflow-hidden rounded-[28px] border border-[#e3e1e9] bg-white shadow-[0_20px_65px_rgba(29,26,52,.07)] lg:grid lg:min-h-[720px] lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_370px]">
-        <div className={mobilePanel === "conversation" ? "block" : "hidden lg:block"}><AIConversation form={form} sources={sources} brandIdentity={brandIdentity} logoPreviewUrl={logoPreviewUrl} session={session} busy={busy || restoring} busyQuestion={busyQuestion} generationStatus={generationStatus} projectId={projectId} error={error} onFormChange={setForm} onSourcesChange={setSources} onBrandIdentityChange={(brand, previewUrl) => { setBrandIdentity(brand); setLogoPreviewUrl(previewUrl); }} onAnalyze={analyze} onAnswer={answer} onGenerate={generate} onOpenEditor={() => projectId && router.push(`/app/projects/${projectId}/editor`)} /></div>
+        <div className={mobilePanel === "conversation" ? "block" : "hidden lg:block"}><AIConversation form={form} sources={sources} brandIdentity={brandIdentity} logoPreviewUrl={logoPreviewUrl} session={session} busy={busy || restoring} busyQuestion={busyQuestion} generationStatus={generationStatus} projectId={projectId} error={error} onFormChange={setForm} onSourcesChange={setSources} onBrandIdentityChange={(brand, previewUrl) => { setBrandIdentity(brand); setLogoPreviewUrl(previewUrl); }} onAnalyze={analyze} onAnswer={answer} onConfirmActions={confirmActions} onGenerate={generate} onOpenLaunch={() => projectId && router.push(`/app/projects/${projectId}/launch`)} /></div>
         <div className={mobilePanel === "preview" ? "block" : "hidden lg:block"}><SetupPreview session={session} businessName={form.businessName} description={form.description} brandIdentity={brandIdentity} logoPreviewUrl={logoPreviewUrl} /></div>
       </div>
     </div>

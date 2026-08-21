@@ -1,9 +1,9 @@
 import "server-only";
 
 import { createServiceClient } from "@/lib/supabase/server";
-import { createPresencePage, createPresenceSection } from "@/features/presence/presence-page-service";
 import { applySiteProposalInputSchema, suggestSiteStructureInputSchema } from "@/features/site-composer/site-composer.schema";
 import { createSiteStructureProposal, suggestSiteStructure } from "@/features/site-composer/site-structure-suggester";
+import { applySiteOperationsToDraft } from "@/features/site-composer/materialize-site-structure";
 import type { SiteStructureProposal } from "@/features/site-composer/site-composer.types";
 import type { AuthenticatedActor } from "@/server/auth/setup-actor";
 import { assertProjectAccess } from "@/server/auth/project-access";
@@ -91,51 +91,9 @@ export async function applySiteProposalForActor(actor: AuthenticatedActor, proje
   if (selected.length !== input.selectedOperations.length) throw new Error("A seleção contém operações que não pertencem à proposta.");
   const database = createServiceClient();
   if (actor.persistence === "database" && database) await requireEntitlement({ database, workspaceId: actor.workspaceId, feature: "ai_page_edits" });
-  const pages = structuredClone(project.presence?.pages || []);
-  const touched = new Set<string>();
-  const deletedByPage = new Map<string, string[]>();
-  for (const operation of selected) {
-    if (operation.type === "add_page") {
-      const page = createPresencePage(projectId, operation.page.name, operation.page.type, pages);
-      page.type = operation.page.type;
-      page.isHome = operation.page.type === "home";
-      page.path = operation.page.pathSuggestion;
-      page.purpose = operation.page.purpose;
-      page.description = operation.page.purpose;
-      page.defaultConversionGoalId = operation.page.conversionGoalId;
-      page.sections = operation.page.sections.map((suggested, order) => {
-        const section = createPresenceSection(page.id, suggested.sectionType, order);
-        return { ...section, title: suggested.purpose, content: { ...section.content, ...suggested.suggestedContent }, settings: { ...section.settings, sourceBindings: suggested.sourceBindings } };
-      });
-      pages.push(page);
-      touched.add(page.id);
-      continue;
-    }
-    const page = pages.find((candidate) => candidate.id === operation.pageId);
-    if (!page) continue;
-    touched.add(page.id);
-    if (operation.type === "add_section") {
-      const section = createPresenceSection(page.id, operation.section.sectionType, operation.at ?? page.sections.length);
-      section.title = operation.section.purpose;
-      section.content = { ...section.content, ...operation.section.suggestedContent };
-      section.settings = { ...section.settings, sourceBindings: operation.section.sourceBindings };
-      page.sections.splice(operation.at ?? page.sections.length, 0, section);
-      page.sections.forEach((item, order) => { item.order = order; });
-    } else if (operation.type === "remove_section") {
-      page.sections = page.sections.filter((section) => section.id !== operation.sectionId).map((section, order) => ({ ...section, order }));
-      deletedByPage.set(page.id, [...(deletedByPage.get(page.id) || []), operation.sectionId]);
-    }
-    else if (operation.type === "move_section") {
-      const index = page.sections.findIndex((section) => section.id === operation.sectionId);
-      if (index >= 0) page.sections.splice(operation.to, 0, page.sections.splice(index, 1)[0]);
-      page.sections.forEach((section, order) => { section.order = order; });
-    } else if (operation.type === "rename_page") page.name = operation.name;
-    else if (operation.type === "connect_goal") page.defaultConversionGoalId = operation.conversionGoalId;
-    else if (operation.type === "update_section") {
-      const index = page.sections.findIndex((section) => section.id === operation.sectionId);
-      if (index >= 0) page.sections[index] = { ...page.sections[index], ...operation.patch };
-    }
-  }
+  const materialized = applySiteOperationsToDraft(project, selected);
+  const pages = materialized.project.presence?.pages || [];
+  const touched = new Set(materialized.touchedPageIds);
   if (actor.persistence === "database" && database) {
     const [pageEntitlement, sectionEntitlement] = await Promise.all([
       requireEntitlement({ database, workspaceId: actor.workspaceId, feature: "presence_pages" }),
@@ -149,7 +107,7 @@ export async function applySiteProposalForActor(actor: AuthenticatedActor, proje
   await savePresencePagesForActor(actor, projectId, [...touched].map((pageId) => {
     const page = pages.find((candidate) => candidate.id === pageId)!;
     const original = project.presence?.pages.find((candidate) => candidate.id === pageId);
-    return { page, expectedVersion: original?.version || 0, deletedSectionIds: deletedByPage.get(pageId) || [] };
+    return { page, expectedVersion: original?.version || 0, deletedSectionIds: materialized.deletedSectionIds[pageId] || [] };
   }));
   if (actor.persistence === "memory") memoryProposals.set(proposal.proposalId, { ...proposal, status: "applied" });
   else if (database) await database.from("ai_site_proposals").update({ status: "applied", applied_at: new Date().toISOString(), selected_operation_ids: input.selectedOperations }).eq("id", proposal.proposalId).eq("workspace_id", actor.workspaceId);

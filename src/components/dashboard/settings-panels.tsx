@@ -109,12 +109,21 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
         ← Projetos
       </Link>
       <h1 className="mt-4 text-3xl font-extrabold tracking-[-.04em]">
-        Configurações do projeto
+        Configurações do negócio
       </h1>
       <p className="mt-2 text-sm text-[#74747e]">
-        URL, SEO, publicação e versões.
+        Informações, produtos, unidades, marca e materiais em um só lugar.
       </p>
-      <section className="mt-7 rounded-[22px] border border-[#e4e3ea] bg-white p-6">
+      <nav aria-label="Áreas das configurações do negócio" className="mt-6 flex gap-2 overflow-x-auto border-y border-[#dfe6ee] py-3">
+        <a href="#information" className="focus-ring inline-flex min-h-11 shrink-0 items-center bg-[#07172f] px-4 text-sm font-bold text-white">Informações</a>
+        <Link href={`/app/projects/${project.id}/data`} className="focus-ring inline-flex min-h-11 shrink-0 items-center px-4 text-sm font-bold text-[#536178] hover:bg-[#eef4fa]">Produtos e serviços</Link>
+        <Link href={`/app/projects/${project.id}/data?tab=locations`} className="focus-ring inline-flex min-h-11 shrink-0 items-center px-4 text-sm font-bold text-[#536178] hover:bg-[#eef4fa]">Unidades</Link>
+        <Link href={`/app/projects/${project.id}/brand`} className="focus-ring inline-flex min-h-11 shrink-0 items-center px-4 text-sm font-bold text-[#536178] hover:bg-[#eef4fa]">Marca</Link>
+        <Link href={`/app/projects/${project.id}/media`} className="focus-ring inline-flex min-h-11 shrink-0 items-center px-4 text-sm font-bold text-[#536178] hover:bg-[#eef4fa]">Mídia</Link>
+        <Link href={`/app/projects/${project.id}/sources`} className="focus-ring inline-flex min-h-11 shrink-0 items-center px-4 text-sm font-bold text-[#536178] hover:bg-[#eef4fa]">Materiais importados</Link>
+        <Link href={`/app/projects/${project.id}/editor`} className="focus-ring inline-flex min-h-11 shrink-0 items-center px-4 text-sm font-bold text-[#536178] hover:bg-[#eef4fa]">Avançado</Link>
+      </nav>
+      <section id="information" className="mt-7 rounded-[22px] border border-[#e4e3ea] bg-white p-6">
         <h2 className="flex items-center gap-2 font-extrabold">
           <Globe2 size={18} className="text-[#0054fc]" /> Informações públicas
         </h2>
@@ -144,6 +153,10 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
               value={project.description}
               onChange={(event) => update({ description: event.target.value })}
             />
+          </div>
+          <div id="contact">
+            <Label htmlFor="project-phone">WhatsApp ou telefone</Label>
+            <Input id="project-phone" type="tel" value={project.phone || ""} onChange={(event) => update({ phone: event.target.value || undefined })} placeholder="5511999999999" />
           </div>
           <div>
             <Label htmlFor="project-status">Status</Label>

@@ -16,6 +16,8 @@ export const suggestSiteStructureInputSchema = z.object({
 export const suggestedSectionSchema = z.object({
   sectionType: z.enum(sectionTypes),
   purpose: z.string().min(1).max(300),
+  title: z.string().min(1).max(180).optional(),
+  description: z.string().max(600).optional(),
   suggestedContent: z.record(z.string(), z.unknown()),
   sourceBindings: z.array(z.string()).max(30),
   conversionGoalId: z.string().optional(),

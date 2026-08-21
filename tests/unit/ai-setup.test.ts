@@ -3,6 +3,9 @@ import { calculateSetupReadiness } from "@/server/ai-setup/readiness";
 import { planAdaptiveQuestions } from "@/server/ai-setup/question-planner";
 import { stageGeneratedDraft } from "@/features/ai-setup/stage-generated-draft";
 import type { AISetupSession } from "@/features/ai-setup/ai-setup.schema";
+import { aiSetupSessionSchema, setupInitialInputSchema } from "@/features/ai-setup/ai-setup.schema";
+import { applyVisitorActionsToProject, defaultVisitorActions } from "@/features/ai-setup/visitor-actions";
+import { casaDeSucos } from "@/data/demo-projects";
 import type { DataRequirement, Project } from "@/types";
 
 const requirements: DataRequirement[] = [
@@ -34,6 +37,8 @@ describe("onboarding adaptativo", () => {
       workspaceId: crypto.randomUUID(),
       status: "generating",
       initialInput: { businessName: "Aurora", description: "Consultoria financeira personalizada." },
+      visitorActions: [],
+      actionsConfirmed: false,
       answers: {},
       missingRequirements: [],
       questions: [],
@@ -49,5 +54,28 @@ describe("onboarding adaptativo", () => {
     expect(staged.projectDraft).toBe(projectDraft);
     expect(staged.projectId).toBeUndefined();
     expect(staged.status).toBe("review");
+  });
+
+  it("aceita entradas novas e antigas sem obrigar a escolha de superfície", () => {
+    expect(setupInitialInputSchema.parse({ businessName: "Aurora", description: "Consultoria financeira personalizada." }).requestedSurface).toBeUndefined();
+    expect(setupInitialInputSchema.parse({ requestedSurface: "landing_page", businessName: "Aurora", description: "Consultoria financeira personalizada." }).requestedSurface).toBe("landing_page");
+    const legacy = aiSetupSessionSchema.parse({
+      id: "legacy", workspaceId: "workspace", status: "collecting",
+      initialInput: { requestedSurface: "business_site", businessName: "Aurora", description: "Consultoria financeira personalizada." },
+      answers: {}, missingRequirements: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    });
+    expect(legacy.visitorActions).toEqual([]);
+    expect(legacy.actionsConfirmed).toBe(false);
+  });
+
+  it("transforma várias ações humanas em objetivos ligados a etapas reais", () => {
+    const project = structuredClone(casaDeSucos);
+    const actions = defaultVisitorActions(project.businessProfile!).slice(0, 3).map((action, index) => ({ ...action, isPrimary: index === 0 }));
+    const result = applyVisitorActionsToProject(project, { visitorActions: actions });
+    const stepIds = new Set(result.steps.filter((step) => step.isActive).map((step) => step.id));
+
+    expect(result.conversionGoals).toHaveLength(actions.length);
+    expect(result.conversionGoals?.filter((goal) => goal.isPrimary)).toHaveLength(1);
+    expect(result.conversionGoals?.every((goal) => stepIds.has(goal.targetStepId))).toBe(true);
   });
 });

@@ -269,7 +269,7 @@ export function PresenceSectionRenderer({
     );
   }
   const visual = appearance(project, section);
-  const wrap = (children: React.ReactNode, extra = "") => (
+  const wrap = (children: React.ReactNode, extra = "", showHeading = true) => (
     <section
       id={section.anchor}
       data-radius={section.style.radius}
@@ -284,7 +284,7 @@ export function PresenceSectionRenderer({
         />
       ) : null}
       <div className={`relative mx-auto ${sectionWidth(page, section)}`}>
-        <Heading section={section} />
+        {showHeading ? <Heading section={section} /> : null}
         {children}
       </div>
     </section>
@@ -759,6 +759,8 @@ export function PresenceSectionRenderer({
           secondary={content.secondaryAction}
         />
       </div>,
+      "",
+      false,
     );
   return wrap(
     <div className="rounded-2xl border border-dashed border-black/20 p-8 text-center text-sm text-[var(--presence-muted)]">

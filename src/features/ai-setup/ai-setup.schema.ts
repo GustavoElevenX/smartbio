@@ -139,6 +139,17 @@ export const setupInitialInputSchema = z.object({
   brandIdentity: brandIdentitySchema.optional(),
 });
 
+export const visitorActionKeySchema = z.enum([
+  "order", "buy", "view_products", "quote", "schedule", "reserve",
+  "contact", "find_location", "support", "resale", "recommendation", "other",
+]);
+
+export const visitorActionSelectionSchema = z.object({
+  key: visitorActionKeySchema,
+  label: z.string().trim().min(1).max(80),
+  isPrimary: z.boolean(),
+});
+
 export const sourceReferenceSchema = z.object({
   id: z.string(),
   name: z.string().min(1).max(240),
@@ -154,6 +165,8 @@ export const aiSetupSessionSchema = z.object({
   status: z.enum(["collecting", "analyzing", "waiting_answers", "generating", "review", "completed", "failed"]),
   initialInput: setupInitialInputSchema,
   extractedProfile: businessCapabilityProfileSchema.optional(),
+  visitorActions: z.array(visitorActionSelectionSchema).max(8).default([]),
+  actionsConfirmed: z.boolean().default(false),
   answers: z.record(z.string(), z.unknown()),
   missingRequirements: z.array(dataRequirementSchema),
   questions: z.array(setupQuestionSchema).max(5).default([]),
@@ -185,3 +198,4 @@ export type CopyGenerationResult = z.infer<typeof copyGenerationResultSchema>;
 export type BrandAIResult = z.infer<typeof brandAIResultSchema>;
 export type BrandIdentity = z.infer<typeof brandIdentitySchema>;
 export type SourceReference = z.infer<typeof sourceReferenceSchema>;
+export type VisitorActionSelection = z.infer<typeof visitorActionSelectionSchema>;

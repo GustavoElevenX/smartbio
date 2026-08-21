@@ -26,14 +26,39 @@ const choiceQuestions: Record<string, SetupQuestion["options"]> = {
 };
 
 const descriptions: Record<string, string> = {
-  "qualification.objective": "Isso define o resultado que a conversa deve produzir.",
-  "qualification.questions": "Separe as perguntas por vírgulas ou linhas; elas virarão campos editáveis.",
+  "qualification.objective": "Isso define como cada pessoa deve ser encaminhada.",
+  "qualification.questions": "Separe as perguntas por vírgulas ou linhas. Você poderá ajustá-las depois.",
   "quote.services": "Liste apenas serviços reais que podem receber uma solicitação.",
   "scheduling.availability": "Exemplo: segunda a sexta, das 9h às 18h.",
-  "catalog.items": "Você poderá completar preços e imagens no editor.",
-  "reservation.policy": "Não inventaremos regras: informe a política usada pelo negócio.",
+  "catalog.items": "Informe itens reais. Preços e imagens podem ser completados depois.",
+  "reservation.policy": "A Sobe não inventa regras: informe a política usada pelo negócio.",
   "routing.location": "Informe cidade, bairro ou endereço das unidades atendidas.",
   "payment.url": "Use apenas o endereço seguro do checkout que já existe.",
+};
+
+const humanTitles: Record<string, string> = {
+  "qualification.objective": "Antes de enviar alguém para sua equipe, o que você precisa descobrir sobre essa pessoa?",
+  "qualification.questions": "Quais perguntas ajudam você a entender o que a pessoa precisa?",
+  "qualification.outcome": "Depois das respostas, o que a Sobe deve indicar para o visitante?",
+  "qualification.destination": "Para onde a pessoa deve seguir depois de responder?",
+  "quote.services": "Quais serviços o cliente pode pedir orçamento por aqui?",
+  "quote.mode": "Como você costuma informar o valor de um orçamento?",
+  "quote.destination": "Quem deve receber o pedido de orçamento?",
+  "quote.visitor": "Quais dados você precisa receber para preparar o orçamento?",
+  "scheduling.services": "Quais serviços podem ser agendados e quanto tempo cada um leva?",
+  "scheduling.availability": "Em quais dias e horários você atende?",
+  "scheduling.destination": "Como o cliente fica sabendo que o horário foi confirmado?",
+  "catalog.categories": "Como você organiza os produtos que vende?",
+  "catalog.items": "Quais produtos o cliente pode ver ou pedir por aqui?",
+  "catalog.completion": "Como você quer receber um pedido depois que o cliente escolher os produtos?",
+  "reservation.units": "O que o visitante pode reservar?",
+  "reservation.availability": "Quando essas opções ficam disponíveis para reserva?",
+  "reservation.policy": "Quais são as regras de confirmação e cancelamento?",
+  "routing.destinations": "Quais unidades ou canais podem receber o cliente?",
+  "routing.fallback": "Se nenhuma unidade servir, como sua equipe deve continuar o atendimento?",
+  "routing.location": "Onde ficam as unidades que o cliente pode encontrar?",
+  "payment.url": "Qual link seguro deve abrir para o pagamento?",
+  "payment.cta": "O que deve estar escrito no botão de pagamento?",
 };
 
 function questionType(requirement: DataRequirement): SetupQuestion["type"] {
@@ -47,7 +72,7 @@ function questionType(requirement: DataRequirement): SetupQuestion["type"] {
 export function planAdaptiveQuestions(
   requirements: DataRequirement[],
   answers: Record<string, unknown>,
-  limit = 5,
+  limit = 3,
 ): SetupQuestion[] {
   const rank = { blocking: 0, warning: 1, optional: 2 } as const;
   return requirements
@@ -57,12 +82,12 @@ export function planAdaptiveQuestions(
     .map((requirement, index) => ({
       id: `question-${requirement.id}`,
       key: requirement.key,
-      title: requirement.reason,
+      title: humanTitles[requirement.key] || requirement.reason,
       description: descriptions[requirement.key],
       type: questionType(requirement),
       options: choiceQuestions[requirement.key],
       required: requirement.severity === "blocking",
-      reason: `Necessário para configurar ${requirement.label.toLocaleLowerCase("pt-BR")}.`,
+      reason: "Essa resposta é necessária para que a ação escolhida funcione do início ao fim.",
       capability: requirement.capability === "brand" || requirement.capability === "project" ? undefined : requirement.capability as CapabilityKey,
       priority: 100 - index,
     }));

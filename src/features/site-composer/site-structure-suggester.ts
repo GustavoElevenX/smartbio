@@ -1,4 +1,5 @@
 import type { Project } from "@/types";
+import type { PresenceAction } from "@/features/presence/presence.types";
 import { inferBusinessShape } from "./business-shape";
 import { chooseCatalogStrategy } from "./catalog-strategy";
 import { recommendContentDensity } from "./content-density";
@@ -38,6 +39,85 @@ function bindInstructionToSections(project: Project, sections: SuggestedSection[
     });
 }
 
+function goalAction(goal: NonNullable<Project["conversionGoals"]>[number] | undefined, style: PresenceAction["style"] = "primary") {
+  if (!goal) return undefined;
+  return {
+    type: "start_conversion_goal" as const,
+    label: goal.name,
+    conversionGoalId: goal.id,
+    style,
+  } satisfies PresenceAction;
+}
+
+function personalizeSections(project: Project, sections: SuggestedSection[]) {
+  const goals = (project.conversionGoals || []).filter((goal) => goal.isActive).toSorted((a, b) => Number(b.isPrimary) - Number(a.isPrimary) || a.order - b.order);
+  const primary = goals[0];
+  const products = (project.commercialConfig?.catalogItems || []).filter((item) => item.isAvailable);
+  const services = (project.commercialConfig?.serviceOfferings || []).filter((item) => item.isActive);
+  const locations = (project.commercialConfig?.locations || []).filter((item) => item.isActive);
+  const buyingGoal = goals.find((goal) => goal.kind === "buy") || primary;
+  const visitingGoal = goals.find((goal) => goal.kind === "visit");
+  const closingGoals = goals.length > 1 ? goals.slice(1, 3) : goals.slice(0, 1);
+
+  return sections.map((section): SuggestedSection => {
+    if (section.sectionType === "hero") {
+      return {
+        ...section,
+        title: project.name,
+        description: project.description,
+        suggestedContent: {
+          ...section.suggestedContent,
+          primaryAction: goalAction(primary),
+          secondaryAction: goalAction(goals[1], "secondary"),
+        },
+        sourceBindings: [...section.sourceBindings, "name", "description", ...goals.slice(0, 2).map((goal) => `conversionGoals:${goal.id}`)],
+        conversionGoalId: primary?.id,
+      };
+    }
+    if (section.sectionType === "products") {
+      const named = products.slice(0, 3).map((item) => item.name);
+      return {
+        ...section,
+        title: named.length ? named.join(", ") : `Produtos de ${project.name}`,
+        description: named.length ? "Conheça as opções disponíveis e escolha como continuar." : "Conheça os produtos disponíveis.",
+        suggestedContent: { ...section.suggestedContent, itemGoalId: buyingGoal?.id },
+        sourceBindings: [...section.sourceBindings, ...products.map((item) => `commercialConfig.catalogItems:${item.id}`), ...(buyingGoal ? [`conversionGoals:${buyingGoal.id}`] : [])],
+      };
+    }
+    if (section.sectionType === "services") {
+      return {
+        ...section,
+        title: services.length ? `Serviços de ${project.name}` : "Serviços",
+        description: services.slice(0, 3).map((service) => service.name).join(", ") || "Veja os serviços disponíveis.",
+        sourceBindings: [...section.sourceBindings, ...services.map((service) => `commercialConfig.serviceOfferings:${service.id}`)],
+      };
+    }
+    if (section.sectionType === "locations") {
+      return {
+        ...section,
+        title: locations.length > 1 ? "Encontre a unidade certa" : "Onde encontrar a gente",
+        description: locations.map((location) => location.name).slice(0, 4).join(", "),
+        suggestedContent: { ...section.suggestedContent, nearestAction: goalAction(visitingGoal, "secondary") },
+        sourceBindings: [...section.sourceBindings, ...locations.map((location) => `commercialConfig.locations:${location.id}`), ...(visitingGoal ? [`conversionGoals:${visitingGoal.id}`] : [])],
+      };
+    }
+    if (section.sectionType === "conversion_cta") {
+      return {
+        ...section,
+        title: goals.length > 1 ? "O que você quer fazer agora?" : (primary?.name || "Pronto para continuar?"),
+        description: goals.length > 1 ? "Escolha o caminho que faz sentido para você." : (primary?.description || project.description),
+        suggestedContent: {
+          primaryAction: goalAction(closingGoals[0] || primary),
+          secondaryAction: goalAction(closingGoals[1], "secondary"),
+        },
+        sourceBindings: [...section.sourceBindings, ...closingGoals.map((goal) => `conversionGoals:${goal.id}`)],
+        conversionGoalId: (closingGoals[0] || primary)?.id,
+      };
+    }
+    return section;
+  });
+}
+
 function proposedPages(project: Project, instruction = ""): SuggestedPage[] {
   const shape = inferBusinessShape(project);
   const flags = instructionFlags(instruction);
@@ -49,12 +129,12 @@ function proposedPages(project: Project, instruction = ""): SuggestedPage[] {
     purpose: "Apresentar a marca, orientar a escolha e conduzir ao objetivo principal.",
     pathSuggestion: "/",
     conversionGoalId: primary?.id,
-    sections: bindInstructionToSections(project, recommendSections({ ...shape, model: flags.b2b ? "b2b" : shape.model, hasQualification: flags.qualification || shape.hasQualification }), instruction).map((section) => ({ ...section, conversionGoalId: section.priority === "essential" ? primary?.id : undefined })),
+    sections: personalizeSections(project, bindInstructionToSections(project, recommendSections({ ...shape, model: flags.b2b ? "b2b" : shape.model, hasQualification: flags.qualification || shape.hasQualification }), instruction).map((section) => ({ ...section, conversionGoalId: section.priority === "essential" ? primary?.id : undefined }))),
   };
   const pages = [home];
-  if (shape.productCount > 8) pages.push({ type: "page", name: "Catálogo", purpose: "Permitir busca, filtro e seleção em um catálogo completo.", pathSuggestion: "/catalogo", conversionGoalId: primary?.id, sections: [recommendSections(shape).find((section) => section.sectionType === "products")!, recommendSections(shape).find((section) => section.sectionType === "conversion_cta")!] });
-  if (shape.model === "b2b" || shape.hasQualification || flags.b2b || flags.qualification) pages.push({ type: "landing", name: flags.b2b ? "Revenda" : "Fale com a equipe", purpose: "Coletar o contexto mínimo para um handoff comercial útil.", pathSuggestion: flags.b2b ? "/revenda" : "/fale-com-a-equipe", conversionGoalId: primary?.id, sections: bindInstructionToSections(project, recommendSections({ ...shape, model: "b2b", hasCatalog: false, hasQualification: true }).filter((section) => ["hero", "benefits", "testimonials", "faq", "conversion_cta"].includes(section.sectionType)), instruction) });
-  if (flags.landing && !pages.some((page) => page.type === "landing")) pages.push({ type: "landing", name: "Campanha", purpose: "Concentrar uma oferta e uma única próxima ação.", pathSuggestion: "/campanha", conversionGoalId: primary?.id, sections: bindInstructionToSections(project, recommendSections({ ...shape, hasCatalog: flags.catalog || shape.hasCatalog }), instruction).filter((section) => ["hero", "products", "services", "benefits", "testimonials", "conversion_cta"].includes(section.sectionType)) });
+  if (shape.productCount > 8) pages.push({ type: "page", name: "Catálogo", purpose: "Permitir busca, filtro e seleção em um catálogo completo.", pathSuggestion: "/catalogo", conversionGoalId: primary?.id, sections: personalizeSections(project, [recommendSections(shape).find((section) => section.sectionType === "products")!, recommendSections(shape).find((section) => section.sectionType === "conversion_cta")!]) });
+  if (shape.model === "b2b" || shape.hasQualification || flags.b2b || flags.qualification) pages.push({ type: "landing", name: flags.b2b ? "Revenda" : "Fale com a equipe", purpose: "Coletar o contexto mínimo para um handoff comercial útil.", pathSuggestion: flags.b2b ? "/revenda" : "/fale-com-a-equipe", conversionGoalId: primary?.id, sections: personalizeSections(project, bindInstructionToSections(project, recommendSections({ ...shape, model: "b2b", hasCatalog: false, hasQualification: true }).filter((section) => ["hero", "benefits", "testimonials", "faq", "conversion_cta"].includes(section.sectionType)), instruction)) });
+  if (flags.landing && !pages.some((page) => page.type === "landing")) pages.push({ type: "landing", name: "Campanha", purpose: "Concentrar uma oferta e uma única próxima ação.", pathSuggestion: "/campanha", conversionGoalId: primary?.id, sections: personalizeSections(project, bindInstructionToSections(project, recommendSections({ ...shape, hasCatalog: flags.catalog || shape.hasCatalog }).filter((section) => ["hero", "products", "services", "benefits", "testimonials", "conversion_cta"].includes(section.sectionType)), instruction)) });
   return pages;
 }
 
@@ -92,7 +172,7 @@ function semanticOperations(project: Project, pages: SuggestedPage[], intent: Si
       const current = availableByType.get(section.sectionType)?.shift();
       if (!current) { operations.push({ id: `add-section-${existing.id}-${section.sectionType}-${index}`, type: "add_section", pageId: existing.id, section, at: index }); return; }
       retained.add(current.id);
-      const patch = { title: section.purpose, content: { ...current.content, ...section.suggestedContent }, settings: { ...current.settings, sourceBindings: section.sourceBindings } };
+      const patch = { title: section.title || section.purpose, description: section.description || current.description, content: { ...current.content, ...section.suggestedContent }, settings: { ...current.settings, sourceBindings: section.sourceBindings } };
       if (JSON.stringify(current.content) !== JSON.stringify(patch.content) || current.title !== patch.title || JSON.stringify((current.settings as { sourceBindings?: string[] }).sourceBindings || []) !== JSON.stringify(section.sourceBindings)) operations.push({ id: `update-section-${current.id}`, type: "update_section", pageId: existing.id, sectionId: current.id, patch });
       if (current.order !== index) operations.push({ id: `move-section-${current.id}-${index}`, type: "move_section", pageId: existing.id, sectionId: current.id, to: index });
       if (section.conversionGoalId && section.priority === "essential" && existing.defaultConversionGoalId !== section.conversionGoalId) operations.push({ id: `connect-goal-${existing.id}-${section.conversionGoalId}`, type: "connect_goal", pageId: existing.id, sectionId: current.id, conversionGoalId: section.conversionGoalId });

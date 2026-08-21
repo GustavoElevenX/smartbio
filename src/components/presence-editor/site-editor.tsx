@@ -39,7 +39,6 @@ import {
 } from "@/features/presence/presence-page-repository";
 import { presenceSectionRegistry } from "@/features/presence/section-registry";
 import { getPresenceReadinessIssues } from "@/features/presence/presence-readiness";
-import { features } from "@/lib/constants";
 import type { AIPresenceDraft } from "@/features/presence/ai-presence.schema";
 import type {
   PresencePage,
@@ -67,7 +66,7 @@ type PerformanceExplanation = { explanation: string; recommendedAction: string; 
 const copilotActions: Array<{ intent: SiteComposerIntent; label: string }> = [
   { intent: "suggest_structure", label: "Sugerir estrutura" },
   { intent: "create_page", label: "Criar página" },
-  { intent: "add_section", label: "Adicionar seção" },
+  { intent: "add_section", label: "Adicionar conteúdo" },
   { intent: "reorganize", label: "Reorganizar" },
   { intent: "improve_cta", label: "Melhorar CTA" },
   { intent: "focus_offer", label: "Focar oferta" },
@@ -603,7 +602,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
         <div className="hidden min-w-0 md:block">
           <div className="flex items-center gap-2">
             <h1 className="truncate text-sm font-black">
-              Site · {project.name}
+              Minha página
             </h1>
             <span
               className={`rounded-full px-2 py-0.5 text-[10px] font-black ${project.status === "published" ? "bg-emerald-100 text-emerald-700" : "bg-[#efeff3] text-[#686570]"}`}
@@ -618,7 +617,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
                 ? "Alterações pendentes"
                 : saveState === "error"
                   ? "Erro ao salvar"
-                  : "Salvo"}
+                  : `${project.name} · Salvo`}
           </p>
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-1">
@@ -663,24 +662,30 @@ export function SiteEditor({ projectId }: { projectId: string }) {
               </Button>
             );
           })}
-          {features.presenceAI ? (
-            <Button
-              className="ml-2"
-              size="sm"
-              variant="secondary"
-              disabled={aiLoading}
-              onClick={() => void requestAI(activeSection ? "section" : "page")}
-            >
-              {aiLoading ? (
-                <LoaderCircle className="animate-spin" size={15} />
-              ) : (
-                <Sparkles size={15} />
-              )}
-              {activeSection ? "Melhorar seção" : "Compor com IA"}
-            </Button>
-          ) : null}
           <Button
-            className={features.presenceAI ? "" : "ml-2"}
+            className="ml-2 hidden lg:inline-flex"
+            size="sm"
+            variant="secondary"
+            disabled={aiLoading}
+            onClick={() => void requestAI(activeSection ? "section" : "page")}
+          >
+            {aiLoading ? (
+              <LoaderCircle className="animate-spin" size={15} />
+            ) : (
+              <Sparkles size={15} />
+            )}
+            Pedir ajuda à Sobe IA
+          </Button>
+          <a
+            href={`/${encodeURIComponent(project.slug)}/preview`}
+            target="_blank"
+            rel="noreferrer"
+            className="focus-ring hidden min-h-9 items-center gap-2 rounded-xl px-3 text-xs font-extrabold text-[#536178] hover:bg-[#eef4fa] sm:inline-flex"
+          >
+            <Eye size={15} />
+            Prévia
+          </a>
+          <Button
             size="sm"
             variant="secondary"
             disabled={saveState === "saving"}
@@ -717,11 +722,11 @@ export function SiteEditor({ projectId }: { projectId: string }) {
       </div>
       <div className="fixed inset-x-3 bottom-3 z-30 grid grid-cols-3 rounded-2xl border border-[#d7e0e9] bg-white/95 p-1.5 shadow-[0_18px_50px_rgba(15,23,42,.22)] backdrop-blur xl:hidden">
         <button type="button" onClick={() => setMobilePanel("pages")} className="min-h-11 rounded-xl text-xs font-black text-[#53606d] hover:bg-[#eef6ff]">Páginas</button>
-        <button type="button" onClick={() => setMobilePanel("sections")} className="min-h-11 rounded-xl text-xs font-black text-[#53606d] hover:bg-[#eef6ff]">Seções</button>
+        <button type="button" onClick={() => setMobilePanel("sections")} className="min-h-11 rounded-xl text-xs font-black text-[#53606d] hover:bg-[#eef6ff]">Conteúdo</button>
         <button type="button" onClick={() => setMobilePanel("properties")} className="min-h-11 rounded-xl bg-[#0054fc] text-xs font-black text-white">Propriedades</button>
       </div>
       {mobilePanel === "pages" ? <MobileDrawer title="Páginas" onClose={() => setMobilePanel(undefined)}><div className="space-y-1">{pages.map((page) => <button key={page.id} type="button" onClick={() => { setSelectedPageId(page.id); setSelectedSectionId(undefined); setMobilePanel(undefined); }} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-bold ${page.id === activePage?.id ? "bg-[#e8f4ff] text-[#0054fc]" : "hover:bg-[#f1f5f9]"}`}><span>{page.isHome ? "⌂" : page.type === "landing" ? "LP" : "P"}</span><span className="min-w-0 flex-1 truncate">{page.name}</span></button>)}</div><div className="mt-4 grid grid-cols-2 gap-2"><Button variant="secondary" onClick={() => { addPage("page"); setMobilePanel(undefined); }}><Plus />Página</Button><Button variant="secondary" onClick={() => { addPage("landing"); setMobilePanel(undefined); }}><Plus />Landing</Button></div></MobileDrawer> : null}
-      {mobilePanel === "sections" ? <MobileDrawer title="Seções" onClose={() => setMobilePanel(undefined)}><div className="space-y-1">{activePage?.sections.toSorted((a, b) => a.order - b.order).map((section) => <button key={section.id} type="button" onClick={() => { setSelectedSectionId(section.id); setMobilePanel("properties"); }} className={`flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-xs font-bold ${section.id === activeSection?.id ? "bg-[#e8f4ff] text-[#0054fc]" : "hover:bg-[#f1f5f9]"}`}><GripVertical size={14} /><span className="min-w-0 flex-1 truncate">{section.title || presenceSectionRegistry[section.type].label}</span></button>)}</div><details className="mt-4"><summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-[#b9cce1] px-3 text-xs font-black text-[#0054fc]"><Plus size={14} />Adicionar seção</summary><SectionLibrary onAdd={(type) => { addSection(type); setMobilePanel("properties"); }} /></details></MobileDrawer> : null}
+      {mobilePanel === "sections" ? <MobileDrawer title="Conteúdo desta página" onClose={() => setMobilePanel(undefined)}><div className="space-y-1">{activePage?.sections.toSorted((a, b) => a.order - b.order).map((section) => <button key={section.id} type="button" onClick={() => { setSelectedSectionId(section.id); setMobilePanel("properties"); }} className={`flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-xs font-bold ${section.id === activeSection?.id ? "bg-[#e8f4ff] text-[#0054fc]" : "hover:bg-[#f1f5f9]"}`}><GripVertical size={14} /><span className="min-w-0 flex-1 truncate">{section.title || presenceSectionRegistry[section.type].label}</span></button>)}</div><details className="mt-4"><summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-[#b9cce1] px-3 text-xs font-black text-[#0054fc]"><Plus size={14} />Adicionar conteúdo</summary><SectionLibrary onAdd={(type) => { addSection(type); setMobilePanel("properties"); }} /></details></MobileDrawer> : null}
       <div className="grid min-h-[calc(100vh-137px)] grid-cols-1 pb-20 xl:grid-cols-[240px_minmax(380px,1fr)_320px] xl:pb-0">
         <aside className="hidden border-r border-[#dfe6ee] bg-white xl:block">
           <div className="relative flex items-center justify-between border-b border-[#e4e2e9] px-4 py-3">
@@ -776,7 +781,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
           </div>
           <div className="mx-3 mt-4 border-t border-[#e3e9ef] pt-4">
             <div className="flex items-center justify-between px-1">
-              <strong className="text-xs uppercase tracking-[.12em] text-[#697180]">Seções</strong>
+              <strong className="text-xs uppercase tracking-[.12em] text-[#697180]">Conteúdo desta página</strong>
               <span className="text-[10px] font-bold text-[#8b94a1]">{activePage?.sections.length || 0}</span>
             </div>
             <div className="mt-2 space-y-1" data-testid="site-section-list">
@@ -791,7 +796,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
               ))}
             </div>
             <details className="mt-3">
-              <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-[#b9cce1] px-3 text-xs font-black text-[#0054fc]"><Plus size={14} />Adicionar seção</summary>
+              <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-[#b9cce1] px-3 text-xs font-black text-[#0054fc]"><Plus size={14} />Adicionar conteúdo</summary>
               <SectionLibrary onAdd={addSection} />
             </details>
           </div>
@@ -888,13 +893,11 @@ export function SiteEditor({ projectId }: { projectId: string }) {
             </div>
           </div>
           <Tabs defaultValue="content" className="max-h-[calc(100vh-185px)] overflow-y-auto">
-            <TabsList className="sticky top-0 z-10 grid h-auto w-full grid-cols-3 rounded-none border-b border-[#e3e9ef] bg-white p-2 2xl:grid-cols-6">
+            <TabsList className="sticky top-0 z-10 grid h-auto w-full grid-cols-4 rounded-none border-b border-[#e3e9ef] bg-white p-2">
               <TabsTrigger value="content" className="px-1 text-[11px]">Conteúdo</TabsTrigger>
-              <TabsTrigger value="visual" className="px-1 text-[11px]">Visual</TabsTrigger>
-              <TabsTrigger value="conversion" className="px-1 text-[11px]">Conversão</TabsTrigger>
-              <TabsTrigger value="data" className="px-1 text-[11px]">Dados</TabsTrigger>
-              <TabsTrigger value="quality" className="px-1 text-[11px]">Qualidade</TabsTrigger>
-              <TabsTrigger value="performance" className="px-1 text-[11px]">Performance</TabsTrigger>
+              <TabsTrigger value="visual" className="px-1 text-[11px]">Aparência</TabsTrigger>
+              <TabsTrigger value="conversion" className="px-1 text-[11px]">Ação</TabsTrigger>
+              <TabsTrigger value="advanced" className="px-1 text-[11px]">Avançado</TabsTrigger>
             </TabsList>
             <TabsContent value="content" className="m-0 p-4">
             {activeSection && activePage ? (
@@ -913,7 +916,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
             ) : null}
             <div className="mt-6 border-t border-[#e6e4eb] pt-4">
               <strong className="text-xs uppercase tracking-[.12em] text-[#77727e]">
-                Seções
+                Conteúdo
               </strong>
               <div className="mt-2 space-y-1">
                 {activePage?.sections
@@ -951,7 +954,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
               <details className="mt-3">
                 <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-[#cbc8d4] px-3 text-xs font-black text-[#0054fc]">
                   <Plus size={14} />
-                  Adicionar seção
+                  Adicionar conteúdo
                 </summary>
                 <SectionLibrary onAdd={addSection} />
               </details>
@@ -965,15 +968,15 @@ export function SiteEditor({ projectId }: { projectId: string }) {
               <div className="rounded-2xl border border-[#dbe8f5] bg-[#eff7ff] p-4"><strong className="text-sm">Objetivo da página</strong><p className="mt-2 text-xs leading-5 text-[#5d6c7b]">{activePage?.defaultConversionGoalId ? "Esta página está conectada a um objetivo mensurável." : "Conecte esta página a um objetivo antes de publicar."}</p></div>
               {activePage ? <label className="mt-4 block text-xs font-bold text-[#555f6b]">Objetivo principal<select value={activePage.defaultConversionGoalId || ""} onChange={(event) => updatePage({ ...activePage, defaultConversionGoalId: event.target.value || undefined })} className="mt-2 min-h-11 w-full rounded-xl border border-[#d9e1e9] bg-white px-3 text-sm"><option value="">Selecionar objetivo</option>{project.conversionGoals?.filter((goal) => goal.isActive).map((goal) => <option key={goal.id} value={goal.id}>{goal.name}</option>)}</select></label> : null}
             </TabsContent>
-            <TabsContent value="data" className="m-0 p-4">
+            <TabsContent value="advanced" className="m-0 p-4">
               <div className="rounded-2xl border border-[#dfe7ef] p-4"><strong className="text-sm">Fontes conectadas</strong><dl className="mt-3 grid grid-cols-2 gap-3 text-xs"><div><dt className="text-[#75808c]">Produtos</dt><dd className="mt-1 font-black">{project.commercialConfig?.catalogItems?.length || 0}</dd></div><div><dt className="text-[#75808c]">Serviços</dt><dd className="mt-1 font-black">{project.commercialConfig?.serviceOfferings?.length || 0}</dd></div><div><dt className="text-[#75808c]">Unidades</dt><dd className="mt-1 font-black">{project.commercialConfig?.locations?.length || 0}</dd></div><div><dt className="text-[#75808c]">Objetivos</dt><dd className="mt-1 font-black">{project.conversionGoals?.length || 0}</dd></div></dl></div>
               <div className="mt-4 rounded-2xl bg-[linear-gradient(135deg,#edf8ff,#e7f1ff)] p-4"><span className="flex items-center gap-2 text-xs font-black text-[#0f64c8]"><Sparkles />Sobe IA</span><h3 className="mt-3 font-black">O que você quer fazer?</h3><p className="mt-2 text-xs leading-5 text-[#526476]">Explique o foco, a oferta, o público ou a página. Planner e IA usam os dados reais do negócio; nada é publicado automaticamente.</p><textarea aria-label="Instrução para a Sobe IA" value={aiInstruction} onChange={(event) => setAiInstruction(event.target.value)} placeholder="Ex.: Quero uma landing para revendedores e menos destaque para o FAQ." className="mt-4 min-h-28 w-full resize-y rounded-xl border border-[#b9d2eb] bg-white p-3 text-sm leading-6 outline-none focus:border-[#0054fc] focus:ring-4 focus:ring-[#0054fc]/10" /><div className="mt-3 flex flex-wrap gap-2">{copilotActions.map((action) => <button key={action.intent} type="button" onClick={() => setAiIntent(action.intent)} className={`min-h-9 rounded-full border px-3 text-[11px] font-black ${aiIntent === action.intent ? "border-[#0054fc] bg-[#0054fc] text-white" : "border-[#b9d2eb] bg-white text-[#36536f]"}`}>{action.label}</button>)}</div><Button className="mt-4 w-full bg-[#0054fc] hover:bg-[#0d54a9]" size="sm" disabled={aiLoading} onClick={() => void requestStructure(aiIntent)}>{aiLoading ? <LoaderCircle className="animate-spin" /> : <Sparkles />}Gerar proposta</Button></div>
             </TabsContent>
-            <TabsContent value="quality" className="m-0 p-4">
+            <TabsContent value="advanced" className="m-0 border-t border-[#e3e9ef] p-4">
               <div className="rounded-2xl bg-[#f7fbff] p-4"><strong className="text-sm">Quality Assistant</strong><p className="mt-2 text-xs leading-5 text-[#666174]">Diagnóstico da página ativa. Ele orienta; não altera nem publica nada sozinho.</p></div>
               <div className="mt-4 flex flex-col gap-2">{qualityWarnings.length ? qualityWarnings.map((warning) => <div key={warning.code} className="rounded-xl border border-[#eaf3ff] bg-white p-3"><strong className="text-xs">{warning.message}</strong><p className="mt-1 text-[11px] text-[#746f7d]">Selecione a seção relacionada ou peça uma proposta à Sobe IA.</p></div>) : <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-bold text-emerald-800">Nenhum problema estrutural detectado nesta página.</div>}</div>
             </TabsContent>
-            <TabsContent value="performance" className="m-0 p-4">
+            <TabsContent value="advanced" className="m-0 border-t border-[#e3e9ef] p-4">
               <div className="rounded-2xl bg-[#eef6ff] p-4"><strong className="text-sm">Performance Copilot</strong><p className="mt-2 text-xs leading-5 text-[#566a7e]">Sugestões só aparecem após 30 dias, 30 sessões e 15 sessões da meta principal quando aplicável.</p></div>
               {!performance?.publishedAt ? <p className="mt-4 rounded-xl border border-[#dfe7ef] p-4 text-xs leading-5 text-[#697684]">Publique o site para iniciar a janela de aprendizado.</p> : performance.evidence ? <div className="mt-4 flex flex-col gap-3"><p className={`rounded-xl p-3 text-xs font-bold ${performance.evidence.eligible ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900"}`}>{performance.evidence.message}</p><EvidenceBar label="Dias" progress={performance.evidence.daysProgress} value={`${performance.evidence.completeDays}/30`} /><EvidenceBar label="Sessões" progress={performance.evidence.sessionsProgress} value={`${Math.round(performance.evidence.sessionsProgress * 30)}/30`} />{performance.evidence.goalSessionsProgress != null ? <EvidenceBar label={performance.primaryGoalName || "Meta principal"} progress={performance.evidence.goalSessionsProgress} value={`${Math.round(performance.evidence.goalSessionsProgress * 15)}/15`} /> : null}{performance.suggestions.map((suggestion) => { const explanation = performanceExplanations[suggestion.id]; const proposalInstruction = `Proponha uma alteração para “${suggestion.title}”. Evidência observada: ${suggestion.explanation}.${explanation ? ` Leitura: ${explanation.explanation} Próxima ação: ${explanation.recommendedAction}` : ""}`; return <article key={suggestion.id} className="rounded-xl border border-[#dfe7ef] p-3"><strong className="text-xs">{suggestion.title}</strong><p className="mt-2 text-[11px] leading-5 text-[#697684]">{suggestion.explanation}</p>{explanation ? <div className="mt-3 rounded-xl bg-[#f7fbff] p-3"><span className="text-[10px] font-black uppercase tracking-[.08em] text-[#0054fc]">{explanation.usedAI ? "Leitura da Sobe IA" : "Leitura determinística"}</span><p className="mt-2 text-[11px] leading-5 text-[#5f5970]">{explanation.explanation}</p><p className="mt-2 text-[11px] font-bold text-[#4e4861]">Próxima ação: {explanation.recommendedAction}</p></div> : null}<div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="ghost" disabled={performanceLoadingId === suggestion.id} onClick={() => void explainPerformanceSuggestion(suggestion.id)}>{performanceLoadingId === suggestion.id ? <LoaderCircle className="animate-spin" /> : <Sparkles />}{explanation ? "Atualizar explicação" : "Explicar com IA"}</Button><Button size="sm" variant="secondary" disabled={aiLoading} onClick={() => { setAiInstruction(proposalInstruction); setAiIntent("reorganize"); void requestStructure("reorganize", proposalInstruction); }}>Criar proposta</Button></div></article>; })}</div> : <p className="mt-4 text-xs text-[#697684]">Carregando evidência…</p>}
             </TabsContent>

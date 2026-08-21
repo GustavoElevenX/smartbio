@@ -25,6 +25,8 @@ export interface BusinessShape {
 export interface SuggestedSection {
   sectionType: PresenceSectionType;
   purpose: string;
+  title?: string;
+  description?: string;
   suggestedContent: Record<string, unknown>;
   sourceBindings: string[];
   conversionGoalId?: string;

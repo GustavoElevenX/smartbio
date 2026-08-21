@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { extractedBusinessSourceSchema, type AISetupSession, type ExtractedBusinessSource, type SetupQuestion, type SourceReference } from "@/features/ai-setup/ai-setup.schema";
 import { materializeSetupAnswers } from "@/features/ai-setup/materialize-setup-answers";
 import { stageGeneratedDraft } from "@/features/ai-setup/stage-generated-draft";
+import { applyVisitorActionsToProject, defaultVisitorActions, profileWithVisitorActions, type VisitorActionSelection } from "@/features/ai-setup/visitor-actions";
 import { RuleBasedBusinessAnalyzer } from "@/features/business-understanding/rule-based-business-analyzer";
 import { capabilityPlanner } from "@/features/capabilities/capability-planner";
 import { draftCapabilityRequirements } from "@/features/capabilities/capability-requirements";
@@ -23,7 +24,10 @@ import { activateTrialAfterFirstStructure } from "@/server/entitlements/trial-se
 import { recordPlatformGrowthEvent } from "@/server/platform-acquisition/platform-acquisition";
 import { assertProjectAccess } from "@/server/auth/project-access";
 import { loadProjectForActor } from "@/server/projects/load-project-for-actor";
-import { createPresencePage } from "@/features/presence/presence-page-service";
+import { materializeSuggestedSiteStructure } from "@/features/site-composer/materialize-site-structure";
+import { suggestedSiteStructureSchema } from "@/features/site-composer/site-composer.schema";
+import { suggestSiteStructure } from "@/features/site-composer/site-structure-suggester";
+import { inferBusinessShape } from "@/features/site-composer/business-shape";
 import { uploadMedia } from "@/server/media/media-service";
 import type { DataRequirement, ExperienceCompositionInput, Project } from "@/types";
 
@@ -35,7 +39,7 @@ function compositionInput(session: AISetupSession): ExperienceCompositionInput {
   return {
     businessName: session.initialInput.businessName,
     businessDescription: session.initialInput.description,
-    primaryGoal: typeof objective === "string" && objective.trim() ? objective : "Criar uma jornada comercial",
+    primaryGoal: session.visitorActions?.find((action) => action.isPrimary)?.label || (typeof objective === "string" && objective.trim() ? objective : "Criar uma estrutura comercial"),
     primaryDestination: typeof destinationAnswer === "string" && destinationAnswer.trim()
       ? destinationAnswer
       : session.initialInput.phone ? "WhatsApp" : session.initialInput.websiteUrl ? "Site" : "Formulário",
@@ -43,6 +47,24 @@ function compositionInput(session: AISetupSession): ExperienceCompositionInput {
     phone: session.initialInput.phone,
     websiteUrl: session.initialInput.websiteUrl,
   };
+}
+
+function initialSiteInstruction(project: Project, session: AISetupSession) {
+  const actions = (session.visitorActions || []).map((action) => action.label).join(", ");
+  const verified = session.missingRequirements
+    .filter((requirement) => requirement.status === "verified")
+    .map((requirement) => `${requirement.label}: ${String(requirement.value ?? session.answers[requirement.key] ?? "confirmado")}`)
+    .join("; ");
+  const sources = session.sources.filter((source) => source.status === "processed").map((source) => source.name).join(", ");
+  return [
+    `Crie a primeira página específica de ${project.name}.`,
+    project.description,
+    project.category ? `Categoria: ${project.category}.` : "",
+    actions ? `Ações confirmadas pelo usuário, em ordem de prioridade: ${actions}.` : "",
+    verified ? `Informações confirmadas no onboarding: ${verified}.` : "",
+    sources ? `Materiais analisados: ${sources}.` : "",
+    "Mostre múltiplas ações legítimas quando existirem, conecte apenas goals reais e não invente fatos, preços, provas ou números.",
+  ].filter(Boolean).join(" ");
 }
 
 function resolvedRequirements(requirements: DataRequirement[], answers: Record<string, unknown>) {
@@ -135,6 +157,8 @@ export class AISetupService {
       workspaceId: actor.workspaceId,
       status: "collecting",
       initialInput,
+      visitorActions: [],
+      actionsConfirmed: false,
       answers: {},
       missingRequirements: [],
       questions: [],
@@ -211,16 +235,38 @@ export class AISetupService {
       }
     }
     const validKeys = new Set(requirements.filter((item) => item.status !== "verified").map((item) => item.key));
-    const questions = providerQuestions?.filter((item) => validKeys.has(item.key)).slice(0, 5);
+    const questions = providerQuestions?.filter((item) => validKeys.has(item.key)).slice(0, 3);
     const next = await this.repository.update(actor, {
       ...session,
       status: "waiting_answers",
       extractedProfile: profile,
+      visitorActions: session.visitorActions?.length ? session.visitorActions : defaultVisitorActions(profile),
+      actionsConfirmed: session.actionsConfirmed || false,
       missingRequirements: requirements,
-      questions: questions?.length ? questions : planAdaptiveQuestions(requirements, session.answers),
+      questions: questions?.length ? questions.slice(0, 3) : planAdaptiveQuestions(requirements, session.answers, 3),
       usedFallback,
     });
-    await this.repository.addMessage(actor, id, "assistant", "Analisei o negócio e preparei as perguntas que faltam para montar a jornada.", { kind: "analysis", usedFallback });
+    await this.repository.addMessage(actor, id, "assistant", "Analisei o negócio e destaquei as ações mais importantes. Confirme-as antes de continuarmos.", { kind: "analysis", usedFallback });
+    return next;
+  }
+
+  async confirmVisitorActions(actor: AISetupActor, id: string, actions: VisitorActionSelection[]) {
+    const session = await this.get(actor, id);
+    if (!session.extractedProfile) throw new Error("Analise o negócio antes de confirmar as ações.");
+    if (!actions.length) throw new Error("Escolha ao menos uma ação para o visitante.");
+    if (actions.filter((action) => action.isPrimary).length !== 1) throw new Error("Marque uma única ação como principal.");
+    const profile = profileWithVisitorActions(session.extractedProfile, actions);
+    const requirements = resolvedRequirements(draftCapabilityRequirements(capabilityPlanner.plan(profile)), session.answers);
+    const next = await this.repository.update(actor, {
+      ...session,
+      extractedProfile: profile,
+      visitorActions: actions,
+      actionsConfirmed: true,
+      missingRequirements: requirements,
+      questions: planAdaptiveQuestions(requirements, session.answers, 3),
+      status: "waiting_answers",
+    });
+    await this.repository.addMessage(actor, id, "user", actions.map((action) => action.label).join(", "), { kind: "visitor_actions" });
     return next;
   }
 
@@ -234,7 +280,7 @@ export class AISetupService {
       status: "waiting_answers",
       answers,
       missingRequirements: requirements,
-      questions: planAdaptiveQuestions(requirements, answers),
+      questions: planAdaptiveQuestions(requirements, answers, 3),
     });
     await this.repository.addMessage(actor, id, "user", typeof value === "string" ? value : JSON.stringify(value), { kind: "answer", key });
     return next;
@@ -245,7 +291,9 @@ export class AISetupService {
     if (!session.extractedProfile) session = await this.analyze(actor, id);
     session = await this.repository.update(actor, { ...session, status: "generating", lastError: undefined });
     const input = compositionInput(session);
-    const profile = session.extractedProfile || new RuleBasedBusinessAnalyzer().analyze(input);
+    const baseProfile = session.extractedProfile || new RuleBasedBusinessAnalyzer().analyze(input);
+    const selectedActions = session.visitorActions?.length ? session.visitorActions : defaultVisitorActions(baseProfile);
+    const profile = profileWithVisitorActions(baseProfile, selectedActions);
     const aiJourney = isAIConfigured() ? async () => getAIProvider().composeJourney({
       input,
       profile,
@@ -270,26 +318,50 @@ export class AISetupService {
         status: "draft",
         dataRequirements: mergeProjectRequirements(generated, session),
       }, session);
-      const requestedSurface = session.initialInput.requestedSurface || "recommend";
-      const surface = requestedSurface === "recommend" ? "business_site" : requestedSurface;
-      if (surface !== "conversion_direct") {
-        const page = createPresencePage(project.id, surface === "landing_page" ? "Landing principal" : "Início", surface === "landing_page" ? "landing" : "home");
-        page.title = project.name;
-        page.description = project.description;
-        page.defaultConversionGoalId = project.conversionGoals?.find((goal) => goal.isPrimary && goal.isActive)?.id || project.conversionGoals?.find((goal) => goal.isActive)?.id;
-        const hero = page.sections.find((section) => section.type === "hero");
-        if (hero && page.defaultConversionGoalId) hero.content = { ...hero.content, primaryAction: { type: "start_conversion_goal", label: project.primaryGoal || "Começar", conversionGoalId: page.defaultConversionGoalId, style: "primary" } };
-        const cta = page.sections.find((section) => section.type === "conversion_cta");
-        if (cta && page.defaultConversionGoalId) cta.content = { primaryAction: { type: "start_conversion_goal", label: project.primaryGoal || "Começar", conversionGoalId: page.defaultConversionGoalId, style: "primary" } };
-        project = { ...project, presence: { pages: [page] } };
-      }
+      project = applyVisitorActionsToProject(project, { visitorActions: selectedActions });
       project = applyBrandIdentity(project, session);
+      const instruction = initialSiteInstruction(project, { ...session, visitorActions: selectedActions });
+      const plannerSuggestion = suggestSiteStructure(project, instruction);
+      let suggestion = plannerSuggestion;
+      let siteUsedFallback = !isAIConfigured();
+      if (isAIConfigured()) {
+        try {
+          suggestion = suggestedSiteStructureSchema.parse(await getAIProvider().composeSiteStructure({
+            workspaceId: actor.workspaceId,
+            projectId: project.id,
+            setupSessionId: id,
+            userId: actor.userId,
+            instruction,
+            target: "site",
+            businessShape: inferBusinessShape(project),
+            plannerSuggestion,
+            currentSite: project.presence,
+            business: {
+              name: project.name,
+              description: project.description,
+              category: project.category,
+              audience: project.audience,
+              primaryGoal: project.primaryGoal,
+              visualDirection: project.visualDirection,
+              brand: project.brand,
+              businessProfile: project.businessProfile,
+              conversionGoals: project.conversionGoals,
+              commercialConfig: project.commercialConfig,
+            },
+          }));
+          siteUsedFallback = false;
+        } catch {
+          suggestion = plannerSuggestion;
+          siteUsedFallback = true;
+        }
+      }
+      project = materializeSuggestedSiteStructure(project, suggestion).project;
       const next = await this.repository.update(actor, stageGeneratedDraft(
         session,
         project,
-        session.usedFallback || !isAIConfigured(),
+        session.usedFallback || siteUsedFallback,
       ));
-      await this.repository.addMessage(actor, id, "assistant", "A jornada foi composta como rascunho e está pronta para revisão no editor.", { kind: "generation", projectId: project.id });
+      await this.repository.addMessage(actor, id, "assistant", "Sua primeira versão foi criada como rascunho e está pronta para teste.", { kind: "generation", projectId: project.id });
       return next;
     } catch (error) {
       await this.repository.update(actor, { ...session, status: "failed", lastError: error instanceof Error ? error.message : "Falha ao gerar a jornada." });
@@ -299,7 +371,7 @@ export class AISetupService {
 
   async complete(actor: AISetupActor, id: string, projectId?: string) {
     const session = await this.get(actor, id);
-    if (!session.projectDraft) throw new Error("Gere a jornada antes de concluir o onboarding.");
+    if (!session.projectDraft) throw new Error("Crie a primeira versão antes de concluir o onboarding.");
     const persistedProjectId = projectId || session.projectId;
     if (!persistedProjectId) throw new Error("Salve o negócio antes de concluir a configuração.");
     await assertProjectAccess(actor, persistedProjectId, "write");
@@ -308,7 +380,7 @@ export class AISetupService {
 
   async finalizeProject(actor: AISetupActor, id: string, projectId: string, applyVerifiedFacts: boolean) {
     const session = await this.get(actor, id);
-    if (!session.projectDraft) throw new Error("Gere a jornada antes de concluir o onboarding.");
+    if (!session.projectDraft) throw new Error("Crie a primeira versão antes de concluir o onboarding.");
     await assertProjectAccess(actor, projectId, "write");
     if (actor.persistence === "memory") {
       const completed = await this.repository.update(actor, { ...session, status: "completed", projectId });

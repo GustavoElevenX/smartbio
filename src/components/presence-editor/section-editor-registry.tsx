@@ -11,6 +11,7 @@ import type {
   PresenceSection,
   PresenceSectionType,
 } from "@/features/presence/presence.types";
+import { SimpleActionEditor } from "@/components/presence-editor/simple-action-editor";
 
 interface EditorProps {
   project: Project;
@@ -28,7 +29,7 @@ function patchContent(props: EditorProps, patch: Record<string, unknown>) {
   });
 }
 
-function ActionEditor({
+function AdvancedActionEditor({
   project,
   page,
   action,
@@ -225,6 +226,10 @@ function ActionEditor({
       </button>
     </fieldset>
   );
+}
+
+function ActionEditor(props: Parameters<typeof SimpleActionEditor>[0]) {
+  return <div className="space-y-3"><SimpleActionEditor {...props} /><details><summary className="flex min-h-10 cursor-pointer list-none items-center text-xs font-extrabold text-[#536178] underline decoration-[#9fc3ff] underline-offset-4">Avançado</summary><div className="mt-3"><AdvancedActionEditor {...props} /></div></details></div>;
 }
 
 function HeroEditor(props: EditorProps) {

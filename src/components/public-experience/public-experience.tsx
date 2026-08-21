@@ -1523,14 +1523,20 @@ export function ExperienceCanvas({
 export function PublicExperience({
   slug,
   preview = false,
+  initialProject,
 }: {
   slug: string;
   preview?: boolean;
+  initialProject?: Project | null;
 }) {
-  const [project, setProject] = useState<Project | null>();
+  const [project, setProject] = useState<Project | null | undefined>(
+    initialProject,
+  );
   useEffect(() => {
-    const local = localStore.getProject(slug) || null;
-    setProject(local);
+    const local = localStore.getProject(slug);
+    if (local) setProject(local);
+    else if (initialProject !== undefined) setProject(initialProject);
+    else setProject(null);
     if (!preview)
       void fetch(`/api/public/projects/${encodeURIComponent(slug)}/experience`)
         .then(async (response) => {
@@ -1541,7 +1547,7 @@ export function PublicExperience({
           if (payload.data?.project) setProject(payload.data.project);
         })
         .catch(() => undefined);
-  }, [preview, slug]);
+  }, [initialProject, preview, slug]);
   if (project === undefined)
     return (
       <div className="grid min-h-screen place-items-center bg-[#f7f8fa] p-6 text-center">
@@ -1562,13 +1568,18 @@ export function PublicExperience({
             <Compass />
           </span>
           <h1 className="mt-5 text-2xl font-extrabold">
-            Experiência indisponível
+            {preview ? "Prévia indisponível" : "Experiência indisponível"}
           </h1>
           <p className="mt-2 text-sm text-[#74747e]">
-            O endereço não existe ou ainda não foi publicado.
+            {preview
+              ? "Volte ao editor, confirme que o projeto foi salvo e tente novamente."
+              : "O endereço não existe ou ainda não foi publicado."}
           </p>
-          <Link href="/" className="mt-6 inline-flex font-bold text-[#0054fc]">
-            Conhecer a Sobe
+          <Link
+            href={preview ? "/app/projects" : "/"}
+            className="mt-6 inline-flex font-bold text-[#0054fc]"
+          >
+            {preview ? "Voltar aos projetos" : "Conhecer a Sobe"}
           </Link>
         </div>
       </div>

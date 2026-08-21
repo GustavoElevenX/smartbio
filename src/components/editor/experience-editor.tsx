@@ -39,6 +39,7 @@ import { localStore } from "@/lib/local-store";
 import { projectRepository } from "@/lib/repositories/project-repository";
 import { canUseLocalStore } from "@/lib/runtime-mode";
 import { uid } from "@/lib/utils";
+import { experiencePreviewUrl } from "@/features/preview/preview-url";
 import type { JourneyStep, Project, StepType } from "@/types";
 
 const stepNames: Record<StepType, string> = {
@@ -389,8 +390,9 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
           </button>
         </div>
         <a
-          href={`/${project.slug}/preview`}
+          href={experiencePreviewUrl(project.slug, previewAs)}
           target="_blank"
+          rel="noopener noreferrer"
           className="focus-ring hidden min-h-10 items-center gap-2 rounded-xl border border-[#dfdee6] px-3 text-xs font-bold sm:inline-flex"
         >
           <Eye size={16} /> Preview

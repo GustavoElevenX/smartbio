@@ -9,7 +9,7 @@ test("editor adaptativo mantém a proposta da Sobe IA sob confirmação", async 
   if (testInfo.project.name === "mobile-chrome") await page.getByRole("button", { name: "Propriedades" }).click();
   await expect(page.getByRole("tab", { name: "Conteúdo" })).toBeVisible();
   const sectionsBefore = await page.getByTestId("site-section-list").getByRole("button").count();
-  await page.getByRole("tab", { name: "Dados" }).click();
+  await page.getByRole("tab", { name: "Avançado" }).click();
   const instruction = page.getByRole("textbox", { name: "Instrução para a Sobe IA" });
   await expect(instruction).toBeVisible();
   await instruction.fill("Crie uma landing para revendedores e remova o FAQ.");
@@ -26,8 +26,8 @@ test("editor adaptativo mantém a proposta da Sobe IA sob confirmação", async 
   expect(await page.getByTestId("site-section-list").getByRole("button").count()).toBe(sectionsBefore);
   if (testInfo.project.name === "mobile-chrome") {
     await page.getByRole("button", { name: "Fechar propriedades" }).click();
-    await page.getByRole("button", { name: "Seções", exact: true }).click();
-    const sectionsDrawer = page.getByRole("dialog", { name: "Seções" });
+    await page.getByRole("button", { name: "Conteúdo", exact: true }).click();
+    const sectionsDrawer = page.getByRole("dialog", { name: "Conteúdo desta página" });
     await expect(sectionsDrawer).toBeVisible();
     await sectionsDrawer.getByRole("button", { name: "Transforme interesse em ação" }).click();
     await expect(page.getByRole("dialog", { name: "Propriedades" })).toBeVisible();

@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { casaDeSucos } from "@/data/demo-projects";
+import { casaDeSucos, redeMovimento } from "@/data/demo-projects";
 import { inferBusinessShape } from "@/features/site-composer/business-shape";
 import { chooseCatalogStrategy } from "@/features/site-composer/catalog-strategy";
 import { createSiteStructureProposal, suggestSiteStructure } from "@/features/site-composer/site-structure-suggester";
 import { fortyProductCatalog } from "../fixtures/large-catalog";
 import type { Project } from "@/types";
 import { createPresencePage } from "@/features/presence/presence-page-service";
+import { materializeSuggestedSiteStructure } from "@/features/site-composer/materialize-site-structure";
 
 function vertical(category: string, config: Partial<NonNullable<Project["commercialConfig"]>> = {}): Project {
   return { ...structuredClone(casaDeSucos), id: `vertical-${category}`, category, commercialConfig: { ...structuredClone(casaDeSucos.commercialConfig), catalogItems: [], serviceOfferings: [], locations: [], ...config } };
@@ -84,5 +85,50 @@ describe("adaptive site composer", () => {
     expect(proposal.suggestion.pages.flatMap((page) => page.sections).find((section) => section.sectionType === "products")?.sourceBindings).toContain("commercialConfig.catalogItems");
     expect(proposal.operations.some((operation) => operation.type === "add_section" && operation.pageId === home?.id && operation.section.sectionType === "hero")).toBe(false);
     expect(proposal.operations.some((operation) => operation.type === "update_section" || operation.type === "move_section")).toBe(true);
+  });
+
+  it("materializes Casa de Sucos as a real, deterministic first version", () => {
+    const project = structuredClone(casaDeSucos);
+    project.status = "draft";
+    project.publishedAt = undefined;
+    project.presence = { pages: [] };
+    const before = structuredClone(project);
+    const suggestion = suggestSiteStructure(project);
+
+    const first = materializeSuggestedSiteStructure(project, suggestion).project;
+    const second = materializeSuggestedSiteStructure(project, suggestion).project;
+    const home = first.presence?.pages.find((page) => page.isHome);
+    const serialized = JSON.stringify(first);
+    const goalIds = new Set(first.conversionGoals?.map((goal) => goal.id));
+    const actions = home?.sections.flatMap((section) => {
+      const content = section.content as Record<string, unknown>;
+      return [content.primaryAction, content.secondaryAction, content.action, content.itemAction, content.nearestAction]
+        .filter((action): action is { type: string; conversionGoalId?: string } => Boolean(action && typeof action === "object" && "type" in action));
+    }) || [];
+
+    expect(project).toEqual(before);
+    expect(first).toEqual(second);
+    expect(first.status).toBe("draft");
+    expect(first.publishedAt).toBeUndefined();
+    expect(home?.sections.length).toBeGreaterThan(2);
+    expect(home?.sections.some((section) => section.type === "products")).toBe(true);
+    expect(serialized).toContain("Suco natural");
+    expect(serialized).toContain("Salada de frutas");
+    expect(home?.sections.some((section) => section.type === "testimonials")).toBe(false);
+    expect(serialized.toLocaleLowerCase("pt-BR")).not.toMatch(/mais vendido|milhares de clientes|líder de mercado/);
+    expect(actions.filter((action) => action.type === "start_conversion_goal").every((action) => Boolean(action.conversionGoalId && goalIds.has(action.conversionGoalId)))).toBe(true);
+  });
+
+  it("includes real locations when the business has active units", () => {
+    const project = structuredClone(redeMovimento);
+    project.status = "draft";
+    project.publishedAt = undefined;
+    project.presence = { pages: [] };
+    const result = materializeSuggestedSiteStructure(project, suggestSiteStructure(project)).project;
+    const locationSection = result.presence?.pages.find((page) => page.isHome)?.sections.find((section) => section.type === "locations");
+
+    expect(locationSection).toBeDefined();
+    expect(locationSection?.description).toContain("Unidade Zona Sul");
+    expect(locationSection?.settings.sourceBindings).toContain("commercialConfig.locations:demo-location-sul");
   });
 });
