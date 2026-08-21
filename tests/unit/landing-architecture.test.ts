@@ -43,4 +43,11 @@ describe("SOBE landing — Arquitetura da Atenção", () => {
     expect(simulation).toContain("Ver produtos");
     expect(simulation).toContain("Pronto para o próximo passo?");
   });
+
+  it("recomposes the dispersed-attention routes vertically on mobile", () => {
+    expect(landing).toContain("styles.mobileScatterRoutes");
+    expect(landing).toContain('cx="280" cy="424"');
+    expect(palette).toContain(".desktopScatterRoutes { display: none; }");
+    expect(palette).toContain(".mobileScatterRoutes { display: inline; }");
+  });
 });

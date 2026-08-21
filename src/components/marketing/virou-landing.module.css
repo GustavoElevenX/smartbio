@@ -287,6 +287,7 @@
   stroke: rgba(7,23,47,.42);
   filter: drop-shadow(0 0 8px rgba(2,229,205,.68));
 }
+.mobileScatterRoutes { display: none; }
 .scatterTag {
   position: absolute;
   z-index: 2;
@@ -594,8 +595,16 @@
   .sectionHeading h2, .mechanismIntro h2, .buildRoute h2, .pricingIntro h2, .faq h2 { font-size: clamp(42px, 12vw, 58px); }
   .sectionHeading > p, .mechanismIntro p, .buildRoute > div > p { font-size: 17px; }
   .problemStage { grid-template-columns: 1fr; min-height: auto; margin-top: 54px; clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px)); }
-  .scattered { min-height: 390px; }
+  .scattered { min-height: clamp(420px, 112vw, 468px); }
   .scattered::before { top: 28px; left: 24px; }
+  .scattered::after {
+    inset: auto 0 0;
+    width: 100%;
+    height: 31%;
+    background: linear-gradient(180deg, transparent, rgba(1,210,223,.065) 54%, rgba(7,23,47,.13));
+  }
+  .desktopScatterRoutes { display: none; }
+  .mobileScatterRoutes { display: inline; }
   .scatterTag { gap: 7px; padding: 9px 12px 9px 10px; font-size: 13px; }
   .scatterCatalog { top: 88px; left: 7%; }
   .scatterWhatsapp { top: 77px; right: 4%; }

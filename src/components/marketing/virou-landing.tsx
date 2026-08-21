@@ -131,14 +131,26 @@ function Problem() {
                 <stop offset="1" stopColor="#0054FC" stopOpacity="0.96" />
               </linearGradient>
             </defs>
-            <path d="M146 121 C234 118 330 163 560 215" />
-            <path d="M414 106 C466 126 505 176 560 215" />
-            <path d="M112 224 C224 228 348 205 560 215" />
-            <path d="M401 207 C463 205 508 211 560 215" />
-            <path d="M171 337 C284 328 396 263 560 215" />
-            <path d="M447 335 C491 302 529 253 560 215" />
-            <circle className={styles.scatterJunction} cx="485" cy="226" r="3" />
-            <circle className={styles.scatterConvergence} cx="553" cy="215" r="5" />
+            <g className={styles.desktopScatterRoutes}>
+              <path d="M146 121 C234 118 330 163 560 215" />
+              <path d="M414 106 C466 126 505 176 560 215" />
+              <path d="M112 224 C224 228 348 205 560 215" />
+              <path d="M401 207 C463 205 508 211 560 215" />
+              <path d="M171 337 C284 328 396 263 560 215" />
+              <path d="M447 335 C491 302 529 253 560 215" />
+              <circle className={styles.scatterJunction} cx="485" cy="226" r="3" />
+              <circle className={styles.scatterConvergence} cx="553" cy="215" r="5" />
+            </g>
+            <g className={styles.mobileScatterRoutes}>
+              <path d="M108 121 C184 132 236 274 280 430" />
+              <path d="M446 111 C378 132 328 276 280 430" />
+              <path d="M92 224 C166 232 226 318 280 430" />
+              <path d="M432 208 C374 220 326 320 280 430" />
+              <path d="M126 348 C188 354 238 390 280 430" />
+              <path d="M448 341 C382 350 330 392 280 430" />
+              <circle className={styles.scatterJunction} cx="280" cy="390" r="3" />
+              <circle className={styles.scatterConvergence} cx="280" cy="424" r="5" />
+            </g>
           </svg>
           <span className={`${styles.scatterTag} ${styles.scatterCatalog}`}><i aria-hidden="true" />Catálogo</span>
           <span className={`${styles.scatterTag} ${styles.scatterWhatsapp}`}><i aria-hidden="true" />WhatsApp</span>
