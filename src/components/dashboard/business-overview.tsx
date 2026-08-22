@@ -104,15 +104,15 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
       <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_1.15fr]">
         <div className="rounded-[24px] border border-[#e4e2e9] bg-white p-6">
           <Zap className="text-[#0054fc]" size={20} />
-          <h2 className="mt-5 text-xl font-black">Ativações</h2>
+          <h2 className="mt-5 text-xl font-black">Campanhas</h2>
           <p className="mt-2 text-sm text-[#74717d]">{activationStats.active} ativas · {activationStats.scheduled} agendadas</p>
           <p className="mt-5 text-sm leading-6 text-[#686570]">Faça o site acompanhar promoções, lançamentos, agenda e o que precisa vender agora.</p>
-          <Link href={`/app/projects/${project.id}/activations`} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#dedbe8] px-4 text-sm font-bold text-[#0054fc]">Ver ativações <ArrowRight size={15}/></Link>
+          <Link href={`/app/projects/${project.id}/activations`} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#dedbe8] px-4 text-sm font-bold text-[#0054fc]">Ver campanhas <ArrowRight size={15}/></Link>
         </div>
         <div className="rounded-[24px] bg-[#1d1b26] p-6 text-white">
           <h2 className="text-xl font-black">O que você quer melhorar agora?</h2>
           <p className="mt-2 text-sm leading-6 text-white/60">Transforme o momento do negócio em um rascunho editável. A IA não publica nada sozinha.</p>
-          <Link href={`/app/projects/${project.id}/activations/new`} className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-xl bg-white px-5 text-sm font-bold text-[#201d2a]">Criar uma ativação <ArrowRight size={16}/></Link>
+          <Link href={`/app/projects/${project.id}/activations/new`} className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-xl bg-white px-5 text-sm font-bold text-[#201d2a]">Criar campanha <ArrowRight size={16}/></Link>
         </div>
       </section>
       */}
@@ -125,7 +125,7 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
         <div>
           <p className="text-sm font-bold text-[#0054fc]">{project.name}</p>
           <h1 className="mt-2 max-w-3xl text-3xl font-black tracking-[-.045em] sm:text-4xl">
-            Sua presença está transformando atenção em oportunidade?
+            Sua Sobe está transformando atenção em leads?
           </h1>
           <p className="mt-3 text-sm text-[#74717d]">
             Acompanhe o caminho completo — da visita à conversão confirmada.
@@ -143,7 +143,7 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
         {[
           ["Visitas", stats.visits, Eye],
           ["Intenções", stats.intentions, MousePointerClick],
-          ["Oportunidades", stats.opportunities, Users],
+          ["Leads", stats.opportunities, Users],
           ["Conversões", stats.conversions, CheckCircle2],
         ].map(([label, value, Icon]) => {
           const CardIcon = Icon as typeof Eye;
@@ -164,22 +164,22 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
       <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_1.15fr]">
         <div className="rounded-[24px] border border-[#e4e2e9] bg-white p-6">
           <Zap className="text-[#0054fc]" size={20} />
-          <h2 className="mt-5 text-xl font-black">Ativações</h2>
+          <h2 className="mt-5 text-xl font-black">Campanhas</h2>
           <p className="mt-2 text-sm text-[#74717d]">{activationStats.active} ativas · {activationStats.scheduled} agendadas</p>
           <p className="mt-5 text-sm leading-6 text-[#686570]">Faça o site acompanhar promoções, lançamentos, agenda e o que precisa vender agora.</p>
-          <Link href={`/app/projects/${project.id}/activations`} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#dedbe8] px-4 text-sm font-bold text-[#0054fc]">Ver ativações <ArrowRight size={15} /></Link>
+          <Link href={`/app/projects/${project.id}/activations`} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#dedbe8] px-4 text-sm font-bold text-[#0054fc]">Ver campanhas <ArrowRight size={15} /></Link>
         </div>
         <div className="rounded-[24px] bg-[#1d1b26] p-6 text-white">
           <h2 className="text-xl font-black">O que você quer melhorar agora?</h2>
           <p className="mt-2 text-sm leading-6 text-white/60">Transforme o momento do negócio em um rascunho editável. A IA não publica nada sozinha.</p>
-          <Link href={`/app/projects/${project.id}/activations/new`} className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-xl bg-white px-5 text-sm font-bold text-[#201d2a]">Criar uma ativação <ArrowRight size={16} /></Link>
+          <Link href={`/app/projects/${project.id}/activations/new`} className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-xl bg-white px-5 text-sm font-bold text-[#201d2a]">Criar campanha <ArrowRight size={16} /></Link>
         </div>
       </section>
       {pages.length ? (
         <section className="mt-6 rounded-[24px] border border-[#e4e2e9] bg-white p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-black">Estrutura publicada</h2>
+              <h2 className="text-xl font-black">Sua Sobe</h2>
               <p className="mt-1 text-xs text-[#77737f]">
                 Dados reais do projeto atual.
               </p>
@@ -200,12 +200,12 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
                 Globe2,
               ],
               [`${pages.length} página${pages.length === 1 ? "" : "s"}`, Eye],
-              [`${project.conversionGoals?.length || 0} objetivos`, Target],
+              [`${project.conversionGoals?.length || 0} ações disponíveis`, Target],
               [
-                `${project.entryPoints?.length || 0} entradas`,
+                `${project.entryPoints?.length || 0} links/origens ativos`,
                 MousePointerClick,
               ],
-              [`${stats.opportunities} oportunidades este mês`, Users],
+              [`${stats.opportunities} leads este mês`, Users],
             ].map(([text, Icon]) => {
               const ItemIcon = Icon as typeof Globe2;
               return (

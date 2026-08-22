@@ -23,7 +23,7 @@ function sanitizeAIJourney(steps: JourneyStep[]) {
 export class CompositionOrchestrator {
   constructor(
     private readonly analyzer: BusinessAnalyzer = deterministicBusinessAnalyzer,
-    private readonly planner: CapabilityPlanner = capabilityPlanner,
+    private readonly planner: Pick<CapabilityPlanner, "plan"> = capabilityPlanner,
     private readonly journey: RuleBasedJourneyComposer = journeyComposer,
     private readonly visual: VisualComposer = visualComposer,
     private readonly aiJourney?: AIJourneyComposer,

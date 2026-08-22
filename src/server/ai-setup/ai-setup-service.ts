@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { extractedBusinessSourceSchema, type AISetupSession, type ExtractedBusinessSource, type SetupQuestion, type SourceReference } from "@/features/ai-setup/ai-setup.schema";
 import { materializeSetupAnswers } from "@/features/ai-setup/materialize-setup-answers";
 import { stageGeneratedDraft } from "@/features/ai-setup/stage-generated-draft";
-import { applyVisitorActionsToProject, defaultVisitorActions, profileWithVisitorActions, type VisitorActionSelection } from "@/features/ai-setup/visitor-actions";
+import { applyVisitorActionsToProject, defaultVisitorActions, ensureVisitorActionTargets, profileWithVisitorActions, type VisitorActionSelection } from "@/features/ai-setup/visitor-actions";
 import { RuleBasedBusinessAnalyzer } from "@/features/business-understanding/rule-based-business-analyzer";
 import { capabilityPlanner } from "@/features/capabilities/capability-planner";
 import { draftCapabilityRequirements } from "@/features/capabilities/capability-requirements";
@@ -256,7 +256,7 @@ export class AISetupService {
     if (!actions.length) throw new Error("Escolha ao menos uma ação para o visitante.");
     if (actions.filter((action) => action.isPrimary).length !== 1) throw new Error("Marque uma única ação como principal.");
     const profile = profileWithVisitorActions(session.extractedProfile, actions);
-    const requirements = resolvedRequirements(draftCapabilityRequirements(capabilityPlanner.plan(profile)), session.answers);
+    const requirements = resolvedRequirements(draftCapabilityRequirements(capabilityPlanner.planForVisitorActions(profile, actions)), session.answers);
     const next = await this.repository.update(actor, {
       ...session,
       extractedProfile: profile,
@@ -294,10 +294,11 @@ export class AISetupService {
     const baseProfile = session.extractedProfile || new RuleBasedBusinessAnalyzer().analyze(input);
     const selectedActions = session.visitorActions?.length ? session.visitorActions : defaultVisitorActions(baseProfile);
     const profile = profileWithVisitorActions(baseProfile, selectedActions);
+    const selectedCapabilities = capabilityPlanner.planForVisitorActions(profile, selectedActions);
     const aiJourney = isAIConfigured() ? async () => getAIProvider().composeJourney({
       input,
       profile,
-      capabilities: capabilityPlanner.plan(profile),
+      capabilities: selectedCapabilities,
       answers: session.answers,
       workspaceId: actor.workspaceId,
       setupSessionId: id,
@@ -305,7 +306,7 @@ export class AISetupService {
     }) : undefined;
     const orchestrator = new CompositionOrchestrator(
       { analyze: () => profile },
-      capabilityPlanner,
+      { plan: () => selectedCapabilities },
       journeyComposer,
       visualComposer,
       aiJourney,
@@ -316,8 +317,10 @@ export class AISetupService {
         ...generated,
         workspaceId: actor.workspaceId,
         status: "draft",
+        capabilities: selectedCapabilities,
         dataRequirements: mergeProjectRequirements(generated, session),
       }, session);
+      project = ensureVisitorActionTargets(project, selectedActions);
       project = applyVisitorActionsToProject(project, { visitorActions: selectedActions });
       project = applyBrandIdentity(project, session);
       const instruction = initialSiteInstruction(project, { ...session, visitorActions: selectedActions });

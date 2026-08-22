@@ -134,7 +134,7 @@ export function ActivationBuilder({
     setError("");
     try {
       const body = {
-        name: state.name || state.title || "Nova ativação",
+        name: state.name || state.title || "Nova campanha",
         activationType: state.activationType,
         status: "draft",
         conversionGoalId: state.conversionGoalId || undefined,
@@ -304,8 +304,8 @@ export function ActivationBuilder({
     <div className="-m-4 min-h-[calc(100vh-73px)] bg-white sm:-m-6 lg:-m-8">
       <header className="flex min-h-[72px] items-center justify-between gap-3 border-b border-[#e5e4ec] px-5">
         <div>
-          <p className="text-xs font-bold text-[#0054fc]">Ativações</p>
-          <h1 className="text-xl font-extrabold">Nova ativação</h1>
+          <p className="text-xs font-bold text-[#0054fc]">Campanhas</p>
+          <h1 className="text-xl font-extrabold">Nova campanha</h1>
         </div>
         <button
           type="button"
@@ -319,7 +319,7 @@ export function ActivationBuilder({
       </header>
       <div className="grid min-h-[calc(100vh-145px)] lg:grid-cols-[230px_minmax(0,1fr)_350px]">
         <aside className="border-r border-[#e8e7ed] bg-[#f7fbff] p-4">
-          <nav className="space-y-1" aria-label="Passos da ativação">
+          <nav className="space-y-1" aria-label="Passos da campanha">
             {steps.map((label, index) => (
               <button
                 key={label}

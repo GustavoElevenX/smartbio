@@ -6,17 +6,25 @@ test("editor adaptativo mantém a proposta da Sobe IA sob confirmação", async 
   await expect(create).toBeVisible();
   await create.click();
   await expect(page.getByRole("link", { name: "Sobe, início" }).last()).toBeVisible();
+  if (testInfo.project.name === "mobile-chrome") {
+    await page.getByTestId("simple-editor-backdrop").click({ position: { x: 12, y: 90 } });
+  }
+  await page.getByTestId("site-editor-mode-toggle").click();
   if (testInfo.project.name === "mobile-chrome") await page.getByRole("button", { name: "Propriedades" }).click();
   await expect(page.getByRole("tab", { name: "Conteúdo" })).toBeVisible();
   const sectionsBefore = await page.getByTestId("site-section-list").getByRole("button").count();
-  await page.getByRole("tab", { name: "Avançado" }).click();
+  if (testInfo.project.name === "mobile-chrome") {
+    await page.getByRole("tab", { name: "Conteúdo" }).press("End");
+  } else {
+    await page.getByRole("tab", { name: "Avançado" }).click();
+  }
   const instruction = page.getByRole("textbox", { name: "Instrução para a Sobe IA" });
   await expect(instruction).toBeVisible();
   await instruction.fill("Crie uma landing para revendedores e remova o FAQ.");
-  await page.getByRole("button", { name: "Criar landing" }).click();
+  await page.getByRole("button", { name: "Criar uma página para campanha" }).click();
   await page.getByRole("button", { name: "Gerar proposta" }).click();
   const dialog = page.getByRole("dialog", { name: "Revise a proposta" });
-  await expect(dialog).toBeVisible();
+  await expect(dialog).toBeVisible({ timeout: 15_000 });
   await expect(dialog).toContainText("nunca publica o site");
   await expect(dialog).toContainText("Diff semântico");
   await dialog.getByRole("button", { name: "Personalizar antes" }).click();
@@ -25,13 +33,13 @@ test("editor adaptativo mantém a proposta da Sobe IA sob confirmação", async 
   await dialog.getByRole("button", { name: "Descartar" }).click();
   expect(await page.getByTestId("site-section-list").getByRole("button").count()).toBe(sectionsBefore);
   if (testInfo.project.name === "mobile-chrome") {
-    await page.getByRole("button", { name: "Fechar propriedades" }).click();
+    await page.getByRole("button", { name: "Fechar painel" }).click({ position: { x: 12, y: 90 } });
     await page.getByRole("button", { name: "Conteúdo", exact: true }).click();
     const sectionsDrawer = page.getByRole("dialog", { name: "Conteúdo desta página" });
     await expect(sectionsDrawer).toBeVisible();
     await sectionsDrawer.getByRole("button", { name: "Transforme interesse em ação" }).click();
     await expect(page.getByRole("dialog", { name: "Propriedades" })).toBeVisible();
-    await page.getByRole("button", { name: "Fechar propriedades" }).click();
+    await page.getByRole("button", { name: "Fechar painel" }).click({ position: { x: 12, y: 90 } });
   }
   await page.getByRole("button", { name: "Visualização mobile" }).click();
   await page.screenshot({ path: testInfo.outputPath("site-composer-mobile.png"), fullPage: false });

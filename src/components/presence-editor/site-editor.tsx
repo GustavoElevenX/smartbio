@@ -47,12 +47,14 @@ import type {
 } from "@/features/presence/presence.types";
 import type { Project } from "@/types";
 import { SectionInspector } from "./section-editor-registry";
+import { SimpleSectionInspector } from "./simple-section-inspector";
 import type { SiteComposerIntent, SiteOperation, SuggestedSiteStructure } from "@/features/site-composer/site-composer.types";
 import { inspectPageQuality } from "@/features/site-composer/site-quality";
 
 type SaveState = "saved" | "dirty" | "saving" | "error";
 type Device = "desktop" | "tablet" | "mobile";
 type MobilePanel = "pages" | "sections" | "properties";
+export type SiteEditorMode = "simple" | "advanced";
 const viewport = { desktop: 1120, tablet: 768, mobile: 390 };
 type AIProposal = {
   kind: "page" | "section";
@@ -64,13 +66,13 @@ type PerformanceState = { evidence: { eligible: boolean; completeDays: number; d
 type PerformanceExplanation = { explanation: string; recommendedAction: string; usedAI: boolean };
 
 const copilotActions: Array<{ intent: SiteComposerIntent; label: string }> = [
-  { intent: "suggest_structure", label: "Sugerir estrutura" },
-  { intent: "create_page", label: "Criar página" },
+  { intent: "suggest_structure", label: "Melhorar a estrutura da página" },
+  { intent: "create_page", label: "Criar uma nova página" },
   { intent: "add_section", label: "Adicionar conteúdo" },
-  { intent: "reorganize", label: "Reorganizar" },
-  { intent: "improve_cta", label: "Melhorar CTA" },
-  { intent: "focus_offer", label: "Focar oferta" },
-  { intent: "create_landing", label: "Criar landing" },
+  { intent: "reorganize", label: "Organizar melhor esta página" },
+  { intent: "improve_cta", label: "Melhorar os botões e chamadas" },
+  { intent: "focus_offer", label: "Dar mais destaque ao que eu vendo" },
+  { intent: "create_landing", label: "Criar uma página para campanha" },
 ];
 
 function operationDescription(operation: SiteOperation) {
@@ -135,6 +137,7 @@ function materializeAISection(
 }
 
 export function SiteEditor({ projectId }: { projectId: string }) {
+  const [mode, setMode] = useState<SiteEditorMode>("simple");
   const [project, setProject] = useState<Project | null>();
   const [pages, setPages] = useState<PresencePage[]>([]);
   const [selectedPageId, setSelectedPageId] = useState("");
@@ -581,11 +584,10 @@ export function SiteEditor({ projectId }: { projectId: string }) {
             <Monitor />
           </span>
           <h1 className="mt-5 text-3xl font-black tracking-[-.04em]">
-            Crie a presença digital deste negócio
+            Crie a página deste negócio
           </h1>
           <p className="mt-3 text-sm leading-6 text-[#706d78]">
-            Monte uma página comercial pública conectada às metas e jornadas que
-            já existem.
+            Monte uma página conectada às ações que seus clientes precisam realizar.
           </p>
           <Button className="mt-6" onClick={() => addPage("home")}>
             <Plus size={17} />
@@ -621,6 +623,17 @@ export function SiteEditor({ projectId }: { projectId: string }) {
           </p>
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-1">
+          <Button
+            data-testid="site-editor-mode-toggle"
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              setMode((current) => current === "simple" ? "advanced" : "simple");
+              setMobilePanel(undefined);
+            }}
+          >
+            {mode === "simple" ? "Modo avançado" : "Modo simples"}
+          </Button>
           <Button
             className="hidden sm:inline-flex"
             size="icon"
@@ -711,7 +724,24 @@ export function SiteEditor({ projectId }: { projectId: string }) {
           {message}
         </div>
       ) : null}
-      <div className="flex items-center gap-2 border-b border-[#dfe6ee] bg-white p-3 xl:hidden">
+      {mode === "simple" && pages.length > 1 ? (
+        <div className="flex items-end gap-3 border-b border-[#dfe6ee] bg-white px-4 py-3">
+          <label className="min-w-0 flex-1 text-xs font-extrabold text-[#536178]">
+            Página atual
+            <select className="mt-1 min-h-11 w-full border border-[#d7e0e9] bg-white px-3 text-sm" value={activePage?.id || ""} onChange={(event) => { setSelectedPageId(event.target.value); setSelectedSectionId(undefined); }}>
+              {pages.map((page) => <option key={page.id} value={page.id}>{page.name}</option>)}
+            </select>
+          </label>
+          <details className="relative">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center px-3 text-xs font-extrabold text-[#0054fc]">Mais opções</summary>
+            <div className="absolute right-0 top-12 z-40 w-56 border border-[#dfe6ee] bg-white p-2 shadow-xl">
+              <button type="button" onClick={() => addPage("page")} className="min-h-11 w-full px-3 text-left text-sm font-bold hover:bg-[#f1f5f9]">Adicionar página</button>
+              <button type="button" onClick={() => addPage("landing")} className="min-h-11 w-full px-3 text-left text-sm font-bold hover:bg-[#f1f5f9]">Página para campanha</button>
+            </div>
+          </details>
+        </div>
+      ) : null}
+      {mode === "advanced" ? <div className="flex items-center gap-2 border-b border-[#dfe6ee] bg-white p-3 xl:hidden">
         <label className="min-w-0 flex-1 text-xs font-black text-[#5f6673]">
           Página ativa
           <select className="mt-1 min-h-11 w-full rounded-xl border border-[#d7e0e9] bg-white px-3 text-sm" value={activePage?.id || ""} onChange={(event) => { setSelectedPageId(event.target.value); setSelectedSectionId(undefined); }}>
@@ -719,16 +749,16 @@ export function SiteEditor({ projectId }: { projectId: string }) {
           </select>
         </label>
         <Button className="mt-5" size="icon" variant="secondary" aria-label="Adicionar página" onClick={() => addPage("page")}><Plus /></Button>
-      </div>
-      <div className="fixed inset-x-3 bottom-3 z-30 grid grid-cols-3 rounded-2xl border border-[#d7e0e9] bg-white/95 p-1.5 shadow-[0_18px_50px_rgba(15,23,42,.22)] backdrop-blur xl:hidden">
+      </div> : null}
+      {mode === "advanced" && !mobilePanel ? <div className="grid grid-cols-3 gap-1 border-b border-[#d7e0e9] bg-white p-2 xl:hidden">
         <button type="button" onClick={() => setMobilePanel("pages")} className="min-h-11 rounded-xl text-xs font-black text-[#53606d] hover:bg-[#eef6ff]">Páginas</button>
         <button type="button" onClick={() => setMobilePanel("sections")} className="min-h-11 rounded-xl text-xs font-black text-[#53606d] hover:bg-[#eef6ff]">Conteúdo</button>
         <button type="button" onClick={() => setMobilePanel("properties")} className="min-h-11 rounded-xl bg-[#0054fc] text-xs font-black text-white">Propriedades</button>
-      </div>
-      {mobilePanel === "pages" ? <MobileDrawer title="Páginas" onClose={() => setMobilePanel(undefined)}><div className="space-y-1">{pages.map((page) => <button key={page.id} type="button" onClick={() => { setSelectedPageId(page.id); setSelectedSectionId(undefined); setMobilePanel(undefined); }} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-bold ${page.id === activePage?.id ? "bg-[#e8f4ff] text-[#0054fc]" : "hover:bg-[#f1f5f9]"}`}><span>{page.isHome ? "⌂" : page.type === "landing" ? "LP" : "P"}</span><span className="min-w-0 flex-1 truncate">{page.name}</span></button>)}</div><div className="mt-4 grid grid-cols-2 gap-2"><Button variant="secondary" onClick={() => { addPage("page"); setMobilePanel(undefined); }}><Plus />Página</Button><Button variant="secondary" onClick={() => { addPage("landing"); setMobilePanel(undefined); }}><Plus />Landing</Button></div></MobileDrawer> : null}
-      {mobilePanel === "sections" ? <MobileDrawer title="Conteúdo desta página" onClose={() => setMobilePanel(undefined)}><div className="space-y-1">{activePage?.sections.toSorted((a, b) => a.order - b.order).map((section) => <button key={section.id} type="button" onClick={() => { setSelectedSectionId(section.id); setMobilePanel("properties"); }} className={`flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-xs font-bold ${section.id === activeSection?.id ? "bg-[#e8f4ff] text-[#0054fc]" : "hover:bg-[#f1f5f9]"}`}><GripVertical size={14} /><span className="min-w-0 flex-1 truncate">{section.title || presenceSectionRegistry[section.type].label}</span></button>)}</div><details className="mt-4"><summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-[#b9cce1] px-3 text-xs font-black text-[#0054fc]"><Plus size={14} />Adicionar conteúdo</summary><SectionLibrary onAdd={(type) => { addSection(type); setMobilePanel("properties"); }} /></details></MobileDrawer> : null}
-      <div className="grid min-h-[calc(100vh-137px)] grid-cols-1 pb-20 xl:grid-cols-[240px_minmax(380px,1fr)_320px] xl:pb-0">
-        <aside className="hidden border-r border-[#dfe6ee] bg-white xl:block">
+      </div> : null}
+      {mode === "advanced" && mobilePanel === "pages" ? <MobileDrawer title="Páginas" onClose={() => setMobilePanel(undefined)}><div className="space-y-1">{pages.map((page) => <button key={page.id} type="button" onClick={() => { setSelectedPageId(page.id); setSelectedSectionId(undefined); setMobilePanel(undefined); }} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-bold ${page.id === activePage?.id ? "bg-[#e8f4ff] text-[#0054fc]" : "hover:bg-[#f1f5f9]"}`}><span>{page.isHome ? "⌂" : page.type === "landing" ? "LP" : "P"}</span><span className="min-w-0 flex-1 truncate">{page.name}</span></button>)}</div><div className="mt-4 grid grid-cols-2 gap-2"><Button variant="secondary" onClick={() => { addPage("page"); setMobilePanel(undefined); }}><Plus />Página</Button><Button variant="secondary" onClick={() => { addPage("landing"); setMobilePanel(undefined); }}><Plus />Landing</Button></div></MobileDrawer> : null}
+      {mode === "advanced" && mobilePanel === "sections" ? <MobileDrawer title="Conteúdo desta página" onClose={() => setMobilePanel(undefined)}><div className="space-y-1">{activePage?.sections.toSorted((a, b) => a.order - b.order).map((section) => <button key={section.id} type="button" onClick={() => { setSelectedSectionId(section.id); setMobilePanel("properties"); }} className={`flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-xs font-bold ${section.id === activeSection?.id ? "bg-[#e8f4ff] text-[#0054fc]" : "hover:bg-[#f1f5f9]"}`}><GripVertical size={14} /><span className="min-w-0 flex-1 truncate">{section.title || presenceSectionRegistry[section.type].label}</span></button>)}</div><details className="mt-4"><summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-[#b9cce1] px-3 text-xs font-black text-[#0054fc]"><Plus size={14} />Adicionar conteúdo</summary><SectionLibrary onAdd={(type) => { addSection(type); setMobilePanel("properties"); }} /></details></MobileDrawer> : null}
+      <div data-testid={`site-editor-${mode}`} className={`grid min-h-[calc(100vh-137px)] grid-cols-1 ${mode === "advanced" ? "xl:grid-cols-[240px_minmax(380px,1fr)_320px]" : "lg:grid-cols-[minmax(480px,1fr)_340px]"}`}>
+        <aside className={mode === "advanced" ? "hidden border-r border-[#dfe6ee] bg-white xl:block" : "hidden"}>
           <div className="relative flex items-center justify-between border-b border-[#e4e2e9] px-4 py-3">
             <strong className="text-xs uppercase tracking-[.12em] text-[#77727e]">
               Páginas
@@ -839,13 +869,49 @@ export function SiteEditor({ projectId }: { projectId: string }) {
                   project={previewProject}
                   page={activePage}
                   preview
+                  editorHooks={mode === "simple" ? {
+                    selectedSectionId,
+                    onSelectSection: (sectionId) => setSelectedSectionId(sectionId),
+                  } : undefined}
                 />
               ) : null}
             </div>
           </div>
         </section>
-        {mobilePanel === "properties" ? <button type="button" aria-label="Fechar painel" onClick={() => setMobilePanel(undefined)} className="fixed inset-0 z-[35] bg-[#101827]/45 xl:hidden" /> : null}
-        <aside role={mobilePanel === "properties" ? "dialog" : undefined} aria-modal={mobilePanel === "properties" ? true : undefined} aria-label={mobilePanel === "properties" ? "Propriedades" : undefined} className={`border-l border-[#dfe6ee] bg-white ${mobilePanel === "properties" ? "fixed inset-x-0 bottom-0 z-40 max-h-[82vh] overflow-hidden rounded-t-[28px] shadow-[0_-20px_70px_rgba(15,23,42,.28)]" : "hidden"} xl:static xl:block xl:max-h-none xl:rounded-none xl:shadow-none`}>
+        {mode === "simple" && activeSection ? <button type="button" data-testid="simple-editor-backdrop" aria-label="Fechar edição" onClick={() => setSelectedSectionId(undefined)} className="fixed inset-0 z-[35] bg-[#101827]/45 lg:hidden" /> : null}
+        {mode === "simple" ? (
+          <aside
+            role={activeSection ? "dialog" : undefined}
+            aria-modal={activeSection ? true : undefined}
+            aria-label={activeSection ? "Editar esta parte" : undefined}
+            className={`${activeSection ? "fixed inset-x-0 bottom-0 z-40 max-h-[84vh] overflow-y-auto bg-white p-5 shadow-[0_-20px_70px_rgba(15,23,42,.28)]" : "hidden"} border-l border-[#dfe6ee] lg:static lg:block lg:max-h-[calc(100vh-137px)] lg:overflow-y-auto lg:bg-white lg:p-5 lg:shadow-none`}
+          >
+            {activeSection && activePage ? (
+              <>
+                <div className="mb-3 flex justify-end lg:hidden">
+                  <Button size="icon" variant="ghost" aria-label="Fechar edição" onClick={() => setSelectedSectionId(undefined)}><X size={17} /></Button>
+                </div>
+                <SimpleSectionInspector
+                  project={previewProject!}
+                  page={activePage}
+                  section={activeSection}
+                  onChange={updateSection}
+                  onImprove={() => void requestAI("section")}
+                  onMove={(direction) => moveSection(activeSection.id, direction)}
+                  onAdvanced={() => setMode("advanced")}
+                />
+              </>
+            ) : (
+              <div className="flex min-h-64 flex-col justify-center">
+                <strong className="text-xl font-black tracking-[-.025em]">Clique em uma parte da página</strong>
+                <p className="mt-3 text-sm leading-6 text-[#65717d]">Você poderá editar título, texto, imagem e botões sem lidar com configurações técnicas.</p>
+                <Button className="mt-5 self-start" variant="secondary" onClick={() => void requestAI("page")}><Sparkles size={16} /> Melhorar esta página</Button>
+              </div>
+            )}
+          </aside>
+        ) : null}
+        {mode === "advanced" && mobilePanel === "properties" ? <button type="button" aria-label="Fechar painel" onClick={() => setMobilePanel(undefined)} className="fixed inset-0 z-[35] bg-[#101827]/45 xl:hidden" /> : null}
+        <aside role={mobilePanel === "properties" ? "dialog" : undefined} aria-modal={mobilePanel === "properties" ? true : undefined} aria-label={mobilePanel === "properties" ? "Propriedades" : undefined} className={mode === "advanced" ? `border-l border-[#dfe6ee] bg-white ${mobilePanel === "properties" ? "fixed inset-x-0 bottom-0 z-40 max-h-[82vh] overflow-hidden rounded-t-[28px] shadow-[0_-20px_70px_rgba(15,23,42,.28)]" : "hidden"} xl:static xl:block xl:max-h-none xl:rounded-none xl:shadow-none` : "hidden"}>
           <div className="border-b border-[#e6e4eb] px-4 py-3">
             <div className="flex items-center justify-between">
               <strong className="text-xs uppercase tracking-[.12em] text-[#77727e]">

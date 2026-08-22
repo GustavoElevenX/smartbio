@@ -1,10 +1,15 @@
 import type { AISetupSession } from "@/features/ai-setup/ai-setup.schema";
 import type {
   BusinessCapabilityProfile,
+  CapabilityKey,
   CommercialIntent,
   ConversionGoal,
+  JourneyStep,
   Project,
+  RoutingDestination,
 } from "@/types";
+import { draftCapabilityRequirements } from "@/features/capabilities/capability-requirements";
+import { createCapability } from "@/features/capabilities/capability-registry";
 
 export const visitorActionCatalog = [
   { key: "order", label: "Fazer um pedido", description: "Escolher produtos e continuar o pedido.", kind: "buy", intent: "order", capabilityKey: "catalog_order" },
@@ -68,13 +73,14 @@ export function profileWithVisitorActions(
     .filter((action) => action.isPrimary)
     .map((action) => byKey.get(action.key)?.intent)
     .filter((intent) => intent !== undefined) as CommercialIntent[];
+  const selectedPrimaryIntents = unique(primaryIntents);
+  const selectedSecondaryIntents = unique(intents).filter(
+    (intent) => !selectedPrimaryIntents.includes(intent),
+  );
   return {
     ...profile,
-    primaryIntents: unique([
-      ...primaryIntents,
-      ...profile.primaryIntents,
-    ]),
-    secondaryIntents: unique([...profile.secondaryIntents, ...intents]),
+    primaryIntents: selectedPrimaryIntents,
+    secondaryIntents: selectedSecondaryIntents,
     hasMultipleLocations:
       profile.hasMultipleLocations || actions.some((action) => action.key === "find_location"),
     requiresQualification:
@@ -82,32 +88,228 @@ export function profileWithVisitorActions(
   };
 }
 
-function targetStepForAction(project: Project, key: VisitorActionKey) {
-  const preferredTypes: Partial<Record<VisitorActionKey, Project["steps"][number]["type"][]>> = {
-    order: ["catalog", "cart", "choice"],
-    buy: ["catalog", "cart", "choice"],
-    view_products: ["catalog", "choice"],
-    quote: ["quote", "form", "choice"],
-    schedule: ["schedule", "availability", "choice"],
-    reserve: ["reservation", "availability", "choice"],
-    contact: ["form", "action", "choice"],
-    find_location: ["routing", "choice"],
-    support: ["form", "action", "choice"],
-    resale: ["form", "quote", "choice"],
-    recommendation: ["recommendation", "form", "choice"],
-    other: ["choice", "form", "action"],
+const actionCapabilities: Partial<Record<VisitorActionKey, CapabilityKey[]>> = {
+  order: ["catalog_order"],
+  buy: ["catalog_order"],
+  view_products: ["catalog_order"],
+  quote: ["quote"],
+  schedule: ["scheduling"],
+  reserve: ["reservation"],
+  contact: ["qualification"],
+  find_location: ["routing"],
+  support: ["qualification"],
+  resale: ["qualification", "quote"],
+  recommendation: ["qualification"],
+  other: ["qualification"],
+};
+
+const directStepTypes: Record<VisitorActionKey, JourneyStep["type"][]> = {
+  order: ["catalog", "cart"],
+  buy: ["catalog", "cart"],
+  view_products: ["catalog"],
+  quote: ["quote"],
+  schedule: ["schedule"],
+  reserve: ["reservation", "availability"],
+  contact: ["form", "action"],
+  find_location: ["routing"],
+  support: ["form", "action"],
+  resale: ["form", "quote"],
+  recommendation: ["recommendation", "form"],
+  other: ["form", "action"],
+};
+
+const destinationLabels: Record<VisitorActionKey, string> = {
+  order: "Pedido",
+  buy: "Compra",
+  view_products: "Catálogo",
+  quote: "Orçamento",
+  schedule: "Agendamento",
+  reserve: "Reserva",
+  contact: "Atendimento",
+  support: "Atendimento",
+  find_location: "Unidade",
+  resale: "Atendimento comercial",
+  recommendation: "Recomendação",
+  other: "Próximo passo",
+};
+
+function optionHasRealDestination(option: NonNullable<JourneyStep["options"]>[number]) {
+  if (option.actionType === "submit_form" || option.actionType === "finish") return true;
+  if (option.actionType === "open_whatsapp") return Boolean(option.actionPayload?.phone);
+  if (option.actionType === "open_url") return /^https?:\/\//i.test(String(option.actionPayload?.url || ""));
+  return false;
+}
+
+function directStepSupportsVisitorAction(step: JourneyStep, key: VisitorActionKey) {
+  if (!step.isActive || step.type === "choice" || !directStepTypes[key].includes(step.type)) return false;
+  const capabilities = actionCapabilities[key] || [];
+  const hasCapability = step.options?.some((option) =>
+    capabilities.includes(option.actionPayload?.capability as CapabilityKey),
+  );
+  if (step.type === "action") {
+    return Boolean(hasCapability || step.options?.some(optionHasRealDestination));
+  }
+  if (step.type === "form" && ["quote", "resale", "recommendation"].includes(key)) {
+    return Boolean(hasCapability);
+  }
+  return true;
+}
+
+function optionSupportsVisitorAction(
+  project: Project,
+  option: NonNullable<JourneyStep["options"]>[number],
+  key: VisitorActionKey,
+) {
+  const capabilities = actionCapabilities[key] || [];
+  if (capabilities.includes(option.actionPayload?.capability as CapabilityKey)) return true;
+  const linkedGoal = project.conversionGoals?.find((goal) => goal.id === option.conversionGoalId);
+  const definition = byKey.get(key);
+  const linkedTarget = linkedGoal
+    ? project.steps.find((step) => step.id === linkedGoal.targetStepId && step.isActive)
+    : undefined;
+  if (
+    linkedGoal &&
+    definition &&
+    linkedGoal.kind === definition.kind &&
+    linkedTarget &&
+    directStepSupportsVisitorAction(linkedTarget, key)
+  ) return true;
+  if (["contact", "support", "other"].includes(key) && optionHasRealDestination(option)) return true;
+  const target = option.targetStepId
+    ? project.steps.find((step) => step.id === option.targetStepId && step.isActive)
+    : undefined;
+  return Boolean(
+    target &&
+    directStepSupportsVisitorAction(target, key),
+  );
+}
+
+export function stepSupportsVisitorAction(
+  project: Project,
+  step: JourneyStep,
+  key: VisitorActionKey,
+) {
+  if (!step.isActive) return false;
+  if (step.type === "choice") {
+    return Boolean(step.options?.some((option) => optionSupportsVisitorAction(project, option, key)));
+  }
+  return directStepSupportsVisitorAction(step, key);
+}
+
+export function targetStepForAction(project: Project, key: VisitorActionKey) {
+  return project.steps
+    .filter((step) => step.isActive)
+    .find((step) => stepSupportsVisitorAction(project, step, key));
+}
+
+function scaffoldStep(project: Project, action: VisitorActionSelection, order: number): JourneyStep {
+  const definition = byKey.get(action.key)!;
+  const capability = actionCapabilities[action.key]?.[0];
+  const type: JourneyStep["type"] = action.key === "order" || action.key === "buy" || action.key === "view_products"
+    ? "catalog"
+    : action.key === "quote"
+      ? "quote"
+      : action.key === "schedule"
+        ? "schedule"
+        : action.key === "reserve"
+          ? "reservation"
+          : action.key === "find_location"
+            ? "routing"
+            : action.key === "recommendation"
+              ? "recommendation"
+              : "form";
+  const blockType = capability === "catalog_order"
+    ? "catalog_item_cards"
+    : capability === "quote"
+      ? "quote_summary"
+      : capability === "scheduling"
+        ? "schedule_slots"
+        : capability === "reservation"
+          ? "reservable_unit_cards"
+          : capability === "routing"
+            ? "location_selector"
+            : "form";
+  return {
+    id: `${project.id}-step-${action.key}`,
+    type,
+    title: action.label,
+    description: definition.description,
+    order,
+    isActive: true,
+    blocks: [{
+      id: `${project.id}-block-${action.key}`,
+      type: blockType,
+      content: { emptyState: "Complete as informações pendentes para disponibilizar esta ação." },
+      style: { incomplete: true },
+    }],
+    options: [{
+      id: `${project.id}-option-${action.key}`,
+      label: type === "form" || type === "quote" ? "Enviar" : "Continuar",
+      value: action.key,
+      actionType: capability ? "start_capability" : "submit_form",
+      actionPayload: capability ? { capability } : undefined,
+    }],
   };
-  const active = project.steps.filter((step) => step.isActive);
-  return preferredTypes[key]
-    ?.map((type) => active.find((step) => step.type === type))
-    .find(Boolean) || active[0];
+}
+
+export function ensureVisitorActionTargets(
+  project: Project,
+  selectedActions: VisitorActionSelection[],
+): Project {
+  const steps = [...project.steps];
+  const capabilities = [...(project.capabilities || [])];
+  for (const action of selectedActions) {
+    if (!targetStepForAction({ ...project, steps }, action.key)) {
+      steps.push(scaffoldStep(project, action, steps.length));
+    }
+    for (const capabilityKey of actionCapabilities[action.key] || []) {
+      if (!capabilities.some((capability) => capability.key === capabilityKey)) {
+        capabilities.push(createCapability(capabilityKey));
+      }
+    }
+  }
+  const existingRequirements = new Map((project.dataRequirements || []).map((item) => [item.key, item]));
+  const required = draftCapabilityRequirements(capabilities).map((item) => existingRequirements.get(item.key) || item);
+  const requiredKeys = new Set(required.map((item) => item.key));
+  return {
+    ...project,
+    steps: steps.map((step, order) => ({ ...step, order })),
+    capabilities,
+    dataRequirements: [
+      ...required,
+      ...(project.dataRequirements || []).filter((item) => !requiredKeys.has(item.key)),
+    ],
+  };
+}
+
+function destinationForTarget(project: Project, target: JourneyStep): RoutingDestination | undefined {
+  const destinationId = target.options
+    ?.map((option) => option.actionPayload?.destinationId)
+    .find((value): value is string => typeof value === "string" && Boolean(value));
+  if (destinationId) {
+    return project.commercialConfig?.routingDestinations?.find((item) => item.id === destinationId);
+  }
+  if (target.type === "routing") {
+    const candidates = (project.commercialConfig?.routingDestinations || []).filter((item) => item.type !== "unavailable");
+    return candidates.length === 1 ? candidates[0] : undefined;
+  }
+  return undefined;
+}
+
+export function resolveVisitorActionDestination(
+  project: Project,
+  action: VisitorActionSelection,
+  targetStep: JourneyStep,
+) {
+  return destinationForTarget(project, targetStep)?.label || destinationLabels[action.key];
 }
 
 export function applyVisitorActionsToProject(project: Project, session: Pick<AISetupSession, "visitorActions">): Project {
   const selected = session.visitorActions || [];
   if (!selected.length) return project;
+  const prepared = ensureVisitorActionTargets(project, selected);
   const goals: ConversionGoal[] = selected.flatMap((action, order) => {
-    const target = targetStepForAction(project, action.key);
+    const target = targetStepForAction(prepared, action.key);
     const definition = byKey.get(action.key);
     if (!target || !definition) return [];
     return [{
@@ -117,7 +319,7 @@ export function applyVisitorActionsToProject(project: Project, session: Pick<AIS
       description: definition.description,
       kind: definition.kind,
       targetStepId: target.id,
-      destinationLabel: project.primaryDestination,
+      destinationLabel: resolveVisitorActionDestination(prepared, action, target),
       isPrimary: action.isPrimary,
       isActive: true,
       order,
@@ -125,9 +327,9 @@ export function applyVisitorActionsToProject(project: Project, session: Pick<AIS
   });
   const primary = goals.find((goal) => goal.isPrimary) || goals[0];
   return {
-    ...project,
-    primaryGoal: primary?.name || project.primaryGoal,
-    conversionGoals: goals.length ? goals : project.conversionGoals,
+    ...prepared,
+    primaryGoal: primary?.name || prepared.primaryGoal,
+    conversionGoals: goals.length ? goals : prepared.conversionGoals,
   };
 }
 

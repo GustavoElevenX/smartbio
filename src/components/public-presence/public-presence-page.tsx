@@ -11,6 +11,11 @@ import { PresenceMobileMenu } from "./presence-mobile-menu";
 import type { PublicActivation } from "@/features/activations/activation.types";
 import { ActivationRuntimeProvider } from "@/components/public-activations/activation-runtime-provider";
 
+export type PresenceEditorHooks = {
+  selectedSectionId?: string;
+  onSelectSection?: (sectionId: string) => void;
+};
+
 function pagePath(project: Project, page: PresencePage) {
   return page.isHome ? `/${project.slug}` : `/${project.slug}/p/${page.key}`;
 }
@@ -73,10 +78,12 @@ export function PresencePageContent({
   project,
   page,
   publicActivations = [],
+  editorHooks,
 }: {
   project: Project;
   page: PresencePage;
   publicActivations?: PublicActivation[];
+  editorHooks?: PresenceEditorHooks;
 }) {
   const heroOverride = publicActivations
     .flatMap((activation) =>
@@ -195,20 +202,46 @@ export function PresencePageContent({
           </div>
         </header>
       ) : null}
-      {activeSections.map((section) => (
-        <PresenceSectionTracker
-          key={section.id}
-          pageId={page.id}
-          sectionId={section.id}
-        >
-          <PresenceSectionRenderer
-            project={project}
-            page={page}
-            section={section}
-            publicActivations={publicActivations}
-          />
-        </PresenceSectionTracker>
-      ))}
+      {activeSections.map((section) => {
+        if (!editorHooks?.onSelectSection) return (
+          <PresenceSectionTracker key={section.id} pageId={page.id} sectionId={section.id}>
+            <PresenceSectionRenderer
+              project={project}
+              page={page}
+              section={section}
+              publicActivations={publicActivations}
+            />
+          </PresenceSectionTracker>
+        );
+        const selected = editorHooks.selectedSectionId === section.id;
+        return (
+          <div
+            key={section.id}
+            data-editable-presence-section={section.id}
+            data-selected={selected ? "true" : "false"}
+            className={`group/editor relative ${selected ? "outline outline-4 outline-[#0054fc] outline-offset-[-4px]" : "hover:outline hover:outline-2 hover:outline-[#0186fc] hover:outline-offset-[-2px]"}`}
+          >
+            <PresenceSectionTracker pageId={page.id} sectionId={section.id}>
+              <PresenceSectionRenderer
+                project={project}
+                page={page}
+                section={section}
+                publicActivations={publicActivations}
+              />
+            </PresenceSectionTracker>
+            <button
+              type="button"
+              aria-label={`Editar ${section.title || "esta parte"}`}
+              onClick={() => editorHooks.onSelectSection?.(section.id)}
+              className="absolute inset-0 z-30 cursor-pointer focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#0054fc] focus-visible:outline-offset-[-4px]"
+            >
+              <span className={`absolute left-3 top-3 bg-[#07172f] px-3 py-2 text-xs font-extrabold text-white shadow-lg transition-opacity ${selected ? "opacity-100" : "opacity-0 group-hover/editor:opacity-100 group-focus-within/editor:opacity-100"}`}>
+                {selected ? "Editando esta parte" : "Clique para editar"}
+              </span>
+            </button>
+          </div>
+        );
+      })}
       {footer.enabled ? (
         <footer className="border-t border-black/10 px-5 py-12 md:px-8">
           <div className="mx-auto grid max-w-6xl gap-8 md:grid-cols-[1fr_auto]">
@@ -283,11 +316,13 @@ export function PublicPresencePage({
   page,
   preview = false,
   publicActivations = [],
+  editorHooks,
 }: {
   project: Project;
   page: PresencePage;
   preview?: boolean;
   publicActivations?: PublicActivation[];
+  editorHooks?: PresenceEditorHooks;
 }) {
   const colors = project.designSystem.colors;
   const shape = project.designSystem.shape;
@@ -328,6 +363,7 @@ export function PublicPresencePage({
             project={project}
             page={page}
             publicActivations={publicActivations}
+            editorHooks={editorHooks}
           />
         </ActivationRuntimeProvider>
       </ConversionLauncher>
