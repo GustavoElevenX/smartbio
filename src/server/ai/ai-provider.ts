@@ -3,7 +3,7 @@ import type { ResponseInputContent } from "openai/resources/responses/responses"
 import type { AttributionContext, BrandProfile, BusinessCapabilityProfile, ConversionGoal, ExperienceCompositionInput, MediaAsset, OptimizationSuggestion, Project, ProjectCapability } from "@/types";
 import type { AIPresenceDraft } from "@/features/presence/ai-presence.schema";
 import type { AIJourneyDraftPayload } from "@/features/composition/composition.schema";
-import type { BrandAIResult, BusinessAnalysisResult, CopyGenerationResult, ExtractedBusinessSource, SetupQuestion } from "@/features/ai-setup/ai-setup.schema";
+import type { BrandAIResult, BusinessAnalysisResult, CopyGenerationResult, CustomVisitorActionClassification, ExtractedBusinessSource, SetupQuestion } from "@/features/ai-setup/ai-setup.schema";
 import type { AIActivationDraft } from "@/features/activations/ai-activation.schema";
 import type { ConversionActivation } from "@/features/activations/activation.types";
 import type { BusinessShape, SuggestedSiteStructure } from "@/features/site-composer/site-composer.types";
@@ -61,6 +61,13 @@ export interface BrandAIInput extends AIRequestContext {
   mimeType?: string;
 }
 
+export interface CustomVisitorActionInput extends AIRequestContext {
+  actionLabel: string;
+  businessName: string;
+  businessDescription: string;
+  profile: BusinessCapabilityProfile;
+}
+
 export interface PresenceCompositionInput extends AIRequestContext {
   businessProfile: BusinessCapabilityProfile;
   conversionGoals: ConversionGoal[];
@@ -98,6 +105,7 @@ export interface VirouAIProvider {
   generateCopy(input: CopyGenerationInput): Promise<CopyGenerationResult>;
   extractSource(input: SourceExtractionInput): Promise<ExtractedBusinessSource>;
   analyzeBrand?(input: BrandAIInput): Promise<BrandAIResult>;
+  classifyVisitorAction?(input: CustomVisitorActionInput): Promise<CustomVisitorActionClassification>;
 }
 
 export interface StructuredAIRequest<T> {

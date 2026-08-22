@@ -31,12 +31,35 @@ export type VisitorActionSelection = {
   key: VisitorActionKey;
   label: string;
   isPrimary: boolean;
+  semanticKey?: Exclude<VisitorActionKey, "other">;
 };
 
 const byKey = new Map(visitorActionCatalog.map((item) => [item.key, item]));
 
 function unique<T>(values: T[]) {
   return [...new Set(values)];
+}
+
+export function visitorActionSemanticKey(action: VisitorActionSelection): VisitorActionKey {
+  return action.key === "other" && action.semanticKey ? action.semanticKey : action.key;
+}
+
+export function classifyCustomVisitorAction(label: string): Exclude<VisitorActionKey, "other"> {
+  const normalized = label.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const rules: Array<[Exclude<VisitorActionKey, "other">, RegExp]> = [
+    ["view_products", /catalog|cardapio|menu|produto|portfolio|mostruario/],
+    ["order", /pedido|pedir|encomenda/],
+    ["buy", /comprar|compra|adquirir/],
+    ["quote", /orcamento|cotacao|proposta|precificar/],
+    ["schedule", /agendar|agenda|horario|marcar/],
+    ["reserve", /reservar|reserva|disponibilidade/],
+    ["find_location", /unidade|endereco|localizacao|loja|como chegar/],
+    ["resale", /revenda|revender|atacado|distribuidor|empresa|corporativo/],
+    ["recommendation", /recomend|descobrir|escolher|ideal|melhor opcao/],
+    ["support", /suporte|ajuda|assistencia|problema/],
+    ["contact", /falar|contato|atendimento|equipe|mensagem/],
+  ];
+  return rules.find(([, pattern]) => pattern.test(normalized))?.[0] || "contact";
 }
 
 export function suggestVisitorActionKeys(profile: BusinessCapabilityProfile): VisitorActionKey[] {
@@ -67,11 +90,11 @@ export function profileWithVisitorActions(
   actions: VisitorActionSelection[],
 ): BusinessCapabilityProfile {
   const intents = actions
-    .map((action) => byKey.get(action.key)?.intent)
+    .map((action) => byKey.get(visitorActionSemanticKey(action))?.intent)
     .filter((intent) => intent !== undefined) as CommercialIntent[];
   const primaryIntents = actions
     .filter((action) => action.isPrimary)
-    .map((action) => byKey.get(action.key)?.intent)
+    .map((action) => byKey.get(visitorActionSemanticKey(action))?.intent)
     .filter((intent) => intent !== undefined) as CommercialIntent[];
   const selectedPrimaryIntents = unique(primaryIntents);
   const selectedSecondaryIntents = unique(intents).filter(
@@ -82,9 +105,9 @@ export function profileWithVisitorActions(
     primaryIntents: selectedPrimaryIntents,
     secondaryIntents: selectedSecondaryIntents,
     hasMultipleLocations:
-      profile.hasMultipleLocations || actions.some((action) => action.key === "find_location"),
+      profile.hasMultipleLocations || actions.some((action) => visitorActionSemanticKey(action) === "find_location"),
     requiresQualification:
-      profile.requiresQualification || actions.some((action) => ["recommendation", "resale"].includes(action.key)),
+      profile.requiresQualification || actions.some((action) => ["recommendation", "resale"].includes(visitorActionSemanticKey(action))),
   };
 }
 
@@ -203,19 +226,20 @@ export function targetStepForAction(project: Project, key: VisitorActionKey) {
 }
 
 function scaffoldStep(project: Project, action: VisitorActionSelection, order: number): JourneyStep {
-  const definition = byKey.get(action.key)!;
-  const capability = actionCapabilities[action.key]?.[0];
-  const type: JourneyStep["type"] = action.key === "order" || action.key === "buy" || action.key === "view_products"
+  const semanticKey = visitorActionSemanticKey(action);
+  const definition = byKey.get(semanticKey)!;
+  const capability = actionCapabilities[semanticKey]?.[0];
+  const type: JourneyStep["type"] = semanticKey === "order" || semanticKey === "buy" || semanticKey === "view_products"
     ? "catalog"
-    : action.key === "quote"
+    : semanticKey === "quote"
       ? "quote"
-      : action.key === "schedule"
+      : semanticKey === "schedule"
         ? "schedule"
-        : action.key === "reserve"
+        : semanticKey === "reserve"
           ? "reservation"
-          : action.key === "find_location"
+          : semanticKey === "find_location"
             ? "routing"
-            : action.key === "recommendation"
+            : semanticKey === "recommendation"
               ? "recommendation"
               : "form";
   const blockType = capability === "catalog_order"
@@ -259,10 +283,11 @@ export function ensureVisitorActionTargets(
   const steps = [...project.steps];
   const capabilities = [...(project.capabilities || [])];
   for (const action of selectedActions) {
-    if (!targetStepForAction({ ...project, steps }, action.key)) {
+    const semanticKey = visitorActionSemanticKey(action);
+    if (!targetStepForAction({ ...project, steps }, semanticKey)) {
       steps.push(scaffoldStep(project, action, steps.length));
     }
-    for (const capabilityKey of actionCapabilities[action.key] || []) {
+    for (const capabilityKey of actionCapabilities[semanticKey] || []) {
       if (!capabilities.some((capability) => capability.key === capabilityKey)) {
         capabilities.push(createCapability(capabilityKey));
       }
@@ -301,7 +326,7 @@ export function resolveVisitorActionDestination(
   action: VisitorActionSelection,
   targetStep: JourneyStep,
 ) {
-  return destinationForTarget(project, targetStep)?.label || destinationLabels[action.key];
+  return destinationForTarget(project, targetStep)?.label || destinationLabels[visitorActionSemanticKey(action)];
 }
 
 export function applyVisitorActionsToProject(project: Project, session: Pick<AISetupSession, "visitorActions">): Project {
@@ -309,8 +334,9 @@ export function applyVisitorActionsToProject(project: Project, session: Pick<AIS
   if (!selected.length) return project;
   const prepared = ensureVisitorActionTargets(project, selected);
   const goals: ConversionGoal[] = selected.flatMap((action, order) => {
-    const target = targetStepForAction(prepared, action.key);
-    const definition = byKey.get(action.key);
+    const semanticKey = visitorActionSemanticKey(action);
+    const target = targetStepForAction(prepared, semanticKey);
+    const definition = byKey.get(semanticKey);
     if (!target || !definition) return [];
     return [{
       id: `${project.id}-goal-${action.key}`,

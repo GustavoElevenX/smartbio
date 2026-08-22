@@ -6,9 +6,11 @@ import type { AISetupSession } from "@/features/ai-setup/ai-setup.schema";
 import { aiSetupSessionSchema, setupInitialInputSchema } from "@/features/ai-setup/ai-setup.schema";
 import {
   applyVisitorActionsToProject,
+  classifyCustomVisitorAction,
   defaultVisitorActions,
   profileWithVisitorActions,
   stepSupportsVisitorAction,
+  visitorActionSemanticKey,
 } from "@/features/ai-setup/visitor-actions";
 import { casaDeSucos } from "@/data/demo-projects";
 import { capabilityPlanner } from "@/features/capabilities/capability-planner";
@@ -115,6 +117,27 @@ describe("onboarding adaptativo", () => {
     ]);
 
     expect(capabilities.map((capability) => capability.key)).toEqual(["quote"]);
+  });
+
+  it("classifica uma ação personalizada antes de montar o caminho", () => {
+    expect(classifyCustomVisitorAction("Baixar catálogo")).toBe("view_products");
+    const action = {
+      key: "other" as const,
+      label: "Baixar catálogo",
+      isPrimary: true,
+      semanticKey: "view_products" as const,
+    };
+    const project = structuredClone(casaDeSucos);
+    project.steps = [];
+
+    const result = applyVisitorActionsToProject(project, { visitorActions: [action] });
+    const goal = result.conversionGoals?.[0];
+    const target = result.steps.find((step) => step.id === goal?.targetStepId);
+
+    expect(visitorActionSemanticKey(action)).toBe("view_products");
+    expect(target?.type).toBe("catalog");
+    expect(goal?.name).toBe("Baixar catálogo");
+    expect(goal?.destinationLabel).toBe("Catálogo");
   });
 
   it("nunca aponta localização para a primeira etapa arbitrária", () => {

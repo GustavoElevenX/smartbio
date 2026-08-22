@@ -10,6 +10,7 @@ import {
   brandAIResultSchema,
   businessAnalysisResultSchema,
   copyGenerationResultSchema,
+  customVisitorActionClassificationSchema,
   extractedBusinessSourceSchema,
   setupQuestionSchema,
 } from "@/features/ai-setup/ai-setup.schema";
@@ -28,6 +29,7 @@ import type {
   SiteCompositionInput,
   OptimizationExplanationInput,
   StructuredAIRequest,
+  CustomVisitorActionInput,
 } from "@/server/ai/ai-provider";
 import { recordAIUsage } from "@/server/ai/ai-usage";
 import { brandAnalysisPrompt } from "@/server/ai/prompts/brand-analysis";
@@ -42,6 +44,7 @@ import { siteCompositionPrompt } from "@/server/ai/prompts/site-composition";
 import { suggestedSiteStructureSchema } from "@/features/site-composer/site-composer.schema";
 import { optimizationAIExplanationSchema } from "@/features/optimization/schema";
 import { optimizationExplanationPrompt } from "@/server/ai/prompts/optimization-explanation";
+import { visitorActionClassificationPrompt } from "@/server/ai/prompts/visitor-action-classification";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
   requireEntitlement,
@@ -63,6 +66,7 @@ const operationFeatures: Record<string, EntitlementFeature> = {
   copy_generation: "ai_optimization",
   source_extraction: "ai_business_analysis",
   brand_analysis: "ai_business_analysis",
+  visitor_action_classification: "ai_business_analysis",
 };
 
 export class OpenAIVirouProvider implements VirouAIProvider {
@@ -347,6 +351,22 @@ export class OpenAIVirouProvider implements VirouAIProvider {
       userContent: visual ? [instruction, visual] : [instruction],
       context: input,
       model: visual ? this.visionModel : undefined,
+    });
+  }
+
+  classifyVisitorAction(input: CustomVisitorActionInput) {
+    return this.structured({
+      operation: "visitor_action_classification",
+      schemaName: "visitor_action_classification",
+      schema: customVisitorActionClassificationSchema,
+      systemPrompt: visitorActionClassificationPrompt,
+      payload: {
+        actionLabel: input.actionLabel,
+        businessName: input.businessName,
+        businessDescription: input.businessDescription,
+        profile: input.profile,
+      },
+      context: input,
     });
   }
 }

@@ -144,10 +144,22 @@ export const visitorActionKeySchema = z.enum([
   "contact", "find_location", "support", "resale", "recommendation", "other",
 ]);
 
+export const customVisitorActionSemanticKeySchema = z.enum([
+  "order", "buy", "view_products", "quote", "schedule", "reserve",
+  "contact", "find_location", "support", "resale", "recommendation",
+]);
+
 export const visitorActionSelectionSchema = z.object({
   key: visitorActionKeySchema,
   label: z.string().trim().min(1).max(80),
   isPrimary: z.boolean(),
+  semanticKey: customVisitorActionSemanticKeySchema.optional(),
+});
+
+export const customVisitorActionClassificationSchema = z.object({
+  key: customVisitorActionSemanticKeySchema,
+  confidence: z.number().min(0).max(1),
+  reasoning: z.string().trim().min(1).max(240),
 });
 
 export const sourceReferenceSchema = z.object({
@@ -199,3 +211,4 @@ export type BrandAIResult = z.infer<typeof brandAIResultSchema>;
 export type BrandIdentity = z.infer<typeof brandIdentitySchema>;
 export type SourceReference = z.infer<typeof sourceReferenceSchema>;
 export type VisitorActionSelection = z.infer<typeof visitorActionSelectionSchema>;
+export type CustomVisitorActionClassification = z.infer<typeof customVisitorActionClassificationSchema>;

@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { extractedBusinessSourceSchema, type AISetupSession, type ExtractedBusinessSource, type SetupQuestion, type SourceReference } from "@/features/ai-setup/ai-setup.schema";
 import { materializeSetupAnswers } from "@/features/ai-setup/materialize-setup-answers";
 import { stageGeneratedDraft } from "@/features/ai-setup/stage-generated-draft";
-import { applyVisitorActionsToProject, defaultVisitorActions, ensureVisitorActionTargets, profileWithVisitorActions, type VisitorActionSelection } from "@/features/ai-setup/visitor-actions";
+import { applyVisitorActionsToProject, classifyCustomVisitorAction, defaultVisitorActions, ensureVisitorActionTargets, profileWithVisitorActions, type VisitorActionSelection } from "@/features/ai-setup/visitor-actions";
 import { RuleBasedBusinessAnalyzer } from "@/features/business-understanding/rule-based-business-analyzer";
 import { capabilityPlanner } from "@/features/capabilities/capability-planner";
 import { draftCapabilityRequirements } from "@/features/capabilities/capability-requirements";
@@ -182,9 +182,41 @@ export class AISetupService {
     return session;
   }
 
-  async analyze(actor: AISetupActor, id: string) {
+  async analyze(
+    actor: AISetupActor,
+    id: string,
+    revision?: { initialInput?: AISetupSession["initialInput"]; sources?: SourceReference[] },
+  ) {
     let session = await this.get(actor, id);
-    session = await this.repository.update(actor, { ...session, status: "analyzing", lastError: undefined });
+    if (revision?.initialInput) {
+      const revisedSources = revision.sources ?? session.sources;
+      session = await this.repository.update(actor, {
+        ...session,
+        projectId: undefined,
+        status: "analyzing",
+        initialInput: revision.initialInput,
+        extractedProfile: undefined,
+        visitorActions: [],
+        actionsConfirmed: false,
+        answers: {},
+        missingRequirements: [],
+        questions: [],
+        sources: revisedSources,
+        projectDraft: undefined,
+        lastError: undefined,
+        usedFallback: false,
+      });
+      if (actor.persistence === "database") {
+        const sourceIds = [
+          ...revisedSources.map((source) => source.id),
+          ...(revision.initialInput.brandIdentity?.sourceId ? [revision.initialInput.brandIdentity.sourceId] : []),
+        ];
+        await sourceRepository.attachToSession(actor, sourceIds, session.id);
+      }
+      await this.repository.addMessage(actor, id, "user", revision.initialInput.description, { kind: "business_description_revision" });
+    } else {
+      session = await this.repository.update(actor, { ...session, status: "analyzing", lastError: undefined });
+    }
     const input = compositionInput(session);
     const fallbackProfile = new RuleBasedBusinessAnalyzer().analyze(input);
     let profile = fallbackProfile;
@@ -255,18 +287,40 @@ export class AISetupService {
     if (!session.extractedProfile) throw new Error("Analise o negócio antes de confirmar as ações.");
     if (!actions.length) throw new Error("Escolha ao menos uma ação para o visitante.");
     if (actions.filter((action) => action.isPrimary).length !== 1) throw new Error("Marque uma única ação como principal.");
-    const profile = profileWithVisitorActions(session.extractedProfile, actions);
-    const requirements = resolvedRequirements(draftCapabilityRequirements(capabilityPlanner.planForVisitorActions(profile, actions)), session.answers);
+    const provider = isAIConfigured() ? getAIProvider() : undefined;
+    const classifiedActions = await Promise.all(actions.map(async (action): Promise<VisitorActionSelection> => {
+      if (action.key !== "other") return { ...action, semanticKey: undefined };
+      let semanticKey = classifyCustomVisitorAction(action.label);
+      if (provider?.classifyVisitorAction) {
+        try {
+          const result = await provider.classifyVisitorAction({
+            actionLabel: action.label,
+            businessName: session.initialInput.businessName,
+            businessDescription: session.initialInput.description,
+            profile: session.extractedProfile!,
+            workspaceId: actor.workspaceId,
+            setupSessionId: id,
+            userId: actor.userId,
+          });
+          semanticKey = result.key;
+        } catch {
+          // A classificação local mantém o fluxo disponível se a IA falhar.
+        }
+      }
+      return { ...action, semanticKey };
+    }));
+    const profile = profileWithVisitorActions(session.extractedProfile, classifiedActions);
+    const requirements = resolvedRequirements(draftCapabilityRequirements(capabilityPlanner.planForVisitorActions(profile, classifiedActions)), session.answers);
     const next = await this.repository.update(actor, {
       ...session,
       extractedProfile: profile,
-      visitorActions: actions,
+      visitorActions: classifiedActions,
       actionsConfirmed: true,
       missingRequirements: requirements,
       questions: planAdaptiveQuestions(requirements, session.answers, 3),
       status: "waiting_answers",
     });
-    await this.repository.addMessage(actor, id, "user", actions.map((action) => action.label).join(", "), { kind: "visitor_actions" });
+    await this.repository.addMessage(actor, id, "user", classifiedActions.map((action) => action.label).join(", "), { kind: "visitor_actions" });
     return next;
   }
 

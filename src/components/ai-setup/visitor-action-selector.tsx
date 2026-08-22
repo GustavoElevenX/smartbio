@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, LoaderCircle, Star } from "lucide-react";
+import { AlertTriangle, Check, LoaderCircle, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { visitorActionCatalog, type VisitorActionKey, type VisitorActionSelection } from "@/features/ai-setup/visitor-actions";
@@ -10,14 +10,21 @@ export function VisitorActionSelector({ initialActions, busy, onConfirm }: { ini
   const [selected, setSelected] = useState<VisitorActionKey[]>([]);
   const [primary, setPrimary] = useState<VisitorActionKey>();
   const [otherLabel, setOtherLabel] = useState("");
+  const [selectionError, setSelectionError] = useState("");
 
   useEffect(() => {
     setSelected(initialActions.map((action) => action.key));
     setPrimary(initialActions.find((action) => action.isPrimary)?.key || initialActions[0]?.key);
     setOtherLabel(initialActions.find((action) => action.key === "other")?.label || "");
+    setSelectionError("");
   }, [initialActions]);
 
   function toggle(key: VisitorActionKey) {
+    if (!selected.includes(key) && selected.length >= 8) {
+      setSelectionError("Você pode escolher até 8 ações. Remova uma para adicionar outra.");
+      return;
+    }
+    setSelectionError("");
     setSelected((current) => {
       if (current.includes(key)) {
         const next = current.filter((item) => item !== key);
@@ -42,6 +49,9 @@ export function VisitorActionSelector({ initialActions, busy, onConfirm }: { ini
     <section aria-labelledby="visitor-actions-title" className="border-y border-[#dfe6ee] py-6">
       <h2 id="visitor-actions-title" className="max-w-2xl text-2xl font-extrabold tracking-[-.035em] text-[#07172f]">Quando alguém entrar no seu link, o que você quer que essa pessoa consiga fazer?</h2>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-[#687582]">Pelo que entendi, estas são as ações mais importantes. Pode ajustar antes de continuar.</p>
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"><strong className="text-[#07172f]">Recomendamos de 2 a 5 ações</strong><span className="text-[#687582]">para manter a primeira página clara.</span><span className="font-bold text-[#0054fc]">{selected.length} selecionada{selected.length === 1 ? "" : "s"}</span></div>
+      {selected.length > 5 ? <div role="alert" className="mt-4 flex max-w-2xl items-start gap-2 border border-[#f0d28f] bg-[#fff9e9] p-3 text-sm leading-5 text-[#795b16]"><AlertTriangle className="mt-0.5 size-4 shrink-0" /><span>Você selecionou {selected.length} ações. Muitas opções podem deixar a primeira página confusa; tente manter apenas os 2 a 5 caminhos mais importantes.</span></div> : null}
+      {selectionError ? <div role="alert" className="mt-3 text-sm font-semibold text-[#a33b35]">{selectionError}</div> : null}
       <div className="mt-5 grid gap-2 sm:grid-cols-2">
         {visitorActionCatalog.map((action) => {
           const active = selected.includes(action.key);

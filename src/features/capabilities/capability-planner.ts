@@ -1,5 +1,5 @@
 import { createCapability } from "@/features/capabilities/capability-registry";
-import type { VisitorActionSelection } from "@/features/ai-setup/visitor-actions";
+import { visitorActionSemanticKey, type VisitorActionSelection } from "@/features/ai-setup/visitor-actions";
 import type { BusinessCapabilityProfile, CapabilityKey, ProjectCapability } from "@/types";
 
 const visitorActionCapabilities: Partial<Record<VisitorActionSelection["key"], CapabilityKey[]>> = {
@@ -42,7 +42,7 @@ export class CapabilityPlanner {
   ): ProjectCapability[] {
     const selected = new Set<CapabilityKey>();
     for (const action of actions) {
-      for (const capability of visitorActionCapabilities[action.key] || []) {
+      for (const capability of visitorActionCapabilities[visitorActionSemanticKey(action)] || []) {
         selected.add(capability);
       }
     }

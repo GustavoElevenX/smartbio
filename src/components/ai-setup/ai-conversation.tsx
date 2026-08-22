@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Bot, LoaderCircle, MessageSquareText, WandSparkles } from "lucide-react";
+import { ArrowRight, Bot, LoaderCircle, MessageSquareText, PencilLine, WandSparkles } from "lucide-react";
 import { AdaptiveQuestion } from "@/components/ai-setup/adaptive-question";
 import { AIMessage } from "@/components/ai-setup/ai-message";
 import { BrandIdentityUploader } from "@/components/ai-setup/brand-identity-uploader";
@@ -31,20 +31,23 @@ interface AIConversationProps {
   generationStatus: "idle" | "generating" | "ready";
   projectId?: string;
   error?: string;
+  editingBusinessInfo: boolean;
   onFormChange: (form: InitialSetupForm) => void;
   onSourcesChange: (sources: SourceReference[]) => void;
   onBrandIdentityChange: (brand: BrandIdentity, previewUrl: string) => void;
   onAnalyze: () => Promise<void>;
+  onEditBusinessInfo: () => void;
   onAnswer: (key: string, value: string) => Promise<void>;
   onConfirmActions: (actions: VisitorActionSelection[]) => Promise<void>;
   onGenerate: () => Promise<void>;
   onOpenLaunch: () => void;
 }
 
-export function AIConversation({ form, sources, brandIdentity, logoPreviewUrl, session, busy, busyQuestion, generationStatus, projectId, error, onFormChange, onSourcesChange, onBrandIdentityChange, onAnalyze, onAnswer, onConfirmActions, onGenerate, onOpenLaunch }: AIConversationProps) {
+export function AIConversation({ form, sources, brandIdentity, logoPreviewUrl, session, busy, busyQuestion, generationStatus, projectId, error, editingBusinessInfo, onFormChange, onSourcesChange, onBrandIdentityChange, onAnalyze, onEditBusinessInfo, onAnswer, onConfirmActions, onGenerate, onOpenLaunch }: AIConversationProps) {
   const analyzed = Boolean(session?.extractedProfile);
   const ready = generationStatus === "ready" || session?.status === "completed" || session?.status === "review";
   const sourcesProcessing = sources.some((source) => ["pending", "uploaded", "processing"].includes(source.status));
+  const inputsDisabled = busy || (analyzed && !editingBusinessInfo);
   return (
     <main className="min-w-0 p-5 sm:p-7 xl:p-9">
       <div className="mx-auto max-w-[780px]">
@@ -63,25 +66,27 @@ export function AIConversation({ form, sources, brandIdentity, logoPreviewUrl, s
           <AIMessage role="assistant"><strong className="text-[#34333a]">Comece pelo que você já sabe sobre o seu negócio.</strong><br />Vou organizar as ações e perguntar apenas o que estiver faltando.</AIMessage>
           <Card className="p-5 sm:p-6">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div><Label htmlFor="ai-business-name">Nome do negócio</Label><Input id="ai-business-name" autoComplete="organization" value={form.businessName} onChange={(event) => onFormChange({ ...form, businessName: event.target.value })} placeholder="Ex.: Estúdio Aurora" disabled={analyzed || busy} /></div>
-              <div><Label htmlFor="ai-website">Site ou Instagram (opcional)</Label><Input id="ai-website" value={form.websiteUrl} onChange={(event) => onFormChange({ ...form, websiteUrl: event.target.value })} placeholder="https:// ou @seunegocio" disabled={analyzed || busy} /></div>
+              <div><Label htmlFor="ai-business-name">Nome do negócio</Label><Input id="ai-business-name" autoComplete="organization" value={form.businessName} onChange={(event) => onFormChange({ ...form, businessName: event.target.value })} placeholder="Ex.: Estúdio Aurora" disabled={inputsDisabled} /></div>
+              <div><Label htmlFor="ai-website">Site ou Instagram (opcional)</Label><Input id="ai-website" value={form.websiteUrl} onChange={(event) => onFormChange({ ...form, websiteUrl: event.target.value })} placeholder="https:// ou @seunegocio" disabled={inputsDisabled} /></div>
             </div>
-            <div className="mt-4"><Label htmlFor="ai-description">O que você vende e como atende?</Label><Textarea id="ai-description" className="min-h-32" value={form.description} onChange={(event) => onFormChange({ ...form, description: event.target.value })} placeholder="Conte o que vende, quem costuma procurar você e como o atendimento continua." disabled={analyzed || busy} /></div>
-            <div className="mt-4"><Label htmlFor="ai-phone">WhatsApp ou telefone (opcional)</Label><Input id="ai-phone" type="tel" autoComplete="tel" value={form.phone} onChange={(event) => onFormChange({ ...form, phone: event.target.value })} placeholder="5511999999999" disabled={analyzed || busy} /></div>
-            <div className="mt-5"><BrandIdentityUploader brand={brandIdentity} previewUrl={logoPreviewUrl} businessName={form.businessName} businessDescription={form.description} onChange={onBrandIdentityChange} disabled={analyzed || busy} /></div>
-            <div className="mt-4"><SourceUploader sources={sources} setupSessionId={session?.id} projectId={projectId} onChange={onSourcesChange} disabled={analyzed || busy} /></div>
+            <div className="mt-4"><Label htmlFor="ai-description">O que você vende e como atende?</Label><Textarea id="ai-description" className="min-h-32" value={form.description} onChange={(event) => onFormChange({ ...form, description: event.target.value })} placeholder="Conte o que vende, quem costuma procurar você e como o atendimento continua." disabled={inputsDisabled} /></div>
+            <div className="mt-4"><Label htmlFor="ai-phone">WhatsApp ou telefone (opcional)</Label><Input id="ai-phone" type="tel" autoComplete="tel" value={form.phone} onChange={(event) => onFormChange({ ...form, phone: event.target.value })} placeholder="5511999999999" disabled={inputsDisabled} /></div>
+            <div className="mt-5"><BrandIdentityUploader brand={brandIdentity} previewUrl={logoPreviewUrl} businessName={form.businessName} businessDescription={form.description} onChange={onBrandIdentityChange} disabled={inputsDisabled} /></div>
+            <div className="mt-4"><SourceUploader sources={sources} setupSessionId={session?.id} projectId={projectId} onChange={onSourcesChange} disabled={inputsDisabled} /></div>
             {!analyzed ? <Button type="button" size="lg" className="mt-5 w-full sm:w-auto" onClick={() => void onAnalyze()} disabled={busy || sourcesProcessing}>{busy || sourcesProcessing ? <LoaderCircle data-icon size={17} className="animate-spin" /> : <WandSparkles data-icon size={17} />}{sourcesProcessing ? "Importando materiais…" : busy ? "Analisando o negócio…" : "Analisar meu negócio"}</Button> : null}
+            {analyzed && !editingBusinessInfo && !ready ? <Button type="button" size="lg" variant="secondary" className="mt-5 w-full sm:w-auto" onClick={onEditBusinessInfo} disabled={busy}><PencilLine data-icon size={17} /> Editar informações do negócio</Button> : null}
+            {analyzed && editingBusinessInfo ? <><p className="mt-4 text-sm leading-6 text-[#536178]">Faça os ajustes necessários. A nova análise vai substituir esta leitura, sem reiniciar o onboarding.</p><Button type="button" size="lg" className="mt-3 w-full sm:w-auto" onClick={() => void onAnalyze()} disabled={busy || sourcesProcessing}>{busy || sourcesProcessing ? <LoaderCircle data-icon size={17} className="animate-spin" /> : <WandSparkles data-icon size={17} />}{sourcesProcessing ? "Importando materiais…" : busy ? "Analisando novamente…" : "Analisar novamente"}</Button></> : null}
           </Card>
 
-          {analyzed && session ? <><AIMessage role="user">{form.description}</AIMessage><AIMessage role="assistant">Encontrei as principais ações que seus visitantes podem querer realizar. Confirme antes de continuarmos.</AIMessage><ConfirmExtractedData session={session} /></> : null}
-          {analyzed && session && !session.actionsConfirmed ? <VisitorActionSelector initialActions={session.visitorActions || []} busy={busy} onConfirm={onConfirmActions} /> : null}
+          {analyzed && session && !editingBusinessInfo ? <><AIMessage role="user">{form.description}</AIMessage><AIMessage role="assistant">Encontrei as principais ações que seus visitantes podem querer realizar. Confirme antes de continuarmos.</AIMessage><ConfirmExtractedData session={session} /></> : null}
+          {analyzed && session && !editingBusinessInfo && !session.actionsConfirmed ? <VisitorActionSelector initialActions={session.visitorActions || []} busy={busy} onConfirm={onConfirmActions} /> : null}
 
-          {session?.actionsConfirmed && session.questions.length ? <section aria-labelledby="adaptive-questions-title">
+          {!editingBusinessInfo && session?.actionsConfirmed && session.questions.length ? <section aria-labelledby="adaptive-questions-title">
             <div className="mb-3 flex items-center justify-between gap-3"><h2 id="adaptive-questions-title" className="flex items-center gap-2 text-sm font-extrabold"><MessageSquareText size={17} className="text-[#0054fc]" /> Só o que falta para funcionar</h2><span className="text-xs font-extrabold text-[#0054fc]">{session.questions.length} agora</span></div>
             <div className="grid gap-3">{session.questions.map((question) => <AdaptiveQuestion key={question.id} question={question} busy={busyQuestion === question.key} onAnswer={(value) => onAnswer(question.key, value)} />)}</div>
-          </section> : analyzed && session?.actionsConfirmed && !ready ? <AIMessage role="assistant">Já tenho contexto suficiente para criar uma primeira versão. O que ainda não foi confirmado aparecerá como pendência antes de publicar.</AIMessage> : null}
+          </section> : analyzed && !editingBusinessInfo && session?.actionsConfirmed && !ready ? <AIMessage role="assistant">Já tenho contexto suficiente para criar uma primeira versão. O que ainda não foi confirmado aparecerá como pendência antes de publicar.</AIMessage> : null}
 
-          {analyzed && session?.actionsConfirmed && !ready ? <div className="border border-[#c8d9ea] bg-[#f7fbff] p-5" style={{ clipPath: "polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%)" }}><h2 className="text-lg font-extrabold tracking-[-.025em]">Pronto para montar a primeira versão?</h2><p className="mt-2 text-sm leading-6 text-[#687582]">A Sobe vai criar a página, conectar cada ação e manter tudo como rascunho até você publicar.</p><Button type="button" size="lg" className="mt-4" onClick={() => void onGenerate()} disabled={busy || generationStatus === "generating"}><WandSparkles data-icon size={17} /> Criar minha primeira versão</Button></div> : null}
+          {analyzed && !editingBusinessInfo && session?.actionsConfirmed && !ready ? <div className="border border-[#c8d9ea] bg-[#f7fbff] p-5" style={{ clipPath: "polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%)" }}><h2 className="text-lg font-extrabold tracking-[-.025em]">Pronto para montar a primeira versão?</h2><p className="mt-2 text-sm leading-6 text-[#687582]">A Sobe vai criar a página, conectar cada ação e manter tudo como rascunho até você publicar.</p><Button type="button" size="lg" className="mt-4" onClick={() => void onGenerate()} disabled={busy || generationStatus === "generating"}><WandSparkles data-icon size={17} /> Criar minha primeira versão</Button></div> : null}
 
           <GenerationStatus status={generationStatus} />
           {ready && projectId ? <div className="border border-[#b9e4cf] bg-[#f0fbf6] p-6" style={{ clipPath: "polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%)" }}><h2 className="text-2xl font-extrabold tracking-[-.035em]">Sua primeira versão está pronta.</h2><p className="mt-2 text-sm leading-6 text-[#526b61]">Teste como visitante, veja as pendências e publique quando estiver tudo certo.</p><Button type="button" size="lg" className="mt-5" onClick={onOpenLaunch}>Revisar primeira versão <ArrowRight data-icon size={17} /></Button></div> : null}

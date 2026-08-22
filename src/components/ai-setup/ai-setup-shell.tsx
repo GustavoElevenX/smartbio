@@ -40,6 +40,7 @@ export function AISetupShell({ startFresh = false }: AISetupShellProps) {
   const [projectId, setProjectId] = useState<string>();
   const [mobilePanel, setMobilePanel] = useState<"conversation" | "preview">("conversation");
   const [restoring, setRestoring] = useState(true);
+  const [editingBusinessInfo, setEditingBusinessInfo] = useState(false);
 
   function adopt(next: AISetupSession) {
     const parsed = aiSetupSessionSchema.parse(next);
@@ -49,6 +50,7 @@ export function AISetupShell({ startFresh = false }: AISetupShellProps) {
     setBrandIdentity(parsed.initialInput.brandIdentity);
     setProjectId(parsed.projectId);
     if (parsed.projectDraft) setGenerationStatus("ready");
+    setEditingBusinessInfo(false);
     rememberAISetupSession(parsed);
   }
 
@@ -84,9 +86,14 @@ export function AISetupShell({ startFresh = false }: AISetupShellProps) {
     try {
       const website = form.websiteUrl.trim();
       const websiteUrl = website.startsWith("@") ? `https://instagram.com/${website.slice(1)}` : website || undefined;
-      const created = await apiCall<AISetupSession>("/api/ai/setup/start", { method: "POST", body: JSON.stringify({ input: { requestedSurface: "recommend", businessName: form.businessName.trim(), description: form.description.trim(), websiteUrl, phone: form.phone.trim() || undefined, brandIdentity }, sources }) });
-      adopt(created);
-      adopt(await apiCall<AISetupSession>(`/api/ai/setup/${created.id}/analyze`, { method: "POST", body: "{}" }));
+      const input = { requestedSurface: "recommend" as const, businessName: form.businessName.trim(), description: form.description.trim(), websiteUrl, phone: form.phone.trim() || undefined, brandIdentity };
+      if (session && editingBusinessInfo) {
+        adopt(await apiCall<AISetupSession>(`/api/ai/setup/${session.id}/analyze`, { method: "POST", body: JSON.stringify({ input, sources }) }));
+      } else {
+        const created = await apiCall<AISetupSession>("/api/ai/setup/start", { method: "POST", body: JSON.stringify({ input, sources }) });
+        adopt(created);
+        adopt(await apiCall<AISetupSession>(`/api/ai/setup/${created.id}/analyze`, { method: "POST", body: "{}" }));
+      }
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Não foi possível analisar o negócio."); }
     finally { setBusy(false); }
   }
@@ -127,7 +134,7 @@ export function AISetupShell({ startFresh = false }: AISetupShellProps) {
       <div className="mb-5"><h2 className="text-xl font-extrabold tracking-[-.03em] text-[#07172f]">Novo negócio</h2><p className="mt-1 text-sm text-[#687582]">Da descrição à primeira versão pronta para testar.</p></div>
       <div className="mb-3 grid grid-cols-2 rounded-xl bg-[#e9e7ef] p-1 lg:hidden"><Button type="button" size="sm" variant={mobilePanel === "conversation" ? "primary" : "ghost"} onClick={() => setMobilePanel("conversation")}><MessagesSquare data-icon size={15} /> Conversa</Button><Button type="button" size="sm" variant={mobilePanel === "preview" ? "primary" : "ghost"} onClick={() => setMobilePanel("preview")}><PanelRight data-icon size={15} /> Prévia</Button></div>
       <div className="overflow-hidden rounded-[28px] border border-[#e3e1e9] bg-white shadow-[0_20px_65px_rgba(29,26,52,.07)] lg:grid lg:min-h-[720px] lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_370px]">
-        <div className={mobilePanel === "conversation" ? "block" : "hidden lg:block"}><AIConversation form={form} sources={sources} brandIdentity={brandIdentity} logoPreviewUrl={logoPreviewUrl} session={session} busy={busy || restoring} busyQuestion={busyQuestion} generationStatus={generationStatus} projectId={projectId} error={error} onFormChange={setForm} onSourcesChange={setSources} onBrandIdentityChange={(brand, previewUrl) => { setBrandIdentity(brand); setLogoPreviewUrl(previewUrl); }} onAnalyze={analyze} onAnswer={answer} onConfirmActions={confirmActions} onGenerate={generate} onOpenLaunch={() => projectId && router.push(`/app/projects/${projectId}/launch`)} /></div>
+        <div className={mobilePanel === "conversation" ? "block" : "hidden lg:block"}><AIConversation form={form} sources={sources} brandIdentity={brandIdentity} logoPreviewUrl={logoPreviewUrl} session={session} busy={busy || restoring} busyQuestion={busyQuestion} generationStatus={generationStatus} projectId={projectId} error={error} editingBusinessInfo={editingBusinessInfo} onFormChange={setForm} onSourcesChange={setSources} onBrandIdentityChange={(brand, previewUrl) => { setBrandIdentity(brand); setLogoPreviewUrl(previewUrl); }} onAnalyze={analyze} onEditBusinessInfo={() => { setEditingBusinessInfo(true); setError(""); }} onAnswer={answer} onConfirmActions={confirmActions} onGenerate={generate} onOpenLaunch={() => projectId && router.push(`/app/projects/${projectId}/launch`)} /></div>
         <div className={mobilePanel === "preview" ? "block" : "hidden lg:block"}><SetupPreview session={session} businessName={form.businessName} description={form.description} brandIdentity={brandIdentity} logoPreviewUrl={logoPreviewUrl} /></div>
       </div>
     </div>
