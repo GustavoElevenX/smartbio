@@ -337,6 +337,10 @@ export class AISetupService {
       questions: planAdaptiveQuestions(requirements, answers, 3),
     });
     await this.repository.addMessage(actor, id, "user", typeof value === "string" ? value : JSON.stringify(value), { kind: "answer", key });
+    if (actor.persistence === "database") {
+      const database = createServiceClient();
+      if (database) await recordPlatformGrowthEvent(database, { eventName: "onboarding_stage_completed", userId: actor.userId, workspaceId: actor.workspaceId, metadata: { stage: key }, idempotencyKey: `onboarding_stage_completed:${id}:${key}` }).catch(() => undefined);
+    }
     return next;
   }
 
@@ -462,6 +466,22 @@ export class AISetupService {
     }
     const requirements = await reconcileProjectRequirements(actor, projectId);
     await activateTrialAfterFirstStructure(client, actor.workspaceId);
+    await Promise.all([
+      recordPlatformGrowthEvent(client, {
+        eventName: "first_structure_generated",
+        userId: actor.userId,
+        workspaceId: actor.workspaceId,
+        metadata: { projectId, usedFallback: Boolean(session.usedFallback), source: session.usedFallback ? "fallback" : "ai" },
+        idempotencyKey: `first_structure_generated:${actor.workspaceId}`,
+      }),
+      recordPlatformGrowthEvent(client, {
+        eventName: "trial_started",
+        userId: actor.userId,
+        workspaceId: actor.workspaceId,
+        metadata: { projectId },
+        idempotencyKey: `trial_started:${actor.workspaceId}`,
+      }),
+    ]).catch(() => undefined);
     await recordPlatformGrowthEvent(client, {
       eventName: "onboarding_completed",
       userId: actor.userId,

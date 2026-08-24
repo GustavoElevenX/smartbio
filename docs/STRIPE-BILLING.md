@@ -1,5 +1,7 @@
 # Stripe Billing na SOBE
 
+Para a validação final de release, use também [`SOBE-STRIPE-LAUNCH-CHECKLIST.md`](./SOBE-STRIPE-LAUNCH-CHECKLIST.md). Testes locais não substituem a aprovação do sandbox real.
+
 ## Arquitetura
 
 A Stripe é a fonte financeira (Customer, Subscription, invoices e formas de pagamento). `subscriptions` mantém o espelho financeiro. `workspace_plan_assignments` continua sendo a única fonte de autorização de recursos.

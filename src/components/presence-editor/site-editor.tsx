@@ -48,8 +48,13 @@ import type {
 import type { Project } from "@/types";
 import { SectionInspector } from "./section-editor-registry";
 import { SimpleSectionInspector } from "./simple-section-inspector";
-import type { SiteComposerIntent, SiteOperation, SuggestedSiteStructure } from "@/features/site-composer/site-composer.types";
+import type {
+  SiteComposerIntent,
+  SiteOperation,
+  SuggestedSiteStructure,
+} from "@/features/site-composer/site-composer.types";
 import { inspectPageQuality } from "@/features/site-composer/site-quality";
+import { SurfaceViewMarker } from "@/components/product-lifecycle/surface-view-marker";
 
 type SaveState = "saved" | "dirty" | "saving" | "error";
 type Device = "desktop" | "tablet" | "mobile";
@@ -61,9 +66,31 @@ type AIProposal = {
   draft: AIPresenceDraft;
   targetSectionId?: string;
 };
-type StructureProposal = { proposalId: string; suggestion: SuggestedSiteStructure; operations: SiteOperation[]; expectedVersion: number; usedAI: boolean };
-type PerformanceState = { evidence: { eligible: boolean; completeDays: number; daysProgress: number; sessionsProgress: number; goalSessionsProgress?: number; message: string } | null; suggestions: Array<{ id: string; title: string; explanation: string }>; publishedAt?: string; primaryGoalName?: string };
-type PerformanceExplanation = { explanation: string; recommendedAction: string; usedAI: boolean };
+type StructureProposal = {
+  proposalId: string;
+  suggestion: SuggestedSiteStructure;
+  operations: SiteOperation[];
+  expectedVersion: number;
+  usedAI: boolean;
+};
+type PerformanceState = {
+  evidence: {
+    eligible: boolean;
+    completeDays: number;
+    daysProgress: number;
+    sessionsProgress: number;
+    goalSessionsProgress?: number;
+    message: string;
+  } | null;
+  suggestions: Array<{ id: string; title: string; explanation: string }>;
+  publishedAt?: string;
+  primaryGoalName?: string;
+};
+type PerformanceExplanation = {
+  explanation: string;
+  recommendedAction: string;
+  usedAI: boolean;
+};
 
 const copilotActions: Array<{ intent: SiteComposerIntent; label: string }> = [
   { intent: "suggest_structure", label: "Melhorar a estrutura da página" },
@@ -76,35 +103,118 @@ const copilotActions: Array<{ intent: SiteComposerIntent; label: string }> = [
 ];
 
 function operationDescription(operation: SiteOperation) {
-  if (operation.type === "add_page") return `Criar página “${operation.page.name}”`;
-  if (operation.type === "add_section") return `Adicionar ${presenceSectionRegistry[operation.section.sectionType].label}`;
+  if (operation.type === "add_page")
+    return `Criar página “${operation.page.name}”`;
+  if (operation.type === "add_section")
+    return `Adicionar ${presenceSectionRegistry[operation.section.sectionType].label}`;
   if (operation.type === "remove_section") return "Remover seção redundante";
-  if (operation.type === "move_section") return `Mover seção para a posição ${operation.to + 1}`;
-  if (operation.type === "update_section") return "Atualizar conteúdo, visual e fontes";
-  if (operation.type === "rename_page") return `Renomear página para “${operation.name}”`;
+  if (operation.type === "move_section")
+    return `Mover seção para a posição ${operation.to + 1}`;
+  if (operation.type === "update_section")
+    return "Atualizar conteúdo, visual e fontes";
+  if (operation.type === "rename_page")
+    return `Renomear página para “${operation.name}”`;
   return "Conectar objetivo de conversão";
 }
 
 function operationSymbol(operation: SiteOperation) {
-  if (operation.type === "add_page" || operation.type === "add_section") return "+";
+  if (operation.type === "add_page" || operation.type === "add_section")
+    return "+";
   if (operation.type === "remove_section") return "−";
   if (operation.type === "move_section") return "↕";
   return "~";
 }
 
-const sectionLibraryGroups: Array<{ label: string; types: PresenceSectionType[] }> = [
+const sectionLibraryGroups: Array<{
+  label: string;
+  types: PresenceSectionType[];
+}> = [
   { label: "Apresentar", types: ["hero", "about", "rich_text", "video"] },
-  { label: "Mostrar oferta", types: ["products", "services", "pricing", "gallery", "portfolio"] },
-  { label: "Construir confiança", types: ["benefits", "feature_grid", "stats", "logo_cloud", "testimonials", "faq"] },
-  { label: "Converter", types: ["conversion_cta", "contact", "locations", "divider"] },
+  {
+    label: "Mostrar oferta",
+    types: ["products", "services", "pricing", "gallery", "portfolio"],
+  },
+  {
+    label: "Construir confiança",
+    types: [
+      "benefits",
+      "feature_grid",
+      "stats",
+      "logo_cloud",
+      "testimonials",
+      "faq",
+    ],
+  },
+  {
+    label: "Converter",
+    types: ["conversion_cta", "contact", "locations", "divider"],
+  },
 ];
 
 function SectionLibrary({ onAdd }: { onAdd(type: PresenceSectionType): void }) {
-  return <div className="mt-2 flex flex-col gap-3">{sectionLibraryGroups.map((group) => <div key={group.label}><p className="mb-1 text-[10px] font-black uppercase tracking-[.1em] text-[#87909c]">{group.label}</p><div className="grid grid-cols-2 gap-1">{group.types.map((type) => <button type="button" key={type} onClick={() => onAdd(type)} className="min-h-10 rounded-lg p-2 text-left text-[11px] font-bold hover:bg-[#eef6ff]">{presenceSectionRegistry[type].label}</button>)}</div></div>)}</div>;
+  return (
+    <div className="mt-2 flex flex-col gap-3">
+      {sectionLibraryGroups.map((group) => (
+        <div key={group.label}>
+          <p className="mb-1 text-[10px] font-black uppercase tracking-[.1em] text-[#87909c]">
+            {group.label}
+          </p>
+          <div className="grid grid-cols-2 gap-1">
+            {group.types.map((type) => (
+              <button
+                type="button"
+                key={type}
+                onClick={() => onAdd(type)}
+                className="min-h-10 rounded-lg p-2 text-left text-[11px] font-bold hover:bg-[#eef6ff]"
+              >
+                {presenceSectionRegistry[type].label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
-function MobileDrawer({ title, onClose, children }: { title: string; onClose(): void; children: ReactNode }) {
-  return <><button type="button" aria-label="Fechar painel" onClick={onClose} className="fixed inset-0 z-40 bg-[#101827]/45 xl:hidden" /><section role="dialog" aria-modal="true" aria-label={title} className="fixed inset-x-0 bottom-0 z-50 max-h-[82vh] overflow-y-auto rounded-t-[28px] bg-white p-4 shadow-[0_-20px_70px_rgba(15,23,42,.28)] xl:hidden"><div className="mb-4 flex items-center justify-between"><strong className="text-sm font-black">{title}</strong><Button size="icon" variant="ghost" aria-label={`Fechar ${title.toLowerCase()}`} onClick={onClose}><X size={16} /></Button></div>{children}</section></>;
+function MobileDrawer({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose(): void;
+  children: ReactNode;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="Fechar painel"
+        onClick={onClose}
+        className="fixed inset-0 z-40 bg-[#101827]/45 xl:hidden"
+      />
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="fixed inset-x-0 bottom-0 z-50 max-h-[82vh] overflow-y-auto rounded-t-[28px] bg-white p-4 shadow-[0_-20px_70px_rgba(15,23,42,.28)] xl:hidden"
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <strong className="text-sm font-black">{title}</strong>
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label={`Fechar ${title.toLowerCase()}`}
+            onClick={onClose}
+          >
+            <X size={16} />
+          </Button>
+        </div>
+        {children}
+      </section>
+    </>
+  );
 }
 
 function materializeAISection(
@@ -150,14 +260,23 @@ export function SiteEditor({ projectId }: { projectId: string }) {
   const [pageMenuOpen, setPageMenuOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiProposal, setAiProposal] = useState<AIProposal>();
-  const [structureProposal, setStructureProposal] = useState<StructureProposal>();
+  const [structureProposal, setStructureProposal] =
+    useState<StructureProposal>();
   const [aiInstruction, setAiInstruction] = useState("");
-  const [aiIntent, setAiIntent] = useState<SiteComposerIntent>("suggest_structure");
-  const [selectedOperationIds, setSelectedOperationIds] = useState<Set<string>>(new Set());
+  const [aiIntent, setAiIntent] =
+    useState<SiteComposerIntent>("suggest_structure");
+  const [selectedOperationIds, setSelectedOperationIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [customizingProposal, setCustomizingProposal] = useState(false);
   const [performance, setPerformance] = useState<PerformanceState>();
-  const [performanceExplanations, setPerformanceExplanations] = useState<Record<string, PerformanceExplanation>>({});
+  const [performanceExplanations, setPerformanceExplanations] = useState<
+    Record<string, PerformanceExplanation>
+  >({});
   const [performanceLoadingId, setPerformanceLoadingId] = useState<string>();
+  const [approvedSuggestionIds, setApprovedSuggestionIds] = useState<
+    Set<string>
+  >(new Set());
   const [aiError, setAiError] = useState("");
   const [undo, setUndo] = useState<PresencePage[][]>([]);
   const [redo, setRedo] = useState<PresencePage[][]>([]);
@@ -181,13 +300,21 @@ export function SiteEditor({ projectId }: { projectId: string }) {
   const performancePublishedAt = project?.publishedAt;
   useEffect(() => {
     if (!performanceProjectId) return;
-    void fetch(`/api/projects/${performanceProjectId}/optimization`).then((response) => response.json()).then((payload: { data?: PerformanceState }) => setPerformance(payload.data)).catch(() => setPerformance(undefined));
+    void fetch(`/api/projects/${performanceProjectId}/optimization`)
+      .then((response) => response.json())
+      .then((payload: { data?: PerformanceState }) =>
+        setPerformance(payload.data),
+      )
+      .catch(() => setPerformance(undefined));
   }, [performanceProjectId, performancePublishedAt]);
   const activePage = pages.find((page) => page.id === selectedPageId);
   const activeSection = activePage?.sections.find(
     (section) => section.id === selectedSectionId,
   );
-  const qualityWarnings = useMemo(() => activePage ? inspectPageQuality(activePage) : [], [activePage]);
+  const qualityWarnings = useMemo(
+    () => (activePage ? inspectPageQuality(activePage) : []),
+    [activePage],
+  );
   const previewProject = useMemo(
     () => (project ? { ...project, presence: { pages } } : null),
     [pages, project],
@@ -453,60 +580,193 @@ export function SiteEditor({ projectId }: { projectId: string }) {
       setAiLoading(false);
     }
   }
-  async function requestStructure(intent: SiteComposerIntent = aiIntent, instructionOverride?: string) {
+  async function requestStructure(
+    intent: SiteComposerIntent = aiIntent,
+    instructionOverride?: string,
+  ) {
     if (!project) return;
     setAiLoading(true);
     setAiError("");
     try {
-      const target = ["suggest_structure", "create_page", "create_landing"].includes(intent) ? "site" : "page";
-      const instruction = instructionOverride?.trim() || aiInstruction.trim() || copilotActions.find((action) => action.intent === intent)?.label || "Organize o site para conduzir ao objetivo comercial principal.";
-      const response = await fetch(`/api/ai/projects/${project.id}/site/suggest-structure`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ instruction, intent, target, pageId: target === "page" ? activePage?.id : undefined }) });
-      const payload = await response.json() as { data?: StructureProposal; error?: { message?: string } };
-      if (!response.ok || !payload.data) throw new Error(payload.error?.message || "Não foi possível sugerir a estrutura.");
+      const target = [
+        "suggest_structure",
+        "create_page",
+        "create_landing",
+      ].includes(intent)
+        ? "site"
+        : "page";
+      const instruction =
+        instructionOverride?.trim() ||
+        aiInstruction.trim() ||
+        copilotActions.find((action) => action.intent === intent)?.label ||
+        "Organize o site para conduzir ao objetivo comercial principal.";
+      const response = await fetch(
+        `/api/ai/projects/${project.id}/site/suggest-structure`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            instruction,
+            intent,
+            target,
+            pageId: target === "page" ? activePage?.id : undefined,
+          }),
+        },
+      );
+      const payload = (await response.json()) as {
+        data?: StructureProposal;
+        error?: { message?: string };
+      };
+      if (!response.ok || !payload.data)
+        throw new Error(
+          payload.error?.message || "Não foi possível sugerir a estrutura.",
+        );
       setStructureProposal(payload.data);
-      setSelectedOperationIds(new Set(payload.data.operations.map((operation) => operation.id)));
+      setSelectedOperationIds(
+        new Set(payload.data.operations.map((operation) => operation.id)),
+      );
       setCustomizingProposal(false);
-    } catch (error) { setAiError(error instanceof Error ? error.message : "Não foi possível sugerir a estrutura."); }
-    finally { setAiLoading(false); }
+    } catch (error) {
+      setAiError(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível sugerir a estrutura.",
+      );
+    } finally {
+      setAiLoading(false);
+    }
   }
   async function explainPerformanceSuggestion(suggestionId: string) {
     if (!project) return;
     setPerformanceLoadingId(suggestionId);
     setAiError("");
     try {
-      const response = await fetch(`/api/projects/${project.id}/optimization/explain`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ suggestionId }) });
-      const payload = await response.json() as { data?: PerformanceExplanation; error?: string };
-      if (!response.ok || !payload.data) throw new Error(payload.error || "Não foi possível explicar esta evidência.");
-      setPerformanceExplanations((current) => ({ ...current, [suggestionId]: payload.data! }));
-    } catch (error) { setAiError(error instanceof Error ? error.message : "Não foi possível explicar esta evidência."); }
-    finally { setPerformanceLoadingId(undefined); }
+      const response = await fetch(
+        `/api/projects/${project.id}/optimization/explain`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ suggestionId }),
+        },
+      );
+      const payload = (await response.json()) as {
+        data?: PerformanceExplanation;
+        error?: string;
+      };
+      if (!response.ok || !payload.data)
+        throw new Error(
+          payload.error || "Não foi possível explicar esta evidência.",
+        );
+      setPerformanceExplanations((current) => ({
+        ...current,
+        [suggestionId]: payload.data!,
+      }));
+    } catch (error) {
+      setAiError(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível explicar esta evidência.",
+      );
+    } finally {
+      setPerformanceLoadingId(undefined);
+    }
+  }
+  async function approvePerformanceSuggestion(suggestionId: string) {
+    if (!project) return;
+    setPerformanceLoadingId(suggestionId);
+    setAiError("");
+    try {
+      const response = await fetch(`/api/projects/${project.id}/optimization`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ suggestionId }),
+      });
+      const payload = (await response.json()) as {
+        data?: { approved: boolean };
+        error?: { message?: string };
+      };
+      if (!response.ok || !payload.data?.approved)
+        throw new Error(
+          payload.error?.message || "Não foi possível aprovar o teste.",
+        );
+      setApprovedSuggestionIds((current) => new Set(current).add(suggestionId));
+      setMessage(
+        "Teste aprovado. A próxima publicação vinculará a nova versão à janela de observação.",
+      );
+    } catch (error) {
+      setAiError(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível aprovar o teste.",
+      );
+    } finally {
+      setPerformanceLoadingId(undefined);
+    }
   }
   async function applyStructureProposal() {
     if (!project || !structureProposal) return;
     setAiLoading(true);
     try {
       const selectedOperations = [...selectedOperationIds];
-      if (!selectedOperations.length) throw new Error("Selecione pelo menos uma operação para aplicar.");
-      const response = await fetch(`/api/projects/${project.id}/site/apply-proposal`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ proposalId: structureProposal.proposalId, selectedOperations, expectedVersion: structureProposal.expectedVersion }) });
-      const payload = await response.json() as { data?: { pages?: PresencePage[] }; error?: { message?: string } };
-      if (!response.ok) throw new Error(payload.error?.message || "Não foi possível aplicar a proposta.");
+      if (!selectedOperations.length)
+        throw new Error("Selecione pelo menos uma operação para aplicar.");
+      const response = await fetch(
+        `/api/projects/${project.id}/site/apply-proposal`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            proposalId: structureProposal.proposalId,
+            selectedOperations,
+            expectedVersion: structureProposal.expectedVersion,
+          }),
+        },
+      );
+      const payload = (await response.json()) as {
+        data?: { pages?: PresencePage[] };
+        error?: { message?: string };
+      };
+      if (!response.ok)
+        throw new Error(
+          payload.error?.message || "Não foi possível aplicar a proposta.",
+        );
       if (payload.data?.pages?.length) {
         const changedPages = payload.data.pages;
         setPages((current) => {
-          const changedById = new Map(changedPages.map((page) => [page.id, page]));
+          const changedById = new Map(
+            changedPages.map((page) => [page.id, page]),
+          );
           const next = current.map((page) => changedById.get(page.id) || page);
-          for (const page of changedPages) if (!next.some((candidate) => candidate.id === page.id)) next.push(page);
-          setProject((currentProject) => currentProject ? { ...currentProject, presence: { pages: next } } : currentProject);
+          for (const page of changedPages)
+            if (!next.some((candidate) => candidate.id === page.id))
+              next.push(page);
+          setProject((currentProject) =>
+            currentProject
+              ? { ...currentProject, presence: { pages: next } }
+              : currentProject,
+          );
           return next;
         });
       } else {
         const refreshed = await projectRepository.getProject(project.id);
-        if (refreshed) { setProject(refreshed); setPages(refreshed.presence?.pages || []); }
+        if (refreshed) {
+          setProject(refreshed);
+          setPages(refreshed.presence?.pages || []);
+        }
       }
       setStructureProposal(undefined);
-      setMessage("Proposta aplicada somente ao rascunho. Revise antes de publicar.");
-    } catch (error) { setAiError(error instanceof Error ? error.message : "Não foi possível aplicar a proposta."); }
-    finally { setAiLoading(false); }
+      setMessage(
+        "Proposta aplicada somente ao rascunho. Revise antes de publicar.",
+      );
+    } catch (error) {
+      setAiError(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível aplicar a proposta.",
+      );
+    } finally {
+      setAiLoading(false);
+    }
   }
   function applyAIProposal() {
     if (!aiProposal || !activePage) return;
@@ -587,7 +847,8 @@ export function SiteEditor({ projectId }: { projectId: string }) {
             Crie a página deste negócio
           </h1>
           <p className="mt-3 text-sm leading-6 text-[#706d78]">
-            Monte uma página conectada às ações que seus clientes precisam realizar.
+            Monte uma página conectada às ações que seus clientes precisam
+            realizar.
           </p>
           <Button className="mt-6" onClick={() => addPage("home")}>
             <Plus size={17} />
@@ -603,9 +864,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
         <Brand className="mr-1 shrink-0" />
         <div className="hidden min-w-0 md:block">
           <div className="flex items-center gap-2">
-            <h1 className="truncate text-sm font-black">
-              Minha página
-            </h1>
+            <h1 className="truncate text-sm font-black">Minha página</h1>
             <span
               className={`rounded-full px-2 py-0.5 text-[10px] font-black ${project.status === "published" ? "bg-emerald-100 text-emerald-700" : "bg-[#efeff3] text-[#686570]"}`}
             >
@@ -628,7 +887,9 @@ export function SiteEditor({ projectId }: { projectId: string }) {
             size="sm"
             variant="secondary"
             onClick={() => {
-              setMode((current) => current === "simple" ? "advanced" : "simple");
+              setMode((current) =>
+                current === "simple" ? "advanced" : "simple",
+              );
               setMobilePanel(undefined);
             }}
           >
@@ -728,37 +989,195 @@ export function SiteEditor({ projectId }: { projectId: string }) {
         <div className="flex items-end gap-3 border-b border-[#dfe6ee] bg-white px-4 py-3">
           <label className="min-w-0 flex-1 text-xs font-extrabold text-[#536178]">
             Página atual
-            <select className="mt-1 min-h-11 w-full border border-[#d7e0e9] bg-white px-3 text-sm" value={activePage?.id || ""} onChange={(event) => { setSelectedPageId(event.target.value); setSelectedSectionId(undefined); }}>
-              {pages.map((page) => <option key={page.id} value={page.id}>{page.name}</option>)}
+            <select
+              className="mt-1 min-h-11 w-full border border-[#d7e0e9] bg-white px-3 text-sm"
+              value={activePage?.id || ""}
+              onChange={(event) => {
+                setSelectedPageId(event.target.value);
+                setSelectedSectionId(undefined);
+              }}
+            >
+              {pages.map((page) => (
+                <option key={page.id} value={page.id}>
+                  {page.name}
+                </option>
+              ))}
             </select>
           </label>
           <details className="relative">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center px-3 text-xs font-extrabold text-[#0054fc]">Mais opções</summary>
+            <summary className="flex min-h-11 cursor-pointer list-none items-center px-3 text-xs font-extrabold text-[#0054fc]">
+              Mais opções
+            </summary>
             <div className="absolute right-0 top-12 z-40 w-56 border border-[#dfe6ee] bg-white p-2 shadow-xl">
-              <button type="button" onClick={() => addPage("page")} className="min-h-11 w-full px-3 text-left text-sm font-bold hover:bg-[#f1f5f9]">Adicionar página</button>
-              <button type="button" onClick={() => addPage("landing")} className="min-h-11 w-full px-3 text-left text-sm font-bold hover:bg-[#f1f5f9]">Página para campanha</button>
+              <button
+                type="button"
+                onClick={() => addPage("page")}
+                className="min-h-11 w-full px-3 text-left text-sm font-bold hover:bg-[#f1f5f9]"
+              >
+                Adicionar página
+              </button>
+              <button
+                type="button"
+                onClick={() => addPage("landing")}
+                className="min-h-11 w-full px-3 text-left text-sm font-bold hover:bg-[#f1f5f9]"
+              >
+                Página para campanha
+              </button>
             </div>
           </details>
         </div>
       ) : null}
-      {mode === "advanced" ? <div className="flex items-center gap-2 border-b border-[#dfe6ee] bg-white p-3 xl:hidden">
-        <label className="min-w-0 flex-1 text-xs font-black text-[#5f6673]">
-          Página ativa
-          <select className="mt-1 min-h-11 w-full rounded-xl border border-[#d7e0e9] bg-white px-3 text-sm" value={activePage?.id || ""} onChange={(event) => { setSelectedPageId(event.target.value); setSelectedSectionId(undefined); }}>
-            {pages.map((page) => <option key={page.id} value={page.id}>{page.name}</option>)}
-          </select>
-        </label>
-        <Button className="mt-5" size="icon" variant="secondary" aria-label="Adicionar página" onClick={() => addPage("page")}><Plus /></Button>
-      </div> : null}
-      {mode === "advanced" && !mobilePanel ? <div className="grid grid-cols-3 gap-1 border-b border-[#d7e0e9] bg-white p-2 xl:hidden">
-        <button type="button" onClick={() => setMobilePanel("pages")} className="min-h-11 rounded-xl text-xs font-black text-[#53606d] hover:bg-[#eef6ff]">Páginas</button>
-        <button type="button" onClick={() => setMobilePanel("sections")} className="min-h-11 rounded-xl text-xs font-black text-[#53606d] hover:bg-[#eef6ff]">Conteúdo</button>
-        <button type="button" onClick={() => setMobilePanel("properties")} className="min-h-11 rounded-xl bg-[#0054fc] text-xs font-black text-white">Propriedades</button>
-      </div> : null}
-      {mode === "advanced" && mobilePanel === "pages" ? <MobileDrawer title="Páginas" onClose={() => setMobilePanel(undefined)}><div className="space-y-1">{pages.map((page) => <button key={page.id} type="button" onClick={() => { setSelectedPageId(page.id); setSelectedSectionId(undefined); setMobilePanel(undefined); }} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-bold ${page.id === activePage?.id ? "bg-[#e8f4ff] text-[#0054fc]" : "hover:bg-[#f1f5f9]"}`}><span>{page.isHome ? "⌂" : page.type === "landing" ? "LP" : "P"}</span><span className="min-w-0 flex-1 truncate">{page.name}</span></button>)}</div><div className="mt-4 grid grid-cols-2 gap-2"><Button variant="secondary" onClick={() => { addPage("page"); setMobilePanel(undefined); }}><Plus />Página</Button><Button variant="secondary" onClick={() => { addPage("landing"); setMobilePanel(undefined); }}><Plus />Landing</Button></div></MobileDrawer> : null}
-      {mode === "advanced" && mobilePanel === "sections" ? <MobileDrawer title="Conteúdo desta página" onClose={() => setMobilePanel(undefined)}><div className="space-y-1">{activePage?.sections.toSorted((a, b) => a.order - b.order).map((section) => <button key={section.id} type="button" onClick={() => { setSelectedSectionId(section.id); setMobilePanel("properties"); }} className={`flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-xs font-bold ${section.id === activeSection?.id ? "bg-[#e8f4ff] text-[#0054fc]" : "hover:bg-[#f1f5f9]"}`}><GripVertical size={14} /><span className="min-w-0 flex-1 truncate">{section.title || presenceSectionRegistry[section.type].label}</span></button>)}</div><details className="mt-4"><summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-[#b9cce1] px-3 text-xs font-black text-[#0054fc]"><Plus size={14} />Adicionar conteúdo</summary><SectionLibrary onAdd={(type) => { addSection(type); setMobilePanel("properties"); }} /></details></MobileDrawer> : null}
-      <div data-testid={`site-editor-${mode}`} className={`grid min-h-[calc(100vh-137px)] grid-cols-1 ${mode === "advanced" ? "xl:grid-cols-[240px_minmax(380px,1fr)_320px]" : "lg:grid-cols-[minmax(480px,1fr)_340px]"}`}>
-        <aside className={mode === "advanced" ? "hidden border-r border-[#dfe6ee] bg-white xl:block" : "hidden"}>
+      {mode === "advanced" ? (
+        <div className="flex items-center gap-2 border-b border-[#dfe6ee] bg-white p-3 xl:hidden">
+          <label className="min-w-0 flex-1 text-xs font-black text-[#5f6673]">
+            Página ativa
+            <select
+              className="mt-1 min-h-11 w-full rounded-xl border border-[#d7e0e9] bg-white px-3 text-sm"
+              value={activePage?.id || ""}
+              onChange={(event) => {
+                setSelectedPageId(event.target.value);
+                setSelectedSectionId(undefined);
+              }}
+            >
+              {pages.map((page) => (
+                <option key={page.id} value={page.id}>
+                  {page.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button
+            className="mt-5"
+            size="icon"
+            variant="secondary"
+            aria-label="Adicionar página"
+            onClick={() => addPage("page")}
+          >
+            <Plus />
+          </Button>
+        </div>
+      ) : null}
+      {mode === "advanced" && !mobilePanel ? (
+        <div className="grid grid-cols-3 gap-1 border-b border-[#d7e0e9] bg-white p-2 xl:hidden">
+          <button
+            type="button"
+            onClick={() => setMobilePanel("pages")}
+            className="min-h-11 rounded-xl text-xs font-black text-[#53606d] hover:bg-[#eef6ff]"
+          >
+            Páginas
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobilePanel("sections")}
+            className="min-h-11 rounded-xl text-xs font-black text-[#53606d] hover:bg-[#eef6ff]"
+          >
+            Conteúdo
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobilePanel("properties")}
+            className="min-h-11 rounded-xl bg-[#0054fc] text-xs font-black text-white"
+          >
+            Propriedades
+          </button>
+        </div>
+      ) : null}
+      {mode === "advanced" && mobilePanel === "pages" ? (
+        <MobileDrawer title="Páginas" onClose={() => setMobilePanel(undefined)}>
+          <div className="space-y-1">
+            {pages.map((page) => (
+              <button
+                key={page.id}
+                type="button"
+                onClick={() => {
+                  setSelectedPageId(page.id);
+                  setSelectedSectionId(undefined);
+                  setMobilePanel(undefined);
+                }}
+                className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-bold ${page.id === activePage?.id ? "bg-[#e8f4ff] text-[#0054fc]" : "hover:bg-[#f1f5f9]"}`}
+              >
+                <span>
+                  {page.isHome ? "⌂" : page.type === "landing" ? "LP" : "P"}
+                </span>
+                <span className="min-w-0 flex-1 truncate">{page.name}</span>
+              </button>
+            ))}
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                addPage("page");
+                setMobilePanel(undefined);
+              }}
+            >
+              <Plus />
+              Página
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                addPage("landing");
+                setMobilePanel(undefined);
+              }}
+            >
+              <Plus />
+              Landing
+            </Button>
+          </div>
+        </MobileDrawer>
+      ) : null}
+      {mode === "advanced" && mobilePanel === "sections" ? (
+        <MobileDrawer
+          title="Conteúdo desta página"
+          onClose={() => setMobilePanel(undefined)}
+        >
+          <div className="space-y-1">
+            {activePage?.sections
+              .toSorted((a, b) => a.order - b.order)
+              .map((section) => (
+                <button
+                  key={section.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedSectionId(section.id);
+                    setMobilePanel("properties");
+                  }}
+                  className={`flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-xs font-bold ${section.id === activeSection?.id ? "bg-[#e8f4ff] text-[#0054fc]" : "hover:bg-[#f1f5f9]"}`}
+                >
+                  <GripVertical size={14} />
+                  <span className="min-w-0 flex-1 truncate">
+                    {section.title ||
+                      presenceSectionRegistry[section.type].label}
+                  </span>
+                </button>
+              ))}
+          </div>
+          <details className="mt-4">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-[#b9cce1] px-3 text-xs font-black text-[#0054fc]">
+              <Plus size={14} />
+              Adicionar conteúdo
+            </summary>
+            <SectionLibrary
+              onAdd={(type) => {
+                addSection(type);
+                setMobilePanel("properties");
+              }}
+            />
+          </details>
+        </MobileDrawer>
+      ) : null}
+      <div
+        data-testid={`site-editor-${mode}`}
+        className={`grid min-h-[calc(100vh-137px)] grid-cols-1 ${mode === "advanced" ? "xl:grid-cols-[240px_minmax(380px,1fr)_320px]" : "lg:grid-cols-[minmax(480px,1fr)_340px]"}`}
+      >
+        <aside
+          className={
+            mode === "advanced"
+              ? "hidden border-r border-[#dfe6ee] bg-white xl:block"
+              : "hidden"
+          }
+        >
           <div className="relative flex items-center justify-between border-b border-[#e4e2e9] px-4 py-3">
             <strong className="text-xs uppercase tracking-[.12em] text-[#77727e]">
               Páginas
@@ -811,22 +1230,57 @@ export function SiteEditor({ projectId }: { projectId: string }) {
           </div>
           <div className="mx-3 mt-4 border-t border-[#e3e9ef] pt-4">
             <div className="flex items-center justify-between px-1">
-              <strong className="text-xs uppercase tracking-[.12em] text-[#697180]">Conteúdo desta página</strong>
-              <span className="text-[10px] font-bold text-[#8b94a1]">{activePage?.sections.length || 0}</span>
+              <strong className="text-xs uppercase tracking-[.12em] text-[#697180]">
+                Conteúdo desta página
+              </strong>
+              <span className="text-[10px] font-bold text-[#8b94a1]">
+                {activePage?.sections.length || 0}
+              </span>
             </div>
             <div className="mt-2 space-y-1" data-testid="site-section-list">
-              {activePage?.sections.toSorted((a, b) => a.order - b.order).map((section) => (
-                <div key={section.id} draggable onDragStart={() => { draggedSectionId.current = section.id; }} onDragOver={(event) => event.preventDefault()} onDrop={() => dropSection(section.id)}>
-                  <button type="button" onClick={() => setSelectedSectionId(section.id)} onKeyDown={(event) => { if (event.altKey && event.key === "ArrowUp") moveSection(section.id, -1); if (event.altKey && event.key === "ArrowDown") moveSection(section.id, 1); }} className={`flex min-h-10 w-full items-center gap-2 rounded-xl px-2 text-left text-xs font-bold ${section.id === activeSection?.id ? "bg-[#e8f4ff] text-[#0054fc]" : "text-[#505866] hover:bg-[#f1f5f9]"}`}>
-                    <GripVertical size={14} className="cursor-grab text-[#a6afbb]" />
-                    <span className="min-w-0 flex-1 truncate">{section.title || presenceSectionRegistry[section.type].label}</span>
-                    {!section.isActive ? <Eye size={13} className="opacity-40" /> : null}
-                  </button>
-                </div>
-              ))}
+              {activePage?.sections
+                .toSorted((a, b) => a.order - b.order)
+                .map((section) => (
+                  <div
+                    key={section.id}
+                    draggable
+                    onDragStart={() => {
+                      draggedSectionId.current = section.id;
+                    }}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={() => dropSection(section.id)}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSectionId(section.id)}
+                      onKeyDown={(event) => {
+                        if (event.altKey && event.key === "ArrowUp")
+                          moveSection(section.id, -1);
+                        if (event.altKey && event.key === "ArrowDown")
+                          moveSection(section.id, 1);
+                      }}
+                      className={`flex min-h-10 w-full items-center gap-2 rounded-xl px-2 text-left text-xs font-bold ${section.id === activeSection?.id ? "bg-[#e8f4ff] text-[#0054fc]" : "text-[#505866] hover:bg-[#f1f5f9]"}`}
+                    >
+                      <GripVertical
+                        size={14}
+                        className="cursor-grab text-[#a6afbb]"
+                      />
+                      <span className="min-w-0 flex-1 truncate">
+                        {section.title ||
+                          presenceSectionRegistry[section.type].label}
+                      </span>
+                      {!section.isActive ? (
+                        <Eye size={13} className="opacity-40" />
+                      ) : null}
+                    </button>
+                  </div>
+                ))}
             </div>
             <details className="mt-3">
-              <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-[#b9cce1] px-3 text-xs font-black text-[#0054fc]"><Plus size={14} />Adicionar conteúdo</summary>
+              <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-[#b9cce1] px-3 text-xs font-black text-[#0054fc]">
+                <Plus size={14} />
+                Adicionar conteúdo
+              </summary>
               <SectionLibrary onAdd={addSection} />
             </details>
           </div>
@@ -869,16 +1323,29 @@ export function SiteEditor({ projectId }: { projectId: string }) {
                   project={previewProject}
                   page={activePage}
                   preview
-                  editorHooks={mode === "simple" ? {
-                    selectedSectionId,
-                    onSelectSection: (sectionId) => setSelectedSectionId(sectionId),
-                  } : undefined}
+                  editorHooks={
+                    mode === "simple"
+                      ? {
+                          selectedSectionId,
+                          onSelectSection: (sectionId) =>
+                            setSelectedSectionId(sectionId),
+                        }
+                      : undefined
+                  }
                 />
               ) : null}
             </div>
           </div>
         </section>
-        {mode === "simple" && activeSection ? <button type="button" data-testid="simple-editor-backdrop" aria-label="Fechar edição" onClick={() => setSelectedSectionId(undefined)} className="fixed inset-0 z-[35] bg-[#101827]/45 lg:hidden" /> : null}
+        {mode === "simple" && activeSection ? (
+          <button
+            type="button"
+            data-testid="simple-editor-backdrop"
+            aria-label="Fechar edição"
+            onClick={() => setSelectedSectionId(undefined)}
+            className="fixed inset-0 z-[35] bg-[#101827]/45 lg:hidden"
+          />
+        ) : null}
         {mode === "simple" ? (
           <aside
             role={activeSection ? "dialog" : undefined}
@@ -889,7 +1356,14 @@ export function SiteEditor({ projectId }: { projectId: string }) {
             {activeSection && activePage ? (
               <>
                 <div className="mb-3 flex justify-end lg:hidden">
-                  <Button size="icon" variant="ghost" aria-label="Fechar edição" onClick={() => setSelectedSectionId(undefined)}><X size={17} /></Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label="Fechar edição"
+                    onClick={() => setSelectedSectionId(undefined)}
+                  >
+                    <X size={17} />
+                  </Button>
                 </div>
                 <SimpleSectionInspector
                   project={previewProject!}
@@ -897,21 +1371,50 @@ export function SiteEditor({ projectId }: { projectId: string }) {
                   section={activeSection}
                   onChange={updateSection}
                   onImprove={() => void requestAI("section")}
-                  onMove={(direction) => moveSection(activeSection.id, direction)}
+                  onMove={(direction) =>
+                    moveSection(activeSection.id, direction)
+                  }
                   onAdvanced={() => setMode("advanced")}
                 />
               </>
             ) : (
               <div className="flex min-h-64 flex-col justify-center">
-                <strong className="text-xl font-black tracking-[-.025em]">Clique em uma parte da página</strong>
-                <p className="mt-3 text-sm leading-6 text-[#65717d]">Você poderá editar título, texto, imagem e botões sem lidar com configurações técnicas.</p>
-                <Button className="mt-5 self-start" variant="secondary" onClick={() => void requestAI("page")}><Sparkles size={16} /> Melhorar esta página</Button>
+                <strong className="text-xl font-black tracking-[-.025em]">
+                  Clique em uma parte da página
+                </strong>
+                <p className="mt-3 text-sm leading-6 text-[#65717d]">
+                  Você poderá editar título, texto, imagem e botões sem lidar
+                  com configurações técnicas.
+                </p>
+                <Button
+                  className="mt-5 self-start"
+                  variant="secondary"
+                  onClick={() => void requestAI("page")}
+                >
+                  <Sparkles size={16} /> Melhorar esta página
+                </Button>
               </div>
             )}
           </aside>
         ) : null}
-        {mode === "advanced" && mobilePanel === "properties" ? <button type="button" aria-label="Fechar painel" onClick={() => setMobilePanel(undefined)} className="fixed inset-0 z-[35] bg-[#101827]/45 xl:hidden" /> : null}
-        <aside role={mobilePanel === "properties" ? "dialog" : undefined} aria-modal={mobilePanel === "properties" ? true : undefined} aria-label={mobilePanel === "properties" ? "Propriedades" : undefined} className={mode === "advanced" ? `border-l border-[#dfe6ee] bg-white ${mobilePanel === "properties" ? "fixed inset-x-0 bottom-0 z-40 max-h-[82vh] overflow-hidden rounded-t-[28px] shadow-[0_-20px_70px_rgba(15,23,42,.28)]" : "hidden"} xl:static xl:block xl:max-h-none xl:rounded-none xl:shadow-none` : "hidden"}>
+        {mode === "advanced" && mobilePanel === "properties" ? (
+          <button
+            type="button"
+            aria-label="Fechar painel"
+            onClick={() => setMobilePanel(undefined)}
+            className="fixed inset-0 z-[35] bg-[#101827]/45 xl:hidden"
+          />
+        ) : null}
+        <aside
+          role={mobilePanel === "properties" ? "dialog" : undefined}
+          aria-modal={mobilePanel === "properties" ? true : undefined}
+          aria-label={mobilePanel === "properties" ? "Propriedades" : undefined}
+          className={
+            mode === "advanced"
+              ? `border-l border-[#dfe6ee] bg-white ${mobilePanel === "properties" ? "fixed inset-x-0 bottom-0 z-40 max-h-[82vh] overflow-hidden rounded-t-[28px] shadow-[0_-20px_70px_rgba(15,23,42,.28)]" : "hidden"} xl:static xl:block xl:max-h-none xl:rounded-none xl:shadow-none`
+              : "hidden"
+          }
+        >
           <div className="border-b border-[#e6e4eb] px-4 py-3">
             <div className="flex items-center justify-between">
               <strong className="text-xs uppercase tracking-[.12em] text-[#77727e]">
@@ -919,7 +1422,15 @@ export function SiteEditor({ projectId }: { projectId: string }) {
                   ? presenceSectionRegistry[activeSection.type].label
                   : "Página"}
               </strong>
-              <Button className="ml-auto xl:hidden" size="icon" variant="ghost" aria-label="Fechar propriedades" onClick={() => setMobilePanel(undefined)}><X size={16} /></Button>
+              <Button
+                className="ml-auto xl:hidden"
+                size="icon"
+                variant="ghost"
+                aria-label="Fechar propriedades"
+                onClick={() => setMobilePanel(undefined)}
+              >
+                <X size={16} />
+              </Button>
               {activeSection ? (
                 <div className="flex">
                   <Button
@@ -958,93 +1469,379 @@ export function SiteEditor({ projectId }: { projectId: string }) {
               ) : null}
             </div>
           </div>
-          <Tabs defaultValue="content" className="max-h-[calc(100vh-185px)] overflow-y-auto">
+          <Tabs
+            defaultValue="content"
+            className="max-h-[calc(100vh-185px)] overflow-y-auto"
+          >
             <TabsList className="sticky top-0 z-10 grid h-auto w-full grid-cols-4 rounded-none border-b border-[#e3e9ef] bg-white p-2">
-              <TabsTrigger value="content" className="px-1 text-[11px]">Conteúdo</TabsTrigger>
-              <TabsTrigger value="visual" className="px-1 text-[11px]">Aparência</TabsTrigger>
-              <TabsTrigger value="conversion" className="px-1 text-[11px]">Ação</TabsTrigger>
-              <TabsTrigger value="advanced" className="px-1 text-[11px]">Avançado</TabsTrigger>
+              <TabsTrigger value="content" className="px-1 text-[11px]">
+                Conteúdo
+              </TabsTrigger>
+              <TabsTrigger value="visual" className="px-1 text-[11px]">
+                Aparência
+              </TabsTrigger>
+              <TabsTrigger value="conversion" className="px-1 text-[11px]">
+                Ação
+              </TabsTrigger>
+              <TabsTrigger value="advanced" className="px-1 text-[11px]">
+                Avançado
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="content" className="m-0 p-4">
-            {activeSection && activePage ? (
-              <SectionInspector
-                project={previewProject!}
-                page={activePage}
-                section={activeSection}
-                onChange={updateSection}
-              />
-            ) : activePage ? (
-              <PageInspector
-                project={previewProject!}
-                page={activePage}
-                onChange={updatePage}
-              />
-            ) : null}
-            <div className="mt-6 border-t border-[#e6e4eb] pt-4">
-              <strong className="text-xs uppercase tracking-[.12em] text-[#77727e]">
-                Conteúdo
-              </strong>
-              <div className="mt-2 space-y-1">
-                {activePage?.sections
-                  .toSorted((a, b) => a.order - b.order)
-                  .map((section) => (
-                    <div
-                      key={section.id}
-                      draggable
-                      onDragStart={() => {
-                        draggedSectionId.current = section.id;
-                      }}
-                      onDragOver={(event) => event.preventDefault()}
-                      onDrop={() => dropSection(section.id)}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setSelectedSectionId(section.id)}
-                        className={`flex min-h-10 w-full items-center gap-2 rounded-xl px-2 text-left text-xs font-bold ${section.id === activeSection?.id ? "bg-[#eaf3ff] text-[#0054fc]" : "hover:bg-[#f2f1f5]"}`}
+              {activeSection && activePage ? (
+                <SectionInspector
+                  project={previewProject!}
+                  page={activePage}
+                  section={activeSection}
+                  onChange={updateSection}
+                />
+              ) : activePage ? (
+                <PageInspector
+                  project={previewProject!}
+                  page={activePage}
+                  onChange={updatePage}
+                />
+              ) : null}
+              <div className="mt-6 border-t border-[#e6e4eb] pt-4">
+                <strong className="text-xs uppercase tracking-[.12em] text-[#77727e]">
+                  Conteúdo
+                </strong>
+                <div className="mt-2 space-y-1">
+                  {activePage?.sections
+                    .toSorted((a, b) => a.order - b.order)
+                    .map((section) => (
+                      <div
+                        key={section.id}
+                        draggable
+                        onDragStart={() => {
+                          draggedSectionId.current = section.id;
+                        }}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={() => dropSection(section.id)}
                       >
-                        <GripVertical
-                          size={14}
-                          className="cursor-grab text-[#aaa6b0]"
-                        />
-                        <span className="min-w-0 flex-1 truncate">
-                          {section.title ||
-                            presenceSectionRegistry[section.type].label}
-                        </span>
-                        {!section.isActive ? (
-                          <Eye size={13} className="opacity-40" />
-                        ) : null}
-                      </button>
-                    </div>
-                  ))}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSectionId(section.id)}
+                          className={`flex min-h-10 w-full items-center gap-2 rounded-xl px-2 text-left text-xs font-bold ${section.id === activeSection?.id ? "bg-[#eaf3ff] text-[#0054fc]" : "hover:bg-[#f2f1f5]"}`}
+                        >
+                          <GripVertical
+                            size={14}
+                            className="cursor-grab text-[#aaa6b0]"
+                          />
+                          <span className="min-w-0 flex-1 truncate">
+                            {section.title ||
+                              presenceSectionRegistry[section.type].label}
+                          </span>
+                          {!section.isActive ? (
+                            <Eye size={13} className="opacity-40" />
+                          ) : null}
+                        </button>
+                      </div>
+                    ))}
+                </div>
+                <details className="mt-3">
+                  <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-[#cbc8d4] px-3 text-xs font-black text-[#0054fc]">
+                    <Plus size={14} />
+                    Adicionar conteúdo
+                  </summary>
+                  <SectionLibrary onAdd={addSection} />
+                </details>
               </div>
-              <details className="mt-3">
-                <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-xl border border-dashed border-[#cbc8d4] px-3 text-xs font-black text-[#0054fc]">
-                  <Plus size={14} />
-                  Adicionar conteúdo
-                </summary>
-                <SectionLibrary onAdd={addSection} />
-              </details>
-            </div>
             </TabsContent>
             <TabsContent value="visual" className="m-0 p-4">
-              <div className="rounded-2xl border border-[#dfe7ef] bg-[#f8fbfe] p-4"><strong className="text-sm">Visual controlado</strong><p className="mt-2 text-xs leading-5 text-[#66717e]">Escolha composição, largura, ritmo, fundo e tratamento de mídia. CSS arbitrário não é aceito.</p></div>
-              {activeSection && activePage ? <div className="mt-4"><SectionInspector project={previewProject!} page={activePage} section={activeSection} onChange={updateSection} appearanceOnly /></div> : activePage ? <div className="mt-4"><PageInspector project={previewProject!} page={activePage} onChange={updatePage} /></div> : null}
+              <div className="rounded-2xl border border-[#dfe7ef] bg-[#f8fbfe] p-4">
+                <strong className="text-sm">Visual controlado</strong>
+                <p className="mt-2 text-xs leading-5 text-[#66717e]">
+                  Escolha composição, largura, ritmo, fundo e tratamento de
+                  mídia. CSS arbitrário não é aceito.
+                </p>
+              </div>
+              {activeSection && activePage ? (
+                <div className="mt-4">
+                  <SectionInspector
+                    project={previewProject!}
+                    page={activePage}
+                    section={activeSection}
+                    onChange={updateSection}
+                    appearanceOnly
+                  />
+                </div>
+              ) : activePage ? (
+                <div className="mt-4">
+                  <PageInspector
+                    project={previewProject!}
+                    page={activePage}
+                    onChange={updatePage}
+                  />
+                </div>
+              ) : null}
             </TabsContent>
             <TabsContent value="conversion" className="m-0 p-4">
-              <div className="rounded-2xl border border-[#dbe8f5] bg-[#eff7ff] p-4"><strong className="text-sm">Objetivo da página</strong><p className="mt-2 text-xs leading-5 text-[#5d6c7b]">{activePage?.defaultConversionGoalId ? "Esta página está conectada a um objetivo mensurável." : "Conecte esta página a um objetivo antes de publicar."}</p></div>
-              {activePage ? <label className="mt-4 block text-xs font-bold text-[#555f6b]">Objetivo principal<select value={activePage.defaultConversionGoalId || ""} onChange={(event) => updatePage({ ...activePage, defaultConversionGoalId: event.target.value || undefined })} className="mt-2 min-h-11 w-full rounded-xl border border-[#d9e1e9] bg-white px-3 text-sm"><option value="">Selecionar objetivo</option>{project.conversionGoals?.filter((goal) => goal.isActive).map((goal) => <option key={goal.id} value={goal.id}>{goal.name}</option>)}</select></label> : null}
+              <div className="rounded-2xl border border-[#dbe8f5] bg-[#eff7ff] p-4">
+                <strong className="text-sm">Objetivo da página</strong>
+                <p className="mt-2 text-xs leading-5 text-[#5d6c7b]">
+                  {activePage?.defaultConversionGoalId
+                    ? "Esta página está conectada a um objetivo mensurável."
+                    : "Conecte esta página a um objetivo antes de publicar."}
+                </p>
+              </div>
+              {activePage ? (
+                <label className="mt-4 block text-xs font-bold text-[#555f6b]">
+                  Objetivo principal
+                  <select
+                    value={activePage.defaultConversionGoalId || ""}
+                    onChange={(event) =>
+                      updatePage({
+                        ...activePage,
+                        defaultConversionGoalId:
+                          event.target.value || undefined,
+                      })
+                    }
+                    className="mt-2 min-h-11 w-full rounded-xl border border-[#d9e1e9] bg-white px-3 text-sm"
+                  >
+                    <option value="">Selecionar objetivo</option>
+                    {project.conversionGoals
+                      ?.filter((goal) => goal.isActive)
+                      .map((goal) => (
+                        <option key={goal.id} value={goal.id}>
+                          {goal.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              ) : null}
             </TabsContent>
             <TabsContent value="advanced" className="m-0 p-4">
-              <div className="rounded-2xl border border-[#dfe7ef] p-4"><strong className="text-sm">Fontes conectadas</strong><dl className="mt-3 grid grid-cols-2 gap-3 text-xs"><div><dt className="text-[#75808c]">Produtos</dt><dd className="mt-1 font-black">{project.commercialConfig?.catalogItems?.length || 0}</dd></div><div><dt className="text-[#75808c]">Serviços</dt><dd className="mt-1 font-black">{project.commercialConfig?.serviceOfferings?.length || 0}</dd></div><div><dt className="text-[#75808c]">Unidades</dt><dd className="mt-1 font-black">{project.commercialConfig?.locations?.length || 0}</dd></div><div><dt className="text-[#75808c]">Objetivos</dt><dd className="mt-1 font-black">{project.conversionGoals?.length || 0}</dd></div></dl></div>
-              <div className="mt-4 rounded-2xl bg-[linear-gradient(135deg,#edf8ff,#e7f1ff)] p-4"><span className="flex items-center gap-2 text-xs font-black text-[#0f64c8]"><Sparkles />Sobe IA</span><h3 className="mt-3 font-black">O que você quer fazer?</h3><p className="mt-2 text-xs leading-5 text-[#526476]">Explique o foco, a oferta, o público ou a página. Planner e IA usam os dados reais do negócio; nada é publicado automaticamente.</p><textarea aria-label="Instrução para a Sobe IA" value={aiInstruction} onChange={(event) => setAiInstruction(event.target.value)} placeholder="Ex.: Quero uma landing para revendedores e menos destaque para o FAQ." className="mt-4 min-h-28 w-full resize-y rounded-xl border border-[#b9d2eb] bg-white p-3 text-sm leading-6 outline-none focus:border-[#0054fc] focus:ring-4 focus:ring-[#0054fc]/10" /><div className="mt-3 flex flex-wrap gap-2">{copilotActions.map((action) => <button key={action.intent} type="button" onClick={() => setAiIntent(action.intent)} className={`min-h-9 rounded-full border px-3 text-[11px] font-black ${aiIntent === action.intent ? "border-[#0054fc] bg-[#0054fc] text-white" : "border-[#b9d2eb] bg-white text-[#36536f]"}`}>{action.label}</button>)}</div><Button className="mt-4 w-full bg-[#0054fc] hover:bg-[#0d54a9]" size="sm" disabled={aiLoading} onClick={() => void requestStructure(aiIntent)}>{aiLoading ? <LoaderCircle className="animate-spin" /> : <Sparkles />}Gerar proposta</Button></div>
+              <div className="rounded-2xl border border-[#dfe7ef] p-4">
+                <strong className="text-sm">Fontes conectadas</strong>
+                <dl className="mt-3 grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <dt className="text-[#75808c]">Produtos</dt>
+                    <dd className="mt-1 font-black">
+                      {project.commercialConfig?.catalogItems?.length || 0}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[#75808c]">Serviços</dt>
+                    <dd className="mt-1 font-black">
+                      {project.commercialConfig?.serviceOfferings?.length || 0}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[#75808c]">Unidades</dt>
+                    <dd className="mt-1 font-black">
+                      {project.commercialConfig?.locations?.length || 0}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[#75808c]">Objetivos</dt>
+                    <dd className="mt-1 font-black">
+                      {project.conversionGoals?.length || 0}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+              <div className="mt-4 rounded-2xl bg-[linear-gradient(135deg,#edf8ff,#e7f1ff)] p-4">
+                <span className="flex items-center gap-2 text-xs font-black text-[#0f64c8]">
+                  <Sparkles />
+                  Sobe IA
+                </span>
+                <h3 className="mt-3 font-black">O que você quer fazer?</h3>
+                <p className="mt-2 text-xs leading-5 text-[#526476]">
+                  Explique o foco, a oferta, o público ou a página. Planner e IA
+                  usam os dados reais do negócio; nada é publicado
+                  automaticamente.
+                </p>
+                <textarea
+                  aria-label="Instrução para a Sobe IA"
+                  value={aiInstruction}
+                  onChange={(event) => setAiInstruction(event.target.value)}
+                  placeholder="Ex.: Quero uma landing para revendedores e menos destaque para o FAQ."
+                  className="mt-4 min-h-28 w-full resize-y rounded-xl border border-[#b9d2eb] bg-white p-3 text-sm leading-6 outline-none focus:border-[#0054fc] focus:ring-4 focus:ring-[#0054fc]/10"
+                />
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {copilotActions.map((action) => (
+                    <button
+                      key={action.intent}
+                      type="button"
+                      onClick={() => setAiIntent(action.intent)}
+                      className={`min-h-9 rounded-full border px-3 text-[11px] font-black ${aiIntent === action.intent ? "border-[#0054fc] bg-[#0054fc] text-white" : "border-[#b9d2eb] bg-white text-[#36536f]"}`}
+                    >
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  className="mt-4 w-full bg-[#0054fc] hover:bg-[#0d54a9]"
+                  size="sm"
+                  disabled={aiLoading}
+                  onClick={() => void requestStructure(aiIntent)}
+                >
+                  {aiLoading ? (
+                    <LoaderCircle className="animate-spin" />
+                  ) : (
+                    <Sparkles />
+                  )}
+                  Gerar proposta
+                </Button>
+              </div>
             </TabsContent>
-            <TabsContent value="advanced" className="m-0 border-t border-[#e3e9ef] p-4">
-              <div className="rounded-2xl bg-[#f7fbff] p-4"><strong className="text-sm">Quality Assistant</strong><p className="mt-2 text-xs leading-5 text-[#666174]">Diagnóstico da página ativa. Ele orienta; não altera nem publica nada sozinho.</p></div>
-              <div className="mt-4 flex flex-col gap-2">{qualityWarnings.length ? qualityWarnings.map((warning) => <div key={warning.code} className="rounded-xl border border-[#eaf3ff] bg-white p-3"><strong className="text-xs">{warning.message}</strong><p className="mt-1 text-[11px] text-[#746f7d]">Selecione a seção relacionada ou peça uma proposta à Sobe IA.</p></div>) : <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-bold text-emerald-800">Nenhum problema estrutural detectado nesta página.</div>}</div>
+            <TabsContent
+              value="advanced"
+              className="m-0 border-t border-[#e3e9ef] p-4"
+            >
+              <SurfaceViewMarker surface="optimization" projectId={project.id} />
+              <div className="rounded-2xl bg-[#f7fbff] p-4">
+                <strong className="text-sm">Quality Assistant</strong>
+                <p className="mt-2 text-xs leading-5 text-[#666174]">
+                  Diagnóstico da página ativa. Ele orienta; não altera nem
+                  publica nada sozinho.
+                </p>
+              </div>
+              <div className="mt-4 flex flex-col gap-2">
+                {qualityWarnings.length ? (
+                  qualityWarnings.map((warning) => (
+                    <div
+                      key={warning.code}
+                      className="rounded-xl border border-[#eaf3ff] bg-white p-3"
+                    >
+                      <strong className="text-xs">{warning.message}</strong>
+                      <p className="mt-1 text-[11px] text-[#746f7d]">
+                        Selecione a seção relacionada ou peça uma proposta à
+                        Sobe IA.
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-bold text-emerald-800">
+                    Nenhum problema estrutural detectado nesta página.
+                  </div>
+                )}
+              </div>
             </TabsContent>
-            <TabsContent value="advanced" className="m-0 border-t border-[#e3e9ef] p-4">
-              <div className="rounded-2xl bg-[#eef6ff] p-4"><strong className="text-sm">Performance Copilot</strong><p className="mt-2 text-xs leading-5 text-[#566a7e]">Sugestões só aparecem após 30 dias, 30 sessões e 15 sessões da meta principal quando aplicável.</p></div>
-              {!performance?.publishedAt ? <p className="mt-4 rounded-xl border border-[#dfe7ef] p-4 text-xs leading-5 text-[#697684]">Publique o site para iniciar a janela de aprendizado.</p> : performance.evidence ? <div className="mt-4 flex flex-col gap-3"><p className={`rounded-xl p-3 text-xs font-bold ${performance.evidence.eligible ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900"}`}>{performance.evidence.message}</p><EvidenceBar label="Dias" progress={performance.evidence.daysProgress} value={`${performance.evidence.completeDays}/30`} /><EvidenceBar label="Sessões" progress={performance.evidence.sessionsProgress} value={`${Math.round(performance.evidence.sessionsProgress * 30)}/30`} />{performance.evidence.goalSessionsProgress != null ? <EvidenceBar label={performance.primaryGoalName || "Meta principal"} progress={performance.evidence.goalSessionsProgress} value={`${Math.round(performance.evidence.goalSessionsProgress * 15)}/15`} /> : null}{performance.suggestions.map((suggestion) => { const explanation = performanceExplanations[suggestion.id]; const proposalInstruction = `Proponha uma alteração para “${suggestion.title}”. Evidência observada: ${suggestion.explanation}.${explanation ? ` Leitura: ${explanation.explanation} Próxima ação: ${explanation.recommendedAction}` : ""}`; return <article key={suggestion.id} className="rounded-xl border border-[#dfe7ef] p-3"><strong className="text-xs">{suggestion.title}</strong><p className="mt-2 text-[11px] leading-5 text-[#697684]">{suggestion.explanation}</p>{explanation ? <div className="mt-3 rounded-xl bg-[#f7fbff] p-3"><span className="text-[10px] font-black uppercase tracking-[.08em] text-[#0054fc]">{explanation.usedAI ? "Leitura da Sobe IA" : "Leitura determinística"}</span><p className="mt-2 text-[11px] leading-5 text-[#5f5970]">{explanation.explanation}</p><p className="mt-2 text-[11px] font-bold text-[#4e4861]">Próxima ação: {explanation.recommendedAction}</p></div> : null}<div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="ghost" disabled={performanceLoadingId === suggestion.id} onClick={() => void explainPerformanceSuggestion(suggestion.id)}>{performanceLoadingId === suggestion.id ? <LoaderCircle className="animate-spin" /> : <Sparkles />}{explanation ? "Atualizar explicação" : "Explicar com IA"}</Button><Button size="sm" variant="secondary" disabled={aiLoading} onClick={() => { setAiInstruction(proposalInstruction); setAiIntent("reorganize"); void requestStructure("reorganize", proposalInstruction); }}>Criar proposta</Button></div></article>; })}</div> : <p className="mt-4 text-xs text-[#697684]">Carregando evidência…</p>}
+            <TabsContent
+              value="advanced"
+              className="m-0 border-t border-[#e3e9ef] p-4"
+            >
+              <div className="rounded-2xl bg-[#eef6ff] p-4">
+                <strong className="text-sm">Performance Copilot</strong>
+                <p className="mt-2 text-xs leading-5 text-[#566a7e]">
+                  Sugestões só aparecem após 30 dias, 30 sessões e 15 sessões da
+                  meta principal quando aplicável.
+                </p>
+              </div>
+              {!performance?.publishedAt ? (
+                <p className="mt-4 rounded-xl border border-[#dfe7ef] p-4 text-xs leading-5 text-[#697684]">
+                  Publique o site para iniciar a janela de aprendizado.
+                </p>
+              ) : performance.evidence ? (
+                <div className="mt-4 flex flex-col gap-3">
+                  <p
+                    className={`rounded-xl p-3 text-xs font-bold ${performance.evidence.eligible ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900"}`}
+                  >
+                    {performance.evidence.message}
+                  </p>
+                  <EvidenceBar
+                    label="Dias"
+                    progress={performance.evidence.daysProgress}
+                    value={`${performance.evidence.completeDays}/30`}
+                  />
+                  <EvidenceBar
+                    label="Sessões"
+                    progress={performance.evidence.sessionsProgress}
+                    value={`${Math.round(performance.evidence.sessionsProgress * 30)}/30`}
+                  />
+                  {performance.evidence.goalSessionsProgress != null ? (
+                    <EvidenceBar
+                      label={performance.primaryGoalName || "Meta principal"}
+                      progress={performance.evidence.goalSessionsProgress}
+                      value={`${Math.round(performance.evidence.goalSessionsProgress * 15)}/15`}
+                    />
+                  ) : null}
+                  {performance.suggestions.map((suggestion) => {
+                    const explanation = performanceExplanations[suggestion.id];
+                    const proposalInstruction = `Proponha uma alteração para “${suggestion.title}”. Evidência observada: ${suggestion.explanation}.${explanation ? ` Leitura: ${explanation.explanation} Próxima ação: ${explanation.recommendedAction}` : ""}`;
+                    return (
+                      <article
+                        key={suggestion.id}
+                        className="rounded-xl border border-[#dfe7ef] p-3"
+                      >
+                        <strong className="text-xs">{suggestion.title}</strong>
+                        <p className="mt-2 text-[11px] leading-5 text-[#697684]">
+                          {suggestion.explanation}
+                        </p>
+                        {explanation ? (
+                          <div className="mt-3 rounded-xl bg-[#f7fbff] p-3">
+                            <span className="text-[10px] font-black uppercase tracking-[.08em] text-[#0054fc]">
+                              {explanation.usedAI
+                                ? "Leitura da Sobe IA"
+                                : "Leitura determinística"}
+                            </span>
+                            <p className="mt-2 text-[11px] leading-5 text-[#5f5970]">
+                              {explanation.explanation}
+                            </p>
+                            <p className="mt-2 text-[11px] font-bold text-[#4e4861]">
+                              Próxima ação: {explanation.recommendedAction}
+                            </p>
+                          </div>
+                        ) : null}
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={performanceLoadingId === suggestion.id}
+                            onClick={() =>
+                              void explainPerformanceSuggestion(suggestion.id)
+                            }
+                          >
+                            {performanceLoadingId === suggestion.id ? (
+                              <LoaderCircle className="animate-spin" />
+                            ) : (
+                              <Sparkles />
+                            )}
+                            {explanation
+                              ? "Atualizar explicação"
+                              : "Explicar com IA"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={aiLoading}
+                            onClick={() => {
+                              setAiInstruction(proposalInstruction);
+                              setAiIntent("reorganize");
+                              void requestStructure(
+                                "reorganize",
+                                proposalInstruction,
+                              );
+                            }}
+                          >
+                            Criar proposta
+                          </Button>
+                          <Button
+                            size="sm"
+                            disabled={
+                              performanceLoadingId === suggestion.id ||
+                              approvedSuggestionIds.has(suggestion.id)
+                            }
+                            onClick={() =>
+                              void approvePerformanceSuggestion(suggestion.id)
+                            }
+                          >
+                            {approvedSuggestionIds.has(suggestion.id)
+                              ? "Teste aprovado"
+                              : "Aprovar teste manual"}
+                          </Button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mt-4 text-xs text-[#697684]">
+                  Carregando evidência…
+                </p>
+              )}
             </TabsContent>
           </Tabs>
         </aside>
@@ -1065,14 +1862,172 @@ export function SiteEditor({ projectId }: { projectId: string }) {
         </div>
       ) : null}
       {structureProposal ? (
-        <div role="dialog" aria-modal="true" aria-labelledby="structure-proposal-title" className="fixed inset-0 z-50 grid place-items-center bg-[#101827]/55 p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="structure-proposal-title"
+          className="fixed inset-0 z-50 grid place-items-center bg-[#101827]/55 p-4"
+        >
           <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-5 shadow-[0_28px_90px_rgba(15,23,42,.34)] md:p-7">
-            <div className="flex items-start justify-between gap-4"><div><span className="inline-flex items-center gap-2 text-xs font-black text-[#0054fc]"><Sparkles />Sobe IA · {structureProposal.usedAI ? "planner + IA contextual" : "planner determinístico"}</span><h2 id="structure-proposal-title" className="mt-2 text-2xl font-black">Revise a proposta</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-[#66717e]">{structureProposal.suggestion.reasoning}</p></div><Button size="icon" variant="ghost" aria-label="Fechar proposta" onClick={() => setStructureProposal(undefined)}><X /></Button></div>
-            <div className="mt-5 grid gap-3 md:grid-cols-2">{structureProposal.suggestion.pages.map((page) => <article key={`${page.type}-${page.pathSuggestion}`} className="rounded-2xl border border-[#dfe7ef] p-4"><div className="flex items-center justify-between gap-3"><strong>{page.name}</strong><span className="text-xs font-bold text-[#0054fc]">{page.pathSuggestion}</span></div><p className="mt-2 text-xs leading-5 text-[#687582]">{page.purpose}</p><ol className="mt-3 flex flex-col gap-1 text-xs">{page.sections.map((section, index) => <li key={`${section.sectionType}-${index}`} className="flex gap-2"><span className="text-[#0054fc]">{index + 1}.</span><span>{presenceSectionRegistry[section.sectionType].label} — {section.purpose}</span></li>)}</ol></article>)}</div>
-            {structureProposal.suggestion.warnings.length ? <div className="mt-4 flex flex-col gap-1 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">{structureProposal.suggestion.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div> : null}
-            <div className="mt-5 rounded-2xl border border-[#dfe7ef] bg-[#f8fafc] p-4"><div className="flex items-center justify-between gap-3"><strong className="text-sm">Diff semântico</strong><button type="button" className="text-xs font-black text-[#0054fc]" onClick={() => setSelectedOperationIds(new Set(selectedOperationIds.size === structureProposal.operations.length ? [] : structureProposal.operations.map((operation) => operation.id)))}>{selectedOperationIds.size === structureProposal.operations.length ? "Desmarcar tudo" : "Selecionar tudo"}</button></div><div className={`mt-3 flex flex-col gap-2 ${customizingProposal ? "" : "max-h-52 overflow-hidden"}`}>{structureProposal.operations.map((operation) => <label key={operation.id} className="flex min-h-11 items-center gap-3 rounded-xl border border-[#dde6ee] bg-white px-3 py-2 text-xs font-bold"><input type="checkbox" checked={selectedOperationIds.has(operation.id)} onChange={(event) => setSelectedOperationIds((current) => { const next = new Set(current); if (event.target.checked) next.add(operation.id); else next.delete(operation.id); return next; })} /><span className={`grid size-6 shrink-0 place-items-center rounded-lg ${operation.type === "remove_section" ? "bg-red-50 text-red-700" : operation.type === "move_section" ? "bg-amber-50 text-amber-800" : "bg-blue-50 text-[#0054fc]"}`}>{operationSymbol(operation)}</span><span>{operationDescription(operation)}</span></label>)}</div>{structureProposal.operations.length > 4 ? <button type="button" onClick={() => setCustomizingProposal((value) => !value)} className="mt-3 text-xs font-black text-[#0054fc]">{customizingProposal ? "Mostrar menos" : "Ver e personalizar todas as operações"}</button> : null}</div>
-            <p className="mt-4 text-xs font-bold text-[#65717d]">{selectedOperationIds.size} de {structureProposal.operations.length} operações selecionadas. A aplicação altera apenas o rascunho e nunca publica o site.</p>
-            <div className="mt-6 flex flex-wrap justify-end gap-2"><Button variant="ghost" onClick={() => setStructureProposal(undefined)}>Descartar</Button><Button variant="secondary" onClick={() => setCustomizingProposal(true)}>Personalizar antes</Button><Button disabled={aiLoading || !selectedOperationIds.size} onClick={() => void applyStructureProposal()}>{aiLoading ? <LoaderCircle className="animate-spin" /> : null}Aplicar ao rascunho</Button></div>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <span className="inline-flex items-center gap-2 text-xs font-black text-[#0054fc]">
+                  <Sparkles />
+                  Sobe IA ·{" "}
+                  {structureProposal.usedAI
+                    ? "planner + IA contextual"
+                    : "planner determinístico"}
+                </span>
+                <h2
+                  id="structure-proposal-title"
+                  className="mt-2 text-2xl font-black"
+                >
+                  Revise a proposta
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-[#66717e]">
+                  {structureProposal.suggestion.reasoning}
+                </p>
+              </div>
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="Fechar proposta"
+                onClick={() => setStructureProposal(undefined)}
+              >
+                <X />
+              </Button>
+            </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              {structureProposal.suggestion.pages.map((page) => (
+                <article
+                  key={`${page.type}-${page.pathSuggestion}`}
+                  className="rounded-2xl border border-[#dfe7ef] p-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <strong>{page.name}</strong>
+                    <span className="text-xs font-bold text-[#0054fc]">
+                      {page.pathSuggestion}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-[#687582]">
+                    {page.purpose}
+                  </p>
+                  <ol className="mt-3 flex flex-col gap-1 text-xs">
+                    {page.sections.map((section, index) => (
+                      <li
+                        key={`${section.sectionType}-${index}`}
+                        className="flex gap-2"
+                      >
+                        <span className="text-[#0054fc]">{index + 1}.</span>
+                        <span>
+                          {presenceSectionRegistry[section.sectionType].label} —{" "}
+                          {section.purpose}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                </article>
+              ))}
+            </div>
+            {structureProposal.suggestion.warnings.length ? (
+              <div className="mt-4 flex flex-col gap-1 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">
+                {structureProposal.suggestion.warnings.map((warning) => (
+                  <p key={warning}>{warning}</p>
+                ))}
+              </div>
+            ) : null}
+            <div className="mt-5 rounded-2xl border border-[#dfe7ef] bg-[#f8fafc] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <strong className="text-sm">Diff semântico</strong>
+                <button
+                  type="button"
+                  className="text-xs font-black text-[#0054fc]"
+                  onClick={() =>
+                    setSelectedOperationIds(
+                      new Set(
+                        selectedOperationIds.size ===
+                          structureProposal.operations.length
+                          ? []
+                          : structureProposal.operations.map(
+                              (operation) => operation.id,
+                            ),
+                      ),
+                    )
+                  }
+                >
+                  {selectedOperationIds.size ===
+                  structureProposal.operations.length
+                    ? "Desmarcar tudo"
+                    : "Selecionar tudo"}
+                </button>
+              </div>
+              <div
+                className={`mt-3 flex flex-col gap-2 ${customizingProposal ? "" : "max-h-52 overflow-hidden"}`}
+              >
+                {structureProposal.operations.map((operation) => (
+                  <label
+                    key={operation.id}
+                    className="flex min-h-11 items-center gap-3 rounded-xl border border-[#dde6ee] bg-white px-3 py-2 text-xs font-bold"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedOperationIds.has(operation.id)}
+                      onChange={(event) =>
+                        setSelectedOperationIds((current) => {
+                          const next = new Set(current);
+                          if (event.target.checked) next.add(operation.id);
+                          else next.delete(operation.id);
+                          return next;
+                        })
+                      }
+                    />
+                    <span
+                      className={`grid size-6 shrink-0 place-items-center rounded-lg ${operation.type === "remove_section" ? "bg-red-50 text-red-700" : operation.type === "move_section" ? "bg-amber-50 text-amber-800" : "bg-blue-50 text-[#0054fc]"}`}
+                    >
+                      {operationSymbol(operation)}
+                    </span>
+                    <span>{operationDescription(operation)}</span>
+                  </label>
+                ))}
+              </div>
+              {structureProposal.operations.length > 4 ? (
+                <button
+                  type="button"
+                  onClick={() => setCustomizingProposal((value) => !value)}
+                  className="mt-3 text-xs font-black text-[#0054fc]"
+                >
+                  {customizingProposal
+                    ? "Mostrar menos"
+                    : "Ver e personalizar todas as operações"}
+                </button>
+              ) : null}
+            </div>
+            <p className="mt-4 text-xs font-bold text-[#65717d]">
+              {selectedOperationIds.size} de{" "}
+              {structureProposal.operations.length} operações selecionadas. A
+              aplicação altera apenas o rascunho e nunca publica o site.
+            </p>
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setStructureProposal(undefined)}
+              >
+                Descartar
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setCustomizingProposal(true)}
+              >
+                Personalizar antes
+              </Button>
+              <Button
+                disabled={aiLoading || !selectedOperationIds.size}
+                onClick={() => void applyStructureProposal()}
+              >
+                {aiLoading ? <LoaderCircle className="animate-spin" /> : null}
+                Aplicar ao rascunho
+              </Button>
+            </div>
           </div>
         </div>
       ) : null}
@@ -1165,8 +2120,29 @@ export function SiteEditor({ projectId }: { projectId: string }) {
   );
 }
 
-function EvidenceBar({ label, progress, value }: { label: string; progress: number; value: string }) {
-  return <div><div className="mb-1 flex items-center justify-between gap-3 text-[11px] font-bold text-[#5f6d7b]"><span>{label}</span><span>{value}</span></div><div className="h-2 overflow-hidden rounded-full bg-[#dfe8f1]"><div className="h-full rounded-full bg-[#0054fc]" style={{ width: `${Math.round(progress * 100)}%` }} /></div></div>;
+function EvidenceBar({
+  label,
+  progress,
+  value,
+}: {
+  label: string;
+  progress: number;
+  value: string;
+}) {
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between gap-3 text-[11px] font-bold text-[#5f6d7b]">
+        <span>{label}</span>
+        <span>{value}</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-[#dfe8f1]">
+        <div
+          className="h-full rounded-full bg-[#0054fc]"
+          style={{ width: `${Math.round(progress * 100)}%` }}
+        />
+      </div>
+    </div>
+  );
 }
 
 function PageInspectorBase({
@@ -1231,7 +2207,15 @@ function PageInspectorBase({
       </label>
       <label className={label}>
         Propósito da página
-        <textarea className={`${input} min-h-20 py-2`} value={page.purpose || ""} maxLength={400} onChange={(event) => onChange({ ...page, purpose: event.target.value || undefined })} placeholder="Explique qual decisão esta página deve apoiar." />
+        <textarea
+          className={`${input} min-h-20 py-2`}
+          value={page.purpose || ""}
+          maxLength={400}
+          onChange={(event) =>
+            onChange({ ...page, purpose: event.target.value || undefined })
+          }
+          placeholder="Explique qual decisão esta página deve apoiar."
+        />
       </label>
       <label className={label}>
         Caminho

@@ -697,7 +697,7 @@ export interface EntryPoint {
   targetStepId?: string;
   surfaceMode?: PublicSurfaceMode;
   presencePageId?: string;
-  channel: "bio" | "story" | "ad" | "qr" | "linkedin" | "other";
+  channel: "bio" | "story" | "instagram_reel" | "tiktok" | "youtube" | "ad" | "qr" | "linkedin" | "other";
   utmSource?: string;
   utmMedium?: string;
   utmCampaign?: string;
@@ -828,6 +828,8 @@ export interface Project {
   };
   dataRequirements?: DataRequirement[];
   version: number;
+  publishedVersionId?: string;
+  publishedVersionNumber?: number;
   createdAt: string;
   updatedAt: string;
   publishedAt?: string;
@@ -1002,6 +1004,7 @@ export interface AnalyticsEvent {
   visitorId: string;
   sessionId: string;
   eventName: AnalyticsEventName;
+  projectVersionId?: string;
   conversionGoalId?: string;
   entryPointId?: string;
   presencePageId?: string;
@@ -1040,6 +1043,7 @@ export interface CommercialOpportunity {
   projectId: string;
   projectName?: string;
   sessionId?: string;
+  projectVersionId?: string;
   conversionGoalId?: string;
   entryPointId?: string;
   presencePageId?: string;
@@ -1077,6 +1081,13 @@ export interface OptimizationSuggestion {
   title: string;
   explanation: string;
   evidence: Record<string, number | string>;
+  targetMetric?: "intention_rate" | "action_rate" | "opportunity_rate" | "conversion_rate" | "confirmed_value_per_session";
+  proposedChange?: {
+    changeType: "shorten_journey" | "reorder_step" | "remove_optional_field" | "change_cta_copy" | "move_primary_cta" | "change_goal_priority" | "change_entry_surface" | "simplify_choice_set";
+    before: Record<string, unknown>;
+    after: Record<string, unknown>;
+    riskLevel: "low" | "medium" | "high";
+  };
   status: "open" | "dismissed" | "applied";
   createdAt: string;
 }

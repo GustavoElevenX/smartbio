@@ -10,7 +10,7 @@ import type {
 import type { PresencePage } from "@/features/presence/presence.types";
 
 export const projectAggregateSelect = `
-  id,workspace_id,name,slug,description,status,primary_goal,category,theme,settings,published_at,created_at,updated_at,
+  id,workspace_id,name,slug,description,status,primary_goal,category,theme,settings,published_version_id,published_at,created_at,updated_at,
   brand_profiles(primary_logo_asset_id,light_logo_asset_id,dark_logo_asset_id,favicon_asset_id,extracted_colors,active_palette,palette_variations,design_system,brand_personality,analysis_metadata),
   business_profiles(signals),project_capabilities(capability_key,enabled,source,settings),
   project_data_requirements(id,requirement_key,label,capability_key,status,severity,value,origin,source_id,field_metadata,reason),
@@ -687,6 +687,8 @@ export function projectFromNormalizedRow(
     commercialConfig,
     dataRequirements,
     version: Number(settings.version || 1),
+    publishedVersionId: row.published_version_id ? String(row.published_version_id) : settings.publishedVersionId ? String(settings.publishedVersionId) : undefined,
+    publishedVersionNumber: settings.publishedVersionNumber ? Number(settings.publishedVersionNumber) : undefined,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
     publishedAt: row.published_at ? String(row.published_at) : undefined,

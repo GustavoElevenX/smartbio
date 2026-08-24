@@ -144,7 +144,7 @@ export async function publishProject(
   const prepared = await prepareProjectPublication(actor, projectId, localSnapshot);
   if (!prepared.readiness.publishable) return prepared;
 
-  await createProjectSnapshot(actor, projectId, prepared.project, "project.published");
+  const snapshot = await createProjectSnapshot(actor, projectId, prepared.project, "project.published");
   const withPublicMedia = await publishProjectMedia(actor, prepared.project);
   const now = new Date().toISOString();
   const published: Project = {
@@ -153,6 +153,8 @@ export async function publishProject(
     publishedAt: now,
     updatedAt: now,
     version: Math.max(1, withPublicMedia.version + 1),
+    publishedVersionId: snapshot.versionId,
+    publishedVersionNumber: snapshot.versionNumber,
   };
 
   if (actor.persistence === "database") {
@@ -175,21 +177,39 @@ export async function publishProject(
       .update({
         status: "published",
         published_at: now,
+        published_version_id: snapshot.versionId || null,
         settings: {
           ...settings,
           version: published.version,
+          publishedVersionId: snapshot.versionId,
+          publishedVersionNumber: snapshot.versionNumber,
           publishedPayload: published,
         },
       })
       .eq("id", projectId)
       .eq("workspace_id", actor.workspaceId);
     if (error) throw new Error("Não foi possível publicar o projeto.");
+    if (snapshot.versionId) {
+      const { error: experimentLinkError } = await supabase.rpc("link_published_optimization_experiments", {
+        target_project: projectId,
+        target_version: snapshot.versionId,
+        published_at: now,
+      });
+      if (experimentLinkError) throw new Error("O projeto foi publicado, mas o experimento não pôde ser vinculado à versão.");
+    }
     await recordPlatformGrowthEvent(supabase, {
       eventName: "project_published",
       userId: actor.userId,
       workspaceId: actor.workspaceId,
-      metadata: { projectId: published.id, slug: published.slug },
+      metadata: { projectId: published.id, versionNumber: snapshot.versionNumber },
       idempotencyKey: `project_published:${published.id}:${published.version}`,
+    }).catch(() => undefined);
+    await recordPlatformGrowthEvent(supabase, {
+      eventName: "first_project_published",
+      userId: actor.userId,
+      workspaceId: actor.workspaceId,
+      metadata: { projectId: published.id, versionNumber: snapshot.versionNumber },
+      idempotencyKey: `first_project_published:${actor.workspaceId}`,
     }).catch(() => undefined);
     revalidatePath(`/${published.slug}`);
   }

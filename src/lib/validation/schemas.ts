@@ -21,6 +21,7 @@ export const analyticsEventNames = [
 
 export const analyticsEventSchema = z.object({
   projectId: shortId, visitorId: shortId, sessionId: shortId,
+  idempotencyKey: z.string().trim().min(12).max(180).optional(),
   eventName: z.enum(analyticsEventNames),
   stepId: shortId.optional(), optionId: shortId.optional(), conversionGoalId: shortId.optional(), entryPointId: shortId.optional(), destinationId: shortId.optional(), presencePageId: shortId.optional(), presenceSectionId: shortId.optional(), activationId: z.string().uuid().optional(), benefitClaimId: z.string().uuid().optional(), metadata: z.record(z.string().max(80), z.unknown()).optional(), referrer: z.string().url().max(1000).or(z.literal("")).optional(),
   utmSource: safeText.optional(), utmMedium: safeText.optional(), utmCampaign: safeText.optional(), utmContent: safeText.optional(), utmTerm: safeText.optional(), deviceType: z.enum(["mobile", "desktop", "tablet"]).optional(),

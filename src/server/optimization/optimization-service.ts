@@ -18,7 +18,7 @@ export async function getOptimizationState(actor: AuthenticatedActor, projectId:
 
   const database = actor.persistence === "database" ? createServiceClient() : null;
   const result = database
-    ? await database.from("analytics_events").select("id,event_name,session_id,conversion_goal_id,created_at").eq("project_id", projectId).order("created_at", { ascending: true })
+    ? await database.from("analytics_events").select("id,event_name,session_id,conversion_goal_id,entry_point_id,step_id,presence_page_id,presence_section_id,created_at").eq("project_id", projectId).order("created_at", { ascending: true })
     : { data: [], error: null };
   if (result.error) throw new Error("Não foi possível carregar a evidência de performance.");
   const events = (result.data || []).map((row) => ({
@@ -28,6 +28,10 @@ export async function getOptimizationState(actor: AuthenticatedActor, projectId:
     sessionId: String(row.session_id || row.id),
     eventName: row.event_name,
     conversionGoalId: row.conversion_goal_id ? String(row.conversion_goal_id) : undefined,
+    entryPointId: row.entry_point_id ? String(row.entry_point_id) : undefined,
+    stepId: row.step_id ? String(row.step_id) : undefined,
+    presencePageId: row.presence_page_id ? String(row.presence_page_id) : undefined,
+    presenceSectionId: row.presence_section_id ? String(row.presence_section_id) : undefined,
     createdAt: String(row.created_at),
   })) as AnalyticsEvent[];
   const sessions = new Set(events.map((event) => event.sessionId)).size;
@@ -38,7 +42,7 @@ export async function getOptimizationState(actor: AuthenticatedActor, projectId:
     ? getOptimizationEvidenceState({ publishedAt, periodStart: publishedAt, periodEnd: new Date().toISOString(), totalSessions: sessions, goalSessions })
     : null;
   const suggestions = evidence?.eligible
-    ? buildOptimizationSuggestions(projectId, project.conversionGoals || [], events, publishedAt)
+    ? buildOptimizationSuggestions(projectId, project.conversionGoals || [], events, publishedAt, project.entryPoints || [])
     : [];
   return { project, evidence, suggestions, publishedAt, primaryGoalName: primaryGoal?.name };
 }

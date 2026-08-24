@@ -25,7 +25,7 @@ export async function loadProjectAggregate(
   const supabase = createServiceClient();
   if (!supabase) return null;
   const tables = [
-    ["projects", "id,workspace_id,name,slug,description,status,primary_goal,category,theme,settings,published_at,created_at,updated_at"],
+    ["projects", "id,workspace_id,name,slug,description,status,primary_goal,category,theme,settings,published_version_id,published_at,created_at,updated_at"],
     ["brand_profiles", "primary_logo_asset_id,light_logo_asset_id,dark_logo_asset_id,favicon_asset_id,extracted_colors,active_palette,palette_variations,design_system,brand_personality,analysis_metadata"],
     ["business_profiles", "signals"],
     ["project_capabilities", "capability_key,enabled,source,settings"],

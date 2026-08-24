@@ -14,6 +14,7 @@ import {
 import { useEffect, useState } from "react";
 import { projectRepository } from "@/lib/repositories/project-repository";
 import type { Project } from "@/types";
+import { publicProjectUrl } from "@/lib/public-url";
 
 export function ProjectsList() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -102,7 +103,7 @@ export function ProjectsList() {
                   {project.status === "published" ? "Publicado" : "Rascunho"}
                 </span>
                 <a
-                  href={`/${project.slug}`}
+                  href={publicProjectUrl(project.slug)}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0054fc]"
@@ -111,7 +112,7 @@ export function ProjectsList() {
                 </a>
               </div>
               <p className="mt-4 text-xs text-[#878791]">
-                smart.bio/{project.slug}
+                {publicProjectUrl(project.slug)}
               </p>
               <div className="mt-5 grid grid-cols-4 gap-2">
                 <Link

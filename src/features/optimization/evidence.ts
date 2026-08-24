@@ -1,6 +1,8 @@
-export const OPTIMIZATION_MIN_DAYS = 30;
-export const OPTIMIZATION_MIN_SESSIONS = 30;
-export const OPTIMIZATION_MIN_GOAL_SESSIONS = 15;
+import { OPTIMIZATION_THRESHOLDS } from "./config";
+
+export const OPTIMIZATION_MIN_DAYS = OPTIMIZATION_THRESHOLDS.completeDays;
+export const OPTIMIZATION_MIN_SESSIONS = OPTIMIZATION_THRESHOLDS.projectSessions;
+export const OPTIMIZATION_MIN_GOAL_SESSIONS = OPTIMIZATION_THRESHOLDS.goalSessions;
 
 export interface OptimizationEvidenceInput {
   publishedAt: string;

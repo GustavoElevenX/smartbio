@@ -10,6 +10,7 @@ import { clientEnv } from "@/lib/env/client";
 import { getTrialDaysRemaining, SOBE_PRO, SOBE_TRIAL } from "@/lib/sobe-pro";
 import type { BillingStatusDto } from "@/server/billing/billing-service";
 import type { WorkspaceEntitlements } from "@/server/entitlements/entitlement-types";
+import { SurfaceViewMarker } from "@/components/product-lifecycle/surface-view-marker";
 
 const included = [
   "1 negócio e até 5 páginas publicadas",
@@ -99,6 +100,7 @@ function PaymentMethodForm({ onSaved }: { onSaved: () => void }) {
 export function BillingSettingsReal() {
   const [entitlements, setEntitlements] = useState<WorkspaceEntitlements>();
   const [billing, setBilling] = useState<BillingStatusDto>();
+  const [valueSummary, setValueSummary] = useState<{ periodDays: number; sessions: number; opportunities: number; conversions: number; confirmedValue: number }>();
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [successNotice, setSuccessNotice] = useState<string>();
@@ -107,6 +109,8 @@ export function BillingSettingsReal() {
   const [checkoutSecret, setCheckoutSecret] = useState<string>();
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelComment, setCancelComment] = useState("");
   const [setupSecret, setSetupSecret] = useState<string>();
   const [setupOpen, setSetupOpen] = useState(false);
 
@@ -114,12 +118,14 @@ export function BillingSettingsReal() {
     setLoading(true);
     setFailed(false);
     try {
-      const [entitlementData, billingData] = await Promise.all([
+      const [entitlementData, billingData, valueData] = await Promise.all([
         api<WorkspaceEntitlements>("/api/workspace/entitlements"),
         api<BillingStatusDto>("/api/billing/status"),
+        api<{ periodDays: number; sessions: number; opportunities: number; conversions: number; confirmedValue: number }>("/api/billing/value-summary"),
       ]);
       setEntitlements(entitlementData);
       setBilling(billingData);
+      setValueSummary(valueData);
     } catch {
       setFailed(true);
     } finally {
@@ -171,12 +177,12 @@ export function BillingSettingsReal() {
     }
   }
 
-  async function mutate(url: string, success: string) {
+  async function mutate(url: string, success: string, body?: Record<string, unknown>) {
     setBusy(url);
     setSuccessNotice(undefined);
     setErrorNotice(undefined);
     try {
-      await api(url, { method: "POST" });
+      await api(url, { method: "POST", headers: body ? { "content-type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });
       setSuccessNotice(success);
       setCancelOpen(false);
       await load();
@@ -204,6 +210,7 @@ export function BillingSettingsReal() {
 
   return (
     <div className="mx-auto max-w-6xl pb-16">
+      {isExpiredTrial ? <SurfaceViewMarker surface="paywall" /> : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-extrabold tracking-[-.03em]">Plano e cobrança</h1>
@@ -289,6 +296,18 @@ export function BillingSettingsReal() {
         </div>
       </section>
 
+      {valueSummary ? (
+        <section aria-labelledby="value-title" className="mt-8 rounded-2xl border border-[#dfe6ee] bg-white p-5 shadow-[0_14px_40px_rgba(7,23,47,.06)] sm:p-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div><h2 id="value-title" className="text-xl font-extrabold tracking-[-.02em]">Valor observado antes da cobrança</h2><p className="mt-1 text-sm text-[#596879]">Últimos {valueSummary.periodDays} dias, sem projeções nem receita estimada.</p></div>
+            <strong className="text-2xl tabular-nums text-[#0054fc]">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valueSummary.confirmedValue)}</strong>
+          </div>
+          <dl className="mt-5 grid grid-cols-3 gap-3 border-t border-[#e8edf2] pt-5">
+            {[["Sessões", valueSummary.sessions], ["Oportunidades", valueSummary.opportunities], ["Conversões", valueSummary.conversions]].map(([label, value]) => <div key={String(label)}><dt className="text-xs text-[#596879]">{String(label)}</dt><dd className="mt-1 text-xl font-extrabold tabular-nums">{Number(value).toLocaleString("pt-BR")}</dd></div>)}
+          </dl>
+        </section>
+      ) : null}
+
       {billing?.plan === "pro" ? (
         <div className="mt-8 grid gap-8 lg:grid-cols-[.8fr_1.2fr]">
           <section aria-labelledby="payment-title">
@@ -327,7 +346,8 @@ export function BillingSettingsReal() {
       <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Cancelar assinatura?</DialogTitle><DialogDescription>Seu acesso ao SOBE Pro continuará até {date(billing?.currentPeriodEnd)}. Não haverá reembolso automático e seus dados permanecerão salvos.</DialogDescription></DialogHeader>
-          <DialogFooter className="gap-3"><Button variant="secondary" onClick={() => setCancelOpen(false)}>Manter assinatura</Button><Button variant="danger" onClick={() => void mutate("/api/billing/cancel", "Cancelamento agendado para o fim do período.")} disabled={Boolean(busy)}>{busy === "/api/billing/cancel" ? <Loader2 className="size-4 animate-spin" /> : null}Confirmar cancelamento</Button></DialogFooter>
+          <div className="space-y-4"><label className="block text-sm font-bold">Motivo (opcional)<select value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} className="mt-2 min-h-11 w-full rounded-xl border border-[#dfe6ee] bg-white px-3 font-normal"><option value="">Prefiro não responder</option><option value="not_using">Não estou usando</option><option value="no_traffic">Não tive tráfego</option><option value="no_result">Não tive resultado</option><option value="too_expensive">Ficou caro</option><option value="alternative">Encontrei outra ferramenta</option><option value="missing_feature">Faltou funcionalidade</option><option value="other">Outro</option></select></label><label className="block text-sm font-bold">Comentário (opcional)<textarea value={cancelComment} onChange={(event) => setCancelComment(event.target.value)} maxLength={1000} rows={3} className="mt-2 w-full rounded-xl border border-[#dfe6ee] bg-white p-3 font-normal" /></label></div>
+          <DialogFooter className="gap-3"><Button variant="secondary" onClick={() => setCancelOpen(false)}>Manter assinatura</Button><Button variant="danger" onClick={() => void mutate("/api/billing/cancel", "Cancelamento agendado para o fim do período.", { reason: cancelReason || undefined, comment: cancelComment || undefined })} disabled={Boolean(busy)}>{busy === "/api/billing/cancel" ? <Loader2 className="size-4 animate-spin" /> : null}Confirmar cancelamento</Button></DialogFooter>
         </DialogContent>
       </Dialog>
       </> : null}

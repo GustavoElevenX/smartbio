@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import type { ProjectReadinessResult } from "@/features/publishing/project-readiness";
 import type { Project } from "@/types";
+import { SurfaceViewMarker } from "@/components/product-lifecycle/surface-view-marker";
 
 interface PublishResponse {
   data?: {
@@ -83,6 +84,7 @@ export function PublishReadinessModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      {open ? <SurfaceViewMarker surface="publish_readiness" projectId={project.id} /> : null}
       <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto rounded-[24px] border-[#dedce8] p-0">
         <DialogHeader className="border-b border-[#e8e6ed] px-6 py-5 pr-12">
           <DialogTitle className="flex items-center gap-2 text-xl font-extrabold tracking-[-.03em]">

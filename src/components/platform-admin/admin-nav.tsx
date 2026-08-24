@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const links = [
   ["/admin", "Visão geral"],
   ["/admin/acquisition", "Aquisição"],
+  ["/admin/product", "Produto"],
   ["/admin/users", "Usuários"],
   ["/admin/workspaces", "Espaços de trabalho"],
   ["/admin/pages", "Páginas"],

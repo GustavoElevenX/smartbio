@@ -2,238 +2,380 @@
 
 import Link from "next/link";
 import {
-  ArrowUpRight,
+  ArrowRight,
   BarChart3,
-  Eye,
-  MessageCircle,
-  MoreHorizontal,
+  BrainCircuit,
+  ExternalLink,
+  Globe2,
   Plus,
+  Route,
   Sparkles,
-  Target,
-  Users,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { commercialRepository } from "@/lib/repositories/commercial-repository";
-import { localStore } from "@/lib/local-store";
-import { projectRepository } from "@/lib/repositories/project-repository";
+import { useEffect, useMemo } from "react";
+import type { WorkspaceOperationalOverview } from "@/features/dashboard/operational-overview";
+import { resolveNextBestAction } from "@/features/dashboard/next-best-action";
 import { formatNumber } from "@/lib/utils";
-import type { AnalyticsEvent, CommercialOpportunity, Project } from "@/types";
 
-export function Overview() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [events, setEvents] = useState<AnalyticsEvent[]>([]);
-  const [opportunities, setOpportunities] = useState<CommercialOpportunity[]>([]);
+const money = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+});
+
+function nextActionHref(
+  key: ReturnType<typeof resolveNextBestAction>["key"],
+  projectId?: string,
+) {
+  if (key === "create") return "/app/onboarding";
+  if (key === "upgrade") return "/app/settings/billing";
+  if (!projectId) return "/app/projects";
+  if (key === "publish") return `/app/projects/${projectId}/launch`;
+  if (key === "distribute") return `/app/projects/${projectId}/entries`;
+  if (key === "confirm") return `/app/projects/${projectId}/opportunities`;
+  if (key === "optimize" || key === "friction")
+    return `/app/projects/${projectId}/analytics`;
+  return `/app/projects/${projectId}/site`;
+}
+
+function observedDays(overview: WorkspaceOperationalOverview) {
+  const published = overview.projects
+    .map((project) => project.publishedAt)
+    .filter((date): date is string => Boolean(date))
+    .sort()[0];
+  if (!published) return 0;
+  return Math.max(
+    0,
+    Math.floor(
+      (new Date(overview.periodEnd).getTime() - new Date(published).getTime()) /
+        86_400_000,
+    ),
+  );
+}
+
+export function Overview({
+  overview,
+}: {
+  overview: WorkspaceOperationalOverview;
+}) {
+  const primary =
+    overview.projects.find((project) => project.status === "published") ||
+    overview.projects[0];
+  const published = overview.projects.some(
+    (project) => project.status === "published",
+  );
+  const nextAction = resolveNextBestAction({
+    hasProjects: overview.projects.length > 0,
+    published,
+    ...overview.totals,
+  });
+  const days = observedDays(overview);
+  const sessionsProgress = Math.min(
+    100,
+    Math.round((overview.totals.sessions / 30) * 100),
+  );
+  const daysProgress = Math.min(100, Math.round((days / 30) * 100));
+  const learning = overview.totals.sessions < 30 || days < 30;
+
   useEffect(() => {
-    void projectRepository.getProjects().then(async (items) => {
-      setProjects(items);
-      const tracked = await Promise.all(items.map((project) => commercialRepository.getEvents(project.id)));
-      setEvents(tracked.flat());
-      setOpportunities(items.flatMap((project) => localStore.getOpportunities(project.id)));
+    const projectIds = overview.projects
+      .map((project) => project.id)
+      .filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+    if (!projectIds.length) return;
+    void fetch("/api/product-state/overview", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ projectIds }),
     });
-  }, []);
-  const stats = useMemo(() => {
-    const views = events.filter(
-      (event) => event.eventName === "page_view",
-    ).length;
-    const sessions = new Set(events.map((event) => event.sessionId)).size;
-    const completed = new Set(
-      events
-        .filter((event) => event.eventName === "journey_completed")
-        .map((event) => event.sessionId),
-    ).size;
-    return {
-      views,
-      sessions,
-      completed,
-      rate: sessions ? Math.round((completed / sessions) * 100) : 0,
-      whatsapp: events.filter((event) => event.eventName === "whatsapp_clicked")
-        .length,
-    };
-  }, [events]);
+  }, [overview.projects]);
+
+  const metrics = useMemo(
+    () =>
+      [
+        ["Sessões", overview.totals.sessions],
+        ["Intenções", overview.totals.intentions],
+        ["Ações", overview.totals.actions],
+        ["Oportunidades", overview.totals.opportunities],
+        ["Conversões", overview.totals.conversions],
+        ["Valor confirmado", money.format(overview.totals.confirmedValue)],
+      ] as const,
+    [overview.totals],
+  );
+
   return (
-    <div className="animate-enter">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+    <div className="animate-enter pb-10">
+      <header className="flex flex-col gap-5 border-b border-[#01d2df]/70 pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-semibold text-[#0054fc]">Visão geral</p>
-          <h1 className="mt-1 text-3xl font-extrabold tracking-[-.04em]">
-            O que sua bio conduziu.
+          <h1 className="text-3xl font-extrabold tracking-[-.045em] text-[#07172f] sm:text-4xl">
+            {overview.hasPreviousVisit
+              ? "Desde sua última visita"
+              : "Últimos 7 dias"}
           </h1>
-          <p className="mt-2 text-sm text-[#72727d]">
-            Acompanhe a jornada, não só os cliques.
+          <p className="mt-2 text-sm text-[#526171]">
+            Acompanhe o que aconteceu e decida o próximo passo.
           </p>
         </div>
         <Link
-          href="/app/onboarding"
-          className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0054fc] px-4 text-sm font-bold text-white shadow-[0_8px_22px_rgba(0,84,252,.2)] transition hover:bg-[#0048d9]"
+          href={
+            primary ? `/app/projects/${primary.id}/entries` : "/app/onboarding"
+          }
+          className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 bg-[#0054fc] px-5 text-sm font-extrabold text-white [clip-path:polygon(0_0,calc(100%_-_12px)_0,100%_12px,100%_100%,0_100%)] hover:bg-[#0186fc]"
         >
-          <Plus size={17} /> Criar experiência
+          <Plus size={17} /> {primary ? "Criar entrada" : "Criar estrutura"}
         </Link>
-      </div>
-      <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          ["Visitas", stats.views, "Sem comparação ainda", Eye, "#0054fc", "#eaf3ff"],
-          [
-            "Jornadas concluídas",
-            stats.completed,
-            `${stats.rate}% de conclusão`,
-            Target,
-            "#14966b",
-            "#e8f8f2",
-          ],
-          [
-            "Oportunidades",
-            opportunities.length,
-            "Ações comerciais registradas",
-            Users,
-            "#dc604e",
-            "#fff0ed",
-          ],
-          [
-            "Cliques no WhatsApp",
-            stats.whatsapp,
-            "Conversão direta",
-            MessageCircle,
-            "#2b9b68",
-            "#e9f8ef",
-          ],
-        ].map(([label, value, note, Icon, color, background]) => {
-          const StatIcon = Icon as typeof Eye;
-          return (
-            <div
-              key={String(label)}
-              className="rounded-[20px] border border-[#e5e4eb] bg-white p-5 shadow-[0_8px_30px_rgba(30,28,50,.04)]"
-            >
-              <div className="flex items-start justify-between">
-                <span className="text-sm font-semibold text-[#72727c]">
-                  {String(label)}
-                </span>
-                <span
-                  className="grid size-9 place-items-center rounded-xl"
-                  style={{
-                    color: String(color),
-                    background: String(background),
-                  }}
-                >
-                  <StatIcon size={18} />
-                </span>
-              </div>
-              <strong className="mt-6 block text-3xl tracking-[-.04em]">
-                {formatNumber(Number(value))}
-              </strong>
-              <span className="mt-2 block text-xs font-medium text-[#84848e]">
-                {String(note)}
-              </span>
+      </header>
+
+      <section
+        aria-label="Evidência do período"
+        className="mt-6 grid border border-[#cbd3dc] bg-white sm:grid-cols-3 lg:grid-cols-6 [clip-path:polygon(0_0,calc(100%_-_14px)_0,100%_14px,100%_100%,0_100%)]"
+      >
+        {metrics.map(([label, value], index) => (
+          <div
+            key={label}
+            className={`min-h-28 px-5 py-5 ${index ? "border-t border-[#dfe5eb] sm:border-l sm:border-t-0" : ""}`}
+          >
+            <span className="block text-xs font-bold text-[#526171]">
+              {label}
+            </span>
+            <strong className="mt-3 block text-2xl tabular-nums tracking-[-.03em] text-[#07172f]">
+              {typeof value === "number" ? formatNumber(value) : value}
+            </strong>
+          </div>
+        ))}
+      </section>
+
+      <div className="mt-6 grid gap-5 lg:grid-cols-[1.02fr_.98fr]">
+        <section className="relative min-h-[260px] overflow-hidden bg-[#07172f] p-7 text-white [clip-path:polygon(0_0,calc(100%_-_18px)_0,100%_18px,100%_100%,0_100%)] sm:p-9">
+          <div className="sobe-gradient-rule absolute inset-x-0 top-0" />
+          <div className="relative flex h-full flex-col justify-between gap-10 sm:flex-row sm:items-center">
+            <span className="grid size-16 shrink-0 place-items-center border border-dashed border-white/55 text-[#02e5cd]">
+              <Route size={27} />
+            </span>
+            <div className="flex-1">
+              <p className="text-xs font-extrabold uppercase tracking-[.12em] text-[#01d2df]">
+                Próxima melhor ação
+              </p>
+              <h2 className="mt-3 text-2xl font-extrabold tracking-[-.035em]">
+                {nextAction.title}
+              </h2>
+              <p className="mt-3 max-w-xl text-sm leading-6 text-white/65">
+                {nextAction.description}
+              </p>
+              <Link
+                href={nextActionHref(nextAction.key, primary?.id)}
+                className="focus-ring mt-6 inline-flex min-h-11 items-center gap-2 bg-[#0054fc] px-4 text-sm font-extrabold text-white hover:bg-[#0186fc]"
+              >
+                {nextAction.actionLabel}
+                <ArrowRight size={16} />
+              </Link>
             </div>
-          );
-        })}
-      </div>
-      <div className="mt-7 grid gap-5 xl:grid-cols-[1.35fr_.65fr]">
-        <section className="rounded-[24px] border border-[#e5e4eb] bg-white p-5 sm:p-6">
-          <div className="flex items-center justify-between">
+          </div>
+        </section>
+
+        <section className="border border-[#cbd3dc] bg-white p-7 [clip-path:polygon(0_0,calc(100%_-_16px)_0,100%_16px,100%_100%,0_100%)]">
+          <div className="flex gap-3">
+            <BrainCircuit className="mt-0.5 text-[#0054fc]" size={24} />
             <div>
-              <h2 className="text-lg font-extrabold">Seus negócios</h2>
-              <p className="mt-1 text-xs text-[#84848e]">
-                Experiências ativas no workspace
+              <h2 className="text-lg font-extrabold text-[#07172f]">
+                Performance Copilot
+              </h2>
+              <p className="mt-1 text-sm text-[#526171]">
+                {learning
+                  ? "A Sobe ainda está aprendendo com seus dados"
+                  : "A evidência mínima foi reunida"}
               </p>
             </div>
-            <Link
-              href="/app/projects"
-              className="text-xs font-bold text-[#0054fc]"
-            >
-              Ver todos
-            </Link>
           </div>
-          <div className="mt-5 space-y-3">
-            {projects.slice(0, 3).map((project) => (
-              <div
-                key={project.id}
-                className="flex flex-wrap items-center gap-4 rounded-[17px] border border-[#ecebf0] p-3.5"
-              >
-                <div
-                  className="grid size-11 place-items-center rounded-[13px] font-extrabold"
-                  style={{
-                    background: project.designSystem.colors.muted,
-                    color: project.designSystem.colors.primary,
-                  }}
-                >
-                  {project.name.slice(0, 2).toUpperCase()}
+          <div className="mt-7 space-y-5">
+            {[
+              [
+                `${Math.min(overview.totals.sessions, 30)} de 30 sessões`,
+                sessionsProgress,
+              ],
+              [`${Math.min(days, 30)} de 30 dias`, daysProgress],
+            ].map(([label, progress]) => (
+              <div key={String(label)}>
+                <div className="flex justify-between gap-4 text-xs font-bold text-[#344150]">
+                  <span>{label}</span>
+                  <span>{progress}%</span>
                 </div>
-                <div className="min-w-[150px] flex-1">
-                  <strong className="block text-sm">{project.name}</strong>
-                  <span className="text-xs text-[#85858f]">
-                    smart.bio/{project.slug}
-                  </span>
+                <div className="mt-2 h-1.5 bg-[#dfe5eb]">
+                  <div
+                    className="h-full bg-[#01d2df]"
+                    style={{ width: `${progress}%` }}
+                  />
                 </div>
-                <span
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${project.status === "published" ? "bg-[#e7f7ef] text-[#147a57]" : "bg-[#f0eff4] text-[#686873]"}`}
-                >
-                  {project.status === "published" ? "Publicado" : "Rascunho"}
-                </span>
-                <Link
-                  href={`/app/projects/${project.id}/editor`}
-                  className="focus-ring grid size-9 place-items-center rounded-xl border border-[#e2e1e8] text-[#676771]"
-                  aria-label={`Editar ${project.name}`}
-                >
-                  <ArrowUpRight size={17} />
-                </Link>
-                <button
-                  className="focus-ring grid size-9 place-items-center rounded-xl text-[#898992]"
-                  aria-label="Mais opções"
-                >
-                  <MoreHorizontal size={18} />
-                </button>
               </div>
             ))}
           </div>
-        </section>
-        <section className="relative overflow-hidden rounded-[24px] bg-[#07172f] p-6 text-white">
-          <div className="sobe-gradient-rule absolute inset-x-0 top-0" />
-          <div className="sobe-gradient absolute -right-12 -top-12 size-48 rounded-full opacity-30 blur-3xl" />
-          <Sparkles className="relative text-[#02e5cd]" size={22} />
-          <h2 className="relative mt-10 text-2xl font-extrabold tracking-[-.035em]">
-            Sugestões baseadas em evidência
-          </h2>
-          <p className="relative mt-3 text-sm leading-6 text-white/60">
-            A Sobe só sugere mudanças depois de reunir pelo menos 30 sessões no negócio e 15 na meta analisada.
-          </p>
-          <Link
-            href="/app/projects/demo-vertice/editor"
-            className="relative mt-6 inline-flex items-center gap-2 text-sm font-bold text-[#01d2df]"
-          >
-            Ver jornada <ArrowUpRight size={16} />
-          </Link>
+          <div className="mt-7 border-t border-[#dfe5eb] pt-5">
+            <p className="text-xs leading-5 text-[#526171]">
+              Sugestões só aparecem quando houver evidência suficiente. A Sobe
+              nunca publica mudanças automaticamente.
+            </p>
+            {primary ? (
+              <Link
+                href={`/app/projects/${primary.id}/analytics`}
+                className="mt-3 inline-flex items-center gap-2 text-xs font-extrabold text-[#0054fc]"
+              >
+                Ver análise <ArrowRight size={14} />
+              </Link>
+            ) : null}
+          </div>
         </section>
       </div>
-      <section className="mt-5 rounded-[24px] border border-[#e5e4eb] bg-white p-6">
+
+      <section className="mt-6 border border-[#cbd3dc] bg-white [clip-path:polygon(0_0,calc(100%_-_14px)_0,100%_14px,100%_100%,0_100%)]">
+        <div className="flex items-center justify-between border-b border-[#dfe5eb] px-5 py-4">
+          <h2 className="font-extrabold text-[#07172f]">Seus negócios</h2>
+          <Link
+            href="/app/projects"
+            className="text-xs font-extrabold text-[#0054fc]"
+          >
+            Ver todos
+          </Link>
+        </div>
+        {overview.projects.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="text-xs text-[#526171]">
+                <tr className="border-b border-[#dfe5eb]">
+                  <th className="px-5 py-3">Negócio</th>
+                  <th>Status</th>
+                  <th>Sessões</th>
+                  <th>Conversões</th>
+                  <th>Valor confirmado</th>
+                  <th>
+                    <span className="sr-only">Ações</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {overview.projects.slice(0, 5).map((project) => (
+                  <tr
+                    key={project.id}
+                    className="border-b border-[#edf0f3] last:border-0"
+                  >
+                    <td className="px-5 py-4">
+                      <strong className="block text-[#07172f]">
+                        {project.name}
+                      </strong>
+                      <span className="mt-1 block max-w-xs truncate text-xs text-[#526171]">
+                        {project.publicUrl}
+                      </span>
+                    </td>
+                    <td>
+                      <span
+                        className={
+                          project.status === "published"
+                            ? "font-bold text-emerald-700"
+                            : "font-bold text-[#667487]"
+                        }
+                      >
+                        {project.status === "published"
+                          ? "Publicado"
+                          : "Rascunho"}
+                      </span>
+                    </td>
+                    <td className="tabular-nums">
+                      {formatNumber(project.sessions)}
+                    </td>
+                    <td className="tabular-nums">
+                      {formatNumber(project.conversions)}
+                    </td>
+                    <td className="tabular-nums">
+                      {money.format(project.confirmedValue)}
+                    </td>
+                    <td className="pr-5">
+                      <div className="flex justify-end gap-2">
+                        <Link
+                          href={`/app/projects/${project.id}`}
+                          aria-label={`Abrir ${project.name}`}
+                          className="focus-ring grid size-11 place-items-center border border-[#dfe5eb] text-[#0054fc]"
+                        >
+                          <ArrowRight size={16} />
+                        </Link>
+                        {project.status === "published" ? (
+                          <a
+                            href={project.publicUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label={`Visitar ${project.name}`}
+                            className="focus-ring grid size-11 place-items-center border border-[#dfe5eb] text-[#344150]"
+                          >
+                            <ExternalLink size={16} />
+                          </a>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="px-6 py-12 text-center">
+            <Globe2 className="mx-auto text-[#8fa1b8]" />
+            <strong className="mt-4 block text-[#07172f]">
+              Você ainda não tem negócios
+            </strong>
+            <p className="mt-2 text-sm text-[#526171]">
+              Crie uma estrutura para começar a medir sua jornada.
+            </p>
+            <Link
+              href="/app/onboarding"
+              className="mt-4 inline-flex min-h-11 items-center gap-2 font-extrabold text-[#0054fc]"
+            >
+              Criar minha estrutura <ArrowRight size={16} />
+            </Link>
+          </div>
+        )}
+      </section>
+
+      <section className="mt-6 border border-[#cbd3dc] bg-white p-5 [clip-path:polygon(0_0,calc(100%_-_14px)_0,100%_14px,100%_100%,0_100%)] sm:p-6">
         <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-xl bg-[#eaf3ff] text-[#0054fc]">
-            <BarChart3 size={19} />
-          </span>
+          <BarChart3 className="text-[#0054fc]" size={19} />
           <div>
-            <h2 className="font-extrabold">Funil resumido</h2>
-            <p className="text-xs text-[#84848e]">Todos os projetos</p>
+            <h2 className="font-extrabold text-[#07172f]">Funil observado</h2>
+            <p className="text-xs text-[#526171]">Sessões únicas no período</p>
           </div>
         </div>
-        <div className="mt-6 grid gap-3 sm:grid-cols-5">
+        <div className="mt-6 grid border border-[#dfe5eb] sm:grid-cols-5">
           {[
-            ["Visualizações", stats.views],
-            ["Intenção", new Set(events.filter((event) => ["conversion_goal_selected", "conversion_goal_resolved"].includes(event.eventName)).map((event) => event.sessionId)).size],
-            ["Ação", new Set(events.filter((event) => ["form_submitted", "quote_submitted", "booking_submitted", "order_submitted", "reservation_submitted", "route_resolved"].includes(event.eventName)).map((event) => event.sessionId)).size],
-            ["Oportunidade", new Set(opportunities.map((item) => item.sessionId).filter(Boolean)).size],
-            ["Conversão", opportunities.filter((item) => item.status === "converted").length],
+            ["Atenção", overview.totals.sessions],
+            ["Intenção", overview.totals.intentions],
+            ["Ação", overview.totals.actions],
+            ["Oportunidade", overview.totals.opportunities],
+            ["Conversão", overview.totals.conversions],
           ].map(([label, value], index) => (
             <div
               key={String(label)}
-              className="relative rounded-[16px] bg-[#f6f5f9] p-4"
+              className={`relative min-h-24 p-4 ${index ? "border-t border-[#dfe5eb] sm:border-l sm:border-t-0" : ""}`}
             >
-              <strong className="text-xl">{value}</strong>
-              <span className="mt-1 block text-xs text-[#777781]">{label}</span>
-              {index < 4 && (
-                <span className="absolute -right-2 top-1/2 z-10 hidden size-4 -translate-y-1/2 rotate-45 border-r border-t border-[#e0dfe7] bg-white sm:block" />
-              )}
+              <span className="text-xs font-bold text-[#526171]">{label}</span>
+              <strong className="mt-3 block text-xl tabular-nums text-[#07172f]">
+                {formatNumber(Number(value))}
+              </strong>
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="mt-6 border border-[#cbd3dc] bg-white p-6 [clip-path:polygon(0_0,calc(100%_-_14px)_0,100%_14px,100%_100%,0_100%)]">
+        <div className="flex items-center gap-3">
+          <Sparkles className="text-[#0054fc]" size={19} />
+          <h2 className="font-extrabold text-[#07172f]">
+            O que a Sobe aprendeu
+          </h2>
+        </div>
+        {overview.learnings.length ? <div className="mt-5 grid gap-3">{overview.learnings.map((learning) => <article key={learning.id} className="border-l-2 border-[#01d2df] bg-[#f6f9fc] p-4"><strong className="text-sm leading-6 text-[#07172f]">{learning.statement}</strong><p className="mt-2 text-xs text-[#526171]">{learning.evidence}</p></article>)}</div> : <div className="py-9 text-center">
+          <BrainCircuit className="mx-auto text-[#8fa1b8]" />
+          <strong className="mt-4 block text-[#07172f]">
+            Ainda não há aprendizado suficiente.
+          </strong>
+          <p className="mt-2 text-sm text-[#526171]">
+            A Sobe precisa comparar versões publicadas com evidência real antes
+            de registrar um fato.
+          </p>
+        </div>}
       </section>
     </div>
   );
