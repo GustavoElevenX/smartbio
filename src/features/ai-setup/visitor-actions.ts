@@ -10,6 +10,7 @@ import type {
 } from "@/types";
 import { draftCapabilityRequirements } from "@/features/capabilities/capability-requirements";
 import { createCapability } from "@/features/capabilities/capability-registry";
+import { extractExplicitOfferNames } from "@/features/qualification/offer-context";
 
 export const visitorActionCatalog = [
   { key: "order", label: "Fazer um pedido", description: "Escolher produtos e continuar o pedido.", kind: "buy", intent: "order", capabilityKey: "catalog_order" },
@@ -51,7 +52,7 @@ export function inferDeclaredVisitorActionKeys(value: string): VisitorActionKey[
     if (pattern.test(text)) keys.push(key);
   };
 
-  add("recommendation", /(?:ajud|orient).{0,90}(?:descobrir|entender|escolher|identificar|caminho|opcao)|(?:descobrir|entender|encontrar|escolher).{0,70}(?:melhor|ideal|caminho|opcao|necessidade|servico)|(?:receber|recebe|obter).{0,35}(?:orientacao|recomendacao)|(?:descrev|explic).{0,100}(?:orientacao|recomendacao)|recomend/);
+  add("recommendation", /(?:ajud|orient).{0,90}(?:descobrir|entender|escolher|identificar|caminho|opcao|sintoma|necessidade|problema|situacao)|(?:descobrir|entender|encontrar|escolher).{0,70}(?:melhor|ideal|caminho|opcao|necessidade|servico)|(?:receber|recebe|obter).{0,35}(?:orientacao|recomendacao)|(?:descrev|explic).{0,100}(?:orientacao|recomendacao)|recomend/);
   add("order", /(?:fazer|receber|montar|enviar).{0,30}(?:pedido|encomenda)|pedir (?:comida|produto)/);
   add("buy", /(?:comprar|adquirir|finalizar compra)/);
   add("quote", /(?:pedir|solicitar|receber).{0,35}(?:orcamento|cotacao|proposta comercial)|(?:orcamento|cotacao) online/);
@@ -89,7 +90,13 @@ export function classifyCustomVisitorAction(label: string): Exclude<VisitorActio
 export function suggestVisitorActionKeys(profile: BusinessCapabilityProfile, declaredObjective = ""): VisitorActionKey[] {
   const intents = new Set([...profile.primaryIntents, ...profile.secondaryIntents]);
   const declared = inferDeclaredVisitorActionKeys(declaredObjective);
-  if (declared.length) {
+  const explicitOffers = extractExplicitOfferNames(declaredObjective);
+  const discoveryBeforeContact = explicitOffers.length >= 2
+    && /(?:orient|recomend|descobr|identific|entend).{0,120}(?:depois|antes|em seguida|encaminh|whatsapp|contato)/i.test(normalizedText(declaredObjective));
+  const prioritizedDeclared = discoveryBeforeContact
+    ? ["recommendation" as const, ...declared.filter((key) => key !== "recommendation")]
+    : declared;
+  if (prioritizedDeclared.length) {
     const complements: Partial<Record<VisitorActionKey, VisitorActionKey[]>> = {
       recommendation: ["contact"],
       order: ["view_products", "contact"],
@@ -101,8 +108,8 @@ export function suggestVisitorActionKeys(profile: BusinessCapabilityProfile, dec
       find_location: ["contact"],
     };
     return unique([
-      ...declared,
-      ...declared.flatMap((key) => complements[key] || []),
+      ...prioritizedDeclared,
+      ...prioritizedDeclared.flatMap((key) => complements[key] || []),
       ...(profile.hasMultipleLocations ? ["find_location" as const] : []),
     ]).slice(0, 5);
   }

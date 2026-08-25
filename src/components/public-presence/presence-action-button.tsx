@@ -31,5 +31,5 @@ export function PresenceActionButton({ action, context, pageHref, className = ""
     }
   }
   const Icon = action.type === "open_whatsapp" ? MessageCircle : ArrowRight;
-  return <button type="button" onClick={act} className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-[var(--presence-button-radius)] px-5 text-sm font-extrabold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--presence-primary)]/25 ${styles[action.style || "primary"]} ${className}`}>{action.label}<Icon size={17} aria-hidden /></button>;
+  return <button type="button" onClick={act} className={`inline-flex min-h-12 max-w-full items-center justify-center gap-2 whitespace-normal rounded-[var(--presence-button-radius)] px-5 text-center text-sm font-extrabold [hyphens:none] [overflow-wrap:break-word] transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--presence-primary)]/25 ${styles[action.style || "primary"]} ${className}`}>{action.label}<Icon className="shrink-0" size={17} aria-hidden /></button>;
 }

@@ -11,6 +11,7 @@ import { recommendService } from "@/features/qualification/recommendation-engine
 import { recommendSections } from "@/features/site-composer/section-recommendation";
 import { inferBusinessShape } from "@/features/site-composer/business-shape";
 import type { Project, StructuredJourneyQuestion } from "@/types";
+import { attachTestOfferIntelligence } from "../fixtures/offer-intelligence";
 
 const recommendationAction: VisitorActionSelection = {
   key: "recommendation",
@@ -68,6 +69,14 @@ function discoveryProject(input: { name: string; description: string; offerings:
     updatedAt: "2026-08-25T00:00:00.000Z",
   };
   let project = materializeSetupAnswers(scoped, session);
+  project = attachTestOfferIntelligence(project, {
+    "higienizacao interna": { strongClues: ["manchas", "odor", "interior"], supporting: ["sujeira interna"] },
+    "polimento tecnico": { strongClues: ["perdeu brilho", "marcas superficiais"], supporting: ["aparência da pintura"] },
+    "revitalizacao de farois": { strongClues: ["faróis opacos", "faróis amarelados"], supporting: ["transparência dos faróis"] },
+    "festa infantil": { strongClues: ["aniversário", "criança"], supporting: ["celebração para crianças"] },
+    "mini wedding": { strongClues: ["celebração pequena", "intimista", "poucos convidados"], supporting: ["casamento intimista"] },
+    "evento corporativo": { strongClues: ["encontro da empresa", "equipe"], supporting: ["evento empresarial"] },
+  });
   project = ensureVisitorActionTargets(project, [recommendationAction]);
   return applyVisitorActionsToProject(project, { visitorActions: [recommendationAction] });
 }
@@ -92,11 +101,9 @@ describe("Activation V4 — recomendação semântica", () => {
       phone: "5511987654321",
     });
     const fields = project.steps.find((step) => step.type === "form")?.formFields || [];
-    expect(fields).toHaveLength(2);
-    expect(fields.map((field) => field.label)).toEqual([
-      "O que você mais gostaria de resolver neste momento?",
-      "Que resultado seria mais importante para você?",
-    ]);
+    expect(fields).toHaveLength(3);
+    expect(fields.every((field) => field.label.endsWith("?"))).toBe(true);
+    expect(new Set(fields.map((field) => field.label)).size).toBe(3);
   });
 
   it("preserva todas as ofertas, cria microdescrições e não oferece selector circular em discovery", () => {

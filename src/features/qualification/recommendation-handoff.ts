@@ -14,12 +14,6 @@ export function buildRecommendationHandoff(input: {
   serviceName?: string;
   confidence?: RecommendationConfidence;
 }): { answers: Record<string, string>; closing: string } {
-  if (input.serviceName && input.confidence !== "uncertain") {
-    return {
-      answers: { orientação_recebida: input.serviceName },
-      closing: "Gostaria de confirmar essa orientação com a equipe.",
-    };
-  }
   const labels = new Map((input.fields || []).map((field) => [field.key, field.handoffLabel || field.label]));
   const context = Object.entries(input.answers)
     .filter(([key, value]) => !ignoredKeys.has(key) && Boolean(valueText(value)))
@@ -27,6 +21,15 @@ export function buildRecommendationHandoff(input: {
     .map(([key, value]) => `${labels.get(key) || "Contexto"}: ${valueText(value)}`)
     .join("; ")
     .slice(0, 360);
+  if (input.serviceName && input.confidence !== "uncertain") {
+    return {
+      answers: {
+        ...(context ? { contexto_informado: context } : {}),
+        orientação_recebida: `${input.serviceName} foi indicada como possível caminho, sujeito à confirmação da equipe.`,
+      },
+      closing: "Gostaria de confirmar essa orientação com a equipe.",
+    };
+  }
   return {
     answers: {
       ...(context ? { contexto_informado: context } : {}),

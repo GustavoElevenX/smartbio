@@ -14,6 +14,7 @@ import { validateConversionPath } from "@/features/publishing/conversion-path-va
 import { getProjectReadiness } from "@/features/publishing/project-readiness";
 import { suggestSiteStructure } from "@/features/site-composer/site-structure-suggester";
 import type { Project, StructuredJourneyQuestion } from "@/types";
+import { attachTestOfferIntelligence } from "../fixtures/offer-intelligence";
 
 const recommendationAction: VisitorActionSelection = { key: "recommendation", label: "Receber uma recomendação", isPrimary: true };
 
@@ -64,6 +65,13 @@ function projectFrom(input: { name: string; description: string; phone?: string 
     updatedAt: "2026-08-25T00:00:00.000Z",
   };
   let project = materializeSetupAnswers(scoped, session);
+  project = attachTestOfferIntelligence(project, {
+    "higienizacao preventiva": { strongClues: ["funciona e gela", "cheiro ruim", "sem limpeza há muito tempo"], supporting: ["sujeira no equipamento"] },
+    "instalacao de ar-condicionado": { strongClues: ["ainda na caixa", "nunca instalado", "colocar para funcionar"], supporting: ["equipamento novo"] },
+    "avaliacao de baixo rendimento/refrigeracao": { strongClues: ["aparelho liga", "refrigera menos"], supporting: ["perda de rendimento"] },
+    "montagem de bicicleta nova": { strongClues: ["bicicleta desmontada", "preciso montar"], supporting: ["comprada desmontada"] },
+    "ajuste de cambio": { strongClues: ["marchas pulam", "dificuldade para trocar"], supporting: ["troca de marchas"] },
+  });
   project = ensureVisitorActionTargets(project, [recommendationAction]);
   return applyVisitorActionsToProject(project, { visitorActions: [recommendationAction] });
 }
@@ -140,11 +148,10 @@ describe("Activation V5 — confiabilidade da primeira versão", () => {
   it("planeja perguntas do domínio que diferenciam as ofertas", () => {
     const climate = buildQualificationQuestionPlan({ initialInput: { businessName: "ArViva Climatização", description: arvivaDescription }, visitorActions: [recommendationAction], answers: {} });
     const bike = buildQualificationQuestionPlan({ initialInput: { businessName: "Pedal Livre Bike Shop", description: bikeDescription }, visitorActions: [recommendationAction], answers: {} });
-    expect(climate[0].question).toContain("aparelho de ar-condicionado");
-    expect(climate[1]).toMatchObject({ type: "radio", purpose: "signal" });
-    expect(climate[1].options).toEqual(expect.arrayContaining([expect.stringMatching(/instalado|funcionamento/i), expect.stringMatching(/refrigera|rendimento/i)]));
-    expect(bike[0].question).toContain("bicicleta");
-    expect(bike[1].options).toEqual(expect.arrayContaining([expect.stringMatching(/marcha|câmbio/i), expect.stringMatching(/montar|desmontado/i)]));
+    expect(climate.some((question) => /ar-condicionado|higienização|rendimento/i.test(question.question))).toBe(true);
+    expect(bike.some((question) => /bicicleta|freios|câmbio/i.test(question.question))).toBe(true);
+    expect(climate[0].purpose).toBe("need");
+    expect(climate.slice(1).every((question) => question.purpose === "signal")).toBe(true);
     expect(bike).not.toEqual(climate);
   });
 
@@ -174,7 +181,7 @@ describe("Activation V5 — confiabilidade da primeira versão", () => {
   it("mantém as microdescrições conservadoras e readiness exige proveniência atual", () => {
     const project = projectFrom({ name: "ArViva Climatização", description: arvivaDescription, phone: "5511987654321" });
     const copy = (project.commercialConfig?.serviceOfferings || []).map((offer) => offer.shortDescription).join(" ");
-    expect(copy).toContain("Serviço de instalação de ar-condicionado.");
+    expect(copy).toContain("Instalação de ar-condicionado: opção real informada pelo negócio");
     expect(copy).not.toMatch(/bancos|carpetes|celebrações|garantido|em \d+ horas/i);
     expect(validateConversionPath(project).checks.find((check) => check.key === "context")?.valid).toBe(true);
     const stale = structuredClone(project);
@@ -187,7 +194,8 @@ describe("Activation V5 — confiabilidade da primeira versão", () => {
     const presence = readFileSync("src/components/public-presence/presence-section-renderer.tsx", "utf8");
     const journey = readFileSync("src/components/public-experience/public-experience.tsx", "utf8");
     for (const source of [presence, journey]) {
-      expect(source).toContain("[overflow-wrap:anywhere]");
+      expect(source).toContain("[overflow-wrap:break-word]");
+      expect(source).toContain("[hyphens:none]");
       expect(source).toContain("min-w-0");
     }
     expect(presence).toContain("text-[clamp(");

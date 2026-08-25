@@ -5,9 +5,13 @@ import {
   journeyModeForProject,
   questionQualityIssues,
 } from "@/features/qualification/recommendation-semantics";
+import {
+  offerIntelligenceFor,
+  offerIntelligenceIsSufficient,
+} from "@/features/qualification/offer-intelligence";
 import type { JourneyStep, Project, RoutingDestination, StepOption } from "@/types";
 
-export type ConversionPathCheckKey = "entry" | "questions" | "circularity" | "result" | "result_quality" | "context" | "public_copy" | "destination";
+export type ConversionPathCheckKey = "entry" | "primary_action" | "questions" | "progressive_questioning" | "circularity" | "offer_integrity" | "result" | "result_quality" | "context" | "public_copy" | "destination";
 
 export interface ConversionPathCheck {
   key: ConversionPathCheckKey;
@@ -82,14 +86,32 @@ export function validateConversionPath(project: Project): ConversionPathValidati
   }).length);
   const circular = fields.some((field) => isCircularOfferSelector(field, offerings));
   const usefulQuestions = fields.some((field) => ["need", "signal", "context", "constraint"].includes(field.purpose || "signal"));
+  const intelligenceQuestions = offerings.flatMap((offering) => offerIntelligenceFor(offering)?.discriminatingQuestions.map((item) => item.question) || []);
+  const normalizedIntelligenceQuestions = new Set(intelligenceQuestions.map((question) => question.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\?$/, "")));
+  const questionsDerived = fields.some((field) => normalizedIntelligenceQuestions.has(field.label.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\?$/, "")));
   const configuredOfferIds = Array.isArray(result?.settings?.recommendationOfferIds)
     ? result.settings.recommendationOfferIds.filter((id): id is string => typeof id === "string")
     : [];
   const realResult = Boolean(result && configuredOfferIds.length && configuredOfferIds.some((id) => offerings.some((offering) => offering.id === id)));
-  const resultQuality = realResult && offerings.some((offering) => {
-    const signals = offering.settings?.recommendationSignals;
-    return Boolean(offering.shortDescription || offering.description || (Array.isArray(signals) && signals.length));
+  const expectedOfferNames = Array.isArray(result?.settings?.explicitOfferNames)
+    ? result.settings.explicitOfferNames.filter((name): name is string => typeof name === "string" && Boolean(name.trim()))
+    : [];
+  const normalizeName = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const actualNames = new Set(offerings.map((offering) => normalizeName(offering.name)));
+  const profilesDiscriminate = offerings.length < 2 || offerings.every((offering) => {
+    const profile = offerIntelligenceFor(offering);
+    return profile?.discriminatingQuestions.some((question) => question.separatesFromOfferNames.some((name) => (
+      normalizeName(name) !== normalizeName(offering.name) && actualNames.has(normalizeName(name))
+    ))) === true;
   });
+  const offerIntegrity = expectedOfferNames.length > 0
+    && expectedOfferNames.every((name) => actualNames.has(normalizeName(name)))
+    && offerings.every((offering) => configuredOfferIds.includes(offering.id));
+  const resultQuality = realResult && profilesDiscriminate && offerings.length > 0
+    && offerings.every((offering) => offerIntelligenceIsSufficient(offering, project.id));
+  const progressiveQuestioning = form?.settings?.progressiveQuestioning === true
+    && result?.settings?.progressiveQuestioning === true;
+  const primaryActionValid = Boolean(primaryGoal && isRecommendationIntent(primaryGoal.name));
   const contextSafe = offerings.every((offering) => {
     if (offering.settings?.descriptionSource !== "generated_conservative") return true;
     const provenance = offering.settings?.copyProvenance;
@@ -98,8 +120,11 @@ export function validateConversionPath(project: Project): ConversionPathValidati
   const publicCopySafe = !hasPublicCopyLeak(project);
   const checks: ConversionPathCheck[] = [
     { key: "entry", valid: entryValid, label: "Entrada da orientação", reason: entryValid ? "A ação principal inicia a orientação." : "A ação principal não inicia uma etapa de orientação válida." },
-    { key: "questions", valid: fields.length > 0 && !invalidQuestions.length && usefulQuestions, label: "Perguntas da orientação", reason: fields.length > 0 && !invalidQuestions.length && usefulQuestions ? "As perguntas chegam como unidades completas e coletam sinais úteis." : "Revise perguntas fragmentadas, ambíguas ou que não ajudam a diferenciar as opções." },
+    { key: "primary_action", valid: primaryActionValid, label: "Ação principal coerente", reason: primaryActionValid ? "A ação principal materializa a descoberta antes do contato final." : "O objetivo pede orientação, mas a ação principal não inicia a descoberta assistida." },
+    { key: "questions", valid: fields.length > 0 && !invalidQuestions.length && usefulQuestions && questionsDerived, label: "Perguntas da orientação", reason: fields.length > 0 && !invalidQuestions.length && usefulQuestions && questionsDerived ? "As perguntas derivam das diferenças registradas entre as ofertas." : "Revise perguntas fragmentadas, genéricas ou desconectadas do Offer Intelligence." },
+    { key: "progressive_questioning", valid: progressiveQuestioning, label: "Perguntas progressivas", reason: progressiveQuestioning ? "A jornada pode encerrar perguntas quando já existe evidência forte e pedir mais contexto quando necessário." : "A descoberta assistida ainda obriga uma sequência fixa de perguntas." },
     { key: "circularity", valid: !circular, label: "Descoberta sem escolha circular", reason: circular ? "A orientação pede que o visitante escolha diretamente a mesma oferta que deveria ser inferida." : "A orientação parte da necessidade antes de apresentar uma opção." },
+    { key: "offer_integrity", valid: offerIntegrity, label: "Integridade das ofertas", reason: offerIntegrity ? "Todas as ofertas confirmadas participam da orientação." : "Uma oferta explicitamente fornecida foi perdida ou ficou fora do resultado materializado." },
     { key: "result", valid: realResult, label: "Resultado da orientação", reason: realResult ? "A jornada apresenta uma oferta real como resultado." : "A jornada promete orientar, mas não possui uma oferta real configurada como resultado." },
     { key: "result_quality", valid: resultQuality, label: "Explicação da orientação", reason: resultQuality ? "As ofertas possuem sinais ou descrições suficientes para explicar o resultado." : "Adicione sinais ou descrições sustentadas pelos dados do negócio para diferenciar o resultado." },
     { key: "context", valid: contextSafe, label: "Contexto das ofertas", reason: contextSafe ? "A copy gerada está vinculada ao projeto atual." : "Uma descrição gerada não possui proveniência do projeto atual e precisa ser regenerada." },

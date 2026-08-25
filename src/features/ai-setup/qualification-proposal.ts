@@ -1,6 +1,9 @@
 import type { AISetupSession } from "@/features/ai-setup/ai-setup.schema";
 import { offerNamesFromSetup } from "@/features/qualification/offer-context";
-import { inferRecommendationSignals, inferRecommendationSubject, inferStrongRecommendationSignals } from "@/features/qualification/recommendation-engine";
+import {
+  buildDeterministicOfferIntelligence,
+  questionsFromOfferIntelligenceProfiles,
+} from "@/features/qualification/offer-intelligence";
 import type { StructuredJourneyQuestion } from "@/types";
 
 function normalize(value: string) {
@@ -50,41 +53,17 @@ export function buildQualificationSuggestions(
 export function buildQualificationQuestionPlan(
   session: Pick<AISetupSession, "initialInput" | "extractedProfile" | "visitorActions"> & Partial<Pick<AISetupSession, "answers">>,
 ): StructuredJourneyQuestion[] {
-  const healthRelated = isHealthRelated(session);
-  if (healthRelated) return [
-    { id: "qualification-need", question: "O que você gostaria de melhorar ou entender?", type: "textarea", purpose: "need", required: true },
-    { id: "qualification-signal", question: "Qual é o seu principal objetivo com uma avaliação profissional?", type: "textarea", purpose: "signal", required: true },
-    { id: "qualification-context", question: "Existe algum contexto importante para a equipe considerar na avaliação?", type: "textarea", purpose: "context", required: false },
-  ];
   const offerNames = offerNamesFromSetup(session.initialInput.description, session.answers?.["qualification.offerings"]);
   const context = `${session.initialInput.businessName} ${session.initialInput.description} ${offerNames.join(" ")}`;
-  const options = offerNames.flatMap((name) => {
-    const candidates = [
-      ...inferStrongRecommendationSignals(name, "", context),
-      ...inferRecommendationSignals(name, "", context),
-    ];
-    const signal = candidates.find((candidate) => candidate.split(/\s+/).length >= 3 && normalize(candidate) !== normalize(name));
-    return signal ? [signal.charAt(0).toLocaleUpperCase("pt-BR") + signal.slice(1)] : [];
-  });
-  const uniqueOptions = [...new Set(options)].slice(0, 6);
-  const subject = inferRecommendationSubject(context);
-  if (uniqueOptions.length >= 2) return [
-    {
-      id: "qualification-need",
-      question: subject ? `O que está acontecendo com ${subject}?` : "O que está acontecendo e o que você precisa resolver?",
-      type: "textarea",
-      purpose: "need",
-      required: true,
-    },
-    {
-      id: "qualification-differentiator",
-      question: "Qual destas situações mais se aproxima do que você precisa?",
-      type: "radio",
-      options: uniqueOptions,
-      purpose: "signal",
-      required: true,
-    },
-  ];
+  const profiles = offerNames.map((offerName) => buildDeterministicOfferIntelligence({
+    projectId: "setup-draft",
+    offerId: `setup-draft:${normalize(offerName)}`,
+    offerName,
+    businessContext: context,
+    competingOfferNames: offerNames,
+  }));
+  const profileQuestions = questionsFromOfferIntelligenceProfiles(profiles);
+  if (profileQuestions.length >= 2) return profileQuestions;
   return [
     {
       id: "qualification-need",

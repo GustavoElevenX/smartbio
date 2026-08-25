@@ -125,32 +125,61 @@ test("Presence publica SEO, canonical e dados estruturados no HTML", async ({
   expect(html).toContain("Instagram");
 });
 
-test("heróis públicos acomodam nomes longos sem overflow mobile", async ({ page }, testInfo) => {
+test("heróis e cards públicos acomodam nomes longos em 360, 375 e 390 px", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile-chrome", "Regressão específica de viewport mobile");
+  test.setTimeout(90_000);
   const names = [
-    "Oficina Pedal Livre Bike Shop",
+    "Assistência Técnica Oficina Pedal Livre Bike Shop",
     "Studio Nexo Interiores e Arquitetura",
     "Clínica de Estética Integrada Aurora",
   ];
 
   for (const route of ["/virou-presenca-demo", "/limpabem"]) {
     await page.goto(route);
-    const hero = page.getByRole("heading", { level: 1 }).first();
-    await expect(hero).toBeVisible();
-    for (const name of names) {
-      await hero.evaluate((element, nextName) => { element.textContent = nextName; }, name);
-      const metrics = await hero.evaluate((element) => {
-        const rect = element.getBoundingClientRect();
-        return {
-          documentWidth: document.documentElement.scrollWidth,
-          viewportWidth: window.innerWidth,
-          left: rect.left,
-          right: rect.right,
-        };
-      });
-      expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth);
-      expect(metrics.left).toBeGreaterThanOrEqual(-1);
-      expect(metrics.right).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+    for (const width of [360, 375, 390]) {
+      await page.setViewportSize({ width, height: 820 });
+      const hero = page.getByRole("heading", { level: 1 }).first();
+      await expect(hero).toBeVisible();
+      for (const name of names) {
+        await hero.evaluate((element, nextName) => { element.textContent = nextName; }, name);
+        const metrics = await hero.evaluate((element) => {
+          const rect = element.getBoundingClientRect();
+          const node = element.firstChild;
+          const text = node?.textContent || "";
+          const word = text.split(/\s+/).find((part) => part.startsWith("Assistência")) || text.split(/\s+/)[0] || "";
+          const start = text.indexOf(word);
+          const range = document.createRange();
+          if (node && start >= 0) {
+            range.setStart(node, start);
+            range.setEnd(node, start + word.length);
+          }
+          return {
+            documentWidth: document.documentElement.scrollWidth,
+            viewportWidth: window.innerWidth,
+            left: rect.left,
+            right: rect.right,
+            splitWord: range.getClientRects().length > 1,
+          };
+        });
+        expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+        expect(metrics.left).toBeGreaterThanOrEqual(-1);
+        expect(metrics.right).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+        expect(metrics.splitWord).toBe(false);
+      }
+      const cardTitle = page.locator("article h3").first();
+      if (await cardTitle.count()) {
+        await cardTitle.evaluate((element) => { element.textContent = "Avaliação detalhada antes do serviço recomendado"; });
+        const cardMetrics = await cardTitle.evaluate((element) => {
+          const article = element.closest("article");
+          return {
+            documentWidth: document.documentElement.scrollWidth,
+            viewportWidth: window.innerWidth,
+            clipped: Boolean(article && (article.scrollWidth > article.clientWidth || article.scrollHeight > article.clientHeight)),
+          };
+        });
+        expect(cardMetrics.documentWidth).toBeLessThanOrEqual(cardMetrics.viewportWidth);
+        expect(cardMetrics.clipped).toBe(false);
+      }
     }
   }
 });

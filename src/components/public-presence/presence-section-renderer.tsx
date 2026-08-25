@@ -146,7 +146,7 @@ function Heading({ section }: { section: PresenceSection }) {
         </p>
       ) : null}
       {section.title ? (
-        <h2 className="text-balance text-3xl font-black tracking-[-.04em] md:text-5xl">
+        <h2 className="max-w-full break-normal text-balance text-3xl font-black tracking-[-.04em] [hyphens:none] [overflow-wrap:break-word] md:text-5xl">
           {section.title}
         </h2>
       ) : null}
@@ -223,7 +223,7 @@ export function PresenceSectionRenderer({
                 {section.eyebrow}
               </p>
             ) : null}
-            <h1 className={`max-w-full break-words text-balance font-black leading-[.98] tracking-[-.04em] [overflow-wrap:anywhere] ${variant === "editorial" ? "text-[clamp(2.5rem,12vw,3.75rem)] md:text-8xl" : variant === "minimal" ? "text-[clamp(2.25rem,11vw,3.25rem)] md:text-6xl" : "text-[clamp(2.5rem,12vw,3.75rem)] md:text-7xl"}`}>
+            <h1 className={`max-w-full break-normal text-balance font-black leading-[.98] tracking-[-.04em] [hyphens:none] [overflow-wrap:break-word] ${variant === "editorial" ? "text-[clamp(2.5rem,12vw,3.75rem)] md:text-8xl" : variant === "minimal" ? "text-[clamp(2.25rem,11vw,3.25rem)] md:text-6xl" : "text-[clamp(2.5rem,12vw,3.75rem)] md:text-7xl"}`}>
               {section.title || page.title || project.name}
             </h1>
             <p className="mt-6 max-w-2xl text-pretty text-lg leading-8 text-[var(--presence-section-muted,var(--presence-muted))] md:text-xl">
@@ -311,12 +311,12 @@ export function PresenceSectionRenderer({
         {(content.items || []).map((item: any) => (
           <article
             key={item.id}
-            className="rounded-3xl border border-black/10 bg-white/80 p-6 text-[#07172f] shadow-sm"
+            className="min-w-0 rounded-3xl border border-black/10 bg-white/80 p-6 text-[#07172f] shadow-sm"
           >
             <span className="grid size-10 place-items-center rounded-xl bg-[var(--presence-primary)]/10 text-[var(--presence-primary)]">
               <Check size={18} />
             </span>
-            <h3 className="mt-5 text-lg font-black">{item.title}</h3>
+            <h3 className="mt-5 max-w-full break-normal text-lg font-black [hyphens:none] [overflow-wrap:break-word]">{item.title}</h3>
             <p className="mt-2 text-sm leading-6 text-[#66636e]">
               {item.description}
             </p>
@@ -338,7 +338,7 @@ export function PresenceSectionRenderer({
           return (
             <article
               key={service.id}
-              className={`overflow-hidden rounded-3xl border border-black/10 bg-white text-[#07172f] shadow-sm ${content.layout === "featured" && index === 0 ? "md:col-span-2 md:grid md:grid-cols-2" : content.layout === "list" ? "md:grid md:grid-cols-[minmax(220px,32%)_1fr]" : ""}`}
+              className={`min-w-0 overflow-hidden rounded-3xl border border-black/10 bg-white text-[#07172f] shadow-sm ${content.layout === "featured" && index === 0 ? "md:col-span-2 md:grid md:grid-cols-2" : content.layout === "list" ? "md:grid md:grid-cols-[minmax(220px,32%)_1fr]" : ""}`}
             >
               {image ? (
                 <div data-presence-media className="relative aspect-[16/10]">
@@ -351,10 +351,10 @@ export function PresenceSectionRenderer({
                   />
                 </div>
               ) : null}
-              <div className="p-6">
+              <div className="min-w-0 p-5 sm:p-6">
                 {activation ? <div className="mb-3"><ActivationServiceBadge label={activation.offer?.label || activation.name} /></div> : null}
-                <h3 className="text-xl font-black">{service.name}</h3>
-                <p className="mt-2 text-sm leading-6 text-[#66636e]">
+                <h3 className="max-w-full break-normal text-xl font-black [hyphens:none] [overflow-wrap:break-word]">{service.name}</h3>
+                <p className="mt-2 max-w-full break-normal text-sm leading-6 text-[#66636e] [hyphens:none] [overflow-wrap:break-word]">
                   {service.shortDescription || service.description}
                 </p>
                 {content.showPrice ? (
@@ -394,7 +394,7 @@ export function PresenceSectionRenderer({
       .slice(0, content.maxItems || 8);
     const catalogPage = project.presence?.pages.find((candidate) => candidate.isActive && candidate.id !== page.id && (candidate.key.includes("catalog") || candidate.name.toLocaleLowerCase("pt-BR").includes("catálogo")));
     return wrap(
-      <><div className={content.layout === "carousel" ? "flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4" : `grid gap-4 ${content.layout === "featured" ? "grid-cols-1 md:grid-cols-3" : "grid-cols-2 md:grid-cols-4"}`}>
+      <><div className={content.layout === "carousel" ? "flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4" : `grid gap-4 ${content.layout === "featured" ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 md:grid-cols-4"}`}>
         {chosen.map((item, index) => {
           const image = asset(project, item.imageAssetId);
           const activation = publicActivations.find((candidate) => candidate.placements.some((placement) => placement.placementType === "product_badge") && (!candidate.offer?.scope.catalogItemIds?.length || candidate.offer.scope.catalogItemIds.includes(item.id)));
@@ -408,7 +408,7 @@ export function PresenceSectionRenderer({
           return (
             <article
               key={item.id}
-              className={`overflow-hidden rounded-3xl border border-black/10 bg-white text-[#07172f] ${content.layout === "carousel" ? "w-[78%] shrink-0 snap-center sm:w-[46%] md:w-[30%]" : ""} ${content.layout === "featured" && index === 0 ? "md:col-span-2 md:row-span-2" : ""}`}
+              className={`min-w-0 overflow-hidden rounded-3xl border border-black/10 bg-white text-[#07172f] ${content.layout === "carousel" ? "w-[78%] shrink-0 snap-center sm:w-[46%] md:w-[30%]" : ""} ${content.layout === "featured" && index === 0 ? "md:col-span-2 md:row-span-2" : ""}`}
             >
               {image ? (
                 <div data-presence-media className="relative aspect-square">
@@ -425,7 +425,7 @@ export function PresenceSectionRenderer({
               )}
               <div className="p-4">
                 {activation ? <div className="mb-3"><ActivationProductBadge label={activation.offer?.label || activation.name} /></div> : null}
-                <h3 className="font-black">{item.name}</h3>
+                <h3 className="max-w-full break-normal font-black [hyphens:none] [overflow-wrap:break-word]">{item.name}</h3>
                 {content.showPrice ? (
                   <p className="mt-1 text-sm font-bold text-[var(--presence-primary)]">
                     {money(item.price, item.currency)}

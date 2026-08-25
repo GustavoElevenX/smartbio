@@ -3,7 +3,12 @@ import { evaluateCapabilityRequirements } from "@/features/capabilities/capabili
 import { isRecommendationIntent, synthesizePublicDescription } from "@/features/composition/public-copy";
 import { contextSignature, offerNamesFromSetup } from "@/features/qualification/offer-context";
 import { classifyJourneyMode, questionQualityIssues } from "@/features/qualification/recommendation-semantics";
-import { conservativeServiceDescription, inferRecommendationSignals, inferStrongRecommendationSignals } from "@/features/qualification/recommendation-engine";
+import {
+  buildDeterministicOfferIntelligence,
+  offerIntelligenceFor,
+  questionsFromOfferIntelligence,
+} from "@/features/qualification/offer-intelligence";
+import { conservativeServiceDescription } from "@/features/qualification/recommendation-engine";
 import { visitorActionSemanticKey } from "@/features/ai-setup/visitor-actions";
 import { uid } from "@/lib/utils";
 import type {
@@ -220,7 +225,12 @@ function legacyQuestionsByLine(value: unknown): StructuredJourneyQuestion[] {
     .map((question, index) => ({ id: `qualification-legacy-${index + 1}`, question, type: "textarea", purpose: index === 0 ? "need" : "signal", required: index < 2 }));
 }
 
-function qualificationQuestions(value: unknown, offerings: string[], mode: JourneyMode): FormField[] {
+function qualificationQuestions(
+  value: unknown,
+  offerings: string[],
+  mode: JourneyMode,
+  intelligenceQuestions: StructuredJourneyQuestion[] = [],
+): FormField[] {
   const structured = Array.isArray(value)
     ? value.map((item) => structuredJourneyQuestionSchema.safeParse(item)).filter((item) => item.success).map((item) => item.data)
     : legacyQuestionsByLine(value);
@@ -231,7 +241,9 @@ function qualificationQuestions(value: unknown, offerings: string[], mode: Journ
     { id: "qualification-fallback-need", question: "O que você mais gostaria de resolver neste momento?", type: "textarea", purpose: "need", required: true },
     { id: "qualification-fallback-signal", question: "Que resultado seria mais importante para você?", type: "textarea", purpose: "signal", required: true },
   ];
-  const questions = valid.length >= 2 ? valid : fallback;
+  const questions = mode === "assisted_discovery" && intelligenceQuestions.length
+    ? intelligenceQuestions
+    : valid.length >= 2 ? valid : fallback;
   const fields: FormField[] = questions.map((question, index) => ({
     id: question.id || uid("field"),
     label: question.question,
@@ -290,12 +302,28 @@ function serviceOfferings(
   const generationContextSignature = contextSignature(`${project.id} ${generationContext}`);
   return allNames.map((name, order): ServiceOffering => {
     const existing = currentByName.get(normalize(name));
+    const offeringId = existing?.id || uid("offering");
     const supportedDescription = existing?.shortDescription || existing?.description || "";
-    const shortDescription = supportedDescription || conservativeServiceDescription(name);
-    const recommendationSignals = inferRecommendationSignals(name, supportedDescription, generationContext);
-    const strongRecommendationSignals = inferStrongRecommendationSignals(name, supportedDescription, generationContext);
+    const existingIntelligence = existing ? offerIntelligenceFor(existing) : undefined;
+    const offerIntelligence = existingIntelligence
+      && existingIntelligence.provenance.projectId === project.id
+      && existingIntelligence.offerId === offeringId
+      && normalize(existingIntelligence.offerName) === normalize(name)
+      ? existingIntelligence
+      : buildDeterministicOfferIntelligence({
+          offerId: offeringId,
+          projectId: project.id,
+          offerName: name,
+          offerDescription: supportedDescription || undefined,
+          businessContext: generationContext,
+          competingOfferNames: allNames,
+        });
+    const shortDescription = supportedDescription || offerIntelligence.safeDescription || conservativeServiceDescription(name);
+    const settings = { ...(existing?.settings || { source: "onboarding_confirmed" }) };
+    delete settings.recommendationSignals;
+    delete settings.strongRecommendationSignals;
     return {
-      id: existing?.id || uid("offering"),
+      id: offeringId,
       projectId: project.id,
       name,
       slug: existing?.slug || normalize(name).replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
@@ -314,9 +342,8 @@ function serviceOfferings(
       isActive: existing?.isActive ?? true,
       order,
       settings: {
-        ...(existing?.settings || { source: "onboarding_confirmed" }),
-        recommendationSignals,
-        strongRecommendationSignals,
+        ...settings,
+        offerIntelligence,
         descriptionSource: existing?.shortDescription || existing?.description ? "business" : "generated_conservative",
         copyProvenance: {
           projectId: project.id,
@@ -421,7 +448,13 @@ function configureJourney(
         ? journeyMode === "assisted_discovery" ? "Responda ao essencial para receber uma orientação inicial." : "Selecione a opção que você já deseja solicitar."
         : step.description,
       formFields: capability === "quote" ? quoteFields : capability === "qualification" && qualificationFields.length ? qualificationFields : step.formFields,
-      settings: capability === "qualification" ? { ...step.settings, journeyMode, businessObjective: qualificationObjective } : step.settings,
+      settings: capability === "qualification" ? {
+        ...step.settings,
+        journeyMode,
+        businessObjective: qualificationObjective,
+        progressiveQuestioning: journeyMode === "assisted_discovery",
+        explicitOfferNames: offerings.map((offering) => offering.name),
+      } : step.settings,
       options: [{
         id: step.options?.[0]?.id || uid("option"),
         label: capability === "quote" ? "Enviar solicitação" : capability === "qualification" && recommendationEnabled ? "Ver orientação" : "Continuar",
@@ -443,7 +476,12 @@ function configureJourney(
       isActive: true,
       formFields: qualificationFields,
       blocks: [{ id: uid("block"), type: "form", content: {} }],
-      settings: { journeyMode, businessObjective: qualificationObjective },
+      settings: {
+        journeyMode,
+        businessObjective: qualificationObjective,
+        progressiveQuestioning: journeyMode === "assisted_discovery",
+        explicitOfferNames: offerings.map((offering) => offering.name),
+      },
       options: [{
         id: uid("option"),
         label: "Ver orientação",
@@ -473,6 +511,8 @@ function configureJourney(
     settings: {
       journeyMode,
       recommendationOfferIds: offerings.map((offering) => offering.id),
+      explicitOfferNames: offerings.map((offering) => offering.name),
+      progressiveQuestioning: journeyMode === "assisted_discovery",
       internalInstruction: qualificationOutcome,
       businessObjective: qualificationObjective,
       recommendationLogic: "answers_to_signals_to_offer",
@@ -499,7 +539,6 @@ export function materializeSetupAnswers(project: Project, session: AISetupSessio
   const qualificationObjective = answerText(answers, "qualification.objective");
   const recommends = recommendationJourney(project, session);
   const journeyMode: JourneyMode = recommends ? "assisted_discovery" : classifyJourneyMode(project.primaryGoal);
-  const qualificationFields = qualificationQuestions(answers["qualification.questions"], offeringNames, journeyMode);
   const qualificationOutcome = answerText(answers, "qualification.outcome");
   const qualificationDestination = answerText(answers, "qualification.destination");
   const modeAnswer = answerText(answers, "quote.mode");
@@ -521,6 +560,13 @@ export function materializeSetupAnswers(project: Project, session: AISetupSessio
     ? [...destinations, selectedDestination]
     : destinations;
   const offerings = serviceOfferings(project, offeringNames, selectedDestination, currentConfig.serviceOfferings, session.initialInput.description);
+  const intelligenceQuestions = questionsFromOfferIntelligence(offerings);
+  const qualificationFields = qualificationQuestions(
+    answers["qualification.questions"],
+    offeringNames,
+    journeyMode,
+    intelligenceQuestions,
+  );
   const configuredScheduleServices = scheduleAnswer
     ? schedulingServices(project, scheduleAnswer, confirmationMode(scheduleDestination), quoteServices)
     : currentConfig.schedulableServices || [];

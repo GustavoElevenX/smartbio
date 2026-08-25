@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const e2ePort = Number(process.env.E2E_PORT || 3000);
+const reuseE2eServer = process.env.E2E_REUSE_SERVER === "true";
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -12,7 +13,7 @@ export default defineConfig({
   webServer: {
     command: `"${process.execPath}" node_modules/next/dist/bin/next dev --hostname 127.0.0.1 --port ${e2ePort}`,
     url: `http://127.0.0.1:${e2ePort}`,
-    reuseExistingServer: false,
+    reuseExistingServer: reuseE2eServer,
     timeout: 120_000,
     env: {
       ...process.env,

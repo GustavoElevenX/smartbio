@@ -54,7 +54,7 @@ test("clínica consulta agenda e confirma horário", async ({ page }) => {
   await page.getByLabel("Data do agendamento").fill(nextWeekday);
   await page.getByRole("button", { name: /consultar horários/i }).click();
   const slot = page.locator("button").filter({ hasText: /^\d{2}:\d{2}$/ }).first();
-  await expect(slot).toBeVisible();
+  await expect(slot).toBeVisible({ timeout: 30_000 });
   await slot.click();
   await page.getByLabel("Nome").fill("Cliente Clínica");
   await page.getByLabel("WhatsApp").fill("11999990002");

@@ -33,6 +33,7 @@ import { qualifyLead } from "@/features/qualification/qualification-engine";
 import { buildRecommendationHandoff } from "@/features/qualification/recommendation-handoff";
 import { recommendService } from "@/features/qualification/recommendation-engine";
 import { journeyModeForProject } from "@/features/qualification/recommendation-semantics";
+import { selectNextQualificationQuestion } from "@/features/qualification/offer-intelligence";
 import { calculateReservationTotal } from "@/features/reservations/reservation-engine";
 import { resolveRoute } from "@/features/routing/routing-engine";
 import {
@@ -404,6 +405,7 @@ export function ExperienceCanvas({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [confirmation, setConfirmation] = useState("");
+  const [revealedQualificationFieldIds, setRevealedQualificationFieldIds] = useState<string[]>([]);
   const formStarted = useRef(false);
   const mediaFiles = useRef<File[]>([]);
   const reduceMotion = useReducedMotion();
@@ -421,6 +423,17 @@ export function ExperienceCanvas({
     () => recommendService(runtime.answers, project.commercialConfig?.serviceOfferings || [], { journeyMode }),
     [journeyMode, project.commercialConfig?.serviceOfferings, runtime.answers],
   );
+  const progressiveQualification = step?.type === "form"
+    && step.settings?.progressiveQuestioning === true
+    && hasRecommendationJourney;
+  const qualificationFields = step?.formFields || [];
+  const renderedFormFields = progressiveQualification
+    ? qualificationFields.filter((field, index) => index === 0 || revealedQualificationFieldIds.includes(field.id))
+    : qualificationFields;
+  const hasMoreQualificationQuestions = progressiveQualification
+    && renderedFormFields.length < qualificationFields.length;
+  const canFinishQualificationEarly = serviceRecommendation.confidence === "clear"
+    && serviceRecommendation.strongEvidence === true;
   const selectedRecommendation = project.commercialConfig?.serviceOfferings?.find(
     (offering) => offering.id === runtime.recommendationKey || offering.slug === runtime.recommendationKey,
   ) || serviceRecommendation.service;
@@ -555,6 +568,7 @@ export function ExperienceCanvas({
     setSubmitted(false);
     setConfirmation("");
     setError("");
+    setRevealedQualificationFieldIds([]);
   }
 
   function back() {
@@ -1223,6 +1237,21 @@ export function ExperienceCanvas({
       setError("Consulte e escolha um horário.");
       return;
     }
+    if (progressiveQualification && hasMoreQualificationQuestions && !canFinishQualificationEarly) {
+      const nextQuestion = selectNextQualificationQuestion({
+        answers: runtime.answers,
+        offerings: project.commercialConfig?.serviceOfferings || [],
+        fields: qualificationFields,
+        visibleFieldIds: renderedFormFields.map((field) => field.id),
+      });
+      if (!nextQuestion) {
+        if (option) void act(option);
+        return;
+      }
+      setRevealedQualificationFieldIds((ids) => [...new Set([...ids, nextQuestion.id])]);
+      setError("");
+      return;
+    }
     if (option) void act(option);
   }
 
@@ -1352,7 +1381,7 @@ export function ExperienceCanvas({
               className="max-h-9 max-w-28 object-contain"
             />
           ) : (
-            <span className="max-w-[50vw] break-words text-center text-xs font-extrabold leading-4 [overflow-wrap:anywhere]">{project.name}</span>
+            <span className="max-w-[50vw] truncate text-center text-xs font-extrabold leading-4" title={project.name}>{project.name}</span>
           )}
         </div>
         <button
@@ -1386,12 +1415,12 @@ export function ExperienceCanvas({
             }}
             className="min-w-0 w-full max-w-[620px]"
           >
-            <p className="max-w-full break-words text-xs font-extrabold uppercase tracking-[.16em] text-[var(--primary)] [overflow-wrap:anywhere]">
+            <p className="max-w-full break-normal text-xs font-extrabold uppercase tracking-[.16em] text-[var(--primary)] [hyphens:none] [overflow-wrap:break-word]">
               {project.name}
             </p>
             <h1
               className={cn(
-                "mt-4 max-w-full break-words font-extrabold leading-[1.02] tracking-[-.055em] [overflow-wrap:anywhere]",
+                "mt-4 max-w-full break-normal font-extrabold leading-[1.02] tracking-[-.04em] [hyphens:none] [overflow-wrap:break-word]",
                 preview ? "text-3xl" : "text-[clamp(2rem,8vw,3.6rem)]",
               )}
               style={{
@@ -1411,7 +1440,7 @@ export function ExperienceCanvas({
                 <span className="text-xs font-extrabold uppercase tracking-wider text-[var(--primary)]">
                   {displayedRecommendation.label || "Recomendado"}
                 </span>
-                <h2 className="mt-2 text-2xl font-extrabold">
+                <h2 className="mt-2 max-w-full break-normal text-2xl font-extrabold [hyphens:none] [overflow-wrap:break-word]">
                   {displayedRecommendation.title}
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-[var(--muted-fg)]">
@@ -1457,9 +1486,14 @@ export function ExperienceCanvas({
                 ))}
               </div>
             ) : null}
-            <form onSubmit={submitStep} className="mt-7 flex flex-col gap-4">
-              {step.formFields?.map((field) => (
-                <label key={field.id} className="block">
+            <form onSubmit={submitStep} className="mt-7 flex min-w-0 flex-col gap-4">
+              {progressiveQualification && qualificationFields.length > 1 ? (
+                <p className="text-xs font-semibold text-[var(--muted-fg)]" aria-live="polite">
+                  Pergunta {renderedFormFields.length} de até {qualificationFields.length}
+                </p>
+              ) : null}
+              {renderedFormFields.map((field) => (
+                <label key={field.id} className="block min-w-0">
                   <span className="mb-2 block text-xs font-bold">
                     {field.label}
                     {field.required ? " *" : ""}
@@ -1509,7 +1543,11 @@ export function ExperienceCanvas({
                       )}
                     </span>
                     <span className="flex-1">
-                      <span className="block">{option.label}</span>
+                      <span className="block break-normal [hyphens:none] [overflow-wrap:break-word]">
+                        {progressiveQualification && index === 0 && hasMoreQualificationQuestions && !canFinishQualificationEarly
+                          ? "Continuar"
+                          : option.label}
+                      </span>
                       {option.description ? (
                         <small
                           className={cn(

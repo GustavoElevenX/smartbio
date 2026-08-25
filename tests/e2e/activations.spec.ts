@@ -26,6 +26,11 @@ test("Casa de Sucos: benefício segue até o handoff humano com claim atribuído
 
   await page.route("**/api/public/activations/*/claim", async (route) => route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ ok: true, data: { eligible: true, claim: { id: "10000000-0000-4000-8000-000000000001", code: "VIR0U7X", benefitLabel: "20% OFF" } } }) }));
   await page.route("**/api/public/activations/*/handoff", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, data: { presented: true, opportunityId: "opportunity-e2e" } }) }));
+  await page.context().route(/https:\/\/(wa\.me|api\.whatsapp\.com)\//, async (route) => route.fulfill({
+    status: 200,
+    contentType: "text/html",
+    body: "<!doctype html><title>WhatsApp</title>",
+  }));
 
   await page.goto("/virou-activation-demo");
   await page.getByRole("button", { name: "Liberar 20% OFF" }).click();

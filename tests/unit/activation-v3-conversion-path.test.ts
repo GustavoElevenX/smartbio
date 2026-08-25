@@ -10,6 +10,7 @@ import { getProjectReadiness } from "@/features/publishing/project-readiness";
 import { validateConversionPath } from "@/features/publishing/conversion-path-validator";
 import { recommendService } from "@/features/qualification/recommendation-engine";
 import type { Project } from "@/types";
+import { attachTestOfferIntelligence } from "../fixtures/offer-intelligence";
 
 const recommendationAction: VisitorActionSelection = {
   key: "recommendation",
@@ -66,6 +67,16 @@ function recommendationProject(input: {
     updatedAt: "2026-08-24T00:00:00.000Z",
   };
   let project = materializeSetupAnswers(scopedBase, session);
+  project = attachTestOfferIntelligence(project, {
+    "projeto de um ambiente": {
+      strongClues: ["renovar um ambiente", "orientação para esse espaço"],
+      supporting: ["um espaço da casa"],
+    },
+    "ingles para negocios": {
+      strongClues: ["inglês no trabalho", "reuniões", "apresentações para empresas"],
+      supporting: ["uso profissional do idioma"],
+    },
+  });
   project = ensureVisitorActionTargets(project, [recommendationAction]);
   project = applyVisitorActionsToProject(project, { visitorActions: [recommendationAction] });
   return project;

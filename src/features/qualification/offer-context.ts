@@ -25,18 +25,27 @@ export function extractExplicitOfferNames(value: string) {
 }
 
 export function offerNamesFromSetup(description: string, answer: unknown) {
+  const explicit = extractExplicitOfferNames(description);
+  const mergePreservingExplicit = (values: string[]) => {
+    const byName = new Map<string, string>();
+    for (const value of [...explicit, ...values]) {
+      const key = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      if (!byName.has(key)) byName.set(key, value);
+    }
+    return [...byName.values()].slice(0, 20);
+  };
   if (Array.isArray(answer)) {
     const values = answer.map((item) => cleanItem(String(item))).filter(plausibleOffer);
-    if (values.length) return [...new Set(values)];
+    if (values.length) return mergePreservingExplicit(values);
   }
   if (typeof answer === "string" && answer.trim()) {
     const values = answer
       .split(/\r?\n|\s*;\s*/)
       .map(cleanItem)
       .filter(plausibleOffer);
-    if (values.length) return [...new Set(values)];
+    if (values.length) return mergePreservingExplicit(values);
   }
-  return extractExplicitOfferNames(description);
+  return explicit;
 }
 
 export function contextSignature(value: string) {
