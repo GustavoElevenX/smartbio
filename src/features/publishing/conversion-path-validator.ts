@@ -10,8 +10,9 @@ import {
   offerIntelligenceIsSufficient,
 } from "@/features/qualification/offer-intelligence";
 import type { JourneyStep, Project, RoutingDestination, StepOption } from "@/types";
+import { discoveryPlanIsReady } from "@/features/qualification/discovery-plan";
 
-export type ConversionPathCheckKey = "entry" | "primary_action" | "questions" | "progressive_questioning" | "circularity" | "offer_integrity" | "result" | "result_quality" | "context" | "public_copy" | "destination";
+export type ConversionPathCheckKey = "entry" | "primary_action" | "plan" | "questions" | "progressive_questioning" | "circularity" | "offer_integrity" | "result" | "result_quality" | "context" | "public_copy" | "destination";
 
 export interface ConversionPathCheck {
   key: ConversionPathCheckKey;
@@ -112,6 +113,9 @@ export function validateConversionPath(project: Project): ConversionPathValidati
   const progressiveQuestioning = form?.settings?.progressiveQuestioning === true
     && result?.settings?.progressiveQuestioning === true;
   const primaryActionValid = Boolean(primaryGoal && isRecommendationIntent(primaryGoal.name));
+  const planReady = Boolean(project.discoveryPlan && discoveryPlanIsReady(project.discoveryPlan)
+    && project.discoveryPlan.projectId === project.id
+    && offerings.every((offering) => offering.settings?.discoveryPlanId === project.discoveryPlan?.id));
   const contextSafe = offerings.every((offering) => {
     if (offering.settings?.descriptionSource !== "generated_conservative") return true;
     const provenance = offering.settings?.copyProvenance;
@@ -121,6 +125,7 @@ export function validateConversionPath(project: Project): ConversionPathValidati
   const checks: ConversionPathCheck[] = [
     { key: "entry", valid: entryValid, label: "Entrada da orientação", reason: entryValid ? "A ação principal inicia a orientação." : "A ação principal não inicia uma etapa de orientação válida." },
     { key: "primary_action", valid: primaryActionValid, label: "Ação principal coerente", reason: primaryActionValid ? "A ação principal materializa a descoberta antes do contato final." : "O objetivo pede orientação, mas a ação principal não inicia a descoberta assistida." },
+    { key: "plan", valid: planReady, label: "Plano contextual da descoberta", reason: planReady ? "Perguntas, ofertas, perfis e fallback usam a mesma versão persistida do plano." : "O plano contextual está ausente, degradado, incompleto ou fora de versão; a publicação permanece bloqueada." },
     { key: "questions", valid: fields.length > 0 && !invalidQuestions.length && usefulQuestions && questionsDerived, label: "Perguntas da orientação", reason: fields.length > 0 && !invalidQuestions.length && usefulQuestions && questionsDerived ? "As perguntas derivam das diferenças registradas entre as ofertas." : "Revise perguntas fragmentadas, genéricas ou desconectadas do Offer Intelligence." },
     { key: "progressive_questioning", valid: progressiveQuestioning, label: "Perguntas progressivas", reason: progressiveQuestioning ? "A jornada pode encerrar perguntas quando já existe evidência forte e pedir mais contexto quando necessário." : "A descoberta assistida ainda obriga uma sequência fixa de perguntas." },
     { key: "circularity", valid: !circular, label: "Descoberta sem escolha circular", reason: circular ? "A orientação pede que o visitante escolha diretamente a mesma oferta que deveria ser inferida." : "A orientação parte da necessidade antes de apresentar uma opção." },

@@ -847,6 +847,7 @@ export interface Project {
     paymentUrl?: string;
     policies?: ProjectPolicy[];
   };
+  discoveryPlan?: import("@/features/qualification/discovery-plan").DiscoveryPlan;
   dataRequirements?: DataRequirement[];
   version: number;
   publishedVersionId?: string;

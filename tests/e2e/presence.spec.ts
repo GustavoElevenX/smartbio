@@ -125,7 +125,7 @@ test("Presence publica SEO, canonical e dados estruturados no HTML", async ({
   expect(html).toContain("Instagram");
 });
 
-test("heróis e cards públicos acomodam nomes longos em 360, 375 e 390 px", async ({ page }, testInfo) => {
+test("CSS-ONLY: wrapping tipográfico isolado em demos, sem evidência de Activation", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile-chrome", "Regressão específica de viewport mobile");
   test.setTimeout(90_000);
   const names = [

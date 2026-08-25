@@ -30,6 +30,7 @@ import type {
   OptimizationExplanationInput,
   StructuredAIRequest,
   CustomVisitorActionInput,
+  DiscoveryPlanningInput,
 } from "@/server/ai/ai-provider";
 import { recordAIUsage } from "@/server/ai/ai-usage";
 import { brandAnalysisPrompt } from "@/server/ai/prompts/brand-analysis";
@@ -45,6 +46,8 @@ import { suggestedSiteStructureSchema } from "@/features/site-composer/site-comp
 import { optimizationAIExplanationSchema } from "@/features/optimization/schema";
 import { optimizationExplanationPrompt } from "@/server/ai/prompts/optimization-explanation";
 import { visitorActionClassificationPrompt } from "@/server/ai/prompts/visitor-action-classification";
+import { discoveryPlanDraftSchema } from "@/features/qualification/discovery-plan";
+import { discoveryPlanPrompt } from "@/server/ai/prompts/discovery-plan";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
   requireEntitlement,
@@ -58,6 +61,7 @@ const questionListSchema = z.object({
 const operationFeatures: Record<string, EntitlementFeature> = {
   business_analysis: "ai_business_analysis",
   missing_questions: "ai_business_analysis",
+  discovery_planning: "ai_journey",
   journey_composition: "ai_journey",
   presence_composition: "ai_presence",
   site_structure_composition: "ai_structure_suggestions",
@@ -249,6 +253,17 @@ export class OpenAIVirouProvider implements VirouAIProvider {
       schemaName: "journey_draft",
       schema: aiJourneyDraftSchema,
       systemPrompt: journeyCompositionPrompt,
+      payload: input,
+      context: input,
+    });
+  }
+
+  composeDiscoveryPlan(input: DiscoveryPlanningInput) {
+    return this.structured({
+      operation: "discovery_planning",
+      schemaName: "discovery_plan_draft",
+      schema: discoveryPlanDraftSchema,
+      systemPrompt: discoveryPlanPrompt,
       payload: input,
       context: input,
     });

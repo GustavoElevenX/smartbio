@@ -11,7 +11,7 @@ import { recommendService } from "@/features/qualification/recommendation-engine
 import { recommendSections } from "@/features/site-composer/section-recommendation";
 import { inferBusinessShape } from "@/features/site-composer/business-shape";
 import type { Project, StructuredJourneyQuestion } from "@/types";
-import { attachTestOfferIntelligence } from "../fixtures/offer-intelligence";
+import { attachEngineFixtureProfiles } from "../fixtures/offer-intelligence";
 
 const recommendationAction: VisitorActionSelection = {
   key: "recommendation",
@@ -69,7 +69,7 @@ function discoveryProject(input: { name: string; description: string; offerings:
     updatedAt: "2026-08-25T00:00:00.000Z",
   };
   let project = materializeSetupAnswers(scoped, session);
-  project = attachTestOfferIntelligence(project, {
+  project = attachEngineFixtureProfiles(project, {
     "higienizacao interna": { strongClues: ["manchas", "odor", "interior"], supporting: ["sujeira interna"] },
     "polimento tecnico": { strongClues: ["perdeu brilho", "marcas superficiais"], supporting: ["aparência da pintura"] },
     "revitalizacao de farois": { strongClues: ["faróis opacos", "faróis amarelados"], supporting: ["transparência dos faróis"] },

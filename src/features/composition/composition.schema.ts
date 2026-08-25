@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { commercialConfigPatchSchema } from "@/features/composition/commercial-config-patch.schema";
-import { offerIntelligenceDraftSchema } from "@/features/qualification/offer-intelligence";
 
 export const capabilityKeySchema = z.enum(["qualification", "quote", "scheduling", "catalog_order", "reservation", "routing", "payment"]);
 export const conversionGoalTypeSchema = z.enum(["buy", "request_quote", "schedule", "reserve", "contact", "visit", "learn", "custom"]);
@@ -57,7 +56,6 @@ export const aiJourneyDraftSchema = z.object({
     reasoning: z.string().min(1).max(500),
   })).max(12),
   commercialConfigPatch: commercialConfigPatchSchema,
-  offerIntelligenceProfiles: z.array(offerIntelligenceDraftSchema).max(100),
   requirements: z.array(z.object({
     id: z.string(),
     key: z.string().min(1).max(120),

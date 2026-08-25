@@ -14,7 +14,7 @@ import { offerIntelligenceFor, offerIntelligenceProfileSchema } from "@/features
 import { validateConversionPath } from "@/features/publishing/conversion-path-validator";
 import { getProjectReadiness } from "@/features/publishing/project-readiness";
 import type { Project } from "@/types";
-import { attachTestOfferIntelligence, type OfferIntelligenceFixture } from "../fixtures/offer-intelligence";
+import { attachEngineFixtureProfiles, type OfferIntelligenceFixture } from "../fixtures/offer-intelligence";
 
 const loopDescription = `Assistência técnica de celulares.
 Serviços:
@@ -148,7 +148,7 @@ function discoveryProject(input: {
     createdAt: "2026-08-25T00:00:00.000Z", updatedAt: "2026-08-25T00:00:00.000Z",
   };
   let project = materializeSetupAnswers(scoped, session);
-  project = attachTestOfferIntelligence(project, input.fixtures);
+  project = attachEngineFixtureProfiles(project, input.fixtures);
   project = materializeSetupAnswers(project, session);
   project = ensureVisitorActionTargets(project, actions);
   project = applyVisitorActionsToProject(project, { visitorActions: actions });
@@ -173,7 +173,7 @@ describe("Activation V6 — Offer Intelligence contextual", () => {
     const profiles = (project.commercialConfig?.serviceOfferings || []).map(offerIntelligenceFor);
     expect(profiles).toHaveLength(5);
     expect(profiles.every((profile) => offerIntelligenceProfileSchema.safeParse(profile).success)).toBe(true);
-    expect(profiles.every((profile) => profile?.provenance.projectId === project.id && profile.provenance.source === "ai_composition")).toBe(true);
+    expect(profiles.every((profile) => profile?.provenance.projectId === project.id && profile.provenance.source === "business_confirmed")).toBe(true);
     expect(profiles.map((profile) => profile?.offerId)).toEqual(project.commercialConfig?.serviceOfferings?.map((offering) => offering.id));
   });
 

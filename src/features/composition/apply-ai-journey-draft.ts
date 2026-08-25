@@ -2,7 +2,6 @@ import { capabilityRegistry, createCapability } from "@/features/capabilities/ca
 import { draftCapabilityRequirements } from "@/features/capabilities/capability-requirements";
 import type { AIJourneyDraftPayload } from "@/features/composition/composition.schema";
 import { mergeCommercialConfig } from "@/features/composition/merge-commercial-config";
-import { attachOfferIntelligenceDrafts } from "@/features/qualification/offer-intelligence";
 import type { JourneyComposition } from "@/features/composition/journey-composer";
 import type { BusinessCapabilityProfile, ConversionGoal, DataRequirement, JourneyStep, Project, ProjectCapability } from "@/types";
 
@@ -45,15 +44,7 @@ export function applyAIJourneyDraft(input: {
     .map((definition) => createCapability(definition.key));
   for (const capability of deterministicCapabilities) if (!capabilities.has(capability.key)) capabilities.set(capability.key, capability);
   const merged = mergeCommercialConfig(input.deterministic.commercialConfig, input.draft.commercialConfigPatch, input.projectId);
-  const commercialConfig = {
-    ...merged.value,
-    serviceOfferings: attachOfferIntelligenceDrafts({
-      offerings: merged.value.serviceOfferings || [],
-      drafts: input.draft.offerIntelligenceProfiles,
-      projectId: input.projectId,
-      businessContext: input.draft.summary,
-    }),
-  };
+  const commercialConfig = merged.value;
   const planned = [...capabilities.values()];
   const fallbackStepId = input.draft.steps[0]?.id || input.deterministic.steps[0]?.id || "";
   const stepIds = new Set(input.draft.steps.map((step) => step.id));

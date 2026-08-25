@@ -9,6 +9,7 @@ import {
   questionsFromOfferIntelligence,
 } from "@/features/qualification/offer-intelligence";
 import { conservativeServiceDescription } from "@/features/qualification/recommendation-engine";
+import { bindDiscoveryPlanToProject, type DiscoveryPlan } from "@/features/qualification/discovery-plan";
 import { visitorActionSemanticKey } from "@/features/ai-setup/visitor-actions";
 import { uid } from "@/lib/utils";
 import type {
@@ -294,7 +295,47 @@ function serviceOfferings(
   destination?: RoutingDestination,
   current: ServiceOffering[] = [],
   businessContext = "",
+  plan?: DiscoveryPlan,
 ) {
+  if (plan) {
+    const currentByName = new Map(current.map((item) => [normalize(item.name), item]));
+    const profiles = new Map(plan.offerIntelligenceProfiles.map((profile) => [profile.offerId, profile]));
+    return plan.offerings.map((planned, order): ServiceOffering => {
+      const existing = currentByName.get(normalize(planned.name));
+      const profile = profiles.get(planned.id);
+      if (!profile) throw new Error(`DiscoveryPlan sem perfil para ${planned.name}.`);
+      return {
+        id: planned.id,
+        projectId: project.id,
+        name: planned.name,
+        slug: existing?.slug || normalize(planned.name).replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
+        description: existing?.description || planned.description,
+        shortDescription: existing?.shortDescription || planned.description || profile.safeDescription,
+        serviceMode: existing?.serviceMode || "contact",
+        priceMode: existing?.priceMode || "on_request",
+        price: existing?.price,
+        minPrice: existing?.minPrice,
+        maxPrice: existing?.maxPrice,
+        currency: existing?.currency || "BRL",
+        imageAssetId: existing?.imageAssetId,
+        destinationId: existing?.destinationId || destination?.id,
+        externalUrl: existing?.externalUrl,
+        isFeatured: existing?.isFeatured ?? order === 0,
+        isActive: existing?.isActive ?? true,
+        order,
+        settings: {
+          ...(existing?.settings || {}),
+          source: "discovery_plan",
+          discoveryPlanId: plan.id,
+          discoveryPlanVersion: plan.version,
+          discoveryContextSignature: plan.contextSignature,
+          offerIntelligence: profile,
+          descriptionSource: existing?.shortDescription || existing?.description ? "business" : "discovery_plan",
+          copyProvenance: { projectId: project.id, contextSignature: plan.contextSignature, sources: ["confirmed_offer_list", "business_description"] },
+        },
+      };
+    });
+  }
   if (!names.length) return current;
   const currentByName = new Map(current.map((item) => [normalize(item.name), item]));
   const allNames = unique([...current.map((item) => item.name), ...names]);
@@ -533,7 +574,11 @@ function configureJourney(
 export function materializeSetupAnswers(project: Project, session: AISetupSession): Project {
   const answers = session.answers;
   const quoteServices = listFromText(answerText(answers, "quote.services"));
-  const qualificationOfferings = offerNamesFromSetup(session.initialInput.description, answers["qualification.offerings"]);
+  const boundDiscoveryPlan = session.discoveryPlan
+    ? bindDiscoveryPlanToProject(session.discoveryPlan, project.id)
+    : project.discoveryPlan?.projectId === project.id ? project.discoveryPlan : undefined;
+  const qualificationOfferings = boundDiscoveryPlan?.offerings.map((item) => item.name)
+    || offerNamesFromSetup(session.initialInput.description, answers["qualification.offerings"]);
   const offeringNames = qualificationOfferings.length ? qualificationOfferings : quoteServices;
   const quoteFields = quoteQuestions(quoteServices);
   const qualificationObjective = answerText(answers, "qualification.objective");
@@ -559,10 +604,10 @@ export function materializeSetupAnswers(project: Project, session: AISetupSessio
   const nextDestinations = selectedDestination && !destinations.some((item) => item.id === selectedDestination.id)
     ? [...destinations, selectedDestination]
     : destinations;
-  const offerings = serviceOfferings(project, offeringNames, selectedDestination, currentConfig.serviceOfferings, session.initialInput.description);
+  const offerings = serviceOfferings(project, offeringNames, selectedDestination, currentConfig.serviceOfferings, session.initialInput.description, boundDiscoveryPlan);
   const intelligenceQuestions = questionsFromOfferIntelligence(offerings);
   const qualificationFields = qualificationQuestions(
-    answers["qualification.questions"],
+    boundDiscoveryPlan?.questions || answers["qualification.questions"],
     offeringNames,
     journeyMode,
     intelligenceQuestions,
@@ -572,6 +617,7 @@ export function materializeSetupAnswers(project: Project, session: AISetupSessio
     : currentConfig.schedulableServices || [];
   const next: Project = {
     ...project,
+    discoveryPlan: boundDiscoveryPlan,
     description: synthesizePublicDescription({ businessName: project.name, primaryGoal: project.primaryGoal, offerings: offeringNames }),
     businessProfile: project.businessProfile ? {
       ...project.businessProfile,
@@ -610,9 +656,14 @@ export function materializeSetupAnswers(project: Project, session: AISetupSessio
       offerings,
       selectedDestination,
       configuredScheduleServices,
-    ).map((step) => step.type === "welcome"
-      ? { ...step, description: synthesizePublicDescription({ businessName: project.name, primaryGoal: project.primaryGoal, offerings: offeringNames }) }
-      : step),
+    ).map((step) => {
+      const prepared = step.type === "welcome"
+        ? { ...step, description: synthesizePublicDescription({ businessName: project.name, primaryGoal: project.primaryGoal, offerings: offeringNames }) }
+        : step;
+      return boundDiscoveryPlan && ["form", "recommendation"].includes(prepared.type)
+        ? { ...prepared, settings: { ...prepared.settings, discoveryPlanId: boundDiscoveryPlan.id, discoveryPlanVersion: boundDiscoveryPlan.version, discoveryContextSignature: boundDiscoveryPlan.contextSignature } }
+        : prepared;
+    }),
   };
   const evaluated = evaluateCapabilityRequirements(next);
   const sessionRequirements = new Map(session.missingRequirements.map((item) => [item.key, item]));

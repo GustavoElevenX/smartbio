@@ -8,6 +8,7 @@ import type { AIActivationDraft } from "@/features/activations/ai-activation.sch
 import type { ConversionActivation } from "@/features/activations/activation.types";
 import type { BusinessShape, SuggestedSiteStructure } from "@/features/site-composer/site-composer.types";
 import type { OptimizationAIExplanation } from "@/features/optimization/schema";
+import type { DiscoveryPlan, DiscoveryPlanDraft } from "@/features/qualification/discovery-plan";
 
 export interface AIRequestContext {
   workspaceId: string;
@@ -33,6 +34,16 @@ export interface JourneyAIInput extends AIRequestContext {
   capabilities: ProjectCapability[];
   answers: Record<string, unknown>;
   confirmedCommercialData?: Project["commercialConfig"];
+  discoveryPlan?: DiscoveryPlan;
+}
+
+export interface DiscoveryPlanningInput extends AIRequestContext {
+  businessName: string;
+  businessDescription: string;
+  declaredObjective: string;
+  primaryAction: { key: string; label: string };
+  completionAction: { label: string; destination: string };
+  offeringNames: string[];
 }
 
 export interface CopyGenerationInput extends AIRequestContext {
@@ -97,6 +108,7 @@ export interface ActivationCompositionInput extends AIRequestContext { businessP
 export interface VirouAIProvider {
   analyzeBusiness(input: BusinessAnalysisInput): Promise<BusinessAnalysisResult>;
   generateMissingQuestions(input: MissingQuestionInput): Promise<SetupQuestion[]>;
+  composeDiscoveryPlan(input: DiscoveryPlanningInput): Promise<DiscoveryPlanDraft>;
   composeJourney(input: JourneyAIInput): Promise<AIJourneyDraftPayload>;
   composePresence(input: PresenceCompositionInput): Promise<AIPresenceDraft>;
   composeSiteStructure(input: SiteCompositionInput): Promise<SuggestedSiteStructure>;

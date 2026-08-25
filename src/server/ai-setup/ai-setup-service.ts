@@ -1,11 +1,13 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { extractedBusinessSourceSchema, setupDraftInputSchema, setupInitialInputSchema, type AISetupSession, type ExtractedBusinessSource, type SetupDraftInput, type SetupInitialInput, type SetupQuestion, type SourceReference } from "@/features/ai-setup/ai-setup.schema";
+import { extractedBusinessSourceSchema, setupDraftInputSchema, setupInitialInputSchema, structuredJourneyQuestionSchema, type AISetupSession, type ExtractedBusinessSource, type SetupDraftInput, type SetupInitialInput, type SetupQuestion, type SourceReference } from "@/features/ai-setup/ai-setup.schema";
 import { materializeSetupAnswers } from "@/features/ai-setup/materialize-setup-answers";
 import { stageGeneratedDraft } from "@/features/ai-setup/stage-generated-draft";
 import { normalizeSetupPhone } from "@/features/ai-setup/setup-phone";
-import { buildQualificationQuestionPlan, buildQualificationSuggestions } from "@/features/ai-setup/qualification-proposal";
+import { buildQualificationSuggestions } from "@/features/ai-setup/qualification-proposal";
+import { createDiscoveryPlan, discoveryContextSignature } from "@/features/qualification/discovery-plan";
+import { offerNamesFromSetup } from "@/features/qualification/offer-context";
 import { applyVisitorActionsToProject, classifyCustomVisitorAction, defaultVisitorActions, ensureVisitorActionTargets, profileWithVisitorActions, type VisitorActionSelection } from "@/features/ai-setup/visitor-actions";
 import { RuleBasedBusinessAnalyzer } from "@/features/business-understanding/rule-based-business-analyzer";
 import { capabilityPlanner } from "@/features/capabilities/capability-planner";
@@ -98,7 +100,7 @@ function requirementsForActions(
   const primary = actions.find((action) => action.isPrimary) || actions[0];
   const recommends = primary && (primary.key === "recommendation" || primary.semanticKey === "recommendation");
   if (!recommends || requirements.some((item) => item.key === "qualification.offerings")) return requirements;
-  const destinationIndex = requirements.findIndex((item) => item.key === "qualification.destination");
+  const questionsIndex = requirements.findIndex((item) => item.key === "qualification.questions");
   const offering: DataRequirement = {
     id: `${projectId}:qualification.offerings`,
     key: "qualification.offerings",
@@ -109,7 +111,7 @@ function requirementsForActions(
     reason: "Quais opções reais podem aparecer no resultado?",
   };
   const next = [...requirements];
-  next.splice(destinationIndex < 0 ? next.length : destinationIndex, 0, offering);
+  next.splice(questionsIndex < 0 ? next.length : questionsIndex, 0, offering);
   return next;
 }
 
@@ -119,9 +121,13 @@ function plannedQuestions(
   providerQuestions?: SetupQuestion[],
 ) {
   const suggestions = buildQualificationSuggestions(session);
-  const planned = planAdaptiveQuestions(requirements, session.answers, 3, suggestions, {
-    "qualification.questions": buildQualificationQuestionPlan(session),
-  });
+  const structured = session.discoveryPlan
+    ? { "qualification.questions": session.discoveryPlan.questions }
+    : {};
+  const planningRequirements = session.discoveryPlan
+    ? requirements
+    : requirements.filter((requirement) => requirement.key !== "qualification.questions");
+  const planned = planAdaptiveQuestions(planningRequirements, session.answers, 3, suggestions, structured);
   if (!providerQuestions?.length) return planned;
   const providerByKey = new Map(providerQuestions.map((question) => [question.key, question]));
   return planned.map((question) => {
@@ -129,6 +135,50 @@ function plannedQuestions(
     if (!provider || question.suggestedAnswer) return question;
     return { ...provider, id: question.id, priority: question.priority };
   });
+}
+
+function recommendationSelected(session: AISetupSession) {
+  const primary = session.visitorActions.find((action) => action.isPrimary) || session.visitorActions[0];
+  return Boolean(primary && (primary.key === "recommendation" || primary.semanticKey === "recommendation"));
+}
+
+async function composePersistedDiscoveryPlan(
+  actor: AISetupActor,
+  session: AISetupSession,
+  answers: Record<string, unknown>,
+) {
+  if (!recommendationSelected(session)) return undefined;
+  if (answers["qualification.offerings"] == null) return undefined;
+  const offeringNames = offerNamesFromSetup(session.initialInput.description, answers["qualification.offerings"]);
+  if (offeringNames.length < 2) return undefined;
+  const primary = session.visitorActions.find((action) => action.isPrimary) || session.visitorActions[0];
+  const declaredObjective = String(answers["qualification.objective"] || primary?.label || "Orientar o visitante").trim();
+  const destination = String(answers["qualification.destination"] || (session.initialInput.phone ? "WhatsApp" : "Atendimento da equipe")).trim();
+  const signature = discoveryContextSignature({
+    businessName: session.initialInput.businessName,
+    businessDescription: session.initialInput.description,
+    declaredObjective,
+    destination,
+    offeringNames,
+  });
+  if (session.discoveryPlan?.contextSignature === signature && session.discoveryPlan.status !== "invalidated") return session.discoveryPlan;
+  const planningInput = {
+    businessName: session.initialInput.businessName,
+    businessDescription: session.initialInput.description,
+    declaredObjective,
+    primaryAction: { key: primary?.key || "recommendation", label: primary?.label || declaredObjective },
+    completionAction: { label: "Conversar com a equipe", destination },
+    offeringNames,
+    workspaceId: actor.workspaceId,
+    setupSessionId: session.id,
+    userId: actor.userId,
+  };
+  try {
+    const draft = isAIConfigured() ? await getAIProvider().composeDiscoveryPlan(planningInput) : undefined;
+    return createDiscoveryPlan({ ...planningInput, draft, providerFailed: !draft });
+  } catch {
+    return createDiscoveryPlan({ ...planningInput, providerFailed: true });
+  }
 }
 
 function scalarFactValue(value: unknown): string | number | boolean | null {
@@ -309,6 +359,7 @@ export class AISetupService {
       ...session,
       status: "collecting",
       initialInput: draft,
+      discoveryPlan: session.discoveryPlan ? { ...session.discoveryPlan, status: "invalidated" } : undefined,
       lastError: undefined,
     });
   }
@@ -338,6 +389,7 @@ export class AISetupService {
         questions: [],
         sources: revisedSources,
         projectDraft: undefined,
+        discoveryPlan: undefined,
         lastError: undefined,
         usedFallback: false,
       });
@@ -458,8 +510,9 @@ export class AISetupService {
       extractedProfile: profile,
       visitorActions: classifiedActions,
       actionsConfirmed: true,
+      discoveryPlan: undefined,
       missingRequirements: requirements,
-      questions: plannedQuestions({ ...session, extractedProfile: profile, visitorActions: classifiedActions }, requirements),
+      questions: plannedQuestions({ ...session, extractedProfile: profile, visitorActions: classifiedActions, discoveryPlan: undefined }, requirements),
       status: "waiting_answers",
     });
     await this.repository.addMessage(actor, id, "user", classifiedActions.map((action) => action.label).join(", "), { kind: "visitor_actions" });
@@ -469,14 +522,39 @@ export class AISetupService {
   async answer(actor: AISetupActor, id: string, key: string, value: unknown) {
     const session = await this.get(actor, id);
     if (!session.missingRequirements.some((item) => item.key === key)) throw new Error("Essa pergunta não pertence à sessão atual.");
-    const answers = { ...session.answers, [key]: value };
-    const requirements = resolvedRequirements(session.missingRequirements, answers);
-    const next = await this.repository.update(actor, {
+    let answers = { ...session.answers, [key]: value };
+    let requirements = resolvedRequirements(session.missingRequirements, answers);
+    let discoveryPlan = await composePersistedDiscoveryPlan(actor, { ...session, answers }, answers);
+    if (session.discoveryPlan && discoveryPlan && session.discoveryPlan.id !== discoveryPlan.id && key !== "qualification.questions") {
+      const { ["qualification.questions"]: _discardedQuestions, ...answersWithoutStaleQuestions } = answers;
+      void _discardedQuestions;
+      answers = answersWithoutStaleQuestions;
+      requirements = requirements.map((requirement) => requirement.key === "qualification.questions"
+        ? { ...requirement, status: "missing", value: undefined, origin: undefined, sourceId: undefined, reason: "O contexto mudou; confirme as perguntas da nova versão do DiscoveryPlan." }
+        : requirement);
+    }
+    if (key === "qualification.questions" && discoveryPlan && Array.isArray(value)) {
+      const confirmedQuestions = value
+        .map((item) => structuredJourneyQuestionSchema.safeParse(item))
+        .filter((item) => item.success)
+        .map((item) => item.data);
+      if (confirmedQuestions.length >= 2) discoveryPlan = {
+        ...discoveryPlan,
+        questions: confirmedQuestions.slice(0, 4),
+        provenance: { ...discoveryPlan.provenance, source: "business_confirmed" },
+      };
+    }
+    const sessionWithPlan = {
       ...session,
-      status: "waiting_answers",
       answers,
+      discoveryPlan,
+      usedFallback: session.usedFallback || discoveryPlan?.status === "degraded",
+    };
+    const next = await this.repository.update(actor, {
+      ...sessionWithPlan,
+      status: "waiting_answers",
       missingRequirements: requirements,
-      questions: plannedQuestions({ ...session, answers }, requirements),
+      questions: plannedQuestions(sessionWithPlan, requirements),
     });
     await this.repository.addMessage(actor, id, "user", typeof value === "string" ? value : JSON.stringify(value), { kind: "answer", key });
     if (actor.persistence === "database") {
@@ -501,6 +579,7 @@ export class AISetupService {
       profile,
       capabilities: selectedCapabilities,
       answers: session.answers,
+      discoveryPlan: session.discoveryPlan,
       workspaceId: actor.workspaceId,
       setupSessionId: id,
       userId: actor.userId,

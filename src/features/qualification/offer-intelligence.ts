@@ -44,7 +44,9 @@ export const offerIntelligenceProfileSchema = offerIntelligenceCoreSchema.extend
   provenance: z.object({
     projectId: text(200),
     contextSignature: text(100),
-    source: z.enum(["ai_composition", "deterministic_context", "business_confirmed"]),
+    discoveryPlanId: text(200).optional(),
+    discoveryPlanVersion: z.number().int().min(1).optional(),
+    source: z.enum(["contextual_ai", "deterministic_placeholder", "business_confirmed", "ai_composition", "deterministic_context"]),
     sourceFields: z.array(z.enum(["offer_name", "offer_description", "business_description", "confirmed_offer_list"])).min(1).max(4),
   }),
 });
@@ -72,15 +74,25 @@ function offerTerms(value: string) {
 
 export function profileFromDraft(
   draft: OfferIntelligenceDraft,
-  input: { offerId: string; projectId: string; businessContext: string; source?: OfferIntelligenceProfile["provenance"]["source"] },
+  input: {
+    offerId: string;
+    projectId: string;
+    businessContext: string;
+    contextSignature?: string;
+    discoveryPlanId?: string;
+    discoveryPlanVersion?: number;
+    source?: OfferIntelligenceProfile["provenance"]["source"];
+  },
 ): OfferIntelligenceProfile {
   return offerIntelligenceProfileSchema.parse({
     ...draft,
     offerId: input.offerId,
     provenance: {
       projectId: input.projectId,
-      contextSignature: contextSignature(`${input.projectId} ${input.businessContext}`),
-      source: input.source || "ai_composition",
+      contextSignature: input.contextSignature || contextSignature(`${input.projectId} ${input.businessContext}`),
+      discoveryPlanId: input.discoveryPlanId,
+      discoveryPlanVersion: input.discoveryPlanVersion,
+      source: input.source || "contextual_ai",
       sourceFields: ["offer_name", "business_description", "confirmed_offer_list"],
     },
   });
@@ -133,7 +145,7 @@ export function buildDeterministicOfferIntelligence(input: {
     offerId: input.offerId,
     projectId: input.projectId,
     businessContext: input.businessContext,
-    source: "deterministic_context",
+    source: "deterministic_placeholder",
   });
 }
 
@@ -204,7 +216,10 @@ export function offerIntelligenceIsSufficient(offering: ServiceOffering, project
   const profile = offerIntelligenceFor(offering);
   if (!profile || profile.offerId !== offering.id || profile.provenance.projectId !== projectId || normalize(profile.offerName) !== normalize(offering.name)) return false;
   return Boolean(
-    profile.safeDescription
+    ["contextual_ai", "business_confirmed"].includes(profile.provenance.source)
+    && profile.provenance.discoveryPlanId
+    && profile.provenance.discoveryPlanVersion
+    && profile.safeDescription
     && profile.compatibleNeeds.length
     && profile.supportingSignals.length >= 2
     && profile.discriminatingQuestions.length

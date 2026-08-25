@@ -2,6 +2,7 @@ import { z } from "zod";
 import { businessCapabilityProfileSchema } from "@/features/business-understanding/business-profile.schema";
 import { capabilityKeySchema } from "@/features/composition/composition.schema";
 import { validateSetupPhone } from "@/features/ai-setup/setup-phone";
+import { discoveryPlanSchema } from "@/features/qualification/discovery-plan";
 
 export const structuredJourneyQuestionSchema = z.object({
   id: z.string().trim().min(1).max(120),
@@ -204,6 +205,7 @@ export const aiSetupSessionSchema = z.object({
   answers: z.record(z.string(), z.unknown()),
   missingRequirements: z.array(dataRequirementSchema),
   questions: z.array(setupQuestionSchema).max(5).default([]),
+  discoveryPlan: discoveryPlanSchema.optional(),
   sources: z.array(sourceReferenceSchema).max(10).default([]),
   projectDraft: z.unknown().optional(),
   lastError: z.string().optional(),

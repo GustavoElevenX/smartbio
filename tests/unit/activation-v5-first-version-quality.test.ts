@@ -14,7 +14,7 @@ import { validateConversionPath } from "@/features/publishing/conversion-path-va
 import { getProjectReadiness } from "@/features/publishing/project-readiness";
 import { suggestSiteStructure } from "@/features/site-composer/site-structure-suggester";
 import type { Project, StructuredJourneyQuestion } from "@/types";
-import { attachTestOfferIntelligence } from "../fixtures/offer-intelligence";
+import { attachEngineFixtureProfiles } from "../fixtures/offer-intelligence";
 
 const recommendationAction: VisitorActionSelection = { key: "recommendation", label: "Receber uma recomendação", isPrimary: true };
 
@@ -65,7 +65,7 @@ function projectFrom(input: { name: string; description: string; phone?: string 
     updatedAt: "2026-08-25T00:00:00.000Z",
   };
   let project = materializeSetupAnswers(scoped, session);
-  project = attachTestOfferIntelligence(project, {
+  project = attachEngineFixtureProfiles(project, {
     "higienizacao preventiva": { strongClues: ["funciona e gela", "cheiro ruim", "sem limpeza há muito tempo"], supporting: ["sujeira no equipamento"] },
     "instalacao de ar-condicionado": { strongClues: ["ainda na caixa", "nunca instalado", "colocar para funcionar"], supporting: ["equipamento novo"] },
     "avaliacao de baixo rendimento/refrigeracao": { strongClues: ["aparelho liga", "refrigera menos"], supporting: ["perda de rendimento"] },
