@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { extractedBusinessSourceSchema, type AISetupSession, type ExtractedBusinessSource, type SetupQuestion, type SourceReference } from "@/features/ai-setup/ai-setup.schema";
+import { extractedBusinessSourceSchema, setupDraftInputSchema, setupInitialInputSchema, type AISetupSession, type ExtractedBusinessSource, type SetupDraftInput, type SetupInitialInput, type SetupQuestion, type SourceReference } from "@/features/ai-setup/ai-setup.schema";
 import { materializeSetupAnswers } from "@/features/ai-setup/materialize-setup-answers";
 import { stageGeneratedDraft } from "@/features/ai-setup/stage-generated-draft";
 import { normalizeSetupPhone } from "@/features/ai-setup/setup-phone";
@@ -32,9 +32,9 @@ import { suggestSiteStructure } from "@/features/site-composer/site-structure-su
 import { inferBusinessShape } from "@/features/site-composer/business-shape";
 import { uploadMedia } from "@/server/media/media-service";
 import { requireActivationPreflight } from "@/server/ai-setup/activation-preflight";
+import { AISetupNotFoundError } from "@/server/ai-setup/ai-setup-errors";
+import { logAISetupLifecycle } from "@/server/ai-setup/ai-setup-observability";
 import type { DataRequirement, ExperienceCompositionInput, Project } from "@/types";
-
-export class AISetupNotFoundError extends Error {}
 
 function compositionInput(session: AISetupSession): ExperienceCompositionInput {
   const destinationAnswer = Object.entries(session.answers).find(([key]) => key.endsWith(".destination") || key.endsWith(".completion"))?.[1];
@@ -178,7 +178,64 @@ async function materializeBrandLogo(actor: AISetupActor, session: AISetupSession
 export class AISetupService {
   constructor(private readonly repository: AISetupRepository = aiSetupRepository) {}
 
-  async start(actor: AISetupActor, initialInput: AISetupSession["initialInput"], sources: SourceReference[] = []) {
+  async initialize(
+    actor: AISetupActor,
+    idempotencyKey: string,
+    reason: "new" | "recovered" | "restarted" = "new",
+  ) {
+    await requireActivationPreflight(actor);
+    const existing = await this.repository.get(actor, idempotencyKey);
+    if (existing) {
+      logAISetupLifecycle(
+        "onboarding_session_resumed",
+        actor,
+        existing.id,
+        { status: existing.status },
+      );
+      return existing;
+    }
+    const now = new Date().toISOString();
+    const created = await this.repository.createIdempotent(actor, {
+      id: idempotencyKey,
+      workspaceId: actor.workspaceId,
+      status: "collecting",
+      initialInput: { businessName: "", description: "" },
+      visitorActions: [],
+      actionsConfirmed: false,
+      answers: {},
+      missingRequirements: [],
+      questions: [],
+      sources: [],
+      usedFallback: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+    logAISetupLifecycle(
+      reason === "recovered"
+        ? "onboarding_session_recovered"
+        : reason === "restarted"
+          ? "onboarding_session_restarted"
+          : "onboarding_session_created",
+      actor,
+      created.id,
+      { status: created.status },
+    );
+    return created;
+  }
+
+  async active(actor: AISetupActor) {
+    const session = await this.repository.latestActive(actor);
+    if (session)
+      logAISetupLifecycle(
+        "onboarding_session_resumed",
+        actor,
+        session.id,
+        { status: session.status },
+      );
+    return session;
+  }
+
+  async start(actor: AISetupActor, initialInput: SetupInitialInput, sources: SourceReference[] = []) {
     await requireActivationPreflight(actor);
     const now = new Date().toISOString();
     const normalizedInput = {
@@ -211,14 +268,30 @@ export class AISetupService {
 
   async get(actor: AISetupActor, id: string) {
     const session = await this.repository.get(actor, id);
-    if (!session) throw new AISetupNotFoundError("Sessão de onboarding não encontrada.");
+    if (!session) {
+      logAISetupLifecycle("onboarding_session_invalid", actor, id, {
+        code: "not_found_or_actor_mismatch",
+      });
+      throw new AISetupNotFoundError("Sessão de onboarding não encontrada.");
+    }
     return session;
+  }
+
+  async saveDraft(actor: AISetupActor, id: string, input: SetupDraftInput) {
+    const session = await this.get(actor, id);
+    const draft = setupDraftInputSchema.parse(input);
+    return this.repository.update(actor, {
+      ...session,
+      status: "collecting",
+      initialInput: draft,
+      lastError: undefined,
+    });
   }
 
   async analyze(
     actor: AISetupActor,
     id: string,
-    revision?: { initialInput?: AISetupSession["initialInput"]; sources?: SourceReference[] },
+    revision?: { initialInput?: SetupInitialInput; sources?: SourceReference[] },
   ) {
     let session = await this.get(actor, id);
     if (revision?.initialInput) {
@@ -254,6 +327,7 @@ export class AISetupService {
     } else {
       session = await this.repository.update(actor, { ...session, status: "analyzing", lastError: undefined });
     }
+    setupInitialInputSchema.parse(session.initialInput);
     const input = compositionInput(session);
     const fallbackProfile = new RuleBasedBusinessAnalyzer().analyze(input);
     let profile = fallbackProfile;

@@ -34,6 +34,7 @@ import { features } from "@/lib/constants";
 import { SupportModeBanner } from "@/components/platform-admin/support-mode-banner";
 import { PlanStatusBanner } from "@/components/entitlements/plan-status-banner";
 import { projectRepository } from "@/lib/repositories/project-repository";
+import { forgetAISetupSession } from "@/features/ai-setup/ai-setup-state";
 
 interface WorkspaceSummary {
   id: string;
@@ -149,7 +150,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       });
       if (!response.ok)
         throw new Error("Não foi possível trocar de workspace.");
-      window.localStorage.removeItem("smartbio:last-ai-setup-session");
+      forgetAISetupSession();
       setActiveWorkspaceId(workspaceId);
       setOpen(false);
       router.push("/app");
@@ -159,6 +160,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     }
   }
   async function logout() {
+    forgetAISetupSession();
     const supabase = createClient();
     if (supabase) await supabase.auth.signOut();
     router.push("/");

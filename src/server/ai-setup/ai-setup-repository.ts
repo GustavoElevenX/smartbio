@@ -2,6 +2,7 @@ import "server-only";
 
 import { aiSetupSessionSchema, type AISetupSession } from "@/features/ai-setup/ai-setup.schema";
 import { createServiceClient } from "@/lib/supabase/server";
+import { AISetupNotFoundError } from "@/server/ai-setup/ai-setup-errors";
 import type { AISetupActor } from "@/server/auth/setup-actor";
 
 declare global {
@@ -72,6 +73,32 @@ export class AISetupRepository {
     return rowToSession(data);
   }
 
+  async createIdempotent(actor: AISetupActor, session: AISetupSession) {
+    const existing = await this.get(actor, session.id);
+    if (existing) return existing;
+    if (actor.persistence === "memory") {
+      sessions.set(session.id, structuredClone(session));
+      return session;
+    }
+    const client = createServiceClient();
+    if (!client) throw new Error("Persistência do onboarding indisponível.");
+    const { data, error } = await client
+      .from("ai_setup_sessions")
+      .insert(sessionToRow(session, actor))
+      .select("*")
+      .single();
+    if (!error && data) return rowToSession(data);
+    if (error?.code === "23505") {
+      const retry = await this.get(actor, session.id);
+      if (retry) return retry;
+    }
+    persistenceFailure(
+      "create_session_idempotent",
+      error,
+      "Não foi possível iniciar a configuração.",
+    );
+  }
+
   async get(actor: AISetupActor, id: string) {
     if (actor.persistence === "memory") {
       const session = sessions.get(id);
@@ -90,10 +117,48 @@ export class AISetupRepository {
     return data ? rowToSession(data) : null;
   }
 
+  async latestActive(actor: AISetupActor) {
+    if (actor.persistence === "memory") {
+      return [...sessions.values()]
+        .filter(
+          (session) =>
+            session.workspaceId === actor.workspaceId &&
+            !["completed", "failed"].includes(session.status),
+        )
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+        .map((session) => structuredClone(session))[0] || null;
+    }
+    const client = createServiceClient();
+    if (!client) return null;
+    const { data, error } = await client
+      .from("ai_setup_sessions")
+      .select("*")
+      .eq("workspace_id", actor.workspaceId)
+      .eq("created_by", actor.userId)
+      .in("status", [
+        "collecting",
+        "analyzing",
+        "waiting_answers",
+        "generating",
+        "review",
+      ])
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error)
+      persistenceFailure(
+        "load_active_session",
+        error,
+        "Não foi possível carregar a configuração em andamento.",
+      );
+    return data ? rowToSession(data) : null;
+  }
+
   async update(actor: AISetupActor, session: AISetupSession) {
     const next = aiSetupSessionSchema.parse({ ...session, updatedAt: new Date().toISOString() });
     if (actor.persistence === "memory") {
-      if (!sessions.has(next.id)) throw new Error("Sessão de onboarding não encontrada.");
+      if (!sessions.has(next.id))
+        throw new AISetupNotFoundError("Sessão de onboarding não encontrada.");
       sessions.set(next.id, structuredClone(next));
       return next;
     }
@@ -106,8 +171,15 @@ export class AISetupRepository {
       .eq("workspace_id", actor.workspaceId)
       .eq("created_by", actor.userId)
       .select("*")
-      .single();
-    if (error) persistenceFailure("update_session", error, "Não foi possível salvar o andamento da configuração.");
+      .maybeSingle();
+    if (!data && (!error || error.code === "PGRST116"))
+      throw new AISetupNotFoundError("Sessão de onboarding não encontrada.");
+    if (error)
+      persistenceFailure(
+        "update_session",
+        error,
+        "Não foi possível salvar o andamento da configuração.",
+      );
     return rowToSession(data);
   }
 

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Dispatch, SetStateAction } from "react";
 import { ArrowRight, Bot, LoaderCircle, MessageSquareText, PencilLine, WandSparkles } from "lucide-react";
 import { AdaptiveQuestion } from "@/components/ai-setup/adaptive-question";
 import { AIMessage } from "@/components/ai-setup/ai-message";
@@ -27,15 +28,17 @@ interface AIConversationProps {
   brandIdentity?: BrandIdentity;
   logoPreviewUrl?: string;
   session: AISetupSession | null;
+  sessionReady: boolean;
   busy: boolean;
   busyQuestion?: string;
   generationStatus: "idle" | "generating" | "ready";
   projectId?: string;
   error?: string;
   phoneError?: string;
+  phoneStatus: "idle" | "invalid" | "saving" | "saved";
   answerFeedback?: string;
   editingBusinessInfo: boolean;
-  onFormChange: (form: InitialSetupForm) => void;
+  onFormChange: Dispatch<SetStateAction<InitialSetupForm>>;
   onSourcesChange: (sources: SourceReference[]) => void;
   onBrandIdentityChange: (brand: BrandIdentity, previewUrl: string) => void;
   onAnalyze: () => Promise<void>;
@@ -46,11 +49,11 @@ interface AIConversationProps {
   onOpenLaunch: () => void;
 }
 
-export function AIConversation({ form, sources, brandIdentity, logoPreviewUrl, session, busy, busyQuestion, generationStatus, projectId, error, phoneError, answerFeedback, editingBusinessInfo, onFormChange, onSourcesChange, onBrandIdentityChange, onAnalyze, onEditBusinessInfo, onAnswer, onConfirmActions, onGenerate, onOpenLaunch }: AIConversationProps) {
+export function AIConversation({ form, sources, brandIdentity, logoPreviewUrl, session, sessionReady, busy, busyQuestion, generationStatus, projectId, error, phoneError, phoneStatus, answerFeedback, editingBusinessInfo, onFormChange, onSourcesChange, onBrandIdentityChange, onAnalyze, onEditBusinessInfo, onAnswer, onConfirmActions, onGenerate, onOpenLaunch }: AIConversationProps) {
   const analyzed = Boolean(session?.extractedProfile);
   const ready = generationStatus === "ready" || session?.status === "completed" || session?.status === "review";
   const sourcesProcessing = sources.some((source) => ["pending", "uploaded", "processing"].includes(source.status));
-  const inputsDisabled = busy || (analyzed && !editingBusinessInfo);
+  const inputsDisabled = !sessionReady || busy || (analyzed && !editingBusinessInfo);
   const readiness = calculateSetupReadiness(session?.missingRequirements || [], session || undefined);
   return (
     <main className="min-w-0 p-5 sm:p-7 xl:p-9">
@@ -70,16 +73,16 @@ export function AIConversation({ form, sources, brandIdentity, logoPreviewUrl, s
           <AIMessage role="assistant"><strong className="text-[#34333a]">Comece pelo que você já sabe sobre o seu negócio.</strong><br />Vou organizar as ações e perguntar apenas o que estiver faltando.</AIMessage>
           <Card className="p-5 sm:p-6">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div><Label htmlFor="ai-business-name">Nome do negócio</Label><Input id="ai-business-name" autoComplete="organization" value={form.businessName} onChange={(event) => onFormChange({ ...form, businessName: event.target.value })} placeholder="Ex.: Estúdio Aurora" disabled={inputsDisabled} /></div>
-              <div><Label htmlFor="ai-website">Site ou Instagram (opcional)</Label><Input id="ai-website" value={form.websiteUrl} onChange={(event) => onFormChange({ ...form, websiteUrl: event.target.value })} placeholder="https:// ou @seunegocio" disabled={inputsDisabled} /></div>
+              <div><Label htmlFor="ai-business-name">Nome do negócio</Label><Input id="ai-business-name" autoComplete="organization" value={form.businessName} onChange={(event) => onFormChange((current) => ({ ...current, businessName: event.target.value }))} placeholder="Ex.: Estúdio Aurora" disabled={inputsDisabled} /></div>
+              <div><Label htmlFor="ai-website">Site ou Instagram (opcional)</Label><Input id="ai-website" value={form.websiteUrl} onChange={(event) => onFormChange((current) => ({ ...current, websiteUrl: event.target.value }))} placeholder="https:// ou @seunegocio" disabled={inputsDisabled} /></div>
             </div>
-            <div className="mt-4"><Label htmlFor="ai-description">O que você vende e como atende?</Label><Textarea id="ai-description" className="min-h-32" value={form.description} onChange={(event) => onFormChange({ ...form, description: event.target.value })} placeholder="Conte o que vende, quem costuma procurar você e como o atendimento continua." disabled={inputsDisabled} /></div>
-            <div className="mt-4"><Label htmlFor="ai-phone">WhatsApp ou telefone (opcional)</Label><Input id="ai-phone" type="tel" autoComplete="tel" value={form.phone} onChange={(event) => onFormChange({ ...form, phone: event.target.value })} placeholder="(11) 99999-9999" disabled={inputsDisabled} aria-invalid={Boolean(phoneError)} aria-describedby={phoneError ? "ai-phone-error" : undefined} />{phoneError ? <p id="ai-phone-error" role="alert" className="mt-2 text-xs font-semibold text-[#a33b35]">{phoneError} O valor foi mantido para você corrigir.</p> : analyzed && form.phone ? <p className="mt-2 text-xs font-semibold text-[#1b7f60]">WhatsApp confirmado e preservado.</p> : null}</div>
+            <div className="mt-4"><Label htmlFor="ai-description">O que você vende e como atende?</Label><Textarea id="ai-description" className="min-h-32" value={form.description} onChange={(event) => onFormChange((current) => ({ ...current, description: event.target.value }))} placeholder="Conte o que vende, quem costuma procurar você e como o atendimento continua." disabled={inputsDisabled} /></div>
+            <div className="mt-4"><Label htmlFor="ai-phone">WhatsApp ou telefone (opcional)</Label><Input id="ai-phone" type="tel" autoComplete="tel" value={form.phone} onChange={(event) => onFormChange((current) => ({ ...current, phone: event.target.value }))} placeholder="(11) 99999-9999" disabled={inputsDisabled} aria-invalid={Boolean(phoneError)} aria-describedby={phoneError ? "ai-phone-error" : undefined} />{phoneError ? <p id="ai-phone-error" role="alert" className="mt-2 text-xs font-semibold text-[#a33b35]">{phoneError} O valor foi mantido para você corrigir.</p> : phoneStatus === "saving" ? <p className="mt-2 text-xs font-semibold text-[#687582]">Salvando WhatsApp…</p> : phoneStatus === "saved" ? <p className="mt-2 text-xs font-semibold text-[#1b7f60]">✓ WhatsApp salvo e confirmado.</p> : null}</div>
             <div className="mt-5"><BrandIdentityUploader brand={brandIdentity} previewUrl={logoPreviewUrl} businessName={form.businessName} businessDescription={form.description} onChange={onBrandIdentityChange} disabled={inputsDisabled} /></div>
             <div className="mt-4"><SourceUploader sources={sources} setupSessionId={session?.id} projectId={projectId} onChange={onSourcesChange} disabled={inputsDisabled} /></div>
-            {!analyzed ? <Button type="button" size="lg" className="mt-5 w-full sm:w-auto" onClick={() => void onAnalyze()} disabled={busy || sourcesProcessing}>{busy || sourcesProcessing ? <LoaderCircle data-icon size={17} className="animate-spin" /> : <WandSparkles data-icon size={17} />}{sourcesProcessing ? "Importando materiais…" : busy ? "Analisando o negócio…" : "Analisar meu negócio"}</Button> : null}
+            {!analyzed ? <Button type="button" size="lg" className="mt-5 w-full sm:w-auto" onClick={() => void onAnalyze()} disabled={!sessionReady || busy || sourcesProcessing}>{busy || sourcesProcessing ? <LoaderCircle data-icon size={17} className="animate-spin" /> : <WandSparkles data-icon size={17} />}{sourcesProcessing ? "Importando materiais…" : busy ? "Analisando o negócio…" : "Analisar meu negócio"}</Button> : null}
             {analyzed && !editingBusinessInfo && !ready ? <Button type="button" size="lg" variant="secondary" className="mt-5 w-full sm:w-auto" onClick={onEditBusinessInfo} disabled={busy}><PencilLine data-icon size={17} /> Editar informações do negócio</Button> : null}
-            {analyzed && editingBusinessInfo ? <><p className="mt-4 text-sm leading-6 text-[#536178]">Faça os ajustes necessários. A nova análise vai substituir esta leitura, sem reiniciar o onboarding.</p><Button type="button" size="lg" className="mt-3 w-full sm:w-auto" onClick={() => void onAnalyze()} disabled={busy || sourcesProcessing}>{busy || sourcesProcessing ? <LoaderCircle data-icon size={17} className="animate-spin" /> : <WandSparkles data-icon size={17} />}{sourcesProcessing ? "Importando materiais…" : busy ? "Analisando novamente…" : "Analisar novamente"}</Button></> : null}
+            {analyzed && editingBusinessInfo ? <><p className="mt-4 text-sm leading-6 text-[#536178]">Faça os ajustes necessários. A nova análise vai substituir esta leitura, sem reiniciar o onboarding.</p><Button type="button" size="lg" className="mt-3 w-full sm:w-auto" onClick={() => void onAnalyze()} disabled={!sessionReady || busy || sourcesProcessing}>{busy || sourcesProcessing ? <LoaderCircle data-icon size={17} className="animate-spin" /> : <WandSparkles data-icon size={17} />}{sourcesProcessing ? "Importando materiais…" : busy ? "Analisando novamente…" : "Analisar novamente"}</Button></> : null}
           </Card>
 
           {analyzed && session && !editingBusinessInfo ? <><AIMessage role="user">{form.description}</AIMessage><AIMessage role="assistant">Encontrei as principais ações que seus visitantes podem querer realizar. Confirme antes de continuarmos.</AIMessage><ConfirmExtractedData session={session} /></> : null}
@@ -92,7 +95,7 @@ export function AIConversation({ form, sources, brandIdentity, logoPreviewUrl, s
 
           {answerFeedback ? <div aria-live="polite" className="border border-[#b9e4cf] bg-[#f0fbf6] p-3 text-sm font-semibold text-[#25684f]">✓ {answerFeedback}</div> : null}
 
-          {analyzed && !editingBusinessInfo && session?.actionsConfirmed && !ready && readiness.readyToGenerate ? <div className="border border-[#c8d9ea] bg-[#f7fbff] p-5" style={{ clipPath: "polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%)" }}><h2 className="text-lg font-extrabold tracking-[-.025em]">Pronto para montar a primeira versão?</h2><p className="mt-2 text-sm leading-6 text-[#687582]">A Sobe vai criar a página, conectar cada ação e manter tudo como rascunho até você publicar.</p><Button type="button" size="lg" className="mt-4" onClick={() => void onGenerate()} disabled={busy || generationStatus === "generating"}><WandSparkles data-icon size={17} /> Criar minha primeira versão</Button></div> : analyzed && !editingBusinessInfo && session?.actionsConfirmed && !ready ? <div className="border border-[#e1dfe8] bg-[#fafafa] p-5"><h2 className="text-lg font-extrabold tracking-[-.025em]">Ainda faltam informações necessárias</h2><p className="mt-2 text-sm leading-6 text-[#687582]">Confirme os itens acima para a Sobe conseguir criar uma primeira versão funcional.</p><a href="#adaptive-questions" className="focus-ring mt-4 inline-flex min-h-11 items-center gap-2 border border-[#c8d9ea] bg-white px-4 text-sm font-extrabold text-[#0054fc]">Continuar configuração <ArrowRight size={16} /></a></div> : null}
+          {analyzed && !editingBusinessInfo && session?.actionsConfirmed && !ready && readiness.readyToGenerate ? <div className="border border-[#c8d9ea] bg-[#f7fbff] p-5" style={{ clipPath: "polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%)" }}><h2 className="text-lg font-extrabold tracking-[-.025em]">Pronto para montar a primeira versão?</h2><p className="mt-2 text-sm leading-6 text-[#687582]">A Sobe vai criar a página, conectar cada ação e manter tudo como rascunho até você publicar.</p><Button type="button" size="lg" className="mt-4" onClick={() => void onGenerate()} disabled={!sessionReady || busy || generationStatus === "generating"}><WandSparkles data-icon size={17} /> Criar minha primeira versão</Button></div> : analyzed && !editingBusinessInfo && session?.actionsConfirmed && !ready ? <div className="border border-[#e1dfe8] bg-[#fafafa] p-5"><h2 className="text-lg font-extrabold tracking-[-.025em]">Ainda faltam informações necessárias</h2><p className="mt-2 text-sm leading-6 text-[#687582]">Confirme os itens acima para a Sobe conseguir criar uma primeira versão funcional.</p><a href="#adaptive-questions" className="focus-ring mt-4 inline-flex min-h-11 items-center gap-2 border border-[#c8d9ea] bg-white px-4 text-sm font-extrabold text-[#0054fc]">Continuar configuração <ArrowRight size={16} /></a></div> : null}
 
           <GenerationStatus status={generationStatus} />
           {ready && projectId ? <div className="border border-[#b9e4cf] bg-[#f0fbf6] p-6" style={{ clipPath: "polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%)" }}><h2 className="text-2xl font-extrabold tracking-[-.035em]">Sua primeira versão está pronta.</h2><p className="mt-2 text-sm leading-6 text-[#526b61]">Teste como visitante, veja as pendências e publique quando estiver tudo certo.</p><Button type="button" size="lg" className="mt-5" onClick={onOpenLaunch}>Revisar primeira versão <ArrowRight data-icon size={17} /></Button></div> : null}

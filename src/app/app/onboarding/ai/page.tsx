@@ -12,5 +12,11 @@ type AIOnboardingPageProps = {
 export default async function AIOnboardingPage({ searchParams }: AIOnboardingPageProps) {
   const [params, actor] = await Promise.all([searchParams, requireAuthenticatedActor()]);
   const preflight = await getActivationPreflight(actor);
-  return <AISetupShell startFresh={params.new === "1"} initialPreflight={preflight} />;
+  return (
+    <AISetupShell
+      startFresh={params.new === "1"}
+      initialPreflight={preflight}
+      workspaceId={actor.workspaceId}
+    />
+  );
 }

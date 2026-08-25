@@ -131,8 +131,17 @@ export const businessAnalysisResultSchema = z.object({
   requirements: z.array(dataRequirementSchema).max(100),
 });
 
-export const setupInitialInputSchema = z.object({
+export const setupDraftInputSchema = z.object({
   requestedSurface: z.enum(["business_site", "landing_page", "conversion_direct", "recommend"]).optional(),
+  businessName: z.string().trim().max(160),
+  description: z.string().trim().max(4000),
+  websiteUrl: z.string().trim().max(1000).optional(),
+  phone: z.string().trim().max(40).optional(),
+  logoReference: z.string().trim().max(500).optional(),
+  brandIdentity: brandIdentitySchema.optional(),
+});
+
+export const setupInitialInputSchema = setupDraftInputSchema.extend({
   businessName: z.string().trim().min(2).max(160),
   description: z.string().trim().min(15).max(4000),
   websiteUrl: z.url().optional(),
@@ -140,8 +149,6 @@ export const setupInitialInputSchema = z.object({
     (value) => validateSetupPhone(value).valid,
     "Confira o número. Use DDD + telefone.",
   ).optional(),
-  logoReference: z.string().trim().max(500).optional(),
-  brandIdentity: brandIdentitySchema.optional(),
 });
 
 export const visitorActionKeySchema = z.enum([
@@ -180,7 +187,7 @@ export const aiSetupSessionSchema = z.object({
   workspaceId: z.string(),
   projectId: z.string().optional(),
   status: z.enum(["collecting", "analyzing", "waiting_answers", "generating", "review", "completed", "failed"]),
-  initialInput: setupInitialInputSchema,
+  initialInput: setupDraftInputSchema,
   extractedProfile: businessCapabilityProfileSchema.optional(),
   visitorActions: z.array(visitorActionSelectionSchema).max(8).default([]),
   actionsConfirmed: z.boolean().default(false),
@@ -208,6 +215,8 @@ export const brandAIResultSchema = z.object({
 });
 
 export type AISetupSession = z.infer<typeof aiSetupSessionSchema>;
+export type SetupInitialInput = z.infer<typeof setupInitialInputSchema>;
+export type SetupDraftInput = z.infer<typeof setupDraftInputSchema>;
 export type SetupQuestion = z.infer<typeof setupQuestionSchema>;
 export type ExtractedBusinessSource = z.infer<typeof extractedBusinessSourceSchema>;
 export type BusinessAnalysisResult = z.infer<typeof businessAnalysisResultSchema>;
