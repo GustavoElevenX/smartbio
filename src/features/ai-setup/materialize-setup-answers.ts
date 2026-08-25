@@ -610,7 +610,7 @@ export function materializeSetupAnswers(project: Project, session: AISetupSessio
     boundDiscoveryPlan?.questions || answers["qualification.questions"],
     offeringNames,
     journeyMode,
-    intelligenceQuestions,
+    boundDiscoveryPlan ? [] : intelligenceQuestions,
   );
   const configuredScheduleServices = scheduleAnswer
     ? schedulingServices(project, scheduleAnswer, confirmationMode(scheduleDestination), quoteServices)

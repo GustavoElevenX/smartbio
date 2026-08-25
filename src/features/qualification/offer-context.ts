@@ -15,11 +15,13 @@ export function extractExplicitOfferNames(value: string) {
   if (!marker) return [];
   const afterMarker = value.slice(marker.index + marker[0].length);
   const scoped = afterMarker
-    .split(/\n\s*\n|\b(?:objetivo|jornada|visitante|próximo passo|atendimento final)\s*:/i)[0]
+    .split(/\n\s*\n|[.!?]\s+(?=(?:o\s+|a\s+)?(?:objetivo|jornada|visitante|próximo passo|atendimento final)\b)|\b(?:objetivo|jornada|visitante|próximo passo|atendimento final)\s*:/i)[0]
     .trim();
   const separator = scoped.includes(";")
     ? /\s*;\s*/
-    : /\r?\n\s*(?:[-•*]\s*)?/;
+    : scoped.includes(",")
+      ? /\s*,\s*|\s+e\s+(?=[A-ZÀ-Ý])/u
+      : /\r?\n\s*(?:[-•*]\s*)?/;
   const offers = scoped.split(separator).map(cleanItem).filter(plausibleOffer);
   return offers.length >= 2 ? [...new Set(offers)].slice(0, 20) : [];
 }

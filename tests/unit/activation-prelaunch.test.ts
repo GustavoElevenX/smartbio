@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { evaluateActivationPreflight } from "@/features/ai-setup/activation-preflight";
-import { buildQualificationSuggestions } from "@/features/ai-setup/qualification-proposal";
+import { buildQualificationQuestionPlan, buildQualificationSuggestions } from "@/features/ai-setup/qualification-proposal";
 import { materializeSetupAnswers } from "@/features/ai-setup/materialize-setup-answers";
 import { calculateSetupReadiness } from "@/features/ai-setup/setup-readiness";
 import { validateSetupPhone } from "@/features/ai-setup/setup-phone";
@@ -94,6 +94,7 @@ describe("objetivo declarado e jornada proposta", () => {
     const actions = defaultVisitorActions(analyzed, description);
     const initialInput = { businessName: "Clínica Lumina", description, phone: "+5511999999999" };
     const suggestions = buildQualificationSuggestions({ initialInput, extractedProfile: analyzed, visitorActions: actions });
+    const questionPlan = buildQualificationQuestionPlan({ initialInput, extractedProfile: analyzed, visitorActions: actions });
     const base = new RuleBasedExperienceComposer().compose({
       businessName: initialInput.businessName,
       businessDescription: description,
@@ -103,7 +104,7 @@ describe("objetivo declarado e jornada proposta", () => {
       phone: initialInput.phone,
     });
     const requirements = draftCapabilityRequirements(base.capabilities || []);
-    const answers = Object.fromEntries(Object.entries(suggestions));
+    const answers: Record<string, unknown> = { ...suggestions, "qualification.questions": questionPlan };
     const session: AISetupSession = {
       id: "lumina-session",
       workspaceId: "workspace",
@@ -124,7 +125,7 @@ describe("objetivo declarado e jornada proposta", () => {
     const qualification = project.steps.find((step) => step.type === "form");
     const conclusion = project.steps.find((step) => step.type === "action");
 
-    expect(suggestions["qualification.questions"].split("\n")).toHaveLength(3);
+    expect(questionPlan).toHaveLength(3);
     expect(suggestions["qualification.outcome"]).toContain("sem diagnosticar ou indicar um procedimento");
     expect(qualification?.formFields).toHaveLength(3);
     expect(conclusion?.description).toContain("avaliação profissional");

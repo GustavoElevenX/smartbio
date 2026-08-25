@@ -75,10 +75,13 @@ export function attachEngineFixtureProfiles(
     completionAction: { label: "Conversar com a equipe", destination: project.primaryDestination || "Atendimento" },
     offerings: offerings.map((item) => ({ id: item.id, name: item.name, description: item.shortDescription })),
     offerIntelligenceProfiles: offerings.map((item) => item.settings?.offerIntelligence).filter(Boolean) as NonNullable<Project["discoveryPlan"]>["offerIntelligenceProfiles"],
-    questions: [
-      { id: "engine-fixture-need", question: "O que você precisa resolver neste momento?", type: "textarea", purpose: "need", required: true },
-      { id: "engine-fixture-signal", question: "Que sinais ajudam a diferenciar sua necessidade?", type: "textarea", purpose: "signal", required: true },
-    ],
+    questions: offerings.slice(0, 3).map((offering, index) => ({
+      id: `engine-fixture-question-${index + 1}`,
+      question: fixtures[normalize(offering.name)]?.question || `Que sinais você percebe para a equipe avaliar ${offering.name.toLocaleLowerCase("pt-BR")}?`,
+      type: "textarea" as const,
+      purpose: index === 0 ? "need" as const : "signal" as const,
+      required: true,
+    })),
     fallbackStrategy: { kind: "team_handoff", explanation: "Fixture controlada encaminha ambiguidades à equipe." },
     provenance: { source: "business_confirmed", providerOperation: "composeDiscoveryPlan", createdAt: "2026-08-25T00:00:00.000Z" },
     status: "ready",

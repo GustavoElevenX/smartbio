@@ -123,6 +123,9 @@ describe("pipeline integration real do DiscoveryPlan", () => {
     expect(project.discoveryPlan?.id).toBe(persistedPlan.id);
     expect(project.discoveryPlan?.version).toBe(persistedPlan.version);
     expect(project.discoveryPlan?.projectId).toBe(project.id);
+    expect(project.steps.find((step) => step.type === "form")?.formFields?.map((field) => field.label)).toEqual(
+      persistedPlan.questions.map((question) => question.question),
+    );
     expect(project.commercialConfig?.serviceOfferings?.map((item) => item.id)).toEqual(persistedPlan.offerings.map((item) => item.id));
     expect(project.commercialConfig?.serviceOfferings?.every((item) => item.settings?.discoveryPlanId === persistedPlan.id)).toBe(true);
     expect(validateConversionPath(project).checks.find((check) => check.key === "plan")?.valid).toBe(true);

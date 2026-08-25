@@ -54,10 +54,10 @@ function stopServer(child: ChildProcess) {
 }
 
 await runLayer("UNIT ENGINE", ["node_modules/vitest/vitest.mjs", "run", "tests/unit/activation-v6-offer-intelligence.test.ts"]);
-await runLayer("CONTRACT", ["node_modules/vitest/vitest.mjs", "run", "tests/unit/discovery-plan-contract.test.ts"]);
+await runLayer("CONTRACT", ["node_modules/vitest/vitest.mjs", "run", "tests/unit/discovery-plan-contract.test.ts", "tests/unit/adaptive-question-suggestion.test.ts"]);
 await runLayer("PIPELINE INTEGRATION", ["node_modules/vitest/vitest.mjs", "run", "tests/unit/discovery-plan-pipeline-integration.test.ts"]);
 
-process.stdout.write("\n=== REAL GENERATED PROJECT E2E ===\n");
+process.stdout.write("\n=== SELF-SERVICE ACTIVATION E2E ===\n");
 const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--hostname", "127.0.0.1", "--port", String(port)], {
   env: baseEnv,
   stdio: "inherit",
@@ -65,7 +65,7 @@ const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev"
 });
 try {
   await waitForServer(`http://127.0.0.1:${port}`, server);
-  await runLayer("REAL GENERATED PROJECT E2E", ["node_modules/@playwright/test/cli.js", "test", "tests/e2e/activation-generated-project.spec.ts", "--project=mobile-chrome"], {
+  await runLayer("SELF-SERVICE ACTIVATION E2E", ["node_modules/@playwright/test/cli.js", "test", "tests/e2e/self-service-activation.spec.ts", "--project=mobile-chrome"], {
     ...baseEnv,
     E2E_PORT: String(port),
     E2E_REUSE_SERVER: "true",

@@ -28,7 +28,6 @@ export function buildQualificationSuggestions(
     : primary;
   const nextAction = completion?.label.toLowerCase() || "conversar com a equipe";
   const healthRelated = isHealthRelated(session);
-  const questionPlan = buildQualificationQuestionPlan(session);
   const extractedOfferings = offerNamesFromSetup(session.initialInput.description, session.answers?.["qualification.offerings"]);
   const outcome = healthRelated
     ? "Apresentar possibilidades relevantes com base nas respostas, sem diagnosticar ou indicar um procedimento, e encaminhar para avaliação profissional."
@@ -43,7 +42,6 @@ export function buildQualificationSuggestions(
       : primaryIsRecommendation
         ? "Entender a necessidade do visitante e indicar uma opção adequada ao que ele procura."
         : `Entender a necessidade do visitante e ajudá-lo a ${nextAction}.`,
-    "qualification.questions": questionPlan.map((question) => question.question).join("\n"),
     "qualification.outcome": outcome,
     "qualification.destination": destination,
     ...(extractedOfferings.length ? { "qualification.offerings": extractedOfferings.join("\n") } : {}),
