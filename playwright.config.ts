@@ -6,6 +6,7 @@ const reuseE2eServer = process.env.E2E_REUSE_SERVER === "true";
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
+  workers: 1,
   retries: process.env.CI ? 2 : 0,
   reporter: "list",
   use: { baseURL: `http://127.0.0.1:${e2ePort}`, trace: "on-first-retry", screenshot: "only-on-failure" },
