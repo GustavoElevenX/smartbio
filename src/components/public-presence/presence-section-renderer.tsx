@@ -213,17 +213,17 @@ export function PresenceSectionRenderer({
           />
         ) : null}
         <div
-          className={`mx-auto grid items-center ${variant === "minimal" ? "min-h-[360px]" : "min-h-[480px]"} ${variant === "editorial" ? "gap-8 md:grid-cols-[1.2fr_.8fr]" : showSideImage && !centered ? "gap-12 md:grid-cols-2" : "md:grid-cols-1"} ${sectionWidth(page, section)}`}
+          className={`mx-auto grid min-w-0 items-center ${variant === "minimal" ? "min-h-[360px]" : "min-h-[480px]"} ${variant === "editorial" ? "gap-8 md:grid-cols-[1.2fr_.8fr]" : showSideImage && !centered ? "gap-12 md:grid-cols-2" : "md:grid-cols-1"} ${sectionWidth(page, section)}`}
         >
           <div
-            className={`${centered ? "text-center md:col-span-2 md:mx-auto md:max-w-4xl" : ""} ${imageFirst && showSideImage ? "md:order-2" : ""} ${variant === "offer_focus" ? "rounded-2xl bg-white p-7 text-[#07172f] shadow-[0_24px_70px_rgba(15,23,42,.22)] md:p-10" : ""}`}
+            className={`min-w-0 max-w-full ${centered ? "text-center md:col-span-2 md:mx-auto md:max-w-4xl" : ""} ${imageFirst && showSideImage ? "md:order-2" : ""} ${variant === "offer_focus" ? "rounded-2xl bg-white p-7 text-[#07172f] shadow-[0_24px_70px_rgba(15,23,42,.22)] md:p-10" : ""}`}
           >
             {section.eyebrow ? (
               <p className="mb-4 text-xs font-black uppercase tracking-[.2em] text-[var(--presence-primary)]">
                 {section.eyebrow}
               </p>
             ) : null}
-            <h1 className={`text-balance font-black leading-[.98] tracking-[-.04em] ${variant === "editorial" ? "text-5xl md:text-8xl" : variant === "minimal" ? "text-4xl md:text-6xl" : "text-5xl md:text-7xl"}`}>
+            <h1 className={`max-w-full break-words text-balance font-black leading-[.98] tracking-[-.04em] [overflow-wrap:anywhere] ${variant === "editorial" ? "text-[clamp(2.5rem,12vw,3.75rem)] md:text-8xl" : variant === "minimal" ? "text-[clamp(2.25rem,11vw,3.25rem)] md:text-6xl" : "text-[clamp(2.5rem,12vw,3.75rem)] md:text-7xl"}`}>
               {section.title || page.title || project.name}
             </h1>
             <p className="mt-6 max-w-2xl text-pretty text-lg leading-8 text-[var(--presence-section-muted,var(--presence-muted))] md:text-xl">

@@ -1,4 +1,5 @@
 import { evaluateCapabilityRequirements } from "@/features/capabilities/capability-requirements";
+import { unsupportedCapabilityReferences } from "@/features/capabilities/capability-provenance";
 import type { CapabilityKey, DataRequirement, Project } from "@/types";
 import { getPresenceReadinessIssues } from "@/features/presence/presence-readiness";
 import { formFieldIssues } from "@/features/forms/form-field-utils";
@@ -194,6 +195,16 @@ export function getProjectReadiness(project: Project): ProjectReadinessResult {
       check.label,
       check.reason,
       `/app/projects/${project.id}/editor`,
+    ));
+  }
+
+  for (const unsupported of unsupportedCapabilityReferences(project)) {
+    issues.push(requirement(
+      project,
+      `capability.provenance.${unsupported.key}.${unsupported.source}`,
+      "Navegação sem origem confirmada",
+      `“${unsupported.label}” sugere uma capacidade que não foi informada nem confirmada para este negócio.`,
+      `/app/projects/${project.id}/site`,
     ));
   }
 

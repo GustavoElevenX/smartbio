@@ -124,3 +124,33 @@ test("Presence publica SEO, canonical e dados estruturados no HTML", async ({
   expect(html).toContain("Logo de Casa Mix");
   expect(html).toContain("Instagram");
 });
+
+test("heróis públicos acomodam nomes longos sem overflow mobile", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-chrome", "Regressão específica de viewport mobile");
+  const names = [
+    "Oficina Pedal Livre Bike Shop",
+    "Studio Nexo Interiores e Arquitetura",
+    "Clínica de Estética Integrada Aurora",
+  ];
+
+  for (const route of ["/virou-presenca-demo", "/limpabem"]) {
+    await page.goto(route);
+    const hero = page.getByRole("heading", { level: 1 }).first();
+    await expect(hero).toBeVisible();
+    for (const name of names) {
+      await hero.evaluate((element, nextName) => { element.textContent = nextName; }, name);
+      const metrics = await hero.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          documentWidth: document.documentElement.scrollWidth,
+          viewportWidth: window.innerWidth,
+          left: rect.left,
+          right: rect.right,
+        };
+      });
+      expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+      expect(metrics.left).toBeGreaterThanOrEqual(-1);
+      expect(metrics.right).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+    }
+  }
+});

@@ -30,6 +30,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { BlockRendererView } from "@/components/public-experience/blocks/block-renderers";
 import { qualifyLead } from "@/features/qualification/qualification-engine";
+import { buildRecommendationHandoff } from "@/features/qualification/recommendation-handoff";
 import { recommendService } from "@/features/qualification/recommendation-engine";
 import { journeyModeForProject } from "@/features/qualification/recommendation-semantics";
 import { calculateReservationTotal } from "@/features/reservations/reservation-engine";
@@ -415,6 +416,7 @@ export function ExperienceCanvas({
   );
   const palette = project.designSystem.colors;
   const journeyMode = journeyModeForProject(project);
+  const hasRecommendationJourney = activeSteps.some((candidate) => candidate.type === "recommendation");
   const serviceRecommendation = useMemo(
     () => recommendService(runtime.answers, project.commercialConfig?.serviceOfferings || [], { journeyMode }),
     [journeyMode, project.commercialConfig?.serviceOfferings, runtime.answers],
@@ -1087,15 +1089,15 @@ export function ExperienceCanvas({
       const cart = runtime.cart.items.length
         ? `Pedido: ${runtime.cart.items.map((item) => `${item.quantity}x ${item.name}`).join(", ")}`
         : undefined;
-      const recommendation = selectedRecommendation?.name || displayedRecommendation?.title || runtime.recommendationKey;
-      const recommendationAnswers = recommendation
-        ? {
-            ...(runtime.answers.qualification_preference
-              ? { interesse_inicial: String(runtime.answers.qualification_preference) }
-              : {}),
-            orientacao_recebida: recommendation,
-          }
-        : stringAnswers(runtime.answers);
+      const recommendationFields = project.steps.flatMap((candidate) => candidate.formFields || []);
+      const recommendationHandoff = hasRecommendationJourney
+        ? buildRecommendationHandoff({
+            answers: runtime.answers,
+            fields: recommendationFields,
+            serviceName: selectedRecommendation?.name,
+            confidence: runtime.recommendationConfidence,
+          })
+        : { answers: stringAnswers(runtime.answers), closing: undefined };
       let message = String(option.actionPayload?.message || "") || buildWhatsAppMessage({
         businessName: project.name,
         interest: step.title,
@@ -1106,10 +1108,10 @@ export function ExperienceCanvas({
           ? { code: launchContext.benefitClaimCode }
           : undefined,
         answers: {
-          ...recommendationAnswers,
+          ...recommendationHandoff.answers,
           ...(cart ? { pedido: cart } : {}),
         },
-        closing: recommendation ? "Gostaria de confirmar essa orientação com a equipe." : undefined,
+        closing: recommendationHandoff.closing,
       });
       if (
         !preview &&
@@ -1278,16 +1280,20 @@ export function ExperienceCanvas({
       )
     : undefined;
   const previewPhone = String(previewDestination?.value || previewWhatsAppOption?.actionPayload?.phone || project.phone || "");
-  const previewRecommendation = selectedRecommendation?.name || displayedRecommendation?.title;
+  const previewHandoff = hasRecommendationJourney
+    ? buildRecommendationHandoff({
+        answers: runtime.answers,
+        fields: project.steps.flatMap((candidate) => candidate.formFields || []),
+        serviceName: selectedRecommendation?.name,
+        confidence: runtime.recommendationConfidence,
+      })
+    : { answers: stringAnswers(runtime.answers), closing: undefined };
   const previewMessage = previewWhatsAppOption
     ? String(previewWhatsAppOption.actionPayload?.message || "") || buildWhatsAppMessage({
         businessName: project.name,
         interest: step.title,
-        answers: {
-          ...(runtime.answers.qualification_preference ? { interesse_inicial: String(runtime.answers.qualification_preference) } : {}),
-          ...(previewRecommendation ? { orientacao_recebida: previewRecommendation } : {}),
-        },
-        closing: previewRecommendation ? "Gostaria de confirmar essa orientação com a equipe." : undefined,
+        answers: previewHandoff.answers,
+        closing: previewHandoff.closing,
       })
     : "";
   const style = {
@@ -1325,10 +1331,10 @@ export function ExperienceCanvas({
         fontFamily: `"${project.designSystem.typography.bodyFont}", Inter, ui-sans-serif, system-ui, sans-serif`,
         paddingBottom: "env(safe-area-inset-bottom)",
       }}
-      className="relative flex min-h-full flex-col overflow-hidden bg-[var(--background)] text-[var(--foreground)]"
+      className="relative flex min-h-full min-w-0 flex-col overflow-x-clip bg-[var(--background)] text-[var(--foreground)]"
     >
       <div className="pointer-events-none absolute -right-24 -top-24 size-64 rounded-full bg-[var(--primary)] opacity-[var(--glow-opacity,.1)] blur-3xl" />
-      <header className="relative flex items-center justify-between px-5 pt-[max(1rem,env(safe-area-inset-top))]">
+      <header className="relative flex min-w-0 items-center justify-between gap-3 px-5 pt-[max(1rem,env(safe-area-inset-top))]">
         <button
           type="button"
           onClick={back}
@@ -1338,7 +1344,7 @@ export function ExperienceCanvas({
         >
           <ArrowLeft size={18} />
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center justify-center gap-2">
           {project.brand.logoDataUrl ? (
             <img
               src={project.brand.logoDataUrl}
@@ -1346,7 +1352,7 @@ export function ExperienceCanvas({
               className="max-h-9 max-w-28 object-contain"
             />
           ) : (
-            <span className="text-xs font-extrabold">{project.name}</span>
+            <span className="max-w-[50vw] break-words text-center text-xs font-extrabold leading-4 [overflow-wrap:anywhere]">{project.name}</span>
           )}
         </div>
         <button
@@ -1366,7 +1372,7 @@ export function ExperienceCanvas({
           }}
         />
       </div>
-      <main className="relative flex flex-1 items-center justify-center px-5 py-8 sm:px-8">
+      <main className="relative flex min-w-0 flex-1 items-center justify-center px-5 py-8 sm:px-8">
         <AnimatePresence mode="wait">
           <motion.section
             key={step.id}
@@ -1378,14 +1384,14 @@ export function ExperienceCanvas({
                 ? 0
                 : project.designSystem.motion.duration / 1000,
             }}
-            className="w-full max-w-[620px]"
+            className="min-w-0 w-full max-w-[620px]"
           >
-            <p className="text-xs font-extrabold uppercase tracking-[.16em] text-[var(--primary)]">
+            <p className="max-w-full break-words text-xs font-extrabold uppercase tracking-[.16em] text-[var(--primary)] [overflow-wrap:anywhere]">
               {project.name}
             </p>
             <h1
               className={cn(
-                "mt-4 font-extrabold leading-[1.02] tracking-[-.055em]",
+                "mt-4 max-w-full break-words font-extrabold leading-[1.02] tracking-[-.055em] [overflow-wrap:anywhere]",
                 preview ? "text-3xl" : "text-[clamp(2rem,8vw,3.6rem)]",
               )}
               style={{

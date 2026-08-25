@@ -7,7 +7,7 @@ import {
 } from "@/features/qualification/recommendation-semantics";
 import type { JourneyStep, Project, RoutingDestination, StepOption } from "@/types";
 
-export type ConversionPathCheckKey = "entry" | "questions" | "circularity" | "result" | "result_quality" | "public_copy" | "destination";
+export type ConversionPathCheckKey = "entry" | "questions" | "circularity" | "result" | "result_quality" | "context" | "public_copy" | "destination";
 
 export interface ConversionPathCheck {
   key: ConversionPathCheckKey;
@@ -90,6 +90,11 @@ export function validateConversionPath(project: Project): ConversionPathValidati
     const signals = offering.settings?.recommendationSignals;
     return Boolean(offering.shortDescription || offering.description || (Array.isArray(signals) && signals.length));
   });
+  const contextSafe = offerings.every((offering) => {
+    if (offering.settings?.descriptionSource !== "generated_conservative") return true;
+    const provenance = offering.settings?.copyProvenance;
+    return Boolean(provenance && typeof provenance === "object" && (provenance as { projectId?: unknown }).projectId === project.id);
+  });
   const publicCopySafe = !hasPublicCopyLeak(project);
   const checks: ConversionPathCheck[] = [
     { key: "entry", valid: entryValid, label: "Entrada da orientação", reason: entryValid ? "A ação principal inicia a orientação." : "A ação principal não inicia uma etapa de orientação válida." },
@@ -97,6 +102,7 @@ export function validateConversionPath(project: Project): ConversionPathValidati
     { key: "circularity", valid: !circular, label: "Descoberta sem escolha circular", reason: circular ? "A orientação pede que o visitante escolha diretamente a mesma oferta que deveria ser inferida." : "A orientação parte da necessidade antes de apresentar uma opção." },
     { key: "result", valid: realResult, label: "Resultado da orientação", reason: realResult ? "A jornada apresenta uma oferta real como resultado." : "A jornada promete orientar, mas não possui uma oferta real configurada como resultado." },
     { key: "result_quality", valid: resultQuality, label: "Explicação da orientação", reason: resultQuality ? "As ofertas possuem sinais ou descrições suficientes para explicar o resultado." : "Adicione sinais ou descrições sustentadas pelos dados do negócio para diferenciar o resultado." },
+    { key: "context", valid: contextSafe, label: "Contexto das ofertas", reason: contextSafe ? "A copy gerada está vinculada ao projeto atual." : "Uma descrição gerada não possui proveniência do projeto atual e precisa ser regenerada." },
     { key: "public_copy", valid: publicCopySafe, label: "Texto público da orientação", reason: publicCopySafe ? "O texto público está separado das instruções internas." : "Uma instrução interna apareceu em título, pergunta, explicação ou botão visível ao visitante." },
     { key: "destination", valid: destinationValid, label: "Próxima ação da orientação", reason: destinationValid ? "O resultado conduz a uma próxima ação funcional." : "O resultado ainda não possui uma próxima ação funcional." },
   ];

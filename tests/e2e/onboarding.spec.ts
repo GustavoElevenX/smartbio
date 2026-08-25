@@ -25,7 +25,7 @@ test("onboarding adaptativo funciona sem login e gera um rascunho", async ({ pag
   await expect(page.getByRole("button", { name: /criar minha primeira versão/i })).toHaveCount(0);
   for (let index = 0; index < 8; index += 1) {
     if (await page.getByRole("heading", { name: /pronto para montar a primeira versão/i }).isVisible().catch(() => false)) break;
-    const offerings = page.locator("[data-setup-question]").filter({ hasText: "Quais opções a Sobe pode recomendar?" });
+    const offerings = page.locator("[data-setup-question]").filter({ hasText: /Encontramos estes serviços|Quais opções a Sobe pode recomendar\?/i });
     if (await offerings.isVisible().catch(() => false)) {
       await offerings.getByPlaceholder("Digite sua resposta…").fill("Limpeza de pele; Tratamento facial; Tratamento corporal");
       await offerings.getByRole("button", { name: /salvar resposta/i }).click();

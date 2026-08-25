@@ -51,7 +51,7 @@ export function inferDeclaredVisitorActionKeys(value: string): VisitorActionKey[
     if (pattern.test(text)) keys.push(key);
   };
 
-  add("recommendation", /(?:ajud|orient).{0,90}(?:descobrir|entender|escolher|identificar|caminho|opcao)|(?:descobrir|entender|escolher).{0,70}(?:melhor|ideal|caminho|opcao|necessidade)|recomend/);
+  add("recommendation", /(?:ajud|orient).{0,90}(?:descobrir|entender|escolher|identificar|caminho|opcao)|(?:descobrir|entender|encontrar|escolher).{0,70}(?:melhor|ideal|caminho|opcao|necessidade|servico)|(?:receber|recebe|obter).{0,35}(?:orientacao|recomendacao)|(?:descrev|explic).{0,100}(?:orientacao|recomendacao)|recomend/);
   add("order", /(?:fazer|receber|montar|enviar).{0,30}(?:pedido|encomenda)|pedir (?:comida|produto)/);
   add("buy", /(?:comprar|adquirir|finalizar compra)/);
   add("quote", /(?:pedir|solicitar|receber).{0,35}(?:orcamento|cotacao|proposta comercial)|(?:orcamento|cotacao) online/);
@@ -78,8 +78,8 @@ export function classifyCustomVisitorAction(label: string): Exclude<VisitorActio
     ["schedule", /agendar|agenda|horario|marcar/],
     ["reserve", /reservar|reserva|disponibilidade/],
     ["find_location", /unidade|endereco|localizacao|loja|como chegar/],
-    ["resale", /revenda|revender|atacado|distribuidor|empresa|corporativo/],
-    ["recommendation", /recomend|descobrir|escolher|ideal|melhor opcao/],
+    ["resale", /revenda|revender|atacado|distribuidor/],
+    ["recommendation", /recomend|orientacao|descobrir|entender|encontrar|escolher|ideal|melhor opcao/],
     ["support", /suporte|ajuda|assistencia|problema/],
     ["contact", /falar|contato|atendimento|equipe|mensagem/],
   ];

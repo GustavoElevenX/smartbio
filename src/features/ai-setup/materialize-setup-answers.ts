@@ -1,8 +1,9 @@
 import { structuredJourneyQuestionSchema, type AISetupSession } from "@/features/ai-setup/ai-setup.schema";
 import { evaluateCapabilityRequirements } from "@/features/capabilities/capability-requirements";
 import { isRecommendationIntent, synthesizePublicDescription } from "@/features/composition/public-copy";
+import { contextSignature, offerNamesFromSetup } from "@/features/qualification/offer-context";
 import { classifyJourneyMode, questionQualityIssues } from "@/features/qualification/recommendation-semantics";
-import { conservativeServiceDescription, inferRecommendationSignals } from "@/features/qualification/recommendation-engine";
+import { conservativeServiceDescription, inferRecommendationSignals, inferStrongRecommendationSignals } from "@/features/qualification/recommendation-engine";
 import { visitorActionSemanticKey } from "@/features/ai-setup/visitor-actions";
 import { uid } from "@/lib/utils";
 import type {
@@ -280,14 +281,19 @@ function serviceOfferings(
   names: string[],
   destination?: RoutingDestination,
   current: ServiceOffering[] = [],
+  businessContext = "",
 ) {
   if (!names.length) return current;
   const currentByName = new Map(current.map((item) => [normalize(item.name), item]));
   const allNames = unique([...current.map((item) => item.name), ...names]);
+  const generationContext = `${project.name} ${project.category || ""} ${businessContext} ${allNames.join(" ")}`;
+  const generationContextSignature = contextSignature(`${project.id} ${generationContext}`);
   return allNames.map((name, order): ServiceOffering => {
     const existing = currentByName.get(normalize(name));
-    const shortDescription = existing?.shortDescription || existing?.description || conservativeServiceDescription(name, `${project.name} ${project.category || ""}`);
-    const recommendationSignals = inferRecommendationSignals(name, shortDescription);
+    const supportedDescription = existing?.shortDescription || existing?.description || "";
+    const shortDescription = supportedDescription || conservativeServiceDescription(name);
+    const recommendationSignals = inferRecommendationSignals(name, supportedDescription, generationContext);
+    const strongRecommendationSignals = inferStrongRecommendationSignals(name, supportedDescription, generationContext);
     return {
       id: existing?.id || uid("offering"),
       projectId: project.id,
@@ -310,7 +316,13 @@ function serviceOfferings(
       settings: {
         ...(existing?.settings || { source: "onboarding_confirmed" }),
         recommendationSignals,
+        strongRecommendationSignals,
         descriptionSource: existing?.shortDescription || existing?.description ? "business" : "generated_conservative",
+        copyProvenance: {
+          projectId: project.id,
+          contextSignature: generationContextSignature,
+          sources: supportedDescription ? ["offer_name", "business_description"] : ["offer_name"],
+        },
       },
     };
   });
@@ -481,7 +493,7 @@ function configureJourney(
 export function materializeSetupAnswers(project: Project, session: AISetupSession): Project {
   const answers = session.answers;
   const quoteServices = listFromText(answerText(answers, "quote.services"));
-  const qualificationOfferings = listFromText(answerText(answers, "qualification.offerings"));
+  const qualificationOfferings = offerNamesFromSetup(session.initialInput.description, answers["qualification.offerings"]);
   const offeringNames = qualificationOfferings.length ? qualificationOfferings : quoteServices;
   const quoteFields = quoteQuestions(quoteServices);
   const qualificationObjective = answerText(answers, "qualification.objective");
@@ -508,7 +520,7 @@ export function materializeSetupAnswers(project: Project, session: AISetupSessio
   const nextDestinations = selectedDestination && !destinations.some((item) => item.id === selectedDestination.id)
     ? [...destinations, selectedDestination]
     : destinations;
-  const offerings = serviceOfferings(project, offeringNames, selectedDestination, currentConfig.serviceOfferings);
+  const offerings = serviceOfferings(project, offeringNames, selectedDestination, currentConfig.serviceOfferings, session.initialInput.description);
   const configuredScheduleServices = scheduleAnswer
     ? schedulingServices(project, scheduleAnswer, confirmationMode(scheduleDestination), quoteServices)
     : currentConfig.schedulableServices || [];

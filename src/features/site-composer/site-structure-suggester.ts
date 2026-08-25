@@ -16,6 +16,7 @@ function instructionFlags(instruction: string) {
   const value = instruction.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   return {
     b2b: /b2b|revenda|revendedor|atacado|corporativ|empresa/.test(value),
+    resale: /revenda|revendedor|atacado|distribuidor/.test(value),
     delivery: /delivery|entrega|pedido/.test(value),
     catalog: /catalog|produto|categoria/.test(value),
     minimal: /minimal|simples|enxut|limp/.test(value),
@@ -137,6 +138,7 @@ function proposedPages(project: Project, instruction = ""): SuggestedPage[] {
   const flags = instructionFlags(instruction);
   const goals = project.conversionGoals?.filter((goal) => goal.isActive) || [];
   const primary = goals.find((goal) => goal.isPrimary) || goals[0];
+  const resaleGoal = goals.find((goal) => /revenda|revendedor|atacado|distribuidor/i.test(`${goal.name} ${goal.description || ""}`));
   const home: SuggestedPage = {
     type: "home",
     name: "Início",
@@ -147,7 +149,10 @@ function proposedPages(project: Project, instruction = ""): SuggestedPage[] {
   };
   const pages = [home];
   if (shape.productCount > 8) pages.push({ type: "page", name: "Catálogo", purpose: "Permitir busca, filtro e seleção em um catálogo completo.", pathSuggestion: "/catalogo", conversionGoalId: primary?.id, sections: personalizeSections(project, [recommendSections(shape).find((section) => section.sectionType === "products")!, recommendSections(shape).find((section) => section.sectionType === "conversion_cta")!]) });
-  if (shape.model === "b2b" || shape.hasQualification || flags.b2b || flags.qualification) pages.push({ type: "landing", name: flags.b2b ? "Revenda" : "Fale com a equipe", purpose: "Entender a necessidade e preparar a continuidade do atendimento.", pathSuggestion: flags.b2b ? "/revenda" : "/fale-com-a-equipe", conversionGoalId: primary?.id, sections: personalizeSections(project, bindInstructionToSections(project, recommendSections({ ...shape, model: "b2b", hasCatalog: false, hasQualification: true }).filter((section) => ["hero", "benefits", "testimonials", "faq", "conversion_cta"].includes(section.sectionType)), instruction)) });
+  if (shape.hasQualification || flags.qualification || flags.resale || resaleGoal) {
+    const resale = Boolean(flags.resale || resaleGoal);
+    pages.push({ type: "landing", name: resale ? "Revenda" : "Fale com a equipe", purpose: "Entender a necessidade e preparar a continuidade do atendimento.", pathSuggestion: resale ? "/revenda" : "/fale-com-a-equipe", conversionGoalId: primary?.id, sections: personalizeSections(project, bindInstructionToSections(project, recommendSections({ ...shape, model: "b2b", hasCatalog: false, hasQualification: true }).filter((section) => ["hero", "benefits", "testimonials", "faq", "conversion_cta"].includes(section.sectionType)), instruction)) });
+  }
   if (flags.landing && !pages.some((page) => page.type === "landing")) pages.push({ type: "landing", name: "Campanha", purpose: "Concentrar uma oferta e uma única próxima ação.", pathSuggestion: "/campanha", conversionGoalId: primary?.id, sections: personalizeSections(project, bindInstructionToSections(project, recommendSections({ ...shape, hasCatalog: flags.catalog || shape.hasCatalog }).filter((section) => ["hero", "products", "services", "benefits", "testimonials", "conversion_cta"].includes(section.sectionType)), instruction)) });
   return pages;
 }
