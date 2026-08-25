@@ -23,10 +23,17 @@ test("onboarding adaptativo funciona sem login e gera um rascunho", async ({ pag
   if (await removeScheduling.count()) await removeScheduling.click();
   await page.getByRole("button", { name: "Continuar", exact: true }).click();
   await expect(page.getByRole("button", { name: /criar minha primeira versão/i })).toHaveCount(0);
-  for (let index = 0; index < 4; index += 1) {
-    const suggestion = page.getByRole("button", { name: /usar assim/i }).first();
-    await expect(suggestion).toBeVisible();
-    await suggestion.click();
+  for (let index = 0; index < 8; index += 1) {
+    if (await page.getByRole("heading", { name: /pronto para montar a primeira versão/i }).isVisible().catch(() => false)) break;
+    const offerings = page.locator("[data-setup-question]").filter({ hasText: "Quais opções a Sobe pode recomendar?" });
+    if (await offerings.isVisible().catch(() => false)) {
+      await offerings.getByPlaceholder("Digite sua resposta…").fill("Limpeza de pele; Tratamento facial; Tratamento corporal");
+      await offerings.getByRole("button", { name: /salvar resposta/i }).click();
+    } else {
+      const suggestion = page.getByRole("button", { name: /usar assim/i }).first();
+      await expect(suggestion).toBeVisible();
+      await suggestion.click();
+    }
     await expect(page.getByText(/salvo\. a sobe atualizou|salvo\. esta confirmação/i)).toBeVisible();
     await page.waitForTimeout(600);
   }

@@ -2,6 +2,7 @@ import { evaluateCapabilityRequirements } from "@/features/capabilities/capabili
 import type { CapabilityKey, DataRequirement, Project } from "@/types";
 import { getPresenceReadinessIssues } from "@/features/presence/presence-readiness";
 import { formFieldIssues } from "@/features/forms/form-field-utils";
+import { validateConversionPath } from "@/features/publishing/conversion-path-validator";
 
 export interface ProjectReadinessResult {
   score: number;
@@ -177,6 +178,17 @@ export function getProjectReadiness(project: Project): ProjectReadinessResult {
         issues.push(requirement(project, `routing.location.${location.id}.geocode`, "Unidade sem geocodificação", `Geocodifique “${location.name}” ou informe coordenadas revisadas.`, `${dataPath}?tab=locations`, "blocking", "routing"));
       }
     }
+  }
+
+  const conversionPath = validateConversionPath(project);
+  for (const check of conversionPath.checks.filter((item) => !item.valid)) {
+    issues.push(requirement(
+      project,
+      `conversion-path.${conversionPath.kind}.${check.key}`,
+      check.label,
+      check.reason,
+      `/app/projects/${project.id}/editor`,
+    ));
   }
 
   walk(project, (value, path) => {

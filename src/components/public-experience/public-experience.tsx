@@ -30,6 +30,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { BlockRendererView } from "@/components/public-experience/blocks/block-renderers";
 import { qualifyLead } from "@/features/qualification/qualification-engine";
+import { recommendService } from "@/features/qualification/recommendation-engine";
 import { calculateReservationTotal } from "@/features/reservations/reservation-engine";
 import { resolveRoute } from "@/features/routing/routing-engine";
 import {
@@ -412,6 +413,28 @@ export function ExperienceCanvas({
     activeSteps.findIndex((item) => item.id === step?.id),
   );
   const palette = project.designSystem.colors;
+  const serviceRecommendation = useMemo(
+    () => recommendService(runtime.answers, project.commercialConfig?.serviceOfferings || []),
+    [project.commercialConfig?.serviceOfferings, runtime.answers],
+  );
+  const selectedRecommendation = project.commercialConfig?.serviceOfferings?.find(
+    (offering) => offering.id === runtime.recommendationKey || offering.slug === runtime.recommendationKey,
+  ) || serviceRecommendation.service;
+  const hasMaterializedRecommendation = Array.isArray(step?.settings?.recommendationOfferIds);
+  const displayedRecommendation = step?.type === "recommendation" && step.recommendation
+    ? hasMaterializedRecommendation ? {
+        ...step.recommendation,
+        title: selectedRecommendation ? `${selectedRecommendation.name} pode fazer sentido` : serviceRecommendation.title,
+        description: runtime.recommendationReason || serviceRecommendation.reason,
+        label: serviceRecommendation.label,
+        benefits: [
+          ...(selectedRecommendation?.shortDescription || selectedRecommendation?.description
+            ? [selectedRecommendation.shortDescription || selectedRecommendation.description || ""]
+            : []),
+          "A equipe pode confirmar se este é o melhor caminho.",
+        ].filter(Boolean),
+      } : step.recommendation
+    : undefined;
 
   function emit(
     eventName: AnalyticsEventName,
@@ -962,7 +985,7 @@ export function ExperienceCanvas({
         if (!preview) window.open(paymentUrl, "_blank", "noopener,noreferrer");
         setConfirmation("Pagamento aberto em ambiente externo seguro.");
       }
-      setSubmitted(true);
+      if (capability !== "qualification") setSubmitted(true);
       return true;
     } catch (caught) {
       setError(
@@ -1017,6 +1040,25 @@ export function ExperienceCanvas({
         band: result.band,
       });
     }
+    const targetStep = option.targetStepId
+      ? project.steps.find((candidate) => candidate.id === option.targetStepId && candidate.isActive)
+      : undefined;
+    if (step.type === "form" && targetStep?.type === "recommendation") {
+      const recommendation = recommendService(
+        runtime.answers,
+        project.commercialConfig?.serviceOfferings || [],
+      );
+      setRuntime((current) => ({
+        ...current,
+        recommendationKey: recommendation.service?.id,
+        recommendationReason: recommendation.reason,
+        recommendationConfidence: recommendation.confidence,
+        selectedOfferIds: recommendation.service
+          ? [...new Set([...current.selectedOfferIds, recommendation.service.id])]
+          : current.selectedOfferIds,
+      }));
+      emit("qualification_completed", { confidence: recommendation.confidence });
+    }
     if (
       option.actionType === "go_to_step" ||
       option.actionType === "show_recommendation"
@@ -1042,8 +1084,15 @@ export function ExperienceCanvas({
       const cart = runtime.cart.items.length
         ? `Pedido: ${runtime.cart.items.map((item) => `${item.quantity}x ${item.name}`).join(", ")}`
         : undefined;
-      const recommendation =
-        step.recommendation?.title || runtime.recommendationKey;
+      const recommendation = selectedRecommendation?.name || displayedRecommendation?.title || runtime.recommendationKey;
+      const recommendationAnswers = recommendation
+        ? {
+            ...(runtime.answers.qualification_preference
+              ? { interesse_inicial: String(runtime.answers.qualification_preference) }
+              : {}),
+            orientacao_recebida: recommendation,
+          }
+        : stringAnswers(runtime.answers);
       let message = String(option.actionPayload?.message || "") || buildWhatsAppMessage({
         businessName: project.name,
         interest: step.title,
@@ -1054,10 +1103,10 @@ export function ExperienceCanvas({
           ? { code: launchContext.benefitClaimCode }
           : undefined,
         answers: {
-          ...stringAnswers(runtime.answers),
+          ...recommendationAnswers,
           ...(cart ? { pedido: cart } : {}),
-          ...(recommendation ? { recomendacao: recommendation } : {}),
         },
+        closing: recommendation ? "Gostaria de confirmar essa orientação com a equipe." : undefined,
       });
       if (
         !preview &&
@@ -1217,6 +1266,27 @@ export function ExperienceCanvas({
   }
 
   if (!step) return null;
+  const previewWhatsAppOption = preview
+    ? step.options?.find((option) => option.actionType === "open_whatsapp")
+    : undefined;
+  const previewDestination = previewWhatsAppOption
+    ? project.commercialConfig?.routingDestinations?.find(
+        (destination) => destination.id === previewWhatsAppOption.actionPayload?.destinationId && destination.type === "whatsapp",
+      )
+    : undefined;
+  const previewPhone = String(previewDestination?.value || previewWhatsAppOption?.actionPayload?.phone || project.phone || "");
+  const previewRecommendation = selectedRecommendation?.name || displayedRecommendation?.title;
+  const previewMessage = previewWhatsAppOption
+    ? String(previewWhatsAppOption.actionPayload?.message || "") || buildWhatsAppMessage({
+        businessName: project.name,
+        interest: step.title,
+        answers: {
+          ...(runtime.answers.qualification_preference ? { interesse_inicial: String(runtime.answers.qualification_preference) } : {}),
+          ...(previewRecommendation ? { orientacao_recebida: previewRecommendation } : {}),
+        },
+        closing: previewRecommendation ? "Gostaria de confirmar essa orientação com a equipe." : undefined,
+      })
+    : "";
   const style = {
     "--primary": palette.primary,
     "--primary-fg": palette.primaryForeground,
@@ -1313,7 +1383,7 @@ export function ExperienceCanvas({
             <h1
               className={cn(
                 "mt-4 font-extrabold leading-[1.02] tracking-[-.055em]",
-                preview ? "text-[2rem]" : "text-[clamp(2rem,8vw,3.6rem)]",
+                preview ? "text-3xl" : "text-[clamp(2rem,8vw,3.6rem)]",
               )}
               style={{
                 fontFamily: `"${project.designSystem.typography.headingFont}", Inter, ui-sans-serif, system-ui, sans-serif`,
@@ -1327,19 +1397,19 @@ export function ExperienceCanvas({
                 {step.description}
               </p>
             ) : null}
-            {step.recommendation ? (
+            {displayedRecommendation ? (
               <div className="mt-7 rounded-[var(--card-radius)] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card-shadow)]">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--primary)]">
-                  {step.recommendation.label || "Recomendado"}
+                <span className="text-xs font-extrabold uppercase tracking-wider text-[var(--primary)]">
+                  {displayedRecommendation.label || "Recomendado"}
                 </span>
                 <h2 className="mt-2 text-2xl font-extrabold">
-                  {step.recommendation.title}
+                  {displayedRecommendation.title}
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-[var(--muted-fg)]">
-                  {step.recommendation.description}
+                  {displayedRecommendation.description}
                 </p>
                 <ul className="mt-4 grid gap-2">
-                  {step.recommendation.benefits.map((benefit) => (
+                  {displayedRecommendation.benefits.map((benefit) => (
                     <li
                       key={benefit}
                       className="flex items-center gap-2 text-xs font-semibold"
@@ -1352,6 +1422,16 @@ export function ExperienceCanvas({
                   ))}
                 </ul>
               </div>
+            ) : null}
+            {previewWhatsAppOption ? (
+              <aside className="mt-7 rounded-[var(--card-radius)] border border-dashed border-[var(--primary)] bg-[var(--muted)] p-4" aria-label="Verificação do destino">
+                <p className="text-xs font-extrabold uppercase tracking-wider text-[var(--primary)]">Verificação da prévia</p>
+                <p className="mt-2 text-sm font-bold">CTA: {previewWhatsAppOption.label}</p>
+                <p className="mt-1 text-xs text-[var(--muted-fg)]">Destino: WhatsApp terminado em {previewPhone.replace(/\D/g, "").slice(-4) || "não configurado"}</p>
+                <p className="mt-3 text-xs font-bold">Mensagem que será preparada</p>
+                <pre className="mt-1 whitespace-pre-wrap font-sans text-xs leading-5 text-[var(--muted-fg)]">{previewMessage}</pre>
+                <p className="mt-3 text-xs text-[var(--muted-fg)]">Nenhuma mensagem é enviada no modo de prévia.</p>
+              </aside>
             ) : null}
             {blocks.length ? (
               <div className="mt-7 flex flex-col gap-3">
@@ -1496,7 +1576,7 @@ export function ExperienceCanvas({
           </motion.section>
         </AnimatePresence>
       </main>
-      <footer className="relative px-5 pb-4 text-center text-[10px] font-semibold text-[var(--muted-fg)]">
+      <footer className="relative px-5 pb-4 text-center text-xs font-semibold text-[var(--muted-fg)]">
         Não encontrou o que procura?{" "}
         <button
           type="button"

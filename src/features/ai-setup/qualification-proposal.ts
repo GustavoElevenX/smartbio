@@ -15,7 +15,11 @@ export function buildQualificationSuggestions(
   session: Pick<AISetupSession, "initialInput" | "extractedProfile" | "visitorActions">,
 ) {
   const primary = session.visitorActions.find((action) => action.isPrimary) || session.visitorActions[0];
-  const nextAction = primary?.label.toLowerCase() || "seguir para o próximo passo";
+  const primaryIsRecommendation = primary?.key === "recommendation" || primary?.semanticKey === "recommendation";
+  const completion = primaryIsRecommendation
+    ? session.visitorActions.find((action) => action.key !== "recommendation" && action.semanticKey !== "recommendation")
+    : primary;
+  const nextAction = completion?.label.toLowerCase() || "conversar com a equipe";
   const healthRelated = isHealthRelated(session);
   const questions = healthRelated
     ? [
@@ -38,7 +42,9 @@ export function buildQualificationSuggestions(
   return {
     "qualification.objective": healthRelated
       ? "Entender a necessidade do visitante, orientar possibilidades e encaminhar para uma avaliação profissional."
-      : `Entender a necessidade do visitante e ajudá-lo a ${nextAction}.`,
+      : primaryIsRecommendation
+        ? "Entender a necessidade do visitante e indicar uma opção adequada ao que ele procura."
+        : `Entender a necessidade do visitante e ajudá-lo a ${nextAction}.`,
     "qualification.questions": questions.join("\n"),
     "qualification.outcome": outcome,
     "qualification.destination": destination,

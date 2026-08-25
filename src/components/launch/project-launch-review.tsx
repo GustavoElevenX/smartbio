@@ -53,7 +53,9 @@ export function ProjectLaunchReview({ projectId }: { projectId: string }) {
         </section>
 
         <aside className="h-fit border border-[#b9c7d6] bg-white p-5 sm:p-6" style={{ clipPath: "polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%)" }}>
-          <h2 className="text-xl font-extrabold tracking-[-.03em] text-[#07172f]">Pronto para publicar: {readiness?.ready || 0} de {readiness?.total || 0}</h2>
+          <h2 className="text-xl font-extrabold tracking-[-.03em] text-[#07172f]">{readiness?.publishable
+            ? `Pronto para publicar: ${readiness.ready} de ${readiness.total}`
+            : `Falta concluir ${Math.max(1, (readiness?.total || 0) - (readiness?.ready || 0))} ponto${Math.max(1, (readiness?.total || 0) - (readiness?.ready || 0)) === 1 ? "" : "s"} antes de publicar`}</h2>
           <div className="mt-5 divide-y divide-[#dfe6ee] border-y border-[#dfe6ee]">{readiness?.items.map((item) => <div key={item.id} className="py-4"><div className="flex items-start gap-3">{item.status === "complete" ? <span className="grid size-7 shrink-0 place-items-center rounded-full bg-[#02e5cd] text-[#07172f]"><Check size={15} /></span> : <span className="grid size-7 shrink-0 place-items-center rounded-full bg-[#fff2cc] text-[#8a6412]"><AlertTriangle size={15} /></span>}<div className="min-w-0"><strong className="block text-sm text-[#07172f]">{item.title}</strong><p className="mt-1 text-xs leading-5 text-[#687582]">{item.description}</p>{item.status !== "complete" && item.actionPath ? <Link href={item.actionPath} className="mt-3 inline-flex min-h-10 items-center text-xs font-extrabold text-[#0054fc] underline decoration-[#9fc3ff] underline-offset-4">{item.actionLabel || "Resolver agora"}</Link> : null}</div></div></div>)}</div>
           {!readiness?.publishable ? <p className="mt-5 text-xs leading-5 text-[#687582]">Resolva os itens sinalizados para liberar a publicação. As demais configurações avançadas podem ser feitas depois.</p> : <Button className="mt-5 w-full" size="lg" onClick={() => setPublishOpen(true)}><Rocket size={16} />Publicar agora</Button>}
         </aside>

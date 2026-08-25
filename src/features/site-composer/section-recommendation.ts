@@ -11,9 +11,9 @@ export function recommendSections(shape: BusinessShape): SuggestedSection[] {
   if (shape.hasCatalog) result.push(section("products", shape.productCount > 8 ? "Destacar itens e conduzir ao catálogo completo" : "Apresentar a oferta", "recommended", { layout: shape.productCount > 8 ? "featured" : "grid", maxItems: Math.min(8, Math.max(1, shape.productCount)), showPrice: true }, ["commercialConfig.catalogItems", "commercialConfig.catalogCategories"]));
   if (shape.serviceCount) result.push(section("services", "Explicar os serviços disponíveis", "recommended", { dataSource: "commercial_data", layout: shape.serviceCount > 4 ? "featured" : "grid", showPrice: true }, ["commercialConfig.serviceOfferings"]));
   if (shape.model === "b2b" || shape.hasQualification) result.push(section("benefits", "Explicar valor, processo e critérios antes do contato", "recommended", { items: [
-    { id: "benefit-context", title: "Contexto antes do contato", description: "Organize as informações essenciais para uma conversa comercial produtiva." },
-    { id: "benefit-fit", title: "Qualificação objetiva", description: "Direcione cada oportunidade de acordo com necessidade e aderência." },
-    { id: "benefit-handoff", title: "Handoff com continuidade", description: "Leve respostas e intenção para quem fará o atendimento." },
+    { id: "benefit-context", title: "Uma conversa mais produtiva", description: "Conte o essencial antes do contato para a equipe entender o que você precisa." },
+    { id: "benefit-fit", title: "Um caminho mais claro", description: "Receba uma orientação inicial de acordo com a sua necessidade." },
+    { id: "benefit-continuity", title: "Continuidade sem repetir tudo", description: "Suas respostas ajudam a equipe a retomar a conversa com contexto." },
   ] }, ["businessProfile", "commercialConfig.qualificationRules"]));
   if (shape.hasPortfolio) result.push(section("portfolio", "Demonstrar trabalhos e resultados"));
   if (shape.hasTestimonials) result.push(section("testimonials", "Reforçar confiança com evidências verificadas"));

@@ -179,7 +179,7 @@ const directStepTypes: Record<VisitorActionKey, JourneyStep["type"][]> = {
   find_location: ["routing"],
   support: ["form", "action"],
   resale: ["form", "quote"],
-  recommendation: ["recommendation", "form"],
+  recommendation: ["form", "recommendation"],
   other: ["form", "action"],
 };
 
@@ -281,9 +281,7 @@ function scaffoldStep(project: Project, action: VisitorActionSelection, order: n
           ? "reservation"
           : semanticKey === "find_location"
             ? "routing"
-            : semanticKey === "recommendation"
-              ? "recommendation"
-              : "form";
+            : "form";
   const blockType = capability === "catalog_order"
     ? "catalog_item_cards"
     : capability === "quote"

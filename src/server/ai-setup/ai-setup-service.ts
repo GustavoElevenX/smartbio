@@ -90,6 +90,29 @@ function resolvedRequirements(requirements: DataRequirement[], answers: Record<s
   });
 }
 
+function requirementsForActions(
+  requirements: DataRequirement[],
+  actions: VisitorActionSelection[],
+  projectId = "setup",
+) {
+  const primary = actions.find((action) => action.isPrimary) || actions[0];
+  const recommends = primary && (primary.key === "recommendation" || primary.semanticKey === "recommendation");
+  if (!recommends || requirements.some((item) => item.key === "qualification.offerings")) return requirements;
+  const destinationIndex = requirements.findIndex((item) => item.key === "qualification.destination");
+  const offering: DataRequirement = {
+    id: `${projectId}:qualification.offerings`,
+    key: "qualification.offerings",
+    label: "Opções da recomendação",
+    capability: "qualification",
+    status: "missing",
+    severity: "blocking",
+    reason: "Quais opções reais podem aparecer no resultado?",
+  };
+  const next = [...requirements];
+  next.splice(destinationIndex < 0 ? next.length : destinationIndex, 0, offering);
+  return next;
+}
+
 function plannedQuestions(
   session: AISetupSession,
   requirements: DataRequirement[],
@@ -362,7 +385,8 @@ export class AISetupService {
     }
 
     const capabilities = capabilityPlanner.plan(profile);
-    const requirements = resolvedRequirements(draftCapabilityRequirements(capabilities), session.answers);
+    const proposedActions = session.visitorActions?.length ? session.visitorActions : defaultVisitorActions(profile, session.initialInput.description);
+    const requirements = resolvedRequirements(requirementsForActions(draftCapabilityRequirements(capabilities), proposedActions, session.id), session.answers);
     if (isAIConfigured() && !usedFallback) {
       try {
         providerQuestions = await getAIProvider().generateMissingQuestions({
@@ -382,7 +406,7 @@ export class AISetupService {
     const questionSession = {
       ...session,
       extractedProfile: profile,
-      visitorActions: session.visitorActions?.length ? session.visitorActions : defaultVisitorActions(profile, session.initialInput.description),
+      visitorActions: proposedActions,
     };
     const next = await this.repository.update(actor, {
       ...session,
@@ -426,7 +450,7 @@ export class AISetupService {
       return { ...action, semanticKey };
     }));
     const profile = profileWithVisitorActions(session.extractedProfile, classifiedActions);
-    const requirements = resolvedRequirements(draftCapabilityRequirements(capabilityPlanner.planForVisitorActions(profile, classifiedActions)), session.answers);
+    const requirements = resolvedRequirements(requirementsForActions(draftCapabilityRequirements(capabilityPlanner.planForVisitorActions(profile, classifiedActions)), classifiedActions, session.id), session.answers);
     const next = await this.repository.update(actor, {
       ...session,
       extractedProfile: profile,

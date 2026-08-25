@@ -1,5 +1,6 @@
 import { draftCapabilityRequirements } from "@/features/capabilities/capability-requirements";
 import { slugify, uid } from "@/lib/utils";
+import { isRecommendationIntent, synthesizePublicDescription } from "@/features/composition/public-copy";
 import type { BusinessCapabilityProfile, ContentBlockType, DataRequirement, ExperienceCompositionInput, JourneyStep, Project, ProjectCapability } from "@/types";
 
 export type CommercialConfig = NonNullable<Project["commercialConfig"]>;
@@ -20,22 +21,14 @@ const blockFor: Record<ProjectCapability["key"], ContentBlockType> = {
   reservation: "reservable_unit_cards", routing: "location_selector", payment: "cta_group",
 };
 
-function compactDescription(value: string, maximum = 220) {
-  const firstSentence = value.match(/^.*?[.!?](?:\s|$)/)?.[0]?.trim();
-  const candidate = firstSentence && firstSentence.length >= 60 ? firstSentence : value.trim();
-  if (candidate.length <= maximum) return candidate;
-  const clipped = candidate.slice(0, maximum + 1);
-  const boundary = clipped.lastIndexOf(" ");
-  return `${clipped.slice(0, boundary > maximum * 0.7 ? boundary : maximum).trim()}…`;
-}
-
-function welcomeActionLabel(capabilities: ProjectCapability[], businessName: string) {
+function welcomeActionLabel(input: ExperienceCompositionInput, capabilities: ProjectCapability[]) {
   const enabled = new Set(capabilities.filter((item) => item.enabled).map((item) => item.key));
+  if (enabled.has("qualification") && isRecommendationIntent(input.primaryGoal)) return input.primaryGoal;
   if (enabled.has("quote") && enabled.has("scheduling")) return "Ver serviços e horários";
   if (enabled.has("quote")) return "Pedir orçamento";
   if (enabled.has("scheduling")) return "Agendar atendimento";
   if (enabled.has("catalog_order")) return "Explorar opções";
-  return `Conhecer ${businessName}`;
+  return `Conhecer ${input.businessName}`;
 }
 
 function configuredAction(input: ExperienceCompositionInput, finalStepId: string): JourneyStep {
@@ -57,9 +50,9 @@ export class RuleBasedJourneyComposer {
     const entries = new Map(usable.map((capability) => [capability.key, uid("step")]));
     const choiceStepId = uid("step");
     const steps: JourneyStep[] = [{
-      id: uid("step"), type: "welcome", title: input.businessName, description: compactDescription(input.businessDescription), order: 0, isActive: true, visualVariant: "brand-introduction",
+      id: uid("step"), type: "welcome", title: input.businessName, description: synthesizePublicDescription({ businessName: input.businessName, primaryGoal: input.primaryGoal }), order: 0, isActive: true, visualVariant: "brand-introduction",
       blocks: [{ id: uid("block"), type: "text", variant: "brand-introduction" }],
-      options: [{ id: uid("option"), label: welcomeActionLabel(usable, input.businessName), value: "start", actionType: "go_to_step", targetStepId: choiceStepId }],
+      options: [{ id: uid("option"), label: welcomeActionLabel(input, usable), value: "start", actionType: "go_to_step", targetStepId: choiceStepId }],
     }, {
       id: choiceStepId, type: "choice", title: "Como podemos ajudar?", description: `Escolha o objetivo da sua visita a ${input.businessName}.`, order: 1, isActive: true, visualVariant: "commercial-intent",
       blocks: [{ id: uid("block"), type: "choice_grid", variant: "brand-composed" }],

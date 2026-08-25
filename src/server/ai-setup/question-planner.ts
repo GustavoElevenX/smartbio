@@ -30,6 +30,7 @@ const descriptions: Record<string, string> = {
   "qualification.questions": "A Sobe preparou uma primeira sequência. Você poderá ajustá-la agora ou depois.",
   "qualification.outcome": "Este é o encaminhamento sugerido para o fim da orientação.",
   "qualification.destination": "A Sobe usou apenas os canais reais que você informou.",
+  "qualification.offerings": "Liste somente opções reais que podem aparecer no resultado.",
   "quote.services": "Liste apenas serviços reais que podem receber uma solicitação.",
   "scheduling.availability": "Exemplo: segunda a sexta, das 9h às 18h.",
   "catalog.items": "Informe itens reais. Preços e imagens podem ser completados depois.",
@@ -43,6 +44,7 @@ const humanTitles: Record<string, string> = {
   "qualification.questions": "Perguntas iniciais sugeridas pela Sobe",
   "qualification.outcome": "Encaminhamento sugerido",
   "qualification.destination": "Como o atendimento vai continuar",
+  "qualification.offerings": "Quais opções a Sobe pode recomendar?",
   "quote.services": "Quais serviços o cliente pode pedir orçamento por aqui?",
   "quote.mode": "Como você costuma informar o valor de um orçamento?",
   "quote.destination": "Quem deve receber o pedido de orçamento?",
@@ -67,7 +69,7 @@ function questionType(requirement: DataRequirement): SetupQuestion["type"] {
   if (choiceQuestions[requirement.key]) return "single_choice";
   if (requirement.key.endsWith(".url")) return "url";
   if (requirement.key.includes("location")) return "address";
-  if (["questions", "services", "items", "availability", "policy", "destinations", "units"].some((part) => requirement.key.endsWith(`.${part}`))) return "textarea";
+  if (["questions", "services", "offerings", "items", "availability", "policy", "destinations", "units"].some((part) => requirement.key.endsWith(`.${part}`))) return "textarea";
   return "text";
 }
 

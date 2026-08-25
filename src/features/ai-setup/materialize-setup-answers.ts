@@ -1,5 +1,7 @@
 import type { AISetupSession } from "@/features/ai-setup/ai-setup.schema";
 import { evaluateCapabilityRequirements } from "@/features/capabilities/capability-requirements";
+import { isRecommendationIntent, synthesizePublicDescription } from "@/features/composition/public-copy";
+import { visitorActionSemanticKey } from "@/features/ai-setup/visitor-actions";
 import { uid } from "@/lib/utils";
 import type {
   AvailabilityRule,
@@ -7,9 +9,11 @@ import type {
   CompletionChannel,
   ConfirmationMode,
   FormField,
+  JourneyStep,
   Project,
   RoutingDestination,
   SchedulableService,
+  ServiceOffering,
 } from "@/types";
 
 function normalize(value: string) {
@@ -203,8 +207,8 @@ function quoteQuestions(services: string[]): FormField[] {
   ];
 }
 
-function qualificationQuestions(value: string): FormField[] {
-  return listFromText(value).slice(0, 6).map((label, index) => ({
+function qualificationQuestions(value: string, offerings: string[]): FormField[] {
+  const questions: FormField[] = listFromText(value).slice(0, offerings.length ? 5 : 6).map((label, index) => ({
     id: uid("field"),
     label,
     key: `qualification_${index + 1}`,
@@ -212,6 +216,80 @@ function qualificationQuestions(value: string): FormField[] {
     placeholder: "Conte um pouco mais…",
     required: true,
   }));
+  if (!offerings.length) return questions;
+  return [{
+    id: uid("field"),
+    label: "Qual destas opções mais se aproxima do que você procura?",
+    key: "qualification_preference",
+    type: "select",
+    options: offerings,
+    required: true,
+  }, ...questions];
+}
+
+function recommendationJourney(project: Project, session: AISetupSession) {
+  const primary = session.visitorActions.find((action) => action.isPrimary) || session.visitorActions[0];
+  return primary
+    ? visitorActionSemanticKey(primary) === "recommendation"
+    : isRecommendationIntent(project.primaryGoal);
+}
+
+function primaryDestination(project: Project, answer: string, existing: RoutingDestination[]) {
+  const normalized = normalize(answer || project.primaryDestination);
+  const whatsapp = existing.find((item) => item.type === "whatsapp");
+  if ((normalized.includes("whatsapp") || normalize(project.primaryDestination).includes("whatsapp")) && project.phone) {
+    return whatsapp || {
+      id: uid("destination"),
+      key: "whatsapp-primary",
+      type: "whatsapp" as const,
+      label: "Conversar pelo WhatsApp",
+      value: project.phone,
+    };
+  }
+  return existing.find((item) => item.type !== "unavailable");
+}
+
+function serviceOfferings(
+  project: Project,
+  names: string[],
+  destination?: RoutingDestination,
+  current: ServiceOffering[] = [],
+) {
+  if (!names.length) return current;
+  const currentByName = new Map(current.map((item) => [normalize(item.name), item]));
+  return names.map((name, order): ServiceOffering => {
+    const existing = currentByName.get(normalize(name));
+    return {
+      id: existing?.id || uid("offering"),
+      projectId: project.id,
+      name,
+      slug: existing?.slug || normalize(name).replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
+      description: existing?.description,
+      shortDescription: existing?.shortDescription,
+      serviceMode: existing?.serviceMode || "contact",
+      priceMode: existing?.priceMode || "on_request",
+      price: existing?.price,
+      minPrice: existing?.minPrice,
+      maxPrice: existing?.maxPrice,
+      currency: existing?.currency || "BRL",
+      imageAssetId: existing?.imageAssetId,
+      destinationId: existing?.destinationId || destination?.id,
+      externalUrl: existing?.externalUrl,
+      isFeatured: existing?.isFeatured ?? order === 0,
+      isActive: existing?.isActive ?? true,
+      order,
+      settings: existing?.settings || { source: "onboarding_confirmed" },
+    };
+  });
+}
+
+function finalActionLabel(value: string) {
+  const normalized = normalize(value);
+  if (normalized.includes("avaliacao")) return "Solicitar avaliação inicial";
+  if (normalized.includes("conversa")) return "Marcar uma conversa";
+  if (normalized.includes("orcamento")) return "Solicitar orçamento";
+  if (normalized.includes("agend")) return "Agendar atendimento";
+  return "Conversar com a equipe";
 }
 
 function capabilityForStep(type: Project["steps"][number]["type"]) {
@@ -229,12 +307,37 @@ function configureJourney(
   quoteFields: FormField[],
   qualificationFields: FormField[],
   qualificationObjective: string,
-  services: SchedulableService[],
+  qualificationOutcome: string,
+  completionActionContext: string,
+  recommendationEnabled: boolean,
+  offerings: ServiceOffering[],
+  destination?: RoutingDestination,
+  services: SchedulableService[] = [],
 ) {
   const finalStep = project.steps.toSorted((a, b) => b.order - a.order).find((step) => step.type === "action");
-  return project.steps.map((step) => {
+  if (!finalStep) return project.steps;
+  const existingRecommendation = project.steps.find((step) => step.type === "recommendation");
+  const recommendationId = existingRecommendation?.id || uid("step");
+  const prepared = project.steps.filter((step) => !recommendationEnabled || step.type !== "recommendation").map((step) => {
     const capability = capabilityForStep(step.type);
-    if (!capability || !finalStep || step.id === finalStep.id) return step;
+    if (step.id === finalStep.id && recommendationEnabled) {
+      const options: JourneyStep["options"] = destination?.type === "whatsapp"
+        ? [{
+            id: step.options?.find((option) => option.actionType === "open_whatsapp")?.id || uid("option"),
+            label: finalActionLabel(completionActionContext),
+            value: "whatsapp",
+            actionType: "open_whatsapp",
+            actionPayload: { phone: destination.value || project.phone || "", destinationId: destination.id },
+          }]
+        : step.options;
+      return {
+        ...step,
+        title: "Quer confirmar o melhor caminho?",
+        description: qualificationOutcome || "A equipe pode revisar seu contexto e ajudar você a continuar.",
+        options,
+      };
+    }
+    if (!capability || step.id === finalStep.id) return step;
     const blocks = capability === "scheduling" && services.length
       ? [
           {
@@ -265,23 +368,75 @@ function configureJourney(
       formFields: capability === "quote" ? quoteFields : capability === "qualification" && qualificationFields.length ? qualificationFields : step.formFields,
       options: [{
         id: step.options?.[0]?.id || uid("option"),
-        label: capability === "quote" ? "Enviar solicitação" : "Continuar",
+        label: capability === "quote" ? "Enviar solicitação" : capability === "qualification" && recommendationEnabled ? "Ver orientação" : "Continuar",
         value: capability,
         actionType: "start_capability" as const,
         actionPayload: { capability },
-        targetStepId: finalStep.id,
+        targetStepId: capability === "qualification" && recommendationEnabled ? recommendationId : finalStep.id,
       }],
     };
   });
+  if (!recommendationEnabled) return prepared;
+  if (!prepared.some((step) => step.type === "form") && qualificationFields.length) {
+    prepared.push({
+      id: uid("step"),
+      type: "form",
+      title: qualificationObjective ? "Encontre o melhor caminho" : "Conte o que você procura",
+      description: qualificationObjective || "Responda o essencial para receber uma orientação inicial.",
+      order: Math.max(0, finalStep.order - 1),
+      isActive: true,
+      formFields: qualificationFields,
+      blocks: [{ id: uid("block"), type: "form", content: {} }],
+      options: [{
+        id: uid("option"),
+        label: "Ver orientação",
+        value: "qualification",
+        actionType: "start_capability",
+        actionPayload: { capability: "qualification" },
+        targetStepId: recommendationId,
+      }],
+    });
+  }
+  const recommendation: JourneyStep = {
+    id: recommendationId,
+    type: "recommendation",
+    title: "Uma orientação para o seu momento",
+    description: qualificationOutcome || "Use este resultado como ponto de partida para conversar com a equipe.",
+    order: Math.max(0, finalStep.order - 0.5),
+    isActive: true,
+    visualVariant: "recommendation-result",
+    recommendation: {
+      title: offerings[0] ? `${offerings[0].name} pode fazer sentido` : "Vale conversar com a equipe antes de escolher",
+      description: offerings[0]
+        ? "A resposta será ajustada ao que o visitante informar."
+        : "As respostas serão levadas para a equipe avaliar o melhor caminho.",
+      label: "Orientação inicial",
+      benefits: ["Resultado baseado nas respostas", "Confirmação final com a equipe"],
+    },
+    settings: { recommendationOfferIds: offerings.map((offering) => offering.id) },
+    options: [{
+      id: uid("option"),
+      label: finalActionLabel(completionActionContext),
+      value: "continue",
+      actionType: "go_to_step",
+      targetStepId: finalStep.id,
+    }],
+  };
+  return [...prepared, recommendation]
+    .toSorted((a, b) => a.order - b.order)
+    .map((step, order) => ({ ...step, order }));
 }
 
 export function materializeSetupAnswers(project: Project, session: AISetupSession): Project {
   const answers = session.answers;
   const quoteServices = listFromText(answerText(answers, "quote.services"));
+  const qualificationOfferings = listFromText(answerText(answers, "qualification.offerings"));
+  const offeringNames = qualificationOfferings.length ? qualificationOfferings : quoteServices;
   const quoteFields = quoteQuestions(quoteServices);
   const qualificationObjective = answerText(answers, "qualification.objective");
-  const qualificationFields = qualificationQuestions(answerText(answers, "qualification.questions"));
+  const qualificationFields = qualificationQuestions(answerText(answers, "qualification.questions"), offeringNames);
   const qualificationOutcome = answerText(answers, "qualification.outcome");
+  const qualificationDestination = answerText(answers, "qualification.destination");
   const modeAnswer = answerText(answers, "quote.mode");
   const quoteDestination = answerText(answers, "quote.destination");
   const scheduleAnswer = answerText(answers, "scheduling.services");
@@ -295,11 +450,19 @@ export function materializeSetupAnswers(project: Project, session: AISetupSessio
     routeLocation,
   );
   const currentConfig = project.commercialConfig || {};
+  const destinations = currentConfig.routingDestinations || [];
+  const selectedDestination = primaryDestination(project, qualificationDestination, destinations);
+  const nextDestinations = selectedDestination && !destinations.some((item) => item.id === selectedDestination.id)
+    ? [...destinations, selectedDestination]
+    : destinations;
+  const offerings = serviceOfferings(project, offeringNames, selectedDestination, currentConfig.serviceOfferings);
+  const recommends = recommendationJourney(project, session);
   const configuredScheduleServices = scheduleAnswer
     ? schedulingServices(project, scheduleAnswer, confirmationMode(scheduleDestination), quoteServices)
     : currentConfig.schedulableServices || [];
   const next: Project = {
     ...project,
+    description: synthesizePublicDescription({ businessName: project.name, primaryGoal: project.primaryGoal, offerings: offeringNames }),
     businessProfile: project.businessProfile ? {
       ...project.businessProfile,
       requiredVisitorData: answerText(answers, "quote.visitor")
@@ -308,6 +471,7 @@ export function materializeSetupAnswers(project: Project, session: AISetupSessio
     } : project.businessProfile,
     commercialConfig: {
       ...currentConfig,
+      serviceOfferings: offerings,
       quoteDefinition: quoteServices.length || modeAnswer || quoteDestination ? {
         id: currentConfig.quoteDefinition?.id || uid("quote-definition"),
         projectId: project.id,
@@ -322,16 +486,21 @@ export function materializeSetupAnswers(project: Project, session: AISetupSessio
       schedulableServices: configuredScheduleServices,
       availabilityRules: scheduleAvailability ? availabilityRules(project, scheduleAvailability) : currentConfig.availabilityRules,
       locations: routeLocation ? [routeLocation] : currentConfig.locations,
-      routingDestinations: routeDestinations.length ? routeDestinations : currentConfig.routingDestinations,
+      routingDestinations: [...new Map([...routeDestinations, ...nextDestinations].map((item) => [item.id, item])).values()],
     },
     steps: configureJourney(
       project,
       quoteFields,
       qualificationFields,
       qualificationObjective,
+      qualificationOutcome,
+      `${qualificationOutcome} ${project.primaryGoal} ${session.initialInput.description}`,
+      recommends,
+      offerings,
+      selectedDestination,
       configuredScheduleServices,
-    ).map((step) => step.type === "action" && qualificationOutcome
-      ? { ...step, title: "Seu próximo passo", description: qualificationOutcome }
+    ).map((step) => step.type === "welcome"
+      ? { ...step, description: synthesizePublicDescription({ businessName: project.name, primaryGoal: project.primaryGoal, offerings: offeringNames }) }
       : step),
   };
   const evaluated = evaluateCapabilityRequirements(next);

@@ -559,6 +559,8 @@ export interface JourneyRuntimeState {
   cart: CartState;
   quoteDraft?: QuoteDraft;
   recommendationKey?: string;
+  recommendationReason?: string;
+  recommendationConfidence?: "clear" | "possible" | "uncertain";
   routeResult?: RouteResult;
   idempotencyKeys?: Partial<Record<CapabilityKey, string>>;
   conversionGoalId?: string;

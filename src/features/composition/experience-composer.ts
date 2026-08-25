@@ -4,6 +4,7 @@ import { deterministicCompositionOrchestrator } from "@/features/composition/com
 import { assignProjectToCommercialConfig, defaultSlug, RuleBasedJourneyComposer } from "@/features/composition/journey-composer";
 import { defaultBrandProfile, defaultProjectSubtitle, VisualComposer } from "@/features/composition/visual-composer";
 import { uid } from "@/lib/utils";
+import { synthesizePublicDescription } from "@/features/composition/public-copy";
 import type { ExperienceCompositionInput, Project } from "@/types";
 
 /** Compatibility facade for callers and tests that require synchronous deterministic composition. */
@@ -25,7 +26,7 @@ export class RuleBasedExperienceComposer {
       workspaceId: "local-workspace",
       name: input.businessName,
       slug: defaultSlug(input),
-      description: input.businessDescription,
+      description: synthesizePublicDescription({ businessName: input.businessName, primaryGoal: input.primaryGoal }),
       subtitle: defaultProjectSubtitle(input),
       status: "draft",
       primaryGoal: input.primaryGoal,

@@ -8,6 +8,7 @@ import type { AIJourneyDraftPayload } from "@/features/composition/composition.s
 import { aiJourneyDraftSchema } from "@/features/composition/composition.schema";
 import { applyAIJourneyDraft } from "@/features/composition/apply-ai-journey-draft";
 import type { ExperienceCompositionInput, JourneyStep, Project, ProjectCapability } from "@/types";
+import { synthesizePublicDescription } from "@/features/composition/public-copy";
 
 export type AIJourneyComposer = (input: ExperienceCompositionInput, projectProfile: NonNullable<Project["businessProfile"]>, capabilities: ProjectCapability[]) => Promise<AIJourneyDraftPayload>;
 
@@ -53,7 +54,7 @@ export class CompositionOrchestrator {
       workspaceId: "local-workspace",
       name: input.businessName,
       slug: defaultSlug(input),
-      description: input.businessDescription,
+      description: synthesizePublicDescription({ businessName: input.businessName, primaryGoal: input.primaryGoal }),
       subtitle: defaultProjectSubtitle(input),
       status: "draft",
       primaryGoal: input.primaryGoal,

@@ -92,6 +92,20 @@ function personalizeSections(project: Project, sections: SuggestedSection[]) {
         sourceBindings: [...section.sourceBindings, ...services.map((service) => `commercialConfig.serviceOfferings:${service.id}`)],
       };
     }
+    if (section.sectionType === "benefits") {
+      return {
+        ...section,
+        title: "Como podemos ajudar",
+        description: "Entenda o caminho e chegue à conversa com mais clareza.",
+      };
+    }
+    if (section.sectionType === "faq") {
+      return {
+        ...section,
+        title: "Dúvidas frequentes",
+        description: "Respostas rápidas antes de você continuar.",
+      };
+    }
     if (section.sectionType === "locations") {
       return {
         ...section,
@@ -133,7 +147,7 @@ function proposedPages(project: Project, instruction = ""): SuggestedPage[] {
   };
   const pages = [home];
   if (shape.productCount > 8) pages.push({ type: "page", name: "Catálogo", purpose: "Permitir busca, filtro e seleção em um catálogo completo.", pathSuggestion: "/catalogo", conversionGoalId: primary?.id, sections: personalizeSections(project, [recommendSections(shape).find((section) => section.sectionType === "products")!, recommendSections(shape).find((section) => section.sectionType === "conversion_cta")!]) });
-  if (shape.model === "b2b" || shape.hasQualification || flags.b2b || flags.qualification) pages.push({ type: "landing", name: flags.b2b ? "Revenda" : "Fale com a equipe", purpose: "Coletar o contexto mínimo para um handoff comercial útil.", pathSuggestion: flags.b2b ? "/revenda" : "/fale-com-a-equipe", conversionGoalId: primary?.id, sections: personalizeSections(project, bindInstructionToSections(project, recommendSections({ ...shape, model: "b2b", hasCatalog: false, hasQualification: true }).filter((section) => ["hero", "benefits", "testimonials", "faq", "conversion_cta"].includes(section.sectionType)), instruction)) });
+  if (shape.model === "b2b" || shape.hasQualification || flags.b2b || flags.qualification) pages.push({ type: "landing", name: flags.b2b ? "Revenda" : "Fale com a equipe", purpose: "Entender a necessidade e preparar a continuidade do atendimento.", pathSuggestion: flags.b2b ? "/revenda" : "/fale-com-a-equipe", conversionGoalId: primary?.id, sections: personalizeSections(project, bindInstructionToSections(project, recommendSections({ ...shape, model: "b2b", hasCatalog: false, hasQualification: true }).filter((section) => ["hero", "benefits", "testimonials", "faq", "conversion_cta"].includes(section.sectionType)), instruction)) });
   if (flags.landing && !pages.some((page) => page.type === "landing")) pages.push({ type: "landing", name: "Campanha", purpose: "Concentrar uma oferta e uma única próxima ação.", pathSuggestion: "/campanha", conversionGoalId: primary?.id, sections: personalizeSections(project, bindInstructionToSections(project, recommendSections({ ...shape, hasCatalog: flags.catalog || shape.hasCatalog }).filter((section) => ["hero", "products", "services", "benefits", "testimonials", "conversion_cta"].includes(section.sectionType)), instruction)) });
   return pages;
 }
