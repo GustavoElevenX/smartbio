@@ -34,9 +34,9 @@ describe("onboarding adaptativo", () => {
 
   it("expõe prontidão e pendências sem fingir que dados ausentes foram confirmados", () => {
     const readiness = calculateSetupReadiness(requirements, { initialInput: { businessName: "Aurora", description: "Consultoria financeira personalizada.", phone: "5511999999999" } });
-    expect(readiness.readyToGenerate).toBe(true);
+    expect(readiness.readyToGenerate).toBe(false);
     expect(readiness.blocking).toBe(2);
-    expect(readiness.progress).toBe(50);
+    expect(readiness.progress).toBeLessThan(50);
   });
 
   it("mantém o projeto gerado apenas como rascunho até ele existir no banco", () => {

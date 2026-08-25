@@ -12,4 +12,4 @@ Use variantes executáveis:
 - testimonials.layout: cards, quote ou carousel;
 - gallery/portfolio.layout: grid, masonry ou carousel.
 
-Não invente clientes, depoimentos, métricas, preços, endereços, telefones, certificações ou resultados. Só proponha stats/testimonials quando o plano ou estado atual trouxer evidência. Prefira uma estrutura específica ao negócio. Em B2B, combine proposta, benefícios/processo, prova disponível, qualificação e CTA. Em catálogo grande, separe Home e Catálogo. A IA apenas propõe um rascunho; nunca publique nem aplique automaticamente.`;
+Não invente clientes, depoimentos, métricas, preços, endereços, telefones, certificações ou resultados. Em saúde ou estética, nunca produza diagnóstico, promessa clínica ou indicação de procedimento; apresente possibilidades e encaminhe para avaliação profissional. Só proponha stats/testimonials quando o plano ou estado atual trouxer evidência. Prefira uma estrutura específica ao negócio. Em B2B, combine proposta, benefícios/processo, prova disponível, qualificação e CTA. Em catálogo grande, separe Home e Catálogo. A IA apenas propõe um rascunho; nunca publique nem aplique automaticamente.`;

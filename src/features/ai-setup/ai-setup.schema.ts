@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { businessCapabilityProfileSchema } from "@/features/business-understanding/business-profile.schema";
 import { capabilityKeySchema } from "@/features/composition/composition.schema";
+import { validateSetupPhone } from "@/features/ai-setup/setup-phone";
 
 export const dataOriginSchema = z.enum(["user", "website", "document", "logo_analysis", "ai_inference", "generated_copy", "system_default"]);
 export const verificationStatusSchema = z.enum(["verified", "needs_confirmation", "missing", "invalid"]);
@@ -31,6 +32,7 @@ export const setupQuestionSchema = z.object({
   reason: z.string().trim().min(1).max(360),
   capability: capabilityKeySchema.optional(),
   priority: z.number().int().min(0).max(100),
+  suggestedAnswer: z.string().trim().min(1).max(2000).optional(),
 });
 
 export const extractedFactSchema = z.object({
@@ -134,7 +136,10 @@ export const setupInitialInputSchema = z.object({
   businessName: z.string().trim().min(2).max(160),
   description: z.string().trim().min(15).max(4000),
   websiteUrl: z.url().optional(),
-  phone: z.string().trim().max(40).optional(),
+  phone: z.string().trim().max(40).refine(
+    (value) => validateSetupPhone(value).valid,
+    "Confira o número. Use DDD + telefone.",
+  ).optional(),
   logoReference: z.string().trim().max(500).optional(),
   brandIdentity: brandIdentitySchema.optional(),
 });

@@ -26,8 +26,10 @@ const choiceQuestions: Record<string, SetupQuestion["options"]> = {
 };
 
 const descriptions: Record<string, string> = {
-  "qualification.objective": "Isso define como cada pessoa deve ser encaminhada.",
-  "qualification.questions": "Separe as perguntas por vírgulas ou linhas. Você poderá ajustá-las depois.",
+  "qualification.objective": "A Sobe inferiu este objetivo a partir do que você contou. Confirme ou ajuste.",
+  "qualification.questions": "A Sobe preparou uma primeira sequência. Você poderá ajustá-la agora ou depois.",
+  "qualification.outcome": "Este é o encaminhamento sugerido para o fim da orientação.",
+  "qualification.destination": "A Sobe usou apenas os canais reais que você informou.",
   "quote.services": "Liste apenas serviços reais que podem receber uma solicitação.",
   "scheduling.availability": "Exemplo: segunda a sexta, das 9h às 18h.",
   "catalog.items": "Informe itens reais. Preços e imagens podem ser completados depois.",
@@ -37,10 +39,10 @@ const descriptions: Record<string, string> = {
 };
 
 const humanTitles: Record<string, string> = {
-  "qualification.objective": "Antes de enviar alguém para sua equipe, o que você precisa descobrir sobre essa pessoa?",
-  "qualification.questions": "Quais perguntas ajudam você a entender o que a pessoa precisa?",
-  "qualification.outcome": "Depois das respostas, o que a Sobe deve indicar para o visitante?",
-  "qualification.destination": "Para onde a pessoa deve seguir depois de responder?",
+  "qualification.objective": "Objetivo que a Sobe entendeu",
+  "qualification.questions": "Perguntas iniciais sugeridas pela Sobe",
+  "qualification.outcome": "Encaminhamento sugerido",
+  "qualification.destination": "Como o atendimento vai continuar",
   "quote.services": "Quais serviços o cliente pode pedir orçamento por aqui?",
   "quote.mode": "Como você costuma informar o valor de um orçamento?",
   "quote.destination": "Quem deve receber o pedido de orçamento?",
@@ -73,11 +75,13 @@ export function planAdaptiveQuestions(
   requirements: DataRequirement[],
   answers: Record<string, unknown>,
   limit = 3,
+  suggestions: Record<string, string> = {},
 ): SetupQuestion[] {
   const rank = { blocking: 0, warning: 1, optional: 2 } as const;
+  const originalOrder = new Map(requirements.map((item, index) => [item.key, index]));
   return requirements
     .filter((item) => item.status !== "verified" && answers[item.key] == null)
-    .sort((a, b) => rank[a.severity] - rank[b.severity] || a.label.localeCompare(b.label, "pt-BR"))
+    .sort((a, b) => rank[a.severity] - rank[b.severity] || (originalOrder.get(a.key) || 0) - (originalOrder.get(b.key) || 0))
     .slice(0, limit)
     .map((requirement, index) => ({
       id: `question-${requirement.id}`,
@@ -90,5 +94,6 @@ export function planAdaptiveQuestions(
       reason: "Essa resposta é necessária para que a ação escolhida funcione do início ao fim.",
       capability: requirement.capability === "brand" || requirement.capability === "project" ? undefined : requirement.capability as CapabilityKey,
       priority: 100 - index,
+      suggestedAnswer: suggestions[requirement.key],
     }));
 }

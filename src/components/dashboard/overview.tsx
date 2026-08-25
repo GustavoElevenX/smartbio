@@ -100,6 +100,26 @@ export function Overview({
     [overview.totals],
   );
 
+  if (!overview.projects.length) {
+    return (
+      <div className="animate-enter pb-10">
+        <section className="relative overflow-hidden bg-[#07172f] p-7 text-white [clip-path:polygon(0_0,calc(100%_-_20px)_0,100%_20px,100%_100%,0_100%)] sm:p-12">
+          <div className="sobe-gradient-rule absolute inset-x-0 top-0" />
+          <div className="dot-grid absolute inset-0 text-white/[.045]" />
+          <div className="relative max-w-3xl">
+            <span className="inline-flex items-center gap-2 text-xs font-extrabold uppercase tracking-[.12em] text-[#02e5cd]"><Sparkles size={15} /> Seu primeiro passo</span>
+            <h1 className="mt-5 text-4xl font-extrabold tracking-[-.05em] sm:text-5xl">Crie sua primeira Sobe.</h1>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-white/70">Conte sobre o seu negócio em linguagem simples. A Sobe propõe a estrutura, as perguntas e o próximo passo para você revisar.</p>
+            <Link href="/app/onboarding" className="focus-ring mt-8 inline-flex min-h-12 items-center gap-2 bg-[#0054fc] px-5 text-sm font-extrabold text-white hover:bg-[#0186fc]">Criar minha Sobe <ArrowRight size={17} /></Link>
+          </div>
+        </section>
+        <section className="mt-6 grid border border-[#cbd3dc] bg-white sm:grid-cols-3">
+          {["Conte sobre seu negócio", "Confirme o que a Sobe entendeu", "Revise sua primeira versão"].map((label, index) => <div key={label} className={`p-5 ${index ? "border-t border-[#dfe5eb] sm:border-l sm:border-t-0" : ""}`}><span className="text-xs font-extrabold text-[#0054fc]">0{index + 1}</span><strong className="mt-2 block text-sm text-[#07172f]">{label}</strong></div>)}
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="animate-enter pb-10">
       <header className="flex flex-col gap-5 border-b border-[#01d2df]/70 pb-6 sm:flex-row sm:items-end sm:justify-between">

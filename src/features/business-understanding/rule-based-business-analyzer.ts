@@ -56,7 +56,7 @@ export class RuleBasedBusinessAnalyzer {
     const isProfessional = offerKinds.includes("professional_service");
     const isLocalService = offerKinds.includes("service");
     const schedulingSignals = matches(text, ["agenda", "agendar", "consulta", "horario", "reuniao", "aula", "visita"]);
-    const quoteSignals = matches(text, ["orcamento", "avaliacao", "sob medida", "medida", "proposta", "limpeza", "manutencao"]);
+    const quoteSignals = matches(text, ["orcamento", "cotacao", "sob medida", "medida", "proposta comercial", "limpeza", "manutencao"]);
     const multipleLocationSignals = matches(text, ["unidades", "filiais", "franquias", "multiplas unidades", "varias unidades", "mais perto", "unidade mais proxima", "canais de atendimento"]);
     const photoSignals = matches(text, ["foto", "imagem", "estofado", "avaria", "avaliacao visual"]);
 

@@ -52,6 +52,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [switchingWorkspace, setSwitchingWorkspace] = useState<string>();
   const projectId = pathname.match(/^\/app\/projects\/([^/]+)/)?.[1];
   const [projectName, setProjectName] = useState("");
+  const [hasProjects, setHasProjects] = useState(false);
   const workspaceItems = [
     { href: "/app", label: "Início", icon: LayoutDashboard, exact: true },
     {
@@ -128,6 +129,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       setActiveWorkspaceId(payload.data?.activeWorkspaceId || "");
       setWorkspaces(payload.data?.workspaces || []);
     });
+    void projectRepository.getProjects().then((projects) => setHasProjects(projects.length > 0)).catch(() => undefined);
   }, []);
   useEffect(() => {
     if (!projectId) { setProjectName(""); return; }
@@ -340,10 +342,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-2">
           <NotificationBell />
           <Link
-            href="/app/projects/new"
+            href={hasProjects ? "/app/projects/new" : "/app/onboarding"}
             className="focus-ring inline-flex min-h-10 items-center rounded-xl bg-[#0054fc] px-4 text-sm font-bold text-white shadow-[0_8px_22px_rgba(0,84,252,.2)] transition hover:bg-[#0048d9]"
           >
-            Novo negócio
+            {hasProjects ? "Novo negócio" : "Criar minha Sobe"}
           </Link>
         </div>
       </header>

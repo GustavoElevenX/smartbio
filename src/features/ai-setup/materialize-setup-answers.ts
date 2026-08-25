@@ -203,6 +203,17 @@ function quoteQuestions(services: string[]): FormField[] {
   ];
 }
 
+function qualificationQuestions(value: string): FormField[] {
+  return listFromText(value).slice(0, 6).map((label, index) => ({
+    id: uid("field"),
+    label,
+    key: `qualification_${index + 1}`,
+    type: "textarea",
+    placeholder: "Conte um pouco mais…",
+    required: true,
+  }));
+}
+
 function capabilityForStep(type: Project["steps"][number]["type"]) {
   if (type === "quote") return "quote";
   if (type === "schedule") return "scheduling";
@@ -213,7 +224,13 @@ function capabilityForStep(type: Project["steps"][number]["type"]) {
   return undefined;
 }
 
-function configureJourney(project: Project, questions: FormField[], services: SchedulableService[]) {
+function configureJourney(
+  project: Project,
+  quoteFields: FormField[],
+  qualificationFields: FormField[],
+  qualificationObjective: string,
+  services: SchedulableService[],
+) {
   const finalStep = project.steps.toSorted((a, b) => b.order - a.order).find((step) => step.type === "action");
   return project.steps.map((step) => {
     const capability = capabilityForStep(step.type);
@@ -243,7 +260,9 @@ function configureJourney(project: Project, questions: FormField[], services: Sc
     return {
       ...step,
       blocks,
-      formFields: capability === "quote" ? questions : step.formFields,
+      title: capability === "qualification" && qualificationObjective ? "Encontre o melhor caminho" : step.title,
+      description: capability === "qualification" && qualificationObjective ? qualificationObjective : step.description,
+      formFields: capability === "quote" ? quoteFields : capability === "qualification" && qualificationFields.length ? qualificationFields : step.formFields,
       options: [{
         id: step.options?.[0]?.id || uid("option"),
         label: capability === "quote" ? "Enviar solicitação" : "Continuar",
@@ -259,7 +278,10 @@ function configureJourney(project: Project, questions: FormField[], services: Sc
 export function materializeSetupAnswers(project: Project, session: AISetupSession): Project {
   const answers = session.answers;
   const quoteServices = listFromText(answerText(answers, "quote.services"));
-  const questions = quoteQuestions(quoteServices);
+  const quoteFields = quoteQuestions(quoteServices);
+  const qualificationObjective = answerText(answers, "qualification.objective");
+  const qualificationFields = qualificationQuestions(answerText(answers, "qualification.questions"));
+  const qualificationOutcome = answerText(answers, "qualification.outcome");
   const modeAnswer = answerText(answers, "quote.mode");
   const quoteDestination = answerText(answers, "quote.destination");
   const scheduleAnswer = answerText(answers, "scheduling.services");
@@ -292,7 +314,7 @@ export function materializeSetupAnswers(project: Project, session: AISetupSessio
         title: `Orçamento de ${project.name}`,
         currency: "BRL",
         estimationMode: quoteMode(modeAnswer),
-        questions,
+        questions: quoteFields,
         rules: currentConfig.quoteDefinition?.rules || [],
         completionChannel: completionChannel(quoteDestination, project),
         isActive: true,
@@ -302,7 +324,15 @@ export function materializeSetupAnswers(project: Project, session: AISetupSessio
       locations: routeLocation ? [routeLocation] : currentConfig.locations,
       routingDestinations: routeDestinations.length ? routeDestinations : currentConfig.routingDestinations,
     },
-    steps: configureJourney(project, questions, configuredScheduleServices),
+    steps: configureJourney(
+      project,
+      quoteFields,
+      qualificationFields,
+      qualificationObjective,
+      configuredScheduleServices,
+    ).map((step) => step.type === "action" && qualificationOutcome
+      ? { ...step, title: "Seu próximo passo", description: qualificationOutcome }
+      : step),
   };
   const evaluated = evaluateCapabilityRequirements(next);
   const sessionRequirements = new Map(session.missingRequirements.map((item) => [item.key, item]));

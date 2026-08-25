@@ -40,6 +40,30 @@ function unique<T>(values: T[]) {
   return [...new Set(values)];
 }
 
+function normalizedText(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+export function inferDeclaredVisitorActionKeys(value: string): VisitorActionKey[] {
+  const text = normalizedText(value);
+  const keys: VisitorActionKey[] = [];
+  const add = (key: VisitorActionKey, pattern: RegExp) => {
+    if (pattern.test(text)) keys.push(key);
+  };
+
+  add("recommendation", /(?:ajud|orient).{0,90}(?:descobrir|entender|escolher|identificar|caminho|opcao)|(?:descobrir|entender|escolher).{0,70}(?:melhor|ideal|caminho|opcao|necessidade)|recomend/);
+  add("order", /(?:fazer|receber|montar|enviar).{0,30}(?:pedido|encomenda)|pedir (?:comida|produto)/);
+  add("buy", /(?:comprar|adquirir|finalizar compra)/);
+  add("quote", /(?:pedir|solicitar|receber).{0,35}(?:orcamento|cotacao|proposta comercial)|(?:orcamento|cotacao) online/);
+  add("schedule", /(?:agendar|marcar).{0,35}(?:horario|consulta|avaliacao|visita|atendimento)|escolher (?:um )?horario/);
+  add("reserve", /(?:fazer|solicitar|consultar).{0,25}(?:reserva|disponibilidade)|reservar/);
+  add("find_location", /(?:encontrar|achar|localizar).{0,30}(?:unidade|loja|endereco)|como chegar/);
+  add("view_products", /(?:ver|conhecer|explorar).{0,30}(?:produtos|catalogo|cardapio|portfolio)/);
+  add("contact", /(?:falar|conversar|entrar em contato).{0,30}(?:equipe|especialista|atendimento)|continuar (?:no|pelo) whatsapp/);
+
+  return unique(keys);
+}
+
 export function visitorActionSemanticKey(action: VisitorActionSelection): VisitorActionKey {
   return action.key === "other" && action.semanticKey ? action.semanticKey : action.key;
 }
@@ -62,8 +86,26 @@ export function classifyCustomVisitorAction(label: string): Exclude<VisitorActio
   return rules.find(([, pattern]) => pattern.test(normalized))?.[0] || "contact";
 }
 
-export function suggestVisitorActionKeys(profile: BusinessCapabilityProfile): VisitorActionKey[] {
+export function suggestVisitorActionKeys(profile: BusinessCapabilityProfile, declaredObjective = ""): VisitorActionKey[] {
   const intents = new Set([...profile.primaryIntents, ...profile.secondaryIntents]);
+  const declared = inferDeclaredVisitorActionKeys(declaredObjective);
+  if (declared.length) {
+    const complements: Partial<Record<VisitorActionKey, VisitorActionKey[]>> = {
+      recommendation: ["contact"],
+      order: ["view_products", "contact"],
+      buy: ["view_products", "contact"],
+      view_products: ["contact"],
+      quote: ["contact"],
+      schedule: ["contact"],
+      reserve: ["contact"],
+      find_location: ["contact"],
+    };
+    return unique([
+      ...declared,
+      ...declared.flatMap((key) => complements[key] || []),
+      ...(profile.hasMultipleLocations ? ["find_location" as const] : []),
+    ]).slice(0, 5);
+  }
   const keys: VisitorActionKey[] = [];
   if (intents.has("order")) keys.push("order", "view_products");
   else if (intents.has("buy")) keys.push("buy", "view_products");
@@ -77,8 +119,8 @@ export function suggestVisitorActionKeys(profile: BusinessCapabilityProfile): Vi
   return unique(keys).slice(0, 5);
 }
 
-export function defaultVisitorActions(profile: BusinessCapabilityProfile): VisitorActionSelection[] {
-  return suggestVisitorActionKeys(profile).map((key, index) => ({
+export function defaultVisitorActions(profile: BusinessCapabilityProfile, declaredObjective = ""): VisitorActionSelection[] {
+  return suggestVisitorActionKeys(profile, declaredObjective).map((key, index) => ({
     key,
     label: byKey.get(key)?.label || "Continuar",
     isPrimary: index === 0,

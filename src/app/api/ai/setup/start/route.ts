@@ -11,7 +11,14 @@ import { recordPlatformGrowthEvent } from "@/server/platform-acquisition/platfor
 const startSchema = z.object({ input: setupInitialInputSchema, sources: z.array(sourceReferenceSchema).max(10).default([]) });
 
 export const POST = withAuthenticatedActor(async (request, _context, actor) => {
-  const rate = await consumeRateLimit("ai-setup-start", actor.userId, rateLimitRules.aiSetupStart, { failClosed: true });
+  const rate = await consumeRateLimit(
+    "ai-setup-start",
+    actor.userId,
+    actor.persistence === "memory"
+      ? { ...rateLimitRules.aiSetupStart, limit: 1_000 }
+      : rateLimitRules.aiSetupStart,
+    { failClosed: true },
+  );
   if (!rate.allowed) return applyRateLimitHeaders(apiError("Muitas tentativas. Aguarde um instante.", 429, "rate_limited"), rate);
   try {
     const payload = startSchema.parse(await request.json());

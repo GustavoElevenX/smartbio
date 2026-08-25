@@ -1,12 +1,13 @@
 import { expect, test } from "@playwright/test";
 
 test("onboarding adaptativo funciona sem login e gera um rascunho", async ({ page }) => {
+  test.setTimeout(60_000);
   await page.goto("/app/onboarding");
   await expect(page).toHaveURL(/\/app\/onboarding\/ai$/);
   await expect(page.getByRole("heading", { name: /vamos montar a sua sobe/i })).toBeVisible();
 
-  await page.getByLabel("Nome do negócio").fill("Clínica Horizonte");
-  await page.getByLabel("O que você vende e como atende?").fill("Clínica de fisioterapia que atende por horário e recebe solicitações de avaliação pelo WhatsApp.");
+  await page.getByLabel("Nome do negócio").fill("Clínica Lumina");
+  await page.getByLabel("O que você vende e como atende?").fill("Clínica de estética com limpeza de pele, Botox, preenchimento, depilação a laser e tratamentos corporais. Quero ajudar o visitante a entender qual caminho pode fazer sentido e solicitar uma avaliação pelo WhatsApp.");
   await page.getByLabel("WhatsApp ou telefone (opcional)").fill("5511999999999");
   await page.getByRole("button", { name: /analisar meu negócio/i }).click();
 
@@ -14,11 +15,19 @@ test("onboarding adaptativo funciona sem login e gera um rascunho", async ({ pag
   await expect(page.getByText("Recomendamos de 2 a 5 ações")).toBeVisible();
   await page.getByRole("button", { name: /editar informações do negócio/i }).click();
   await expect(page.getByLabel("O que você vende e como atende?")).toBeEnabled();
-  await page.getByLabel("O que você vende e como atende?").fill("Clínica de fisioterapia que atende por horário, recebe avaliações pelo WhatsApp e também vende planos de acompanhamento.");
+  await page.getByLabel("O que você vende e como atende?").fill("Clínica de estética com tratamentos faciais e corporais. Quero ajudar o visitante a entender qual caminho pode fazer sentido e solicitar uma avaliação pelo WhatsApp.");
   await page.getByRole("button", { name: /analisar novamente/i }).click();
   await expect(page.getByRole("heading", { name: /o que você quer que essa pessoa consiga fazer/i })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("Roteamento", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Continuar", exact: true }).click();
+  await expect(page.getByRole("button", { name: /criar minha primeira versão/i })).toHaveCount(0);
+  for (let index = 0; index < 4; index += 1) {
+    const suggestion = page.getByRole("button", { name: /usar assim/i }).first();
+    await expect(suggestion).toBeVisible();
+    await suggestion.click();
+    await expect(page.getByText(/salvo\. a sobe atualizou|salvo\. esta confirmação/i)).toBeVisible();
+    await page.waitForTimeout(600);
+  }
   await expect(page.getByRole("heading", { name: /pronto para montar a primeira versão/i })).toBeVisible();
   await page.getByRole("button", { name: /criar minha primeira versão/i }).click();
 
@@ -27,6 +36,24 @@ test("onboarding adaptativo funciona sem login e gera um rascunho", async ({ pag
   await expect(page.getByText(/pronto para publicar:/i)).toBeVisible();
   await page.getByRole("link", { name: "Editar página" }).click();
   await expect(page.getByTestId("site-editor-simple")).toBeVisible();
+});
+
+test("WhatsApp inválido permanece visível e mostra como corrigir", async ({ page }) => {
+  await page.goto("/app/onboarding/ai?new=1");
+  await page.getByLabel("Nome do negócio").fill("Studio Norte");
+  await page.getByLabel("O que você vende e como atende?").fill("Studio de serviços que orienta clientes e continua o atendimento pelo WhatsApp.");
+  const phone = page.getByLabel("WhatsApp ou telefone (opcional)");
+  await phone.fill("123");
+  await page.getByRole("button", { name: /analisar meu negócio/i }).click();
+
+  await expect(page.locator("#ai-phone-error")).toContainText("Confira o número. Use DDD + telefone.");
+  await expect(phone).toHaveValue("123");
+  await expect(phone).toBeEnabled();
+
+  await phone.fill("5511000000000");
+  await page.getByRole("button", { name: /analisar meu negócio/i }).click();
+  await expect(page.getByRole("heading", { name: /o que você quer que essa pessoa consiga fazer/i })).toBeVisible({ timeout: 15_000 });
+  await expect(phone).toHaveValue("+5511000000000");
 });
 
 test("orienta quando há ações demais e aceita uma ação personalizada", async ({ page }) => {

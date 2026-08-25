@@ -1,20 +1,18 @@
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Circle, CircleDot } from "lucide-react";
 import type { AISetupSession } from "@/features/ai-setup/ai-setup.schema";
+import { buildSetupProgressStages } from "@/features/ai-setup/setup-readiness";
 
 export function SetupProgress({ session }: { session?: AISetupSession | null }) {
-  const requirements = session?.missingRequirements || [];
-  const verified = requirements.filter((item) => item.status === "verified").length;
-  const base = session ? 3 : 0;
-  const total = requirements.length + 3;
-  const progress = total ? Math.round(((verified + base) / total) * 100) : 12;
+  const stages = buildSetupProgressStages(session);
   return (
-    <div>
-      <div className="flex items-center justify-between gap-3 text-xs font-bold">
-        <span className="flex items-center gap-2 text-[#4f4f58]"><CheckCircle2 size={15} className="text-[#0054fc]" /> Prontidão do rascunho</span>
-        <span className="text-[#0054fc]">{progress}%</span>
-      </div>
-      <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#e8e6ef]"><div className="h-full rounded-full bg-[#0054fc] transition-[width]" style={{ width: `${progress}%` }} /></div>
-      <p className="mt-2 text-[11px] leading-4 text-[#85848e]">O rascunho pode ser gerado agora; pendências continuam visíveis no editor e bloqueiam publicação quando necessário.</p>
+    <div className="grid gap-3">
+      {stages.map((stage) => {
+        const Icon = stage.status === "complete" ? CheckCircle2 : stage.status === "current" ? CircleDot : Circle;
+        return <div key={stage.key} className="flex items-start gap-2.5">
+          <Icon size={16} className={stage.status === "complete" ? "mt-0.5 text-[#1b9a70]" : stage.status === "current" ? "mt-0.5 text-[#0054fc]" : "mt-0.5 text-[#a6a4ae]"} />
+          <div><strong className="block text-xs text-[#4f4f58]">{stage.label}</strong><span className="mt-0.5 block text-[10px] leading-4 text-[#85848e]">{stage.detail}</span></div>
+        </div>;
+      })}
     </div>
   );
 }

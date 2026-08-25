@@ -4,6 +4,8 @@ import { randomUUID } from "node:crypto";
 import { extractedBusinessSourceSchema, type AISetupSession, type ExtractedBusinessSource, type SetupQuestion, type SourceReference } from "@/features/ai-setup/ai-setup.schema";
 import { materializeSetupAnswers } from "@/features/ai-setup/materialize-setup-answers";
 import { stageGeneratedDraft } from "@/features/ai-setup/stage-generated-draft";
+import { normalizeSetupPhone } from "@/features/ai-setup/setup-phone";
+import { buildQualificationSuggestions } from "@/features/ai-setup/qualification-proposal";
 import { applyVisitorActionsToProject, classifyCustomVisitorAction, defaultVisitorActions, ensureVisitorActionTargets, profileWithVisitorActions, type VisitorActionSelection } from "@/features/ai-setup/visitor-actions";
 import { RuleBasedBusinessAnalyzer } from "@/features/business-understanding/rule-based-business-analyzer";
 import { capabilityPlanner } from "@/features/capabilities/capability-planner";
@@ -29,6 +31,7 @@ import { suggestedSiteStructureSchema } from "@/features/site-composer/site-comp
 import { suggestSiteStructure } from "@/features/site-composer/site-structure-suggester";
 import { inferBusinessShape } from "@/features/site-composer/business-shape";
 import { uploadMedia } from "@/server/media/media-service";
+import { requireActivationPreflight } from "@/server/ai-setup/activation-preflight";
 import type { DataRequirement, ExperienceCompositionInput, Project } from "@/types";
 
 export class AISetupNotFoundError extends Error {}
@@ -36,12 +39,21 @@ export class AISetupNotFoundError extends Error {}
 function compositionInput(session: AISetupSession): ExperienceCompositionInput {
   const destinationAnswer = Object.entries(session.answers).find(([key]) => key.endsWith(".destination") || key.endsWith(".completion"))?.[1];
   const objective = session.answers["qualification.objective"];
+  const destinationText = typeof destinationAnswer === "string" ? destinationAnswer.trim() : "";
+  const normalizedDestination = destinationText.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const primaryDestination = normalizedDestination.includes("whatsapp")
+    ? "WhatsApp"
+    : normalizedDestination.includes("email") || normalizedDestination.includes("e-mail")
+      ? "E-mail"
+      : normalizedDestination.includes("telefone")
+        ? "Telefone"
+        : destinationText;
   return {
     businessName: session.initialInput.businessName,
     businessDescription: session.initialInput.description,
     primaryGoal: session.visitorActions?.find((action) => action.isPrimary)?.label || (typeof objective === "string" && objective.trim() ? objective : "Criar uma estrutura comercial"),
-    primaryDestination: typeof destinationAnswer === "string" && destinationAnswer.trim()
-      ? destinationAnswer
+    primaryDestination: primaryDestination
+      ? primaryDestination
       : session.initialInput.phone ? "WhatsApp" : session.initialInput.websiteUrl ? "Site" : "Formulário",
     slug: slugify(session.initialInput.businessName),
     phone: session.initialInput.phone,
@@ -75,6 +87,22 @@ function resolvedRequirements(requirements: DataRequirement[], answers: Record<s
     origin: "user",
     sourceId: "adaptive-onboarding",
     reason: "Informação confirmada durante o onboarding adaptativo.",
+  });
+}
+
+function plannedQuestions(
+  session: AISetupSession,
+  requirements: DataRequirement[],
+  providerQuestions?: SetupQuestion[],
+) {
+  const suggestions = buildQualificationSuggestions(session);
+  const planned = planAdaptiveQuestions(requirements, session.answers, 3, suggestions);
+  if (!providerQuestions?.length) return planned;
+  const providerByKey = new Map(providerQuestions.map((question) => [question.key, question]));
+  return planned.map((question) => {
+    const provider = providerByKey.get(question.key);
+    if (!provider || question.suggestedAnswer) return question;
+    return { ...provider, id: question.id, priority: question.priority };
   });
 }
 
@@ -151,12 +179,17 @@ export class AISetupService {
   constructor(private readonly repository: AISetupRepository = aiSetupRepository) {}
 
   async start(actor: AISetupActor, initialInput: AISetupSession["initialInput"], sources: SourceReference[] = []) {
+    await requireActivationPreflight(actor);
     const now = new Date().toISOString();
+    const normalizedInput = {
+      ...initialInput,
+      phone: normalizeSetupPhone(initialInput.phone),
+    };
     const session: AISetupSession = {
       id: randomUUID(),
       workspaceId: actor.workspaceId,
       status: "collecting",
-      initialInput,
+      initialInput: normalizedInput,
       visitorActions: [],
       actionsConfirmed: false,
       answers: {},
@@ -169,10 +202,10 @@ export class AISetupService {
     };
     const created = await this.repository.create(actor, session);
     if (actor.persistence === "database") {
-      const sourceIds = [...sources.map((source) => source.id), ...(initialInput.brandIdentity?.sourceId ? [initialInput.brandIdentity.sourceId] : [])];
+      const sourceIds = [...sources.map((source) => source.id), ...(normalizedInput.brandIdentity?.sourceId ? [normalizedInput.brandIdentity.sourceId] : [])];
       await sourceRepository.attachToSession(actor, sourceIds, created.id);
     }
-    await this.repository.addMessage(actor, created.id, "user", initialInput.description, { kind: "business_description" });
+    await this.repository.addMessage(actor, created.id, "user", normalizedInput.description, { kind: "business_description" });
     return created;
   }
 
@@ -190,11 +223,15 @@ export class AISetupService {
     let session = await this.get(actor, id);
     if (revision?.initialInput) {
       const revisedSources = revision.sources ?? session.sources;
+      const revisedInput = {
+        ...revision.initialInput,
+        phone: normalizeSetupPhone(revision.initialInput.phone),
+      };
       session = await this.repository.update(actor, {
         ...session,
         projectId: undefined,
         status: "analyzing",
-        initialInput: revision.initialInput,
+        initialInput: revisedInput,
         extractedProfile: undefined,
         visitorActions: [],
         actionsConfirmed: false,
@@ -209,11 +246,11 @@ export class AISetupService {
       if (actor.persistence === "database") {
         const sourceIds = [
           ...revisedSources.map((source) => source.id),
-          ...(revision.initialInput.brandIdentity?.sourceId ? [revision.initialInput.brandIdentity.sourceId] : []),
+          ...(revisedInput.brandIdentity?.sourceId ? [revisedInput.brandIdentity.sourceId] : []),
         ];
         await sourceRepository.attachToSession(actor, sourceIds, session.id);
       }
-      await this.repository.addMessage(actor, id, "user", revision.initialInput.description, { kind: "business_description_revision" });
+      await this.repository.addMessage(actor, id, "user", revisedInput.description, { kind: "business_description_revision" });
     } else {
       session = await this.repository.update(actor, { ...session, status: "analyzing", lastError: undefined });
     }
@@ -268,14 +305,19 @@ export class AISetupService {
     }
     const validKeys = new Set(requirements.filter((item) => item.status !== "verified").map((item) => item.key));
     const questions = providerQuestions?.filter((item) => validKeys.has(item.key)).slice(0, 3);
+    const questionSession = {
+      ...session,
+      extractedProfile: profile,
+      visitorActions: session.visitorActions?.length ? session.visitorActions : defaultVisitorActions(profile, session.initialInput.description),
+    };
     const next = await this.repository.update(actor, {
       ...session,
       status: "waiting_answers",
       extractedProfile: profile,
-      visitorActions: session.visitorActions?.length ? session.visitorActions : defaultVisitorActions(profile),
+      visitorActions: questionSession.visitorActions,
       actionsConfirmed: session.actionsConfirmed || false,
       missingRequirements: requirements,
-      questions: questions?.length ? questions.slice(0, 3) : planAdaptiveQuestions(requirements, session.answers, 3),
+      questions: plannedQuestions(questionSession, requirements, questions),
       usedFallback,
     });
     await this.repository.addMessage(actor, id, "assistant", "Analisei o negócio e destaquei as ações mais importantes. Confirme-as antes de continuarmos.", { kind: "analysis", usedFallback });
@@ -317,7 +359,7 @@ export class AISetupService {
       visitorActions: classifiedActions,
       actionsConfirmed: true,
       missingRequirements: requirements,
-      questions: planAdaptiveQuestions(requirements, session.answers, 3),
+      questions: plannedQuestions({ ...session, extractedProfile: profile, visitorActions: classifiedActions }, requirements),
       status: "waiting_answers",
     });
     await this.repository.addMessage(actor, id, "user", classifiedActions.map((action) => action.label).join(", "), { kind: "visitor_actions" });
@@ -334,7 +376,7 @@ export class AISetupService {
       status: "waiting_answers",
       answers,
       missingRequirements: requirements,
-      questions: planAdaptiveQuestions(requirements, answers, 3),
+      questions: plannedQuestions({ ...session, answers }, requirements),
     });
     await this.repository.addMessage(actor, id, "user", typeof value === "string" ? value : JSON.stringify(value), { kind: "answer", key });
     if (actor.persistence === "database") {
@@ -346,11 +388,12 @@ export class AISetupService {
 
   async generate(actor: AISetupActor, id: string) {
     let session = await this.get(actor, id);
+    await requireActivationPreflight(actor);
     if (!session.extractedProfile) session = await this.analyze(actor, id);
     session = await this.repository.update(actor, { ...session, status: "generating", lastError: undefined });
     const input = compositionInput(session);
     const baseProfile = session.extractedProfile || new RuleBasedBusinessAnalyzer().analyze(input);
-    const selectedActions = session.visitorActions?.length ? session.visitorActions : defaultVisitorActions(baseProfile);
+    const selectedActions = session.visitorActions?.length ? session.visitorActions : defaultVisitorActions(baseProfile, session.initialInput.description);
     const profile = profileWithVisitorActions(baseProfile, selectedActions);
     const selectedCapabilities = capabilityPlanner.planForVisitorActions(profile, selectedActions);
     const aiJourney = isAIConfigured() ? async () => getAIProvider().composeJourney({

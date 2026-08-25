@@ -13,7 +13,7 @@ export function SetupRequirements({ requirements }: { requirements: DataRequirem
           <div className="min-w-0"><strong className="block truncate text-xs text-[#484850]">{item.label}</strong><span className="text-[10px] text-[#8b8994]">{verified ? "Confirmado" : item.severity === "blocking" ? "Falta informar" : "Pode completar depois"}</span></div>
         </div>;
       })}
-      {requirements.length > 6 ? <p className="text-center text-[11px] font-semibold text-[#777581]">+ {requirements.length - 6} informações adicionais</p> : null}
+      {requirements.length > 6 ? <p className="text-center text-[11px] font-semibold text-[#777581]">Mais {requirements.length - 6} itens para revisar depois</p> : null}
     </div>
   );
 }
