@@ -1,4 +1,5 @@
 import type { AISetupSession } from "@/features/ai-setup/ai-setup.schema";
+import type { StructuredJourneyQuestion } from "@/types";
 
 function normalize(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -8,6 +9,7 @@ function isHealthRelated(session: Pick<AISetupSession, "initialInput" | "extract
   const text = normalize(
     `${session.initialInput.businessName} ${session.initialInput.description} ${(session.extractedProfile?.offerKinds || []).join(" ")}`,
   );
+  if (/automot|veicul|carro|pintura|farol|oficina/.test(text)) return false;
   return /clinica|saude|medic|odont|fisioter|terapia|nutri|psicolog|estetic|procedimento|botox|preenchimento/.test(text);
 }
 
@@ -49,4 +51,39 @@ export function buildQualificationSuggestions(
     "qualification.outcome": outcome,
     "qualification.destination": destination,
   } satisfies Record<string, string>;
+}
+
+export function buildQualificationQuestionPlan(
+  session: Pick<AISetupSession, "initialInput" | "extractedProfile" | "visitorActions">,
+): StructuredJourneyQuestion[] {
+  const healthRelated = isHealthRelated(session);
+  return [
+    {
+      id: "qualification-need",
+      question: healthRelated
+        ? "O que você gostaria de melhorar ou entender?"
+        : "O que você mais gostaria de resolver neste momento?",
+      type: "textarea",
+      purpose: "need",
+      required: true,
+    },
+    {
+      id: "qualification-signal",
+      question: healthRelated
+        ? "Qual é o seu principal objetivo com uma avaliação profissional?"
+        : "Que resultado seria mais importante para você?",
+      type: "textarea",
+      purpose: "signal",
+      required: true,
+    },
+    {
+      id: "qualification-context",
+      question: healthRelated
+        ? "Existe algum contexto importante para a equipe considerar na avaliação?"
+        : "Existe algum detalhe ou restrição importante para essa escolha?",
+      type: "textarea",
+      purpose: healthRelated ? "context" : "constraint",
+      required: false,
+    },
+  ];
 }

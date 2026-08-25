@@ -5,7 +5,7 @@ import { extractedBusinessSourceSchema, setupDraftInputSchema, setupInitialInput
 import { materializeSetupAnswers } from "@/features/ai-setup/materialize-setup-answers";
 import { stageGeneratedDraft } from "@/features/ai-setup/stage-generated-draft";
 import { normalizeSetupPhone } from "@/features/ai-setup/setup-phone";
-import { buildQualificationSuggestions } from "@/features/ai-setup/qualification-proposal";
+import { buildQualificationQuestionPlan, buildQualificationSuggestions } from "@/features/ai-setup/qualification-proposal";
 import { applyVisitorActionsToProject, classifyCustomVisitorAction, defaultVisitorActions, ensureVisitorActionTargets, profileWithVisitorActions, type VisitorActionSelection } from "@/features/ai-setup/visitor-actions";
 import { RuleBasedBusinessAnalyzer } from "@/features/business-understanding/rule-based-business-analyzer";
 import { capabilityPlanner } from "@/features/capabilities/capability-planner";
@@ -119,7 +119,9 @@ function plannedQuestions(
   providerQuestions?: SetupQuestion[],
 ) {
   const suggestions = buildQualificationSuggestions(session);
-  const planned = planAdaptiveQuestions(requirements, session.answers, 3, suggestions);
+  const planned = planAdaptiveQuestions(requirements, session.answers, 3, suggestions, {
+    "qualification.questions": buildQualificationQuestionPlan(session),
+  });
   if (!providerQuestions?.length) return planned;
   const providerByKey = new Map(providerQuestions.map((question) => [question.key, question]));
   return planned.map((question) => {

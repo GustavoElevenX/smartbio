@@ -3,6 +3,15 @@ import { businessCapabilityProfileSchema } from "@/features/business-understandi
 import { capabilityKeySchema } from "@/features/composition/composition.schema";
 import { validateSetupPhone } from "@/features/ai-setup/setup-phone";
 
+export const structuredJourneyQuestionSchema = z.object({
+  id: z.string().trim().min(1).max(120),
+  question: z.string().trim().min(1).max(240),
+  type: z.enum(["text", "textarea", "select", "radio", "checkbox"]),
+  options: z.array(z.string().trim().min(1).max(160)).max(10).optional(),
+  purpose: z.enum(["need", "signal", "context", "constraint", "explicit_choice"]),
+  required: z.boolean(),
+});
+
 export const dataOriginSchema = z.enum(["user", "website", "document", "logo_analysis", "ai_inference", "generated_copy", "system_default"]);
 export const verificationStatusSchema = z.enum(["verified", "needs_confirmation", "missing", "invalid"]);
 
@@ -33,6 +42,7 @@ export const setupQuestionSchema = z.object({
   capability: capabilityKeySchema.optional(),
   priority: z.number().int().min(0).max(100),
   suggestedAnswer: z.string().trim().min(1).max(2000).optional(),
+  structuredAnswer: z.array(structuredJourneyQuestionSchema).min(1).max(6).optional(),
 });
 
 export const extractedFactSchema = z.object({

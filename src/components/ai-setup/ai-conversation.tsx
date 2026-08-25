@@ -5,7 +5,7 @@ import { AdaptiveQuestion } from "@/components/ai-setup/adaptive-question";
 import { AIMessage } from "@/components/ai-setup/ai-message";
 import { BrandIdentityUploader } from "@/components/ai-setup/brand-identity-uploader";
 import { ConfirmExtractedData } from "@/components/ai-setup/confirm-extracted-data";
-import { GenerationStatus } from "@/components/ai-setup/generation-status";
+import { GenerationStatus, type GenerationPhase } from "@/components/ai-setup/generation-status";
 import { SourceUploader } from "@/components/ai-setup/source-uploader";
 import { VisitorActionSelector } from "@/components/ai-setup/visitor-action-selector";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,7 @@ interface AIConversationProps {
   sessionReady: boolean;
   busy: boolean;
   busyQuestion?: string;
-  generationStatus: "idle" | "generating" | "ready";
+  generationStatus: GenerationPhase;
   projectId?: string;
   error?: string;
   phoneError?: string;
@@ -43,7 +43,7 @@ interface AIConversationProps {
   onBrandIdentityChange: (brand: BrandIdentity, previewUrl: string) => void;
   onAnalyze: () => Promise<void>;
   onEditBusinessInfo: () => void;
-  onAnswer: (key: string, value: string) => Promise<void>;
+  onAnswer: (key: string, value: unknown) => Promise<void>;
   onConfirmActions: (actions: VisitorActionSelection[]) => Promise<void>;
   onGenerate: () => Promise<void>;
   onOpenLaunch: () => void;
@@ -95,7 +95,7 @@ export function AIConversation({ form, sources, brandIdentity, logoPreviewUrl, s
 
           {answerFeedback ? <div aria-live="polite" className="border border-[#b9e4cf] bg-[#f0fbf6] p-3 text-sm font-semibold text-[#25684f]">✓ {answerFeedback}</div> : null}
 
-          {analyzed && !editingBusinessInfo && session?.actionsConfirmed && !ready && readiness.readyToGenerate ? <div className="border border-[#c8d9ea] bg-[#f7fbff] p-5" style={{ clipPath: "polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%)" }}><h2 className="text-lg font-extrabold tracking-[-.025em]">Pronto para montar a primeira versão?</h2><p className="mt-2 text-sm leading-6 text-[#687582]">A Sobe vai criar a página, conectar cada ação e manter tudo como rascunho até você publicar.</p><Button type="button" size="lg" className="mt-4" onClick={() => void onGenerate()} disabled={!sessionReady || busy || generationStatus === "generating"}><WandSparkles data-icon size={17} /> Criar minha primeira versão</Button></div> : analyzed && !editingBusinessInfo && session?.actionsConfirmed && !ready ? <div className="border border-[#e1dfe8] bg-[#fafafa] p-5"><h2 className="text-lg font-extrabold tracking-[-.025em]">Ainda faltam informações necessárias</h2><p className="mt-2 text-sm leading-6 text-[#687582]">Confirme os itens acima para a Sobe conseguir criar uma primeira versão funcional.</p><a href="#adaptive-questions" className="focus-ring mt-4 inline-flex min-h-11 items-center gap-2 border border-[#c8d9ea] bg-white px-4 text-sm font-extrabold text-[#0054fc]">Continuar configuração <ArrowRight size={16} /></a></div> : null}
+          {analyzed && !editingBusinessInfo && session?.actionsConfirmed && !ready && readiness.readyToGenerate ? <div className="border border-[#c8d9ea] bg-[#f7fbff] p-5" style={{ clipPath: "polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%)" }}><h2 className="text-lg font-extrabold tracking-[-.025em]">Pronto para montar a primeira versão?</h2><p className="mt-2 text-sm leading-6 text-[#687582]">A Sobe vai criar a página, conectar cada ação e manter tudo como rascunho até você publicar.</p><Button type="button" size="lg" className="mt-4" onClick={() => void onGenerate()} disabled={!sessionReady || busy || !["idle", "ready"].includes(generationStatus)}><WandSparkles data-icon size={17} /> Criar minha primeira versão</Button></div> : analyzed && !editingBusinessInfo && session?.actionsConfirmed && !ready ? <div className="border border-[#e1dfe8] bg-[#fafafa] p-5"><h2 className="text-lg font-extrabold tracking-[-.025em]">Ainda faltam informações necessárias</h2><p className="mt-2 text-sm leading-6 text-[#687582]">Confirme os itens acima para a Sobe conseguir criar uma primeira versão funcional.</p><a href="#adaptive-questions" className="focus-ring mt-4 inline-flex min-h-11 items-center gap-2 border border-[#c8d9ea] bg-white px-4 text-sm font-extrabold text-[#0054fc]">Continuar configuração <ArrowRight size={16} /></a></div> : null}
 
           <GenerationStatus status={generationStatus} />
           {ready && projectId ? <div className="border border-[#b9e4cf] bg-[#f0fbf6] p-6" style={{ clipPath: "polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%)" }}><h2 className="text-2xl font-extrabold tracking-[-.035em]">Sua primeira versão está pronta.</h2><p className="mt-2 text-sm leading-6 text-[#526b61]">Teste como visitante, veja as pendências e publique quando estiver tudo certo.</p><Button type="button" size="lg" className="mt-5" onClick={onOpenLaunch}>Revisar primeira versão <ArrowRight data-icon size={17} /></Button></div> : null}

@@ -83,6 +83,12 @@ function hasCapability(project: Project, key: CapabilityKey) {
   return Boolean(project.capabilities?.some((item) => item.key === key && item.enabled));
 }
 
+function normalizedRequirementKey(item: DataRequirement) {
+  const key = item.key.toLocaleLowerCase("pt-BR");
+  if (key.includes("whatsapp") || key.includes(".phone") || key === "project.phone") return "contact.whatsapp";
+  return item.key;
+}
+
 export function getProjectReadiness(project: Project): ProjectReadinessResult {
   const issues: DataRequirement[] = [];
   const dataPath = `/app/projects/${project.id}/data`;
@@ -214,7 +220,10 @@ export function getProjectReadiness(project: Project): ProjectReadinessResult {
     ...getPresenceReadinessIssues(project),
     ...issues,
   ];
-  const unique = [...new Map(all.map((item) => [item.key, item])).values()];
+  const unique = [...new Map(all.map((item) => {
+    const key = normalizedRequirementKey(item);
+    return [key, key === item.key ? item : { ...item, id: `${project.id}:${key}`, key }];
+  })).values()];
   const unresolved = unique.filter((item) => item.status !== "verified");
   const blocking = unresolved.filter((item) => item.severity === "blocking");
   const warnings = unresolved.filter((item) => item.severity === "warning");

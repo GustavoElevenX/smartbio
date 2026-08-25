@@ -1,7 +1,13 @@
 import { isRecommendationIntent } from "@/features/composition/public-copy";
+import {
+  hasPublicCopyLeak,
+  isCircularOfferSelector,
+  journeyModeForProject,
+  questionQualityIssues,
+} from "@/features/qualification/recommendation-semantics";
 import type { JourneyStep, Project, RoutingDestination, StepOption } from "@/types";
 
-export type ConversionPathCheckKey = "entry" | "questions" | "result" | "destination";
+export type ConversionPathCheckKey = "entry" | "questions" | "circularity" | "result" | "result_quality" | "public_copy" | "destination";
 
 export interface ConversionPathCheck {
   key: ConversionPathCheckKey;
@@ -50,7 +56,8 @@ export function validateConversionPath(project: Project): ConversionPathValidati
   const active = project.steps.filter((step) => step.isActive);
   const primaryGoal = project.conversionGoals?.find((goal) => goal.isPrimary && goal.isActive)
     || project.conversionGoals?.find((goal) => goal.isActive);
-  const recommendation = isRecommendationIntent(`${project.primaryGoal} ${primaryGoal?.name || ""} ${primaryGoal?.description || ""}`);
+  const journeyMode = journeyModeForProject(project);
+  const recommendation = journeyMode === "assisted_discovery" || isRecommendationIntent(`${project.primaryGoal} ${primaryGoal?.name || ""} ${primaryGoal?.description || ""}`);
   if (!recommendation) {
     const complete = active.some((step) => reachesTerminal(project, step));
     return {
@@ -62,13 +69,35 @@ export function validateConversionPath(project: Project): ConversionPathValidati
 
   const form = active.find((step) => step.type === "form" && Boolean(step.formFields?.length));
   const result = active.find((step) => step.type === "recommendation" && Boolean(step.recommendation));
+  const offerings = project.commercialConfig?.serviceOfferings?.filter((offering) => offering.isActive) || [];
   const goalTarget = primaryGoal ? active.find((step) => step.id === primaryGoal.targetStepId) : undefined;
   const entryValid = Boolean(form && (!goalTarget || goalTarget.id === form.id || goalTarget.type === "choice" || goalTarget.type === "welcome"));
   const destinationValid = Boolean(result && reachesTerminal(project, result));
+  const fields = form?.formFields || [];
+  const invalidQuestions = fields.filter((field) => questionQualityIssues({
+    question: field.label,
+    type: ["select", "radio", "checkbox"].includes(field.type) ? field.type as "select" | "radio" | "checkbox" : "textarea",
+    options: field.options,
+    purpose: field.purpose || "signal",
+  }).length);
+  const circular = fields.some((field) => isCircularOfferSelector(field, offerings));
+  const usefulQuestions = fields.some((field) => ["need", "signal", "context", "constraint"].includes(field.purpose || "signal"));
+  const configuredOfferIds = Array.isArray(result?.settings?.recommendationOfferIds)
+    ? result.settings.recommendationOfferIds.filter((id): id is string => typeof id === "string")
+    : [];
+  const realResult = Boolean(result && configuredOfferIds.length && configuredOfferIds.some((id) => offerings.some((offering) => offering.id === id)));
+  const resultQuality = realResult && offerings.some((offering) => {
+    const signals = offering.settings?.recommendationSignals;
+    return Boolean(offering.shortDescription || offering.description || (Array.isArray(signals) && signals.length));
+  });
+  const publicCopySafe = !hasPublicCopyLeak(project);
   const checks: ConversionPathCheck[] = [
     { key: "entry", valid: entryValid, label: "Entrada da orientação", reason: entryValid ? "A ação principal inicia a orientação." : "A ação principal não inicia uma etapa de orientação válida." },
-    { key: "questions", valid: Boolean(form?.formFields?.length), label: "Perguntas da orientação", reason: form?.formFields?.length ? "Existem perguntas para entender a necessidade." : "Adicione as perguntas necessárias para produzir o resultado." },
-    { key: "result", valid: Boolean(result), label: "Resultado da orientação", reason: result ? "A jornada apresenta um resultado compreensível." : "A jornada promete orientar, mas não apresenta um resultado." },
+    { key: "questions", valid: fields.length > 0 && !invalidQuestions.length && usefulQuestions, label: "Perguntas da orientação", reason: fields.length > 0 && !invalidQuestions.length && usefulQuestions ? "As perguntas chegam como unidades completas e coletam sinais úteis." : "Revise perguntas fragmentadas, ambíguas ou que não ajudam a diferenciar as opções." },
+    { key: "circularity", valid: !circular, label: "Descoberta sem escolha circular", reason: circular ? "A orientação pede que o visitante escolha diretamente a mesma oferta que deveria ser inferida." : "A orientação parte da necessidade antes de apresentar uma opção." },
+    { key: "result", valid: realResult, label: "Resultado da orientação", reason: realResult ? "A jornada apresenta uma oferta real como resultado." : "A jornada promete orientar, mas não possui uma oferta real configurada como resultado." },
+    { key: "result_quality", valid: resultQuality, label: "Explicação da orientação", reason: resultQuality ? "As ofertas possuem sinais ou descrições suficientes para explicar o resultado." : "Adicione sinais ou descrições sustentadas pelos dados do negócio para diferenciar o resultado." },
+    { key: "public_copy", valid: publicCopySafe, label: "Texto público da orientação", reason: publicCopySafe ? "O texto público está separado das instruções internas." : "Uma instrução interna apareceu em título, pergunta, explicação ou botão visível ao visitante." },
     { key: "destination", valid: destinationValid, label: "Próxima ação da orientação", reason: destinationValid ? "O resultado conduz a uma próxima ação funcional." : "O resultado ainda não possui uma próxima ação funcional." },
   ];
   return { kind: "recommendation", complete: checks.every((check) => check.valid), checks };

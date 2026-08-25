@@ -31,6 +31,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { BlockRendererView } from "@/components/public-experience/blocks/block-renderers";
 import { qualifyLead } from "@/features/qualification/qualification-engine";
 import { recommendService } from "@/features/qualification/recommendation-engine";
+import { journeyModeForProject } from "@/features/qualification/recommendation-semantics";
 import { calculateReservationTotal } from "@/features/reservations/reservation-engine";
 import { resolveRoute } from "@/features/routing/routing-engine";
 import {
@@ -413,9 +414,10 @@ export function ExperienceCanvas({
     activeSteps.findIndex((item) => item.id === step?.id),
   );
   const palette = project.designSystem.colors;
+  const journeyMode = journeyModeForProject(project);
   const serviceRecommendation = useMemo(
-    () => recommendService(runtime.answers, project.commercialConfig?.serviceOfferings || []),
-    [project.commercialConfig?.serviceOfferings, runtime.answers],
+    () => recommendService(runtime.answers, project.commercialConfig?.serviceOfferings || [], { journeyMode }),
+    [journeyMode, project.commercialConfig?.serviceOfferings, runtime.answers],
   );
   const selectedRecommendation = project.commercialConfig?.serviceOfferings?.find(
     (offering) => offering.id === runtime.recommendationKey || offering.slug === runtime.recommendationKey,
@@ -1047,6 +1049,7 @@ export function ExperienceCanvas({
       const recommendation = recommendService(
         runtime.answers,
         project.commercialConfig?.serviceOfferings || [],
+        { journeyMode },
       );
       setRuntime((current) => ({
         ...current,

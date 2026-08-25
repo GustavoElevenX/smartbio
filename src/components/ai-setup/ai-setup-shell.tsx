@@ -16,6 +16,7 @@ import {
   AIConversation,
   type InitialSetupForm,
 } from "@/components/ai-setup/ai-conversation";
+import type { GenerationPhase } from "@/components/ai-setup/generation-status";
 import { Button } from "@/components/ui/button";
 import {
   aiSetupSessionSchema,
@@ -121,9 +122,7 @@ export function AISetupShell({
   const [busy, setBusy] = useState(false);
   const [busyQuestion, setBusyQuestion] = useState<string>();
   const [error, setError] = useState("");
-  const [generationStatus, setGenerationStatus] = useState<
-    "idle" | "generating" | "ready"
-  >("idle");
+  const [generationStatus, setGenerationStatus] = useState<GenerationPhase>("idle");
   const [projectId, setProjectId] = useState<string>();
   const [mobilePanel, setMobilePanel] = useState<"conversation" | "preview">(
     "conversation",
@@ -212,7 +211,7 @@ export function AISetupShell({
       if (startFresh) {
         forgetAISetupSession();
         await createInitialSession("new");
-        if (active) router.replace("/app/onboarding/ai");
+        if (active) window.history.replaceState(null, "", "/app/onboarding/ai");
         return;
       }
 
@@ -437,7 +436,7 @@ export function AISetupShell({
     }
   }
 
-  async function answer(key: string, value: string) {
+  async function answer(key: string, value: unknown) {
     if (!ensureActiveSession()) return;
     setBusyQuestion(key);
     setLifecycle("saving");
@@ -514,6 +513,7 @@ export function AISetupShell({
     setBusy(true);
     setLifecycle("generating");
     setError("");
+    setGenerationStatus("checking");
     try {
       const latestPreflight = await apiCall<ActivationPreflight>(
         "/api/ai/setup/preflight",
@@ -524,7 +524,7 @@ export function AISetupShell({
           latestPreflight.blockedReason ||
             "Não é possível criar uma nova versão agora.",
         );
-      setGenerationStatus("generating");
+      setGenerationStatus("composing");
       const generatedSession = await apiCall<AISetupSession>(
         `/api/ai/setup/${session!.id}/generate`,
         { method: "POST", body: "{}" },
@@ -532,7 +532,9 @@ export function AISetupShell({
       const project = generatedSession.projectDraft as Project | undefined;
       if (!project)
         throw new Error("A geração terminou sem criar um rascunho.");
+      setGenerationStatus("saving");
       const saved = await projectRepository.saveProject(project);
+      setGenerationStatus("finalizing");
       const finalized = await apiCall<{ session: AISetupSession }>(
         `/api/ai/setup/${session!.id}/finalize-project`,
         {

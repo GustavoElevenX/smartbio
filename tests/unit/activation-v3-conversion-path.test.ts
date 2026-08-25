@@ -78,6 +78,7 @@ describe("Activation V3 — experiência gerada até a próxima ação", () => {
       description: "Escritório de interiores. O visitante deve descobrir qual serviço faz sentido e depois solicitar uma avaliação inicial.",
       offerings: "Consultoria de interiores; Projeto de um ambiente; Projeto completo de apartamento ou casa; Projeto para espaços comerciais; Acompanhamento de execução",
       choice: "Projeto de um ambiente",
+      signal: "Quero renovar um ambiente da casa e preciso de orientação para esse espaço.",
       expectedCta: "Solicitar avaliação inicial",
     },
     {
@@ -85,22 +86,25 @@ describe("Activation V3 — experiência gerada até a próxima ação", () => {
       description: "Escola de idiomas. A pessoa deve descobrir qual modalidade faz sentido e depois marcar uma conversa.",
       offerings: "Inglês para iniciantes; Conversação; Inglês para viagens; Inglês para negócios; Preparação para entrevistas",
       choice: "Inglês para negócios",
+      signal: "Preciso usar inglês no trabalho, em reuniões e apresentações para empresas.",
       expectedCta: "Marcar uma conversa",
     },
-  ])("materializa perguntas, oferta real, explicação e WhatsApp para $name", ({ name, description, offerings, choice, expectedCta }) => {
+  ])("materializa perguntas, oferta real, explicação e WhatsApp para $name", ({ name, description, offerings, choice, signal, expectedCta }) => {
     const project = recommendationProject({ name, description, offerings, phone: "5511987654321" });
     const form = project.steps.find((step) => step.type === "form");
     const result = project.steps.find((step) => step.type === "recommendation");
     const action = project.steps.find((step) => step.type === "action");
     const recommendation = recommendService(
-      { qualification_preference: choice, qualification_1: "Quero apoio completo" },
+      { qualification_1: signal },
       project.commercialConfig?.serviceOfferings || [],
+      { journeyMode: "assisted_discovery" },
     );
 
-    expect(form?.formFields?.[0]).toMatchObject({ type: "select", options: expect.arrayContaining([choice]) });
+    expect(form?.formFields?.[0]).toMatchObject({ type: "textarea", purpose: "need" });
+    expect(form?.formFields?.some((field) => field.options?.includes(choice))).toBe(false);
     expect(form?.options?.[0].targetStepId).toBe(result?.id);
     expect(recommendation.service?.name).toBe(choice);
-    expect(recommendation.reason).not.toBe("");
+    expect(recommendation.reason).toContain(signal.replace(/[.!?]+$/g, ""));
     expect(result?.options?.[0].targetStepId).toBe(action?.id);
     expect(action?.options?.[0]).toMatchObject({ actionType: "open_whatsapp", actionPayload: { phone: "5511987654321" } });
     expect(action?.options?.[0].label).toBe(expectedCta);

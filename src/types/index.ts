@@ -103,6 +103,24 @@ export type CapacityKind =
 
 export type CompletionChannel = "native" | "whatsapp" | "external_url" | "email" | "phone";
 
+export type JourneyMode = "explicit_choice" | "assisted_discovery";
+
+export type JourneyQuestionPurpose =
+  | "need"
+  | "signal"
+  | "context"
+  | "constraint"
+  | "explicit_choice";
+
+export interface StructuredJourneyQuestion {
+  id: string;
+  question: string;
+  type: "text" | "textarea" | "select" | "radio" | "checkbox";
+  options?: string[];
+  purpose: JourneyQuestionPurpose;
+  required: boolean;
+}
+
 export type DataOrigin =
   | "user"
   | "website"
@@ -735,6 +753,7 @@ export interface FormField {
   options?: string[];
   includeInHandoff?: boolean;
   handoffLabel?: string;
+  purpose?: JourneyQuestionPurpose;
 }
 
 export interface ContentBlock {

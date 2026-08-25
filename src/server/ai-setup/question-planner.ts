@@ -78,6 +78,7 @@ export function planAdaptiveQuestions(
   answers: Record<string, unknown>,
   limit = 3,
   suggestions: Record<string, string> = {},
+  structuredSuggestions: Record<string, SetupQuestion["structuredAnswer"]> = {},
 ): SetupQuestion[] {
   const rank = { blocking: 0, warning: 1, optional: 2 } as const;
   const originalOrder = new Map(requirements.map((item, index) => [item.key, index]));
@@ -97,5 +98,6 @@ export function planAdaptiveQuestions(
       capability: requirement.capability === "brand" || requirement.capability === "project" ? undefined : requirement.capability as CapabilityKey,
       priority: 100 - index,
       suggestedAnswer: suggestions[requirement.key],
+      structuredAnswer: structuredSuggestions[requirement.key],
     }));
 }
