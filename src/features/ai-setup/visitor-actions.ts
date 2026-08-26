@@ -211,7 +211,7 @@ const destinationLabels: Record<VisitorActionKey, string> = {
 };
 
 function optionHasRealDestination(option: NonNullable<JourneyStep["options"]>[number]) {
-  if (option.actionType === "submit_form" || option.actionType === "finish") return true;
+  if (option.actionType === "submit_form" || option.actionType === "capture_lead" || option.actionType === "finish") return true;
   if (option.actionType === "open_whatsapp") return Boolean(option.actionPayload?.phone);
   if (option.actionType === "open_url") return /^https?:\/\//i.test(String(option.actionPayload?.url || ""));
   return false;
@@ -323,7 +323,7 @@ function scaffoldStep(project: Project, action: VisitorActionSelection, order: n
       id: `${project.id}-option-${action.key}`,
       label: type === "form" || type === "quote" ? "Enviar" : "Continuar",
       value: action.key,
-      actionType: capability ? "start_capability" : "submit_form",
+      actionType: capability ? "start_capability" : "capture_lead",
       actionPayload: capability ? { capability } : undefined,
     }],
   };

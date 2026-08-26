@@ -57,7 +57,7 @@ function isHttpUrl(value?: string) {
 
 function hasDestination(project: Project) {
   return project.steps.some((step) => step.options?.some((option) => {
-    if (option.actionType === "submit_form" || option.actionType === "finish") return true;
+    if (option.actionType === "submit_form" || option.actionType === "capture_lead" || option.actionType === "finish") return true;
     if (option.actionType === "open_whatsapp") {
       const configured = project.commercialConfig?.routingDestinations?.find((destination) => destination.id === option.actionPayload?.destinationId && destination.type === "whatsapp");
       return Boolean(configured?.value || option.actionPayload?.phone || project.phone);

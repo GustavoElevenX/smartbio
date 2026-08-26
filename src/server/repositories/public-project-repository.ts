@@ -455,6 +455,10 @@ export function projectFromNormalizedRow(
           ? String((item.settings as Record<string, unknown>).message || "") ||
             undefined
           : undefined,
+      isDefault: item.settings && typeof item.settings === "object" ? (item.settings as Record<string, unknown>).isDefault === true : false,
+      role: item.settings && typeof item.settings === "object" && ["general_contact", "intent_contact", "location_contact"].includes(String((item.settings as Record<string, unknown>).role || ""))
+        ? String((item.settings as Record<string, unknown>).role) as "general_contact" | "intent_contact" | "location_contact"
+        : undefined,
     })),
     routingRules: records("routing_rules").map((item) => ({
       id: String(item.id),

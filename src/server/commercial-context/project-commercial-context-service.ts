@@ -13,6 +13,7 @@ import {
   reconcileOperationalProjectContext,
 } from "@/features/commercial-context/project-commercial-context";
 import type { Project } from "@/types";
+import { validateCommercialRuntimeConsistency } from "@/features/commercial-context/commercial-runtime-consistency";
 import { assertProjectAccess } from "@/server/auth/project-access";
 import type { AuthenticatedActor } from "@/server/auth/setup-actor";
 import {
@@ -35,6 +36,8 @@ export class ProjectCommercialContextService {
     const current = await this.repository.get(actor, projectId);
     const candidate = projectCommercialContextFromActivation({ projectId, project, session, current });
     const merged = mergeProjectCommercialContexts(current, candidate, session.architectureEdited ? "user_edit" : "generated");
+    const consistency = validateCommercialRuntimeConsistency({ context: merged, project, architecture: session.commercialArchitecture });
+    if (!consistency.valid) throw new Error(consistency.issues[0]?.message || "A memória comercial diverge da configuração materializada.");
     const saved = await this.repository.upsert(actor, merged, session.architectureEdited ? "commercial_context.user_edited" : current ? "commercial_context.confirmed" : "commercial_context.generated", current?.revision || 0);
     if (!current && !session.architectureEdited) await this.repository.audit(actor, { projectId, objectType: "project_commercial_context", objectId: projectId, action: "commercial_context.confirmed", after: { revision: saved.revision, confirmedAt: saved.lastConfirmedAt } });
     return saved;

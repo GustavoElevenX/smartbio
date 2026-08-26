@@ -40,7 +40,8 @@ function destination(project: Project, option: StepOption): RoutingDestination |
 
 function isTerminal(project: Project, option: StepOption) {
   const configured = destination(project, option);
-  if (option.actionType === "submit_form" || option.actionType === "finish") return true;
+  if (option.actionType === "submit_form" || option.actionType === "capture_lead" || option.actionType === "finish") return true;
+  if (option.actionType === "continue_with_answers") return false;
   if (option.actionType === "open_whatsapp") return isPhone(configured?.value || option.actionPayload?.phone || project.phone);
   if (option.actionType === "open_url") return isHttpUrl(configured?.value || option.actionPayload?.url);
   return false;

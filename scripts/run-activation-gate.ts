@@ -58,6 +58,7 @@ await runLayer("ACTION/UNDERSTANDING CONTRACT", ["node_modules/vitest/vitest.mjs
 await runLayer("STATE MACHINE INVARIANTS", ["node_modules/vitest/vitest.mjs", "run", "tests/unit/activation-understanding.test.ts", "-t", "STATE MACHINE INVARIANTS"]);
 await runLayer("DISCOVERY PLAN CONTRACT", ["node_modules/vitest/vitest.mjs", "run", "tests/unit/discovery-plan-contract.test.ts", "tests/unit/adaptive-question-suggestion.test.ts"]);
 await runLayer("DISCOVERY PLAN PIPELINE", ["node_modules/vitest/vitest.mjs", "run", "tests/unit/discovery-plan-pipeline-integration.test.ts"]);
+await runLayer("ACTIVATION RUNTIME HARDENING", ["node_modules/vitest/vitest.mjs", "run", "tests/unit/activation-hardening.test.ts"]);
 
 process.stdout.write("\n=== SELF-SERVICE UI PLUMBING ===\n");
 const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--hostname", "127.0.0.1", "--port", String(port)], {

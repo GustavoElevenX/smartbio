@@ -161,17 +161,17 @@ export function deterministicCommercialArchitecture(input: {
   const detectedLinks = sources.flatMap((source) => source.detectedLinks || []);
   const channels: CommercialArchitecture["channels"] = [];
   if (input.phone) {
-    channels.push({ id: "channel-whatsapp-primary", type: "whatsapp", label: "WhatsApp principal", value: input.phone, purpose: "Atendimento principal", evidence: [userEvidence], confidence: 1 });
+    channels.push({ id: "channel-whatsapp-primary", type: "whatsapp", label: "WhatsApp principal", value: input.phone, purpose: "Atendimento principal", isFallback: false, evidence: [userEvidence], confidence: 1 });
   }
   if (input.websiteUrl) {
     const instagram = /instagram\.com/i.test(input.websiteUrl);
-    channels.push({ id: "channel-website-primary", type: "external_url", label: instagram ? "Instagram" : "Site principal", value: input.websiteUrl, purpose: instagram ? "Presença pública" : "Site", evidence: [evidence("initial-input", instagram ? "instagram" : "user", input.websiteUrl, 1)], confidence: 1 });
+    channels.push({ id: "channel-website-primary", type: "external_url", label: instagram ? "Instagram" : "Site principal", value: input.websiteUrl, purpose: instagram ? "Presença pública" : "Site", isFallback: false, evidence: [evidence("initial-input", instagram ? "instagram" : "user", input.websiteUrl, 1)], confidence: 1 });
   }
   for (const [index, link] of detectedLinks.entries()) {
     if (link.classification === "whatsapp") {
-      channels.push({ id: stableId("channel-whatsapp", link.label || link.url, index), type: "whatsapp", label: link.label || "WhatsApp", value: phoneFromUrl(link.url) ?? null, purpose: "Atendimento encontrado nos materiais", evidence: [sourceEvidence], confidence: 0.9 });
+      channels.push({ id: stableId("channel-whatsapp", link.label || link.url, index), type: "whatsapp", label: link.label || "WhatsApp", value: phoneFromUrl(link.url) ?? null, purpose: "Atendimento encontrado nos materiais", isFallback: false, evidence: [sourceEvidence], confidence: 0.9 });
     } else if (["menu", "catalog", "delivery", "quote", "commercial_b2b", "scheduling", "location"].includes(link.classification)) {
-      channels.push({ id: stableId("channel-link", link.label || link.url, index), type: "external_url", label: link.label || "Link comercial", value: link.url, purpose: link.classification, evidence: [sourceEvidence], confidence: 0.9 });
+      channels.push({ id: stableId("channel-link", link.label || link.url, index), type: "external_url", label: link.label || "Link comercial", value: link.url, purpose: link.classification, isFallback: false, evidence: [sourceEvidence], confidence: 0.9 });
     }
   }
   const normalizedChannels = uniqueBy(channels, (item) => `${item.type}:${item.value || normalized(item.label)}`);
@@ -234,10 +234,10 @@ export function deterministicCommercialArchitecture(input: {
         ? ["Data preferida", "Horário preferido"]
         : [];
     const requiredFacts: CommercialArchitecture["journeyBlueprints"][number]["requiredFacts"] = [];
-    if (mode === "direct_external" && !channel?.value) requiredFacts.push({ key: `architecture.${intent.id}.url`, label: `Link para ${intent.label}`, reason: "O caminho direto precisa de uma URL real.", affects: intent.label, severity: "blocking" });
-    if (["direct_contact", "qualification", "quote", "hybrid"].includes(mode) && !channel?.value) requiredFacts.push({ key: `architecture.${intent.id}.destination`, label: `Destino de ${intent.label}`, reason: "Precisamos saber qual canal real recebe este contato.", affects: intent.label, severity: "blocking" });
-    if (["scheduling", "reservation"].includes(mode) && !channel?.value) requiredFacts.push({ key: `architecture.${intent.id}.completion`, label: `Conclusão de ${intent.label}`, reason: "Sem agenda nativa confiável, link externo ou canal de atendimento, a Sobe não pode afirmar disponibilidade nem concluir este caminho.", affects: intent.label, severity: "blocking" });
-    if (mode === "routing" && (!locations.length || locations.some((location) => !location.channelIds.length))) requiredFacts.push({ key: `architecture.${intent.id}.location_channels`, label: "WhatsApp de cada unidade", reason: "O cliente só pode ser encaminhado quando cada unidade tiver um destino conhecido.", affects: intent.label, severity: "blocking" });
+    if (mode === "direct_external" && !channel?.value) requiredFacts.push({ key: `architecture.${intent.id}.url`, label: `Link para ${intent.label}`, reason: "O caminho direto precisa de uma URL real.", affects: intent.label, severity: "blocking", resolutionTarget: { type: "external_url", blueprintId: stableId("blueprint", intent.id, index), intentId: intent.id } });
+    if (["direct_contact", "qualification", "quote", "hybrid"].includes(mode) && !channel?.value) requiredFacts.push({ key: `architecture.${intent.id}.destination`, label: `Destino de ${intent.label}`, reason: "Precisamos saber qual canal real recebe este contato.", affects: intent.label, severity: "blocking", resolutionTarget: { type: "channel_value", channelId: channel?.id ?? null, intentId: intent.id, channelType: "whatsapp" } });
+    if (["scheduling", "reservation"].includes(mode) && !channel?.value) requiredFacts.push({ key: `architecture.${intent.id}.completion`, label: `Conclusão de ${intent.label}`, reason: "Sem agenda nativa confiável, link externo ou canal de atendimento, a Sobe não pode afirmar disponibilidade nem concluir este caminho.", affects: intent.label, severity: "blocking", resolutionTarget: { type: "completion_strategy", blueprintId: stableId("blueprint", intent.id, index), acceptedStrategies: ["fixed", "external_url", "native"] } });
+    if (mode === "routing" && (!locations.length || locations.some((location) => !location.channelIds.length))) requiredFacts.push({ key: `architecture.${intent.id}.location_channels`, label: "WhatsApp de cada unidade", reason: "O cliente só pode ser encaminhado quando cada unidade tiver um destino conhecido.", affects: intent.label, severity: "blocking", resolutionTarget: { type: "location_channel_mapping", intentId: intent.id, locationIds: locations.map((location) => location.id), channelType: "whatsapp" } });
     return {
       id: stableId("blueprint", intent.id, index), intentId: intent.id, objective: intent.visitorNeed, mode,
       steps: mode.startsWith("direct_") ? [] : [{ purpose: intent.visitorNeed, expectedCapability: capability ?? null, collects, usesOfferings: offerings.map((item) => stableId("offering", item.name)), usesLocations: locations.map((item) => item.id) }],
@@ -327,7 +327,7 @@ export function commercialArchitectureFromActivationUnderstanding(understanding:
   const intents = uniqueBy(useContextualBase ? [...base.intents, ...legacyIntents] : legacyIntents, (intent) => intent.semanticKey || normalized(intent.label));
   const channels = [...base.channels];
   const completionChannel = channels.find((item) => item.type === understanding.completionAction.destination)
-    || (understanding.completionAction.destination === "native" ? undefined : { id: "channel-legacy-completion", type: understanding.completionAction.destination, label: understanding.completionAction.label, value: null, purpose: "Destino inferido", evidence: [source], confidence: understanding.completionAction.confidence });
+    || (understanding.completionAction.destination === "native" ? undefined : { id: "channel-legacy-completion", type: understanding.completionAction.destination, label: understanding.completionAction.label, value: null, purpose: "Destino inferido", isFallback: false, evidence: [source], confidence: understanding.completionAction.confidence });
   if (completionChannel && !channels.some((item) => item.id === completionChannel.id)) channels.push(completionChannel);
   const existingIntentIds = new Set(useContextualBase ? base.intents.map((intent) => intent.id) : []);
   const addedBlueprints = intents.filter((intent) => !existingIntentIds.has(intent.id)).map((intent, index) => {

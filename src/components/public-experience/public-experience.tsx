@@ -36,6 +36,7 @@ import { journeyModeForProject } from "@/features/qualification/recommendation-s
 import { selectNextQualificationQuestion } from "@/features/qualification/offer-intelligence";
 import { calculateReservationTotal } from "@/features/reservations/reservation-engine";
 import { resolveRoute } from "@/features/routing/routing-engine";
+import { buildJourneyHandoff } from "@/features/handoff/journey-handoff";
 import {
   buildWhatsAppMessage,
   buildWhatsAppUrl,
@@ -529,6 +530,7 @@ export function ExperienceCanvas({
     if (!preview) {
       emit("page_view");
       emit("session_started");
+      emit("journey_started");
       if (runtime.entryPointId) emit("entry_point_loaded");
       if (
         runtime.conversionGoalId &&
@@ -957,17 +959,18 @@ export function ExperienceCanvas({
       } else if (capability === "routing") {
         const destinations =
           project.commercialConfig?.routingDestinations || [];
+        const fallbackDestinationId = destinations.find((destination) => destination.isDefault && destination.role === "general_contact")?.id;
         const result = resolveRoute(
           runtime.answers,
           project.commercialConfig?.routingRules || [],
           destinations,
-          destinations[0]?.id,
+          fallbackDestinationId,
+          project.commercialConfig?.locations || [],
         );
         setRuntime((current) => ({
           ...current,
           routeResult: result,
-          selectedLocationId:
-            result.destination?.locationId || result.destination?.id,
+          selectedLocationId: current.selectedLocationId || (typeof current.answers.location_id === "string" ? current.answers.location_id : undefined),
         }));
         await fetch("/api/public/routing/resolve", {
           method: "POST",
@@ -978,11 +981,7 @@ export function ExperienceCanvas({
             context: runtime.answers,
           }),
         }).catch(() => undefined);
-        emit("route_resolved", {
-          ruleId: result.ruleId,
-          destinationId: result.destination?.id,
-          fallback: result.fallback,
-        });
+        emit(result.destination ? "route_resolved" : "route_unresolved", { ruleId: result.ruleId, destinationId: result.destination?.id, fallback: result.fallback, locationId: runtime.selectedLocationId });
         if (result.destination?.type === "whatsapp" && runtime.conversionGoalId)
           addOpportunity(
             "routed_contact",
@@ -990,11 +989,8 @@ export function ExperienceCanvas({
             `Contato encaminhado · ${result.destination.label}`,
             { destinationId: result.destination.id, summary: result.reason },
           );
-        setConfirmation(
-          result.destination
-            ? `Destino encontrado: ${result.destination.label}.`
-            : "Seu pedido será direcionado manualmente.",
-        );
+        if (!result.destination) throw new Error("Não encontramos um destino seguro para a unidade selecionada. Escolha outra unidade ou fale com a equipe.");
+        setConfirmation(`Destino encontrado: ${result.destination.label}.`);
       } else if (capability === "payment") {
         const paymentUrl = project.commercialConfig?.paymentUrl;
         if (!paymentUrl)
@@ -1090,16 +1086,51 @@ export function ExperienceCanvas({
       if (completed && option.targetStepId) go(option.targetStepId);
       return;
     }
-    if (option.actionType === "submit_form") {
+    if (option.actionType === "continue_with_answers") {
+      const answeredFieldIds = (step.formFields || []).filter((field) => runtime.answers[field.key] !== undefined && runtime.answers[field.key] !== "").map((field) => field.id);
+      for (const fieldId of answeredFieldIds) emit("journey_answered", { fieldId, blueprintId: option.actionPayload?.blueprintId, intentId: option.actionPayload?.intentId });
+      emit("journey_context_completed", { blueprintId: option.actionPayload?.blueprintId, intentId: option.actionPayload?.intentId, conversionGoalId: runtime.conversionGoalId });
+      return go(option.targetStepId);
+    }
+    if (option.actionType === "submit_form" || option.actionType === "capture_lead") {
       setLeadForm(true);
       return;
     }
     if (option.actionType === "open_whatsapp") {
-      emit("whatsapp_clicked");
-      const configuredDestination = project.commercialConfig?.routingDestinations?.find(
+      const destinations = project.commercialConfig?.routingDestinations || [];
+      let configuredDestination = destinations.find(
         (destination) => destination.id === option.actionPayload?.destinationId && destination.type === "whatsapp",
       );
-      const phone = String(configuredDestination?.value || option.actionPayload?.phone || project.phone || "");
+      if (option.actionPayload?.destinationId && !configuredDestination) {
+        emit("route_unresolved", { destinationId: option.actionPayload.destinationId, blueprintId: option.actionPayload?.blueprintId, intentId: option.actionPayload?.intentId });
+        setError("O destino configurado não está mais disponível. O WhatsApp não foi aberto para evitar um encaminhamento incorreto.");
+        return;
+      }
+      if (option.actionPayload?.routing === true) {
+        const fallbackDestinationId = destinations.find((destination) => destination.isDefault && destination.role === "general_contact")?.id;
+        const result = resolveRoute(
+          { ...runtime.answers, ...(runtime.selectedLocationId ? { location_id: runtime.selectedLocationId } : {}) },
+          project.commercialConfig?.routingRules || [],
+          destinations,
+          fallbackDestinationId,
+          project.commercialConfig?.locations || [],
+        );
+        configuredDestination = result.destination?.type === "whatsapp" ? result.destination : undefined;
+        if (!configuredDestination?.value) {
+          emit("route_unresolved", { locationId: runtime.selectedLocationId, blueprintId: option.actionPayload?.blueprintId, intentId: option.actionPayload?.intentId });
+          setError("Não encontramos um WhatsApp seguro para a unidade selecionada. Revise a unidade antes de continuar.");
+          return;
+        }
+        emit("route_resolved", { locationId: runtime.selectedLocationId, destinationId: configuredDestination.id, ruleId: result.ruleId, fallback: result.fallback });
+        setRuntime((current) => ({ ...current, routeResult: result }));
+      }
+      const phone = String(configuredDestination?.value || option.actionPayload?.phone || (!option.actionPayload?.routing ? project.phone : "") || "");
+      if (!phone) {
+        emit("route_unresolved", { blueprintId: option.actionPayload?.blueprintId, intentId: option.actionPayload?.intentId });
+        setError("O WhatsApp desta jornada não está configurado.");
+        return;
+      }
+      emit("whatsapp_clicked", { destinationId: configuredDestination?.id || option.actionPayload?.destinationId, locationId: runtime.selectedLocationId, blueprintId: option.actionPayload?.blueprintId, intentId: option.actionPayload?.intentId });
       const cart = runtime.cart.items.length
         ? `Pedido: ${runtime.cart.items.map((item) => `${item.quantity}x ${item.name}`).join(", ")}`
         : undefined;
@@ -1112,9 +1143,20 @@ export function ExperienceCanvas({
             confidence: runtime.recommendationConfidence,
           })
         : { answers: stringAnswers(runtime.answers), closing: undefined };
+      const handoffFields = project.steps.flatMap((candidate) => candidate.formFields || []);
+      const selectedLocation = project.commercialConfig?.locations?.find((location) => location.id === runtime.selectedLocationId);
+      const allOfferings = [...(project.commercialConfig?.serviceOfferings || []), ...(project.commercialConfig?.catalogItems || [])];
+      const journeyHandoff = buildJourneyHandoff({
+        intent: { label: String(option.actionPayload?.interestLabel || step.title) },
+        answers: runtime.answers,
+        fields: handoffFields,
+        selectedLocation,
+        selectedOfferings: allOfferings.filter((offering) => runtime.selectedOfferIds.includes(offering.id)),
+      });
       let message = String(option.actionPayload?.message || "") || buildWhatsAppMessage({
         businessName: project.name,
-        interest: step.title,
+        interest: journeyHandoff.interest,
+        location: journeyHandoff.location,
         activation: launchContext?.activationId
           ? { name: "Ativação selecionada" }
           : undefined,
@@ -1122,11 +1164,12 @@ export function ExperienceCanvas({
           ? { code: launchContext.benefitClaimCode }
           : undefined,
         answers: {
-          ...recommendationHandoff.answers,
+          ...(Object.keys(journeyHandoff.answers).length ? journeyHandoff.answers : recommendationHandoff.answers),
           ...(cart ? { pedido: cart } : {}),
         },
         closing: recommendationHandoff.closing,
       });
+      emit("handoff_built", { destinationId: configuredDestination?.id || option.actionPayload?.destinationId, locationId: runtime.selectedLocationId, blueprintId: option.actionPayload?.blueprintId, intentId: option.actionPayload?.intentId });
       if (
         !preview &&
         launchContext?.activationId &&
@@ -1153,7 +1196,7 @@ export function ExperienceCanvas({
           },
         );
       } else if (!preview) {
-        const handoffFields = project.steps
+        const includedHandoffFields = project.steps
           .flatMap((candidate) => candidate.formFields || [])
           .filter((field) => field.includeInHandoff);
         const response = await fetch("/api/public/handoff", {
@@ -1184,7 +1227,7 @@ export function ExperienceCanvas({
                 serviceIds: runtime.selectedOfferIds,
                 locationId: runtime.selectedLocationId,
               },
-              qualification: handoffFields.map((field) => ({
+              qualification: includedHandoffFields.map((field) => ({
                 label: field.handoffLabel || field.label,
                 value: String(runtime.answers[field.key] ?? ""),
                 include: Boolean(
@@ -1210,6 +1253,7 @@ export function ExperienceCanvas({
       return;
     }
     if (option.actionType === "open_url") {
+      emit("external_url_clicked", { url: option.actionPayload?.url, blueprintId: option.actionPayload?.blueprintId, intentId: option.actionPayload?.intentId });
       emit(
         option.value === "payment"
           ? "payment_started"
@@ -1281,6 +1325,7 @@ export function ExperienceCanvas({
       { summary: runtime.recommendationKey },
     );
     emit("form_submitted");
+    emit("lead_captured");
     emit("journey_completed");
     setSubmitted(true);
     setLeadForm(false);

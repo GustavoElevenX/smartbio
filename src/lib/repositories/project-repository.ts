@@ -162,8 +162,20 @@ function normalizeIds(project: Project): Project {
         item.id = isUuid(item.id) ? item.id : uuid();
         item.projectId = projectId;
       }
-    for (const destination of commercialConfig.routingDestinations || [])
+    const destinationIds = new Map<string, string>();
+    for (const destination of commercialConfig.routingDestinations || []) {
+      const previousId = destination.id;
       destination.id = isUuid(destination.id) ? destination.id : uuid();
+      destinationIds.set(previousId, destination.id);
+    }
+    for (const location of commercialConfig.locations || []) {
+      if (location.routingDestinationId) location.routingDestinationId = destinationIds.get(location.routingDestinationId) || location.routingDestinationId;
+    }
+    for (const rule of commercialConfig.routingRules || []) rule.destinationId = destinationIds.get(rule.destinationId) || rule.destinationId;
+    for (const step of steps) for (const option of step.options || []) {
+      const destinationId = typeof option.actionPayload?.destinationId === "string" ? option.actionPayload.destinationId : undefined;
+      if (destinationId && destinationIds.has(destinationId)) option.actionPayload = { ...option.actionPayload, destinationId: destinationIds.get(destinationId)! };
+    }
   }
   return {
     ...project,

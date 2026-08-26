@@ -44,7 +44,7 @@ begin
   -- Destinos primeiro: serviços, regras e unidades podem referenciá-los.
   for item in select value from jsonb_array_elements(coalesce(config->'routingDestinations','[]'::jsonb)) loop
     insert into public.routing_destinations(id,project_id,label,channel,value,is_active,settings)
-    values((item->>'id')::uuid,p_project_id,item->>'label',case when item->>'type' in ('whatsapp','email','phone') then item->>'type' when item->>'type' in ('url','checkout','schedule','form') then 'url' else 'internal' end,coalesce(item->>'value',item->>'key'),true,jsonb_build_object('message',item->>'message','type',item->>'type','key',item->>'key'))
+    values((item->>'id')::uuid,p_project_id,item->>'label',case when item->>'type' in ('whatsapp','email','phone') then item->>'type' when item->>'type' in ('url','checkout','schedule','form') then 'url' else 'internal' end,coalesce(item->>'value',item->>'key'),true,jsonb_build_object('message',item->>'message','type',item->>'type','key',item->>'key','isDefault',coalesce((item->>'isDefault')::boolean,false),'role',item->>'role'))
     on conflict(id) do update set label=excluded.label,channel=excluded.channel,value=excluded.value,settings=excluded.settings,updated_at=now()
     where public.routing_destinations.project_id=p_project_id;
   end loop;

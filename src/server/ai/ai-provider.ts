@@ -9,6 +9,7 @@ import type { ConversionActivation } from "@/features/activations/activation.typ
 import type { BusinessShape, SuggestedSiteStructure } from "@/features/site-composer/site-composer.types";
 import type { OptimizationAIExplanation } from "@/features/optimization/schema";
 import type { DiscoveryPlan, DiscoveryPlanDraft } from "@/features/qualification/discovery-plan";
+import type { commercialContextForAI } from "@/features/commercial-context/project-commercial-context";
 
 export interface AIRequestContext {
   workspaceId: string;
@@ -39,6 +40,7 @@ export interface JourneyAIInput extends AIRequestContext {
   confirmedCommercialData?: Project["commercialConfig"];
   discoveryPlan?: DiscoveryPlan;
   commercialArchitecture?: CommercialArchitecture;
+  commercialContext?: ReturnType<typeof commercialContextForAI>;
 }
 
 export interface DiscoveryPlanningInput extends AIRequestContext {
@@ -103,6 +105,7 @@ export interface SiteCompositionInput extends AIRequestContext {
   currentSite: Project["presence"];
   business: Pick<Project, "name" | "description" | "category" | "audience" | "primaryGoal" | "visualDirection" | "brand" | "businessProfile" | "conversionGoals" | "commercialConfig">;
   commercialArchitecture?: CommercialArchitecture;
+  commercialContext?: ReturnType<typeof commercialContextForAI>;
 }
 export interface OptimizationExplanationInput extends AIRequestContext {
   project: Pick<Project, "name" | "category" | "audience" | "primaryGoal">;

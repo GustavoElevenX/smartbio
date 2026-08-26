@@ -44,11 +44,13 @@ export function LocationFinder({
   runtime,
   setRuntime,
   emit,
+  allowDirectHandoff = true,
 }: {
   project: Project;
   runtime: JourneyRuntimeState;
   setRuntime: React.Dispatch<React.SetStateAction<JourneyRuntimeState>>;
-  emit: (name: "route_resolved" | "whatsapp_clicked", metadata?: Record<string, unknown>) => void;
+  emit: (name: "route_resolved" | "whatsapp_clicked" | "location_selected", metadata?: Record<string, unknown>) => void;
+  allowDirectHandoff?: boolean;
 }) {
   const [mode, setMode] = useState<"options" | "postal" | "area" | "manual">("options");
   const [postalCode, setPostalCode] = useState("");
@@ -69,6 +71,7 @@ export function LocationFinder({
         ...current.answers,
         location: location.name,
         locationId: location.id,
+        location_id: location.id,
       },
       routeResult: {
         destination: location.destination,
@@ -78,6 +81,7 @@ export function LocationFinder({
           : `${location.distanceKm.toFixed(1)} km de distância aproximada.`,
       },
     }));
+    emit("location_selected", { locationId: location.id, destinationId: location.destination?.id });
   }
 
   async function resolve(input: Record<string, unknown>) {
@@ -192,7 +196,7 @@ export function LocationFinder({
               <span className="text-xs text-[var(--muted-fg)]">{[location.neighborhood, location.city].filter(Boolean).join(" · ")}</span>
             </button>
           ))}
-          {!manualLocations.length ? <p className="text-xs text-[var(--muted-fg)]">Nenhuma unidade pública disponível. O atendimento seguirá para o destino padrão.</p> : null}
+          {!manualLocations.length ? <p className="text-xs text-[var(--muted-fg)]">Nenhuma unidade pública está disponível para seleção. Fale com a equipe para confirmar o destino correto.</p> : null}
         </div>
       ) : null}
 
@@ -204,7 +208,7 @@ export function LocationFinder({
           <strong className="mt-1 block text-lg">{selected.name}</strong>
           <p className="mt-1 text-xs text-[var(--muted-fg)]">{selected.address}</p>
           {selected.distanceKm != null ? <p className="mt-2 text-xs font-bold">Distância aproximada: {selected.distanceKm.toFixed(1)} km · {selected.isOpen ? "aberta agora" : "fechada agora"}</p> : null}
-          {selected.destination?.type === "whatsapp" && selected.destination.value ? (
+          {allowDirectHandoff && selected.destination?.type === "whatsapp" && selected.destination.value ? (
             <a href={whatsappUrl(selected.destination, selected.name)} target="_blank" rel="noreferrer" onClick={() => emit("whatsapp_clicked", { locationId: selected.id })} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-[var(--button-radius)] bg-[var(--primary)] px-4 text-sm font-bold text-[var(--primary-fg)]"><MessageCircle size={17} />Continuar no WhatsApp</a>
           ) : null}
         </div>

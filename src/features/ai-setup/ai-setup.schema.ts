@@ -183,9 +183,40 @@ export const commercialChannelSchema = z.object({
   label: z.string().trim().min(1).max(160),
   value: z.string().trim().max(1000).nullable(),
   purpose: z.string().trim().max(240).nullable(),
+  isFallback: z.boolean(),
   evidence: z.array(commercialEvidenceRefSchema).max(12),
   confidence: z.number().min(0).max(1),
 });
+
+export const architectureResolutionTargetSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("channel_value"),
+    channelId: z.string().trim().min(1).max(160).nullable(),
+    intentId: z.string().trim().min(1).max(160),
+    channelType: z.enum(["whatsapp", "external_url", "phone", "email"]),
+  }),
+  z.object({
+    type: z.literal("location_channel_mapping"),
+    intentId: z.string().trim().min(1).max(160),
+    locationIds: z.array(z.string().trim().min(1).max(160)).max(100),
+    channelType: z.enum(["whatsapp", "phone", "external_url"]),
+  }),
+  z.object({
+    type: z.literal("completion_strategy"),
+    blueprintId: z.string().trim().min(1).max(160),
+    acceptedStrategies: z.array(z.enum(["fixed", "by_location", "by_answer", "external_url", "native"])).min(1).max(5),
+  }),
+  z.object({
+    type: z.literal("external_url"),
+    blueprintId: z.string().trim().min(1).max(160),
+    intentId: z.string().trim().min(1).max(160),
+  }),
+  z.object({
+    type: z.literal("required_field"),
+    blueprintId: z.string().trim().min(1).max(160),
+    fieldKey: z.string().trim().min(1).max(160),
+  }),
+]);
 
 export const commercialArchitectureSchema = z.object({
   status: z.enum(["ready", "needs_confirmation", "degraded"]),
@@ -251,6 +282,7 @@ export const commercialArchitectureSchema = z.object({
       reason: z.string().trim().min(1).max(400),
       affects: z.string().trim().min(1).max(240),
       severity: z.enum(["blocking", "warning"]).default("blocking"),
+      resolutionTarget: architectureResolutionTargetSchema.nullable(),
     })).max(20),
     assumptions: z.array(z.string().trim().min(1).max(400)).max(20),
     confidence: z.number().min(0).max(1),
@@ -386,3 +418,4 @@ export type ActivationUnderstanding = z.infer<typeof activationUnderstandingSche
 export type ActivationDecisionSource = z.infer<typeof activationDecisionSourceSchema>;
 export type CommercialArchitecture = z.infer<typeof commercialArchitectureSchema>;
 export type CommercialEvidenceRef = z.infer<typeof commercialEvidenceRefSchema>;
+export type ArchitectureResolutionTarget = z.infer<typeof architectureResolutionTargetSchema>;

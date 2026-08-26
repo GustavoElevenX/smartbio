@@ -64,7 +64,7 @@ const LocationCardBlock: BlockRenderer = ({ block, runtime, setRuntime }) => {
         setRuntime((current) => ({
           ...current,
           selectedLocationId: id,
-          answers: { ...current.answers, location: String(content.name || id) },
+          answers: { ...current.answers, location: String(content.name || id), locationId: id, location_id: id },
         }))
       }
       className={cn(
@@ -1055,6 +1055,7 @@ const BookingSummaryBlock: BlockRenderer = ({ project, runtime }) => {
 };
 
 const LocationSelectorBlock: BlockRenderer = ({
+  block,
   project,
   runtime,
   setRuntime,
@@ -1066,6 +1067,7 @@ const LocationSelectorBlock: BlockRenderer = ({
       runtime={runtime}
       setRuntime={setRuntime}
       emit={emit}
+      allowDirectHandoff={block.content?.allowDirectHandoff !== false}
     />
   );
 };

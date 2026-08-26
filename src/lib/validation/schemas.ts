@@ -13,6 +13,7 @@ const conversionContext = {
 
 export const analyticsEventNames = [
   "page_view", "session_started", "step_viewed", "option_clicked", "form_started", "form_submitted", "recommendation_viewed", "cta_clicked", "whatsapp_clicked", "external_link_clicked", "journey_completed",
+  "journey_started", "journey_answered", "journey_context_completed", "location_selected", "route_unresolved", "handoff_built", "external_url_clicked", "lead_captured",
   "capability_started", "qualification_completed", "quote_started", "quote_submitted", "quote_estimate_viewed", "media_uploaded", "availability_searched", "slot_selected", "booking_submitted", "booking_confirmed", "booking_cancel_requested", "catalog_viewed", "item_viewed", "item_added", "cart_viewed", "order_submitted", "reservation_search_started", "reservation_option_viewed", "reservation_submitted", "reservation_confirmed", "reservation_cancel_requested", "route_resolved", "payment_started",
   "entry_point_loaded", "conversion_goal_selected", "conversion_goal_resolved", "opportunity_created", "conversion_confirmed", "conversion_lost",
   "presence_page_viewed", "presence_section_viewed", "presence_cta_clicked", "presence_conversion_started",

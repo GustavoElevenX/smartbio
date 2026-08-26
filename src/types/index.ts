@@ -23,6 +23,8 @@ export type ActionType =
   | "open_url"
   | "open_whatsapp"
   | "submit_form"
+  | "continue_with_answers"
+  | "capture_lead"
   | "show_recommendation"
   | "start_capability"
   | "finish";
@@ -530,6 +532,8 @@ export interface RoutingDestination {
   locationId?: string;
   value?: string;
   message?: string;
+  isDefault?: boolean;
+  role?: "general_contact" | "intent_contact" | "location_contact";
 }
 
 export interface RoutingRule {
@@ -980,6 +984,14 @@ export type AnalyticsEventName =
   | "whatsapp_clicked"
   | "external_link_clicked"
   | "journey_completed"
+  | "journey_started"
+  | "journey_answered"
+  | "journey_context_completed"
+  | "location_selected"
+  | "route_unresolved"
+  | "handoff_built"
+  | "external_url_clicked"
+  | "lead_captured"
   | "capability_started"
   | "qualification_completed"
   | "quote_started"

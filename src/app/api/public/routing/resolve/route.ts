@@ -22,6 +22,7 @@ export async function POST(request: Request) {
   const project = await getPublicProjectById(createServiceClient(), parsed.data.projectId);
   if (!project) return respond(apiError("Projeto não encontrado.", 404, "project_not_found"));
   const destinations = project.commercialConfig?.routingDestinations || [];
-  const result = resolveRoute(parsed.data.context, project.commercialConfig?.routingRules || [], destinations, destinations[0]?.id);
+  const fallbackDestinationId = destinations.find((item) => item.isDefault && item.role === "general_contact")?.id;
+  const result = resolveRoute(parsed.data.context, project.commercialConfig?.routingRules || [], destinations, fallbackDestinationId, project.commercialConfig?.locations || []);
   return respond(apiSuccess({ result }));
 }

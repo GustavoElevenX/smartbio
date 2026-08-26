@@ -65,7 +65,16 @@ const humanTitles: Record<string, string> = {
   "payment.cta": "O que deve estar escrito no botão de pagamento?",
 };
 
-function questionType(requirement: DataRequirement): SetupQuestion["type"] {
+function resolutionTarget(architecture: CommercialArchitecture | undefined, key: string) {
+  return architecture?.journeyBlueprints.flatMap((blueprint) => blueprint.requiredFacts).find((fact) => fact.key === key)?.resolutionTarget;
+}
+
+function questionType(requirement: DataRequirement, architecture?: CommercialArchitecture): SetupQuestion["type"] {
+  const target = resolutionTarget(architecture, requirement.key);
+  if (target?.type === "external_url") return "url";
+  if (target?.type === "channel_value") return target.channelType === "whatsapp" || target.channelType === "phone" ? "phone" : target.channelType === "external_url" ? "url" : "text";
+  if (target?.type === "location_channel_mapping") return "textarea";
+  if (target?.type === "completion_strategy") return "single_choice";
   if (choiceQuestions[requirement.key]) return "single_choice";
   if (requirement.key.endsWith(".url")) return "url";
   if (requirement.key.includes("location")) return "address";
@@ -94,18 +103,23 @@ export function planAdaptiveQuestions(
     .filter((item) => item.status !== "verified" && answers[item.key] == null)
     .sort((a, b) => rank[a.severity] - rank[b.severity] || operationalRank(a.key) - operationalRank(b.key) || (originalOrder.get(a.key) || 0) - (originalOrder.get(b.key) || 0))
     .slice(0, limit)
-    .map((requirement, index) => ({
+    .map((requirement, index) => {
+      const target = resolutionTarget(architecture, requirement.key);
+      return ({
       id: `question-${requirement.id}`,
       key: requirement.key,
       title: humanTitles[requirement.key] || requirement.label,
       description: descriptions[requirement.key],
-      type: questionType(requirement),
-      options: choiceQuestions[requirement.key],
+      type: questionType(requirement, architecture),
+      options: target?.type === "completion_strategy"
+        ? target.acceptedStrategies.map((value) => ({ label: value.replaceAll("_", " "), value }))
+        : choiceQuestions[requirement.key],
       required: requirement.severity === "blocking",
       reason: architecture ? requirement.reason : "Essa resposta é necessária para que a ação escolhida funcione do início ao fim.",
       capability: requirement.capability === "brand" || requirement.capability === "project" ? undefined : requirement.capability as CapabilityKey,
       priority: 100 - index,
       suggestedAnswer: suggestions[requirement.key],
       structuredAnswer: structuredSuggestions[requirement.key],
-    }));
+      });
+    });
 }

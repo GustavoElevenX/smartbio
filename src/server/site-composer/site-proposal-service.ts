@@ -14,6 +14,8 @@ import { demoProjects } from "@/data/demo-projects";
 import { getAIProvider, isAIConfigured } from "@/server/ai/ai-client";
 import { inferBusinessShape } from "@/features/site-composer/business-shape";
 import { suggestedSiteStructureSchema } from "@/features/site-composer/site-composer.schema";
+import { projectCommercialContextService } from "@/server/commercial-context/project-commercial-context-service";
+import { commercialContextForAI } from "@/features/commercial-context/project-commercial-context";
 
 const memoryProposals = new Map<string, SiteStructureProposal>();
 
@@ -33,7 +35,10 @@ async function getProposal(actor: AuthenticatedActor, proposalId: string) {
 export async function suggestStructureForActor(actor: AuthenticatedActor, projectId: string, raw: unknown) {
   await assertProjectAccess(actor, projectId, "write");
   const input = suggestSiteStructureInputSchema.parse(raw);
-  const project = await loadComposerProject(actor, projectId);
+  const [project, commercialContext] = await Promise.all([
+    loadComposerProject(actor, projectId),
+    projectCommercialContextService.get(actor, projectId),
+  ]);
   if (!project) throw new Error("Projeto não encontrado.");
   const database = createServiceClient();
   if (actor.persistence === "database" && database) await requireEntitlement({ database, workspaceId: actor.workspaceId, feature: "ai_structure_suggestions" });
@@ -64,6 +69,7 @@ export async function suggestStructureForActor(actor: AuthenticatedActor, projec
           conversionGoals: project.conversionGoals,
           commercialConfig: project.commercialConfig,
         },
+        commercialContext: commercialContext ? commercialContextForAI(commercialContext) : undefined,
       }));
       usedAI = true;
     } catch {

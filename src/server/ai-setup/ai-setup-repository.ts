@@ -16,6 +16,18 @@ function persistenceFailure(operation: string, error: { code?: string } | null, 
   throw new Error(userMessage);
 }
 
+function compatibleCommercialArchitecture(value: unknown) {
+  if (!value || typeof value !== "object") return value;
+  const architecture = structuredClone(value) as Record<string, unknown>;
+  if (Array.isArray(architecture.channels)) architecture.channels = architecture.channels.map((channel) => channel && typeof channel === "object" ? { isFallback: false, ...channel as Record<string, unknown> } : channel);
+  if (Array.isArray(architecture.journeyBlueprints)) architecture.journeyBlueprints = architecture.journeyBlueprints.map((blueprint) => {
+    if (!blueprint || typeof blueprint !== "object") return blueprint;
+    const item = blueprint as Record<string, unknown>;
+    return { ...item, requiredFacts: Array.isArray(item.requiredFacts) ? item.requiredFacts.map((fact) => fact && typeof fact === "object" ? { resolutionTarget: null, ...fact as Record<string, unknown> } : fact) : item.requiredFacts };
+  });
+  return architecture;
+}
+
 function rowToSession(row: Record<string, unknown>): AISetupSession {
   return aiSetupSessionSchema.parse({
     id: row.id,
@@ -25,7 +37,7 @@ function rowToSession(row: Record<string, unknown>): AISetupSession {
     initialInput: row.initial_input,
     extractedProfile: row.extracted_profile || undefined,
     activationUnderstanding: row.activation_understanding || undefined,
-    commercialArchitecture: row.commercial_architecture || undefined,
+    commercialArchitecture: compatibleCommercialArchitecture(row.commercial_architecture) || undefined,
     architectureReviewed: row.architecture_reviewed || false,
     architectureEdited: row.architecture_edited || false,
     visitorActions: row.visitor_actions || [],

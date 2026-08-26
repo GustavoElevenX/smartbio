@@ -9,7 +9,7 @@ const optionSchema = z.object({
   label: z.string().min(1).max(160),
   description: z.string().max(300).optional(),
   value: z.string().min(1).max(120),
-  actionType: z.enum(["go_to_step", "open_url", "open_whatsapp", "submit_form", "show_recommendation", "start_capability", "finish"]),
+  actionType: z.enum(["go_to_step", "open_url", "open_whatsapp", "submit_form", "continue_with_answers", "capture_lead", "show_recommendation", "start_capability", "finish"]),
   targetStepId: z.string().optional(),
   actionPayload: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
 });

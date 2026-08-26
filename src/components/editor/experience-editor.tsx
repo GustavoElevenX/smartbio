@@ -680,7 +680,9 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
                           <option value="finish">Encerrar jornada</option>
                           <option value="open_whatsapp">WhatsApp</option>
                           <option value="open_url">Link externo</option>
-                          <option value="submit_form">Capturar lead</option>
+                          <option value="continue_with_answers">Continuar com respostas</option>
+                          <option value="capture_lead">Capturar lead</option>
+                          <option value="submit_form">Capturar lead (legado)</option>
                           {(project.capabilities || [])
                             .filter((item) => item.enabled)
                             .map((item) => (
@@ -697,6 +699,19 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
                             ))}
                         </Select>
                       </div>
+                      {option.actionType === "continue_with_answers" ? (
+                        <div className="mt-3">
+                          <Label htmlFor={`option-next-step-${option.id}`}>Próxima etapa</Label>
+                          <Select
+                            id={`option-next-step-${option.id}`}
+                            value={option.targetStepId || ""}
+                            onChange={(event) => updateStep({ options: selected.options?.map((item) => item.id === option.id ? { ...item, targetStepId: event.target.value || undefined } : item) })}
+                          >
+                            <option value="">Selecione a próxima etapa</option>
+                            {project.steps.filter((item) => item.id !== selected.id).map((item) => <option key={item.id} value={item.id}>Etapa {item.order + 1}: {item.title}</option>)}
+                          </Select>
+                        </div>
+                      ) : null}
                       {option.actionType === "open_url" ? (
                         <div className="mt-3">
                           <Label htmlFor={`option-url-${option.id}`}>URL de destino</Label>

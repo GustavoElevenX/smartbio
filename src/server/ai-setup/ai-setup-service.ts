@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { commercialArchitectureSchema, extractedBusinessSourceSchema, setupDraftInputSchema, setupInitialInputSchema, structuredJourneyQuestionSchema, type AISetupSession, type CommercialArchitecture, type ExtractedBusinessSource, type SetupDraftInput, type SetupInitialInput, type SetupQuestion, type SourceReference } from "@/features/ai-setup/ai-setup.schema";
 import { actionsFromActivationUnderstanding, deterministicActivationUnderstanding, markActionsConfirmed, markOfferingsConfirmed, normalizeActivationUnderstanding, understandingOfferingNames } from "@/features/ai-setup/activation-understanding";
 import { activationUnderstandingFromCommercialArchitecture, capabilitiesFromCommercialArchitecture, commercialArchitectureFromActivationUnderstanding, deterministicCommercialArchitecture, normalizeCommercialArchitecture, requirementsFromCommercialArchitecture, visitorActionsFromCommercialArchitecture } from "@/features/ai-setup/commercial-architecture";
+import { reconcileCommercialArchitectureRequirements, resolveArchitectureRequirement, validateCommercialArchitectureForMaterialization } from "@/features/ai-setup/architecture-resolution";
 import { assertActivationStateInvariants } from "@/features/ai-setup/activation-state-invariants";
 import { materializeSetupAnswers } from "@/features/ai-setup/materialize-setup-answers";
 import { stageGeneratedDraft } from "@/features/ai-setup/stage-generated-draft";
@@ -93,7 +94,7 @@ function initialSiteInstruction(project: Project, session: AISetupSession) {
 }
 
 function resolvedRequirements(requirements: DataRequirement[], answers: Record<string, unknown>) {
-  return requirements.map((requirement): DataRequirement => answers[requirement.key] == null ? requirement : {
+  return requirements.map((requirement): DataRequirement => answers[requirement.key] == null || requirement.key.startsWith("architecture.") ? requirement : {
     ...requirement,
     status: "verified",
     value: answers[requirement.key],
@@ -210,6 +211,9 @@ export async function reconcileActivationState(
   session: AISetupSession,
   providerQuestions?: SetupQuestion[],
 ) {
+  if (session.commercialArchitecture) {
+    session = { ...session, commercialArchitecture: reconcileCommercialArchitectureRequirements(session.commercialArchitecture) };
+  }
   const baseProfile = session.extractedProfile || new RuleBasedBusinessAnalyzer().analyze(compositionInput(session));
   const selectedActions = session.visitorActions.length
     ? session.visitorActions
@@ -770,8 +774,19 @@ export class AISetupService {
 
   async answer(actor: AISetupActor, id: string, key: string, value: unknown) {
     const session = await this.get(actor, id);
-    if (!session.missingRequirements.some((item) => item.key === key)) throw new Error("Essa pergunta não pertence à sessão atual.");
+    const requirement = session.missingRequirements.find((item) => item.key === key);
+    if (!requirement) throw new Error("Essa pergunta não pertence à sessão atual.");
     let activationUnderstanding = session.activationUnderstanding;
+    let commercialArchitecture = session.commercialArchitecture;
+    if (commercialArchitecture && key.startsWith("architecture.")) {
+      const fact = commercialArchitecture.journeyBlueprints.flatMap((blueprint) => blueprint.requiredFacts).find((item) => item.key === key);
+      if (!fact) throw new Error("Esse blocker não possui um target estrutural ativo.");
+      const result = resolveArchitectureRequirement({ architecture: commercialArchitecture, requirement: fact, answer: value, sourceId: session.id });
+      const changed = JSON.stringify(result.architecture) !== JSON.stringify(commercialArchitecture);
+      if (!result.resolved && !changed) throw new Error(result.warnings[0] || "A resposta não resolveu a configuração necessária.");
+      commercialArchitecture = result.architecture;
+      activationUnderstanding = normalizeActivationUnderstanding(activationUnderstandingFromCommercialArchitecture(commercialArchitecture));
+    }
     if (activationUnderstanding && key === "qualification.offerings") {
       const confirmedOfferings = offerNamesFromSetup("", value);
       if (confirmedOfferings.length < 2) throw new Error("Confirme pelo menos duas opções reais para montar a recomendação.");
@@ -806,6 +821,7 @@ export class AISetupService {
     let reconciled = await reconcileActivationState(actor, {
       ...session,
       activationUnderstanding,
+      commercialArchitecture,
       answers: { ...session.answers, [key]: value },
     });
     if (key === "qualification.questions" && reconciled.discoveryPlan && Array.isArray(value)) {
@@ -844,6 +860,10 @@ export class AISetupService {
     if (!session.extractedProfile) session = await this.analyze(actor, id);
     session = await reconcileActivationState(actor, session);
     if (session.commercialArchitecture ? !session.architectureReviewed : !session.actionsConfirmed) throw new Error("Confirme a interpretação do negócio antes de criar a primeira versão.");
+    if (session.commercialArchitecture) {
+      const architectureGate = validateCommercialArchitectureForMaterialization(session.commercialArchitecture);
+      if (!architectureGate.valid) throw new Error(architectureGate.issues[0]?.message || "A arquitetura comercial ainda possui inconsistências.");
+    }
     const blocking = session.missingRequirements.filter((item) => item.severity === "blocking" && item.status !== "verified");
     if (blocking.length) throw new Error("Confirme todas as informações necessárias antes de criar a primeira versão.");
     if (session.activationUnderstanding?.status === "degraded") {

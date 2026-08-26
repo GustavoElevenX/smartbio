@@ -280,3 +280,25 @@ export function reconcileOperationalProjectContext(current: ProjectCommercialCon
   const context = projectCommercialContextSchema.parse({ ...current, revision: current.revision + 1, locationContexts: nextLocations, updatedAt: now });
   return { context, affectedIntentIds, changedLocationIds };
 }
+
+export function commercialContextForAI(context: ProjectCommercialContext) {
+  const confirmedFirst = <T extends { status: CommercialContextStatus }>(values: T[]) => values.toSorted((left, right) => Number(right.status === "confirmed") - Number(left.status === "confirmed"));
+  return {
+    revision: context.revision,
+    summary: context.summary,
+    audiences: confirmedFirst(context.audienceContexts).map(({ id, label, description, kind, status }) => ({ id, label, description, kind, status })),
+    offerings: confirmedFirst(context.offeringContexts).map(({ id, offeringId, label, commercialRoles, audienceContextIds, status }) => ({ id, offeringId, label, commercialRoles, audienceContextIds, status })),
+    intents: confirmedFirst(context.intentContexts).map(({ id, semanticKey, label, visitorNeed, priority, entryVisibility, status }) => ({ id, semanticKey, label, visitorNeed, priority, entryVisibility, status })),
+    channels: confirmedFirst(context.channelContexts).map(({ id, destinationId, externalUrl, role, servesIntentIds, locationIds, status }) => ({ id, destinationId, externalUrl, role, servesIntentIds, locationIds, status })),
+    locations: confirmedFirst(context.locationContexts).map(({ locationId, commercialRoles, destinationIds, servesIntentIds, status }) => ({ locationId, commercialRoles, destinationIds, servesIntentIds, status })),
+    purchaseMechanisms: confirmedFirst(context.purchaseMechanisms).map(({ id, intentIds, journeyBlueprintId, mechanism, requiredInformation, completionStrategy, destinationIds, status }) => ({ id, intentIds, journeyBlueprintId, mechanism, requiredInformation, completionStrategy, destinationIds, status })),
+    confirmedDecisions: [
+      ...context.intentContexts.filter((item) => item.status === "confirmed").map((item) => `Intent confirmado: ${item.label}`),
+      ...context.channelContexts.filter((item) => item.status === "confirmed").map((item) => `Canal confirmado: ${item.role}`),
+      ...context.purchaseMechanisms.filter((item) => item.status === "confirmed").map((item) => `Mecanismo confirmado: ${item.label} → ${item.completionStrategy}`),
+    ],
+    relevantEvidence: context.evidence.filter((item) => item.confidence >= 0.8).slice(-20).map(({ sourceId, origin, excerpt, confidence }) => ({ sourceId, origin, excerpt, confidence })),
+    pending: context.assumptions.filter((item) => item.status === "unverified" && item.importance !== "optional").map(({ statement, importance }) => ({ statement, importance })),
+    precedence: ["latest_user_edit", "confirmed_commercial_context", "current_operational_entity", "recent_trusted_source", "ai_inference"],
+  };
+}

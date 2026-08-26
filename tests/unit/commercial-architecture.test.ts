@@ -59,7 +59,7 @@ describe("CommercialArchitecture context-first", () => {
       status: "ready", confidence: 0.9,
       businessSummary: { whatItSells: "Produtos", commercialModel: "Pedidos por unidade", evidence },
       offerings: [], audienceContexts: [],
-      channels: [{ id: "wa-a", type: "whatsapp", label: "WhatsApp A", value: "5511999999999", purpose: null, evidence, confidence: 1 }],
+      channels: [{ id: "wa-a", type: "whatsapp", label: "WhatsApp A", value: "5511999999999", purpose: null, isFallback: false, evidence, confidence: 1 }],
       locations: [{ id: "loc-a", label: "Unidade A", address: null, channelIds: ["wa-a", "ausente"], evidence, confidence: 1 }],
       intents: [
         { id: "pedido", semanticKey: "order", label: "Fazer pedido", visitorNeed: "Pedir", priority: 100, visibleOnEntry: true, evidence, confidence: 0.9 },
