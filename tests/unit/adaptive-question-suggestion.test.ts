@@ -40,4 +40,15 @@ describe("ofertas explícitas da Activation autônoma", () => {
       "Persiana Double Vision",
     ]);
   });
+
+  it("extrai produtos inline e encerra a lista antes do objetivo do negócio", () => {
+    const description = "A Lumina Persianas atende ambientes residenciais e comerciais. Nossos produtos são: Persiana Rolô Blackout, Persiana Double Vision, Persiana Romana, Persiana Vertical e Cortina Rolô Tela Solar. Queremos que o visitante receba orientação e continue pelo WhatsApp.";
+    expect(extractExplicitOfferNames(description)).toEqual([
+      "Persiana Rolô Blackout",
+      "Persiana Double Vision",
+      "Persiana Romana",
+      "Persiana Vertical",
+      "Cortina Rolô Tela Solar",
+    ]);
+  });
 });

@@ -12,7 +12,10 @@ function normalized(value: string) {
 }
 
 function matches(text: string, terms: string[]) {
-  return terms.some((term) => text.includes(term));
+  return terms.some((term) => {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(?:^|[^a-z0-9])${escaped}(?=$|[^a-z0-9])`).test(text);
+  });
 }
 
 function unique<T>(values: T[]) {

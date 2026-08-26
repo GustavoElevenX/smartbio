@@ -192,6 +192,9 @@ export function markOfferingsConfirmed(
   const existing = new Map(understanding.offerings.map((offering) => [normalize(offering.name), offering]));
   return normalizeActivationUnderstanding({
     ...understanding,
+    status: understanding.status === "degraded" ? "needs_confirmation" : understanding.status,
+    source: "business_confirmed",
+    confidence: Math.max(understanding.confidence, 0.8),
     offerings: names.map((name) => ({
       ...(existing.get(normalize(name)) || {
         name,

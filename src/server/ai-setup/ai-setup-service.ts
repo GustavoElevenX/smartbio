@@ -501,12 +501,17 @@ export class AISetupService {
           userId: actor.userId,
         };
         const provider = getAIProvider();
-        const [result, contextualUnderstanding] = await Promise.all([
+        const [businessResult, understandingResult] = await Promise.allSettled([
           provider.analyzeBusiness(analysisInput),
           provider.analyzeActivationUnderstanding(analysisInput),
         ]);
-        profile = result.profile;
-        activationUnderstanding = normalizeActivationUnderstanding(contextualUnderstanding);
+        if (businessResult.status === "fulfilled") profile = businessResult.value.profile;
+        else usedFallback = true;
+        if (understandingResult.status === "fulfilled") {
+          activationUnderstanding = normalizeActivationUnderstanding(understandingResult.value);
+        } else {
+          usedFallback = true;
+        }
       } catch {
         usedFallback = true;
       }

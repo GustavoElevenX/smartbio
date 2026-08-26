@@ -11,11 +11,11 @@ function plausibleOffer(value: string) {
 }
 
 export function extractExplicitOfferNames(value: string) {
-  const marker = /(?:serviços?|ofertas?|opções?|soluções?)\s*(?:oferecid[oa]s?|disponíveis|incluem|são)?\s*:\s*/i.exec(value);
+  const marker = /(?:produtos?|serviços?|ofertas?|opções?|soluções?|planos?|modalidades?|pacotes?)\s*(?:reais?|oferecid[oa]s?|disponíveis|incluem|são)?\s*:\s*/i.exec(value);
   if (!marker) return [];
   const afterMarker = value.slice(marker.index + marker[0].length);
   const scoped = afterMarker
-    .split(/\n\s*\n|[.!?]\s+(?=(?:o\s+|a\s+)?(?:objetivo|jornada|visitante|próximo passo|atendimento final)\b)|\b(?:objetivo|jornada|visitante|próximo passo|atendimento final)\s*:/i)[0]
+    .split(/\n\s*\n|[.!?]\s+(?=(?:queremos?|esperamos?|(?:o\s+|a\s+)?(?:objetivo|jornada|visitante|pessoa|cliente|próximo passo|atendimento(?:\s+final)?))\b)|\b(?:objetivo|jornada|visitante|próximo passo|atendimento final)\s*:/i)[0]
     .trim();
   const separator = scoped.includes(";")
     ? /\s*;\s*/

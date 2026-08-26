@@ -17,6 +17,12 @@ import { setAIProviderForTests } from "@/server/ai/ai-client";
 import type { AISetupActor } from "@/server/auth/setup-actor";
 import type { Project } from "@/types";
 
+class FailingActivationUnderstandingProvider extends ContractActivationProvider {
+  override async analyzeActivationUnderstanding(): Promise<never> {
+    throw new Error("activation understanding indisponível");
+  }
+}
+
 const actor: AISetupActor = {
   userId: "sonoleve-user",
   email: "sonoleve@sobe.test",
@@ -172,6 +178,35 @@ describe("SONOLEVE REGRESSION + STATE MACHINE INVARIANTS", () => {
     expect(project.discoveryPlan?.offerings.map((offering) => offering.name)).toEqual(offerNames);
     expect(project.discoveryPlan?.questions.length).toBeGreaterThanOrEqual(2);
     expect(project.steps.some((step) => step.formFields?.length)).toBe(true);
+  });
+
+  it("preserva ofertas explícitas e recupera o fluxo quando só o entendimento contextual falha", async () => {
+    setAIProviderForTests(new FailingActivationUnderstandingProvider());
+    const service = new AISetupService(repositoryDouble());
+    let session = await service.start(actor, {
+      businessName: "Lumina Persianas",
+      description: "A Lumina Persianas atende ambientes residenciais e comerciais. Nossos produtos são: Persiana Rolô Blackout, Persiana Double Vision, Persiana Romana, Persiana Vertical e Cortina Rolô Tela Solar. Queremos que o visitante receba orientação entre essas opções e continue pelo WhatsApp.",
+      phone: "+5511999990000",
+    });
+
+    session = await service.analyze(actor, session.id);
+    expect(session.activationUnderstanding).toMatchObject({ status: "degraded", source: "deterministic_fallback" });
+    expect(session.activationUnderstanding?.offerings.map((offering) => offering.name)).toEqual([
+      "Persiana Rolô Blackout",
+      "Persiana Double Vision",
+      "Persiana Romana",
+      "Persiana Vertical",
+      "Cortina Rolô Tela Solar",
+    ]);
+    expect(session.extractedProfile?.analysisMetadata?.reasons.join(" ")).not.toContain("disponibilidade de horário");
+
+    session = await service.confirmVisitorActions(actor, session.id, session.visitorActions.map(({ key, label, isPrimary }) => ({ key, label, isPrimary })));
+    session = await service.answer(actor, session.id, "qualification.objective", session.activationUnderstanding!.declaredObjective);
+    session = await service.answer(actor, session.id, "qualification.offerings", session.activationUnderstanding!.offerings.map((offering) => offering.name));
+
+    expect(session.activationUnderstanding?.status).not.toBe("degraded");
+    expect(session.discoveryPlan).toMatchObject({ status: "ready" });
+    expect(session.questions.find((question) => question.key === "qualification.questions")?.structuredAnswer).toEqual(session.discoveryPlan?.questions);
   });
 
   it("detecta explicitamente o estado impossível original", () => {
