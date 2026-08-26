@@ -130,6 +130,12 @@ export const extractedBusinessSourceSchema = z.object({
   frequentlyAskedQuestions: z.array(extractedEntitySchema).max(100),
   brandStatements: z.array(extractedEntitySchema).max(100),
   destinations: z.array(extractedEntitySchema).max(100),
+  detectedLinks: z.array(z.object({
+    url: z.string().trim().max(1000),
+    label: z.string().trim().max(240),
+    classification: z.enum(["whatsapp", "menu", "location", "quote", "commercial_b2b", "delivery", "scheduling", "site", "catalog", "other"]),
+    external: z.boolean(),
+  })).max(60).nullable().default(null),
   warnings: z.array(z.string().max(400)).max(50),
 });
 
@@ -163,6 +169,94 @@ export const activationDecisionSourceSchema = z.enum([
   "business_confirmed",
   "deterministic_fallback",
 ]);
+
+export const commercialEvidenceRefSchema = z.object({
+  sourceId: z.string().trim().min(1).max(160),
+  origin: z.enum(["user", "website", "document", "link_bio", "instagram", "logo_analysis", "ai_inference", "system_fallback"]),
+  excerpt: z.string().trim().min(1).max(500).nullable(),
+  confidence: z.number().min(0).max(1),
+});
+
+export const commercialChannelSchema = z.object({
+  id: z.string().trim().min(1).max(160),
+  type: z.enum(["whatsapp", "external_url", "email", "phone", "native"]),
+  label: z.string().trim().min(1).max(160),
+  value: z.string().trim().max(1000).nullable(),
+  purpose: z.string().trim().max(240).nullable(),
+  evidence: z.array(commercialEvidenceRefSchema).max(12),
+  confidence: z.number().min(0).max(1),
+});
+
+export const commercialArchitectureSchema = z.object({
+  status: z.enum(["ready", "needs_confirmation", "degraded"]),
+  confidence: z.number().min(0).max(1),
+  businessSummary: z.object({
+    whatItSells: z.string().trim().min(1).max(800),
+    commercialModel: z.string().trim().min(1).max(600),
+    evidence: z.array(commercialEvidenceRefSchema).max(16),
+  }),
+  offerings: z.array(z.object({
+    id: z.string().trim().min(1).max(160),
+    name: z.string().trim().min(1).max(160),
+    kind: z.enum(["product", "service", "plan", "package", "other"]),
+    evidence: z.array(commercialEvidenceRefSchema).max(12),
+    confidence: z.number().min(0).max(1),
+  })).max(200),
+  audienceContexts: z.array(z.object({
+    id: z.string().trim().min(1).max(160),
+    label: z.string().trim().min(1).max(160),
+    description: z.string().trim().max(500).nullable(),
+    evidence: z.array(commercialEvidenceRefSchema).max(12),
+    confidence: z.number().min(0).max(1),
+  })).max(30),
+  channels: z.array(commercialChannelSchema).max(50),
+  locations: z.array(z.object({
+    id: z.string().trim().min(1).max(160),
+    label: z.string().trim().min(1).max(160),
+    address: z.string().trim().max(500).nullable(),
+    channelIds: z.array(z.string().trim().min(1).max(160)).max(12),
+    evidence: z.array(commercialEvidenceRefSchema).max(12),
+    confidence: z.number().min(0).max(1),
+  })).max(100),
+  intents: z.array(z.object({
+    id: z.string().trim().min(1).max(160),
+    semanticKey: visitorActionKeySchema.nullable(),
+    label: z.string().trim().min(1).max(100),
+    visitorNeed: z.string().trim().min(1).max(500),
+    priority: z.number().int().min(0).max(100),
+    visibleOnEntry: z.boolean(),
+    evidence: z.array(commercialEvidenceRefSchema).max(12),
+    confidence: z.number().min(0).max(1),
+  })).max(20),
+  journeyBlueprints: z.array(z.object({
+    id: z.string().trim().min(1).max(160),
+    intentId: z.string().trim().min(1).max(160),
+    objective: z.string().trim().min(1).max(500),
+    mode: z.enum(["direct_external", "direct_contact", "routing", "catalog", "qualification", "quote", "scheduling", "reservation", "guided_flow", "hybrid"]),
+    steps: z.array(z.object({
+      purpose: z.string().trim().min(1).max(400),
+      expectedCapability: capabilityKeySchema.nullable(),
+      collects: z.array(z.string().trim().min(1).max(160)).max(20).default([]),
+      usesOfferings: z.array(z.string().trim().min(1).max(160)).max(100).default([]),
+      usesLocations: z.array(z.string().trim().min(1).max(160)).max(100).default([]),
+    })).max(12),
+    completion: z.object({
+      channelId: z.string().trim().min(1).max(160).nullable(),
+      destinationStrategy: z.enum(["fixed", "by_location", "by_answer", "external_url", "native"]),
+      handoffSummary: z.boolean().default(false),
+    }),
+    requiredFacts: z.array(z.object({
+      key: z.string().trim().min(1).max(160),
+      label: z.string().trim().min(1).max(180),
+      reason: z.string().trim().min(1).max(400),
+      affects: z.string().trim().min(1).max(240),
+      severity: z.enum(["blocking", "warning"]).default("blocking"),
+    })).max(20),
+    assumptions: z.array(z.string().trim().min(1).max(400)).max(20),
+    confidence: z.number().min(0).max(1),
+  })).max(20),
+  issues: z.array(z.string().trim().min(1).max(400)).max(50),
+});
 
 export const activationUnderstandingSchema = z.object({
   status: z.enum(["ready", "needs_confirmation", "degraded"]),
@@ -247,6 +341,9 @@ export const aiSetupSessionSchema = z.object({
   initialInput: setupDraftInputSchema,
   extractedProfile: businessCapabilityProfileSchema.optional(),
   activationUnderstanding: activationUnderstandingSchema.optional(),
+  commercialArchitecture: commercialArchitectureSchema.optional(),
+  architectureReviewed: z.boolean().optional(),
+  architectureEdited: z.boolean().optional(),
   visitorActions: z.array(visitorActionSelectionSchema).max(8).default([]),
   actionsConfirmed: z.boolean().default(false),
   answers: z.record(z.string(), z.unknown()),
@@ -287,3 +384,5 @@ export type VisitorActionSelection = z.infer<typeof visitorActionSelectionSchema
 export type CustomVisitorActionClassification = z.infer<typeof customVisitorActionClassificationSchema>;
 export type ActivationUnderstanding = z.infer<typeof activationUnderstandingSchema>;
 export type ActivationDecisionSource = z.infer<typeof activationDecisionSourceSchema>;
+export type CommercialArchitecture = z.infer<typeof commercialArchitectureSchema>;
+export type CommercialEvidenceRef = z.infer<typeof commercialEvidenceRefSchema>;

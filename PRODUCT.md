@@ -13,6 +13,21 @@ The link in bio is one entry point into that structure, not the whole product. C
 
 The product serves Brazilian small and medium businesses that receive traffic from Instagram, ads, LinkedIn, QR codes, and other social entry points. It must support multiple business models without niche templates by reusing the existing qualification, quote, scheduling, catalog/order, reservation, routing, payment, analytics, publication, Supabase, and RLS engines.
 
+## Context-first activation
+
+The creation of the first Sobe is context-first. The business owner supplies concrete facts and real sources; Sobe interprets the commercial model, proposes distinct conversion paths, connects the appropriate existing engines, and generates the first structure. The owner confirms the complete interpretation or edits only what is necessary.
+
+Sobe does not use niche templates as the foundation of creation. The Design System and runtime engines are reusable, but each Commercial Architecture is composed from the specific business, its offers, audiences and commercial contexts, visitor intents, real channels, locations, available evidence, and next commercial action. `visitorActions` is a compatibility adapter derived from that architecture, never the strategic input the owner must configure.
+
+## Commercial memory per project
+
+- The Activation session is transient. After confirmation and project materialization, the understanding moves to `ProjectCommercialContext`, a private, versioned, one-to-one project memory.
+- Normalized entities remain the operational source of truth. Commercial context references existing offerings, locations, and destinations and stores their semantic relationships instead of duplicating operational records in JSON.
+- Precedence is explicit user confirmation, configured operational data, recent official source, user-provided material, AI inference, then system fallback. New inference never silently replaces a confirmed decision.
+- Reanalysis and conflicts create auditable proposals that can be accepted or rejected. Operational changes recalculate only affected relationships and journeys.
+- `ProjectCommercialContext`, `CommercialArchitecture`, runtime, design, and analytics have separate responsibilities. Changing a palette does not change commercial context; adding a location does not require regenerating the full page.
+- Scheduling and reservation claim availability only when backed by trustworthy operational configuration. Otherwise, Sobe opens an external engine or builds a request/handoff without promising confirmation.
+
 ## Users and jobs
 
 - Business owner or operator: define what visitors want, connect each intent to a journey, publish entry-specific links, receive opportunities, and measure confirmed conversion.

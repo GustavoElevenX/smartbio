@@ -22,6 +22,7 @@ import {
   aiSetupSessionSchema,
   type AISetupSession,
   type BrandIdentity,
+  type CommercialArchitecture,
   type SourceReference,
 } from "@/features/ai-setup/ai-setup.schema";
 import {
@@ -38,7 +39,6 @@ import {
 } from "@/features/ai-setup/session-lifecycle";
 import { projectRepository } from "@/lib/repositories/project-repository";
 import type { Project } from "@/types";
-import type { VisitorActionSelection } from "@/features/ai-setup/visitor-actions";
 import type { ActivationPreflight } from "@/features/ai-setup/activation-preflight";
 import { validateSetupPhone } from "@/features/ai-setup/setup-phone";
 
@@ -480,7 +480,7 @@ export function AISetupShell({
     }
   }
 
-  async function confirmActions(actions: VisitorActionSelection[]) {
+  async function confirmArchitecture() {
     if (!ensureActiveSession()) return;
     setBusy(true);
     setLifecycle("saving");
@@ -488,8 +488,8 @@ export function AISetupShell({
     try {
       adopt(
         await apiCall<AISetupSession>(
-          `/api/ai/setup/${session!.id}/actions`,
-          { method: "POST", body: JSON.stringify({ actions }) },
+          `/api/ai/setup/${session!.id}/architecture`,
+          { method: "POST", body: "{}" },
         ),
       );
       setLifecycle("active");
@@ -500,9 +500,29 @@ export function AISetupShell({
         setError(
           caught instanceof Error
             ? caught.message
-            : "Não foi possível confirmar as ações.",
+            : "Não foi possível confirmar a interpretação.",
         );
       }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function updateArchitecture(architecture: CommercialArchitecture) {
+    if (!ensureActiveSession()) return;
+    setBusy(true);
+    setLifecycle("saving");
+    setError("");
+    try {
+      adopt(await apiCall<AISetupSession>(`/api/ai/setup/${session!.id}/architecture`, { method: "PATCH", body: JSON.stringify({ architecture }) }));
+      setLifecycle("active");
+    } catch (caught) {
+      if (isInvalidSessionError(caught)) invalidateSession(form);
+      else {
+        setLifecycle("active");
+        setError(caught instanceof Error ? caught.message : "Não foi possível salvar os ajustes da interpretação.");
+      }
+      throw caught;
     } finally {
       setBusy(false);
     }
@@ -766,7 +786,8 @@ export function AISetupShell({
               setError("");
             }}
             onAnswer={answer}
-            onConfirmActions={confirmActions}
+            onConfirmArchitecture={confirmArchitecture}
+            onUpdateArchitecture={updateArchitecture}
             onGenerate={generate}
             onOpenLaunch={() =>
               projectId && router.push(`/app/projects/${projectId}/launch`)

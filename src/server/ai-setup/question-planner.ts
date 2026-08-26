@@ -1,4 +1,4 @@
-import type { SetupQuestion } from "@/features/ai-setup/ai-setup.schema";
+import type { CommercialArchitecture, SetupQuestion } from "@/features/ai-setup/ai-setup.schema";
 import type { CapabilityKey, DataRequirement } from "@/types";
 
 const choiceQuestions: Record<string, SetupQuestion["options"]> = {
@@ -79,22 +79,30 @@ export function planAdaptiveQuestions(
   limit = 3,
   suggestions: Record<string, string> = {},
   structuredSuggestions: Record<string, SetupQuestion["structuredAnswer"]> = {},
+  architecture?: CommercialArchitecture,
 ): SetupQuestion[] {
   const rank = { blocking: 0, warning: 1, optional: 2 } as const;
+  const operationalRank = (key: string) => key.includes("destination") || key.includes("location_channels")
+    ? 0
+    : key.endsWith(".url")
+      ? 1
+      : key.includes("handoff")
+        ? 3
+        : 2;
   const originalOrder = new Map(requirements.map((item, index) => [item.key, index]));
   return requirements
     .filter((item) => item.status !== "verified" && answers[item.key] == null)
-    .sort((a, b) => rank[a.severity] - rank[b.severity] || (originalOrder.get(a.key) || 0) - (originalOrder.get(b.key) || 0))
+    .sort((a, b) => rank[a.severity] - rank[b.severity] || operationalRank(a.key) - operationalRank(b.key) || (originalOrder.get(a.key) || 0) - (originalOrder.get(b.key) || 0))
     .slice(0, limit)
     .map((requirement, index) => ({
       id: `question-${requirement.id}`,
       key: requirement.key,
-      title: humanTitles[requirement.key] || requirement.reason,
+      title: humanTitles[requirement.key] || requirement.label,
       description: descriptions[requirement.key],
       type: questionType(requirement),
       options: choiceQuestions[requirement.key],
       required: requirement.severity === "blocking",
-      reason: "Essa resposta é necessária para que a ação escolhida funcione do início ao fim.",
+      reason: architecture ? requirement.reason : "Essa resposta é necessária para que a ação escolhida funcione do início ao fim.",
       capability: requirement.capability === "brand" || requirement.capability === "project" ? undefined : requirement.capability as CapabilityKey,
       priority: 100 - index,
       suggestedAnswer: suggestions[requirement.key],

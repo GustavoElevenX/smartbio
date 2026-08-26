@@ -9,6 +9,7 @@ import { aiJourneyDraftSchema } from "@/features/composition/composition.schema"
 import { applyAIJourneyDraft } from "@/features/composition/apply-ai-journey-draft";
 import type { ExperienceCompositionInput, JourneyStep, Project, ProjectCapability } from "@/types";
 import { synthesizePublicDescription } from "@/features/composition/public-copy";
+import type { CommercialArchitecture } from "@/features/ai-setup/ai-setup.schema";
 
 export type AIJourneyComposer = (input: ExperienceCompositionInput, projectProfile: NonNullable<Project["businessProfile"]>, capabilities: ProjectCapability[]) => Promise<AIJourneyDraftPayload>;
 
@@ -28,13 +29,14 @@ export class CompositionOrchestrator {
     private readonly journey: RuleBasedJourneyComposer = journeyComposer,
     private readonly visual: VisualComposer = visualComposer,
     private readonly aiJourney?: AIJourneyComposer,
+    private readonly commercialArchitecture?: CommercialArchitecture,
   ) {}
 
   async compose(input: ExperienceCompositionInput): Promise<Project> {
     const id = uid("project");
     const profile = await this.analyzer.analyze(input);
     let capabilities = this.planner.plan(profile);
-    let composition = this.journey.compose(input, profile, capabilities);
+    let composition = this.journey.compose(input, profile, capabilities, this.commercialArchitecture);
     let conversionGoals: Project["conversionGoals"];
     if (features.aiJourneyComposition && this.aiJourney) {
       try {

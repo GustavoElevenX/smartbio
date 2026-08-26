@@ -10,6 +10,8 @@ import { assertSafeWebsiteUrl, importWebsite } from "@/server/business-sources/w
 import { notifyProjectEvent } from "@/server/notifications/notification-service";
 import { requireEntitlement } from "@/server/entitlements/require-entitlement";
 import type { BusinessSource } from "@/types";
+import { projectCommercialContextService } from "@/server/commercial-context/project-commercial-context-service";
+import { loadProjectForActor } from "@/server/projects/load-project-for-actor";
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024;
 function cleanName(value: string) { return value.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").slice(0, 180) || "material"; }
@@ -55,7 +57,7 @@ export async function processWebsiteSource(actor: AuthenticatedActor, sourceId: 
     const imported = await importWebsite(source.sourceUrl);
     return await finishProcessing(actor, source, {
       text: imported.text,
-      metadata: { pages: imported.pages.map((page) => page.url) },
+      metadata: { pages: imported.pages.map((page) => page.url), detectedLinks: imported.detectedLinks },
     });
   } catch (error) {
     await sourceRepository
@@ -79,4 +81,73 @@ export async function importWebsiteSource(
   return processWebsiteSource(actor, source.id);
 }
 
-export async function reprocessBusinessSource(actor: AuthenticatedActor, sourceId: string) { const source = await sourceRepository.get(actor, sourceId); if (!source) throw new Error("Fonte não encontrada."); if (source.projectId) await assertProjectAccess(actor, source.projectId, "write"); if (source.type === "website" && source.sourceUrl) { const imported = await importWebsite(source.sourceUrl); return finishProcessing(actor, source, { text: imported.text, metadata: { pages: imported.pages.map((page) => page.url) } }); } if (!source.storagePath) throw new Error("Arquivo original indisponível para reprocessamento."); const client = createServiceClient()!; const { data, error } = await client.storage.from("business-sources").download(source.storagePath); if (error || !data) throw new Error("Não foi possível baixar o arquivo original."); const buffer = Buffer.from(await data.arrayBuffer()); return finishProcessing(actor, source, await parseSource(buffer, source.type as "pdf" | "image" | "csv" | "text", source.mimeType || "application/octet-stream")); }
+async function proposeDetectedLinkChanges(actor: AuthenticatedActor, source: BusinessSource) {
+  if (!source.projectId) return;
+  const [current, project] = await Promise.all([
+    projectCommercialContextService.get(actor, source.projectId),
+    loadProjectForActor(actor, source.projectId),
+  ]);
+  if (!current?.lastConfirmedAt || !project) return;
+  const detectedLinks = Array.isArray(source.extractedData?.detectedLinks)
+    ? source.extractedData.detectedLinks as Array<{ url?: unknown; label?: unknown; classification?: unknown }>
+    : [];
+  const currentValues = new Set([
+    ...current.channelContexts.flatMap((channel) => channel.externalUrl ? [channel.externalUrl] : []),
+    ...(project.commercialConfig?.routingDestinations || []).flatMap((destination) => destination.value ? [destination.value] : []),
+  ].map((value) => String(value).replace(/\D/g, "") || String(value).toLowerCase()));
+  const divergent = detectedLinks.filter((link) => {
+    if (typeof link.url !== "string" || ["other", "site", undefined].includes(link.classification as string | undefined)) return false;
+    const key = link.url.replace(/\D/g, "") || link.url.toLowerCase();
+    return !currentValues.has(key);
+  });
+  if (!divergent.length) return;
+  const observedAt = new Date().toISOString();
+  const evidence = divergent.map((link, index) => ({ id: `evidence-source-${source.id}-${index + 1}`, sourceId: source.id, origin: "website" as const, excerpt: `${String(link.label || "Novo destino")}: ${String(link.url)}`.slice(0, 500), confidence: 0.9, observedAt }));
+  const proposedContext = {
+    ...current,
+    revision: current.revision + 1,
+    evidence: [...current.evidence, ...evidence],
+    channelContexts: [...current.channelContexts, ...divergent.map((link, index) => ({
+      id: `proposed-channel-${source.id}-${index + 1}`,
+      destinationId: null,
+      externalUrl: String(link.url),
+      role: String(link.classification || link.label || "novo_destino"),
+      servesIntentIds: [],
+      servesAudienceContextIds: [],
+      locationIds: [],
+      status: "inferred" as const,
+      confidence: 0.9,
+      evidenceRefs: [evidence[index].id],
+    }))],
+    lastAnalyzedAt: observedAt,
+    updatedAt: observedAt,
+  };
+  await projectCommercialContextService.proposeUpdate(actor, {
+    projectId: source.projectId,
+    proposedContext,
+    reason: divergent.length === 1 ? "Uma fonte reanalisada apresentou um novo destino comercial. Confirme antes de substituir o caminho atual." : "Uma fonte reanalisada apresentou novos destinos comerciais. Confirme antes de alterar os caminhos atuais.",
+    evidence,
+    affectedIntentIds: current.intentContexts.map((intent) => intent.id),
+  });
+}
+
+export async function reprocessBusinessSource(actor: AuthenticatedActor, sourceId: string) {
+  const source = await sourceRepository.get(actor, sourceId);
+  if (!source) throw new Error("Fonte não encontrada.");
+  if (source.projectId) await assertProjectAccess(actor, source.projectId, "write");
+  let result;
+  if (source.type === "website" && source.sourceUrl) {
+    const imported = await importWebsite(source.sourceUrl);
+    result = await finishProcessing(actor, source, { text: imported.text, metadata: { pages: imported.pages.map((page) => page.url), detectedLinks: imported.detectedLinks } });
+  } else {
+    if (!source.storagePath) throw new Error("Arquivo original indisponível para reprocessamento.");
+    const client = createServiceClient()!;
+    const { data, error } = await client.storage.from("business-sources").download(source.storagePath);
+    if (error || !data) throw new Error("Não foi possível baixar o arquivo original.");
+    const buffer = Buffer.from(await data.arrayBuffer());
+    result = await finishProcessing(actor, source, await parseSource(buffer, source.type as "pdf" | "image" | "csv" | "text", source.mimeType || "application/octet-stream"));
+  }
+  if (source.projectId) await projectCommercialContextService.recordSourceReanalysis(actor, { projectId: source.projectId, sourceId: source.id, before: source.extractedData, after: result.source.extractedData });
+  await proposeDetectedLinkChanges(actor, result.source).catch(() => undefined);
+  return result;
+}

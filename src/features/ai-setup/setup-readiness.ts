@@ -19,7 +19,7 @@ export interface SetupProgressStage {
 
 export function calculateSetupReadiness(
   requirements: DataRequirement[],
-  session?: Pick<AISetupSession, "initialInput"> & Partial<Pick<AISetupSession, "actionsConfirmed" | "extractedProfile" | "activationUnderstanding" | "visitorActions" | "discoveryPlan" | "answers">>,
+  session?: Pick<AISetupSession, "initialInput"> & Partial<Pick<AISetupSession, "actionsConfirmed" | "architectureReviewed" | "commercialArchitecture" | "extractedProfile" | "activationUnderstanding" | "visitorActions" | "discoveryPlan" | "answers">>,
 ): SetupReadiness {
   const businessReady = Boolean(
     session?.initialInput.businessName && session.initialInput.description.length >= 15,
@@ -28,11 +28,12 @@ export function calculateSetupReadiness(
   const blocking = requirements.filter(
     (item) => item.severity === "blocking" && item.status !== "verified",
   ).length;
-  const baseCompleted = Number(businessReady) + Number(Boolean(session?.extractedProfile)) + Number(Boolean(session?.actionsConfirmed));
+  const reviewed = session?.commercialArchitecture ? Boolean(session.architectureReviewed) : Boolean(session?.actionsConfirmed);
+  const baseCompleted = Number(businessReady) + Number(Boolean(session?.extractedProfile)) + Number(reviewed);
   const total = requirements.length + 3;
   const primary = session?.visitorActions?.find((action) => action.isPrimary) || session?.visitorActions?.[0];
   const recommendation = primary?.key === "recommendation" || primary?.semanticKey === "recommendation";
-  const contextualReady = session?.activationUnderstanding?.status !== "degraded";
+  const contextualReady = session?.commercialArchitecture?.status !== "degraded" && session?.activationUnderstanding?.status !== "degraded";
   const discoveryReady = !recommendation || Boolean(
     session?.discoveryPlan
     && discoveryPlanIsReady(session.discoveryPlan)
@@ -43,15 +44,15 @@ export function calculateSetupReadiness(
     verified,
     total: requirements.length,
     blocking,
-    readyToGenerate: businessReady && Boolean(session?.actionsConfirmed) && blocking === 0 && contextualReady && discoveryReady,
+    readyToGenerate: businessReady && reviewed && blocking === 0 && contextualReady && discoveryReady,
   };
 }
 
 export function buildSetupProgressStages(session?: AISetupSession | null): SetupProgressStage[] {
   const readiness = calculateSetupReadiness(session?.missingRequirements || [], session || undefined);
   const analyzed = Boolean(session?.extractedProfile);
-  const actionsConfirmed = Boolean(session?.actionsConfirmed);
-  const requirementsComplete = actionsConfirmed && readiness.blocking === 0;
+  const architectureReviewed = session?.commercialArchitecture ? Boolean(session.architectureReviewed) : Boolean(session?.actionsConfirmed);
+  const requirementsComplete = architectureReviewed && readiness.blocking === 0;
   const blockingLabel = readiness.blocking === 1
     ? "1 informação necessária"
     : `${readiness.blocking} informações necessárias`;
@@ -65,15 +66,15 @@ export function buildSetupProgressStages(session?: AISetupSession | null): Setup
     },
     {
       key: "conversion",
-      label: "Objetivo do visitante",
-      status: actionsConfirmed ? "complete" : analyzed ? "current" : "pending",
-      detail: actionsConfirmed ? "Definido" : analyzed ? "Confirme a sugestão" : "Aguardando análise",
+      label: "Caminhos comerciais",
+      status: architectureReviewed ? "complete" : analyzed ? "current" : "pending",
+      detail: architectureReviewed ? "Revisados" : analyzed ? "Revise a interpretação" : "Aguardando análise",
     },
     {
       key: "requirements",
       label: "Informações necessárias",
-      status: requirementsComplete ? "complete" : actionsConfirmed ? "current" : "pending",
-      detail: requirementsComplete ? "Tudo confirmado" : actionsConfirmed ? blockingLabel : "Aguardando objetivo",
+      status: requirementsComplete ? "complete" : architectureReviewed ? "current" : "pending",
+      detail: requirementsComplete ? "Tudo confirmado" : architectureReviewed ? blockingLabel : "Aguardando revisão",
     },
     {
       key: "generate",

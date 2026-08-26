@@ -7,6 +7,7 @@ import { commercialDatabase } from "@/server/commercial-data/repository-utils";
 import { loadProjectForActor } from "@/server/projects/load-project-for-actor";
 import { requireEntitlement } from "@/server/entitlements/require-entitlement";
 import { DEFAULT_CATALOG_THRESHOLDS } from "@/features/site-composer/catalog-strategy";
+import { projectCommercialContextService } from "@/server/commercial-context/project-commercial-context-service";
 
 export class CommercialDataConflictError extends Error {
   readonly status = 409;
@@ -34,5 +35,6 @@ export async function saveCommercialData(actor: AuthenticatedActor, projectId: s
   }
   const aggregate = await loadProjectForActor(actor, projectId);
   if (!aggregate) throw new Error("Os dados foram salvos, mas o agregado não pôde ser recarregado.");
+  await projectCommercialContextService.synchronizeOperationalChanges(actor, aggregate);
   return aggregate;
 }

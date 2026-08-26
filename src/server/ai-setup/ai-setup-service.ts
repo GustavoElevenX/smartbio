@@ -1,8 +1,9 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { extractedBusinessSourceSchema, setupDraftInputSchema, setupInitialInputSchema, structuredJourneyQuestionSchema, type AISetupSession, type ExtractedBusinessSource, type SetupDraftInput, type SetupInitialInput, type SetupQuestion, type SourceReference } from "@/features/ai-setup/ai-setup.schema";
+import { commercialArchitectureSchema, extractedBusinessSourceSchema, setupDraftInputSchema, setupInitialInputSchema, structuredJourneyQuestionSchema, type AISetupSession, type CommercialArchitecture, type ExtractedBusinessSource, type SetupDraftInput, type SetupInitialInput, type SetupQuestion, type SourceReference } from "@/features/ai-setup/ai-setup.schema";
 import { actionsFromActivationUnderstanding, deterministicActivationUnderstanding, markActionsConfirmed, markOfferingsConfirmed, normalizeActivationUnderstanding, understandingOfferingNames } from "@/features/ai-setup/activation-understanding";
+import { activationUnderstandingFromCommercialArchitecture, capabilitiesFromCommercialArchitecture, commercialArchitectureFromActivationUnderstanding, deterministicCommercialArchitecture, normalizeCommercialArchitecture, requirementsFromCommercialArchitecture, visitorActionsFromCommercialArchitecture } from "@/features/ai-setup/commercial-architecture";
 import { assertActivationStateInvariants } from "@/features/ai-setup/activation-state-invariants";
 import { materializeSetupAnswers } from "@/features/ai-setup/materialize-setup-answers";
 import { stageGeneratedDraft } from "@/features/ai-setup/stage-generated-draft";
@@ -23,6 +24,7 @@ import { planAdaptiveQuestions } from "@/server/ai-setup/question-planner";
 import type { AISetupActor } from "@/server/auth/setup-actor";
 import { getAIProvider, isAIConfigured } from "@/server/ai/ai-client";
 import { sourceRepository } from "@/server/business-sources/source-repository";
+import { createWebsiteSource, processWebsiteSource } from "@/server/business-sources/source-service";
 import { applyExtractedFacts } from "@/server/business-sources/apply-extracted-facts";
 import { reconcileProjectRequirements } from "@/server/business-sources/reconcile-project-requirements";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -38,6 +40,7 @@ import { uploadMedia } from "@/server/media/media-service";
 import { requireActivationPreflight } from "@/server/ai-setup/activation-preflight";
 import { AISetupNotFoundError } from "@/server/ai-setup/ai-setup-errors";
 import { logAISetupLifecycle } from "@/server/ai-setup/ai-setup-observability";
+import { projectCommercialContextService } from "@/server/commercial-context/project-commercial-context-service";
 import type { DataRequirement, ExperienceCompositionInput, Project } from "@/types";
 
 function compositionInput(session: AISetupSession): ExperienceCompositionInput {
@@ -72,11 +75,17 @@ function initialSiteInstruction(project: Project, session: AISetupSession) {
     .map((requirement) => `${requirement.label}: ${String(requirement.value ?? session.answers[requirement.key] ?? "confirmado")}`)
     .join("; ");
   const sources = session.sources.filter((source) => source.status === "processed").map((source) => source.name).join(", ");
+  const architecture = session.commercialArchitecture?.journeyBlueprints.map((blueprint) => {
+    const intent = session.commercialArchitecture?.intents.find((item) => item.id === blueprint.intentId);
+    const channel = session.commercialArchitecture?.channels.find((item) => item.id === blueprint.completion.channelId);
+    return `${intent?.label || blueprint.objective} → ${blueprint.mode}${channel ? ` → ${channel.label}` : ""}`;
+  }).join("; ");
   return [
     `Crie a primeira página específica de ${project.name}.`,
     project.description,
     project.category ? `Categoria: ${project.category}.` : "",
     actions ? `Ações confirmadas pelo usuário, em ordem de prioridade: ${actions}.` : "",
+    architecture ? `Arquitetura comercial confirmada, que não deve ser reinventada pelo design: ${architecture}.` : "",
     verified ? `Informações confirmadas no onboarding: ${verified}.` : "",
     sources ? `Materiais analisados: ${sources}.` : "",
     "Mostre múltiplas ações legítimas quando existirem, conecte apenas goals reais e não invente fatos, preços, provas ou números.",
@@ -135,7 +144,7 @@ function plannedQuestions(
   const planningRequirements = session.discoveryPlan
     ? requirements
     : requirements.filter((requirement) => requirement.key !== "qualification.questions");
-  const planned = planAdaptiveQuestions(planningRequirements, session.answers, 3, suggestions, structured);
+  const planned = planAdaptiveQuestions(planningRequirements, session.answers, 3, suggestions, structured, session.commercialArchitecture);
   if (!providerQuestions?.length) return planned;
   const providerByKey = new Map(providerQuestions.map((question) => [question.key, question]));
   return planned.map((question) => {
@@ -155,16 +164,20 @@ async function composePersistedDiscoveryPlan(
   session: AISetupSession,
   answers: Record<string, unknown>,
 ) {
-  if (!session.actionsConfirmed || !recommendationSelected(session)) return undefined;
-  if (answers["qualification.objective"] == null || answers["qualification.offerings"] == null) return undefined;
-  const contextualNames = understandingOfferingNames(session.activationUnderstanding);
+  if (!(session.architectureReviewed || session.actionsConfirmed) || !recommendationSelected(session)) return undefined;
+  const architecture = session.commercialArchitecture;
+  if (!architecture && (answers["qualification.objective"] == null || answers["qualification.offerings"] == null)) return undefined;
+  const contextualNames = architecture?.offerings.map((item) => item.name) || understandingOfferingNames(session.activationUnderstanding);
   const offeringNames = contextualNames.length
     ? contextualNames
     : offerNamesFromSetup(session.initialInput.description, answers["qualification.offerings"]);
   if (offeringNames.length < 2) return undefined;
   const primary = session.visitorActions.find((action) => action.isPrimary) || session.visitorActions[0];
-  const declaredObjective = String(answers["qualification.objective"] || primary?.label || "Orientar o visitante").trim();
-  const destination = String(answers["qualification.destination"] || (session.initialInput.phone ? "WhatsApp" : "Atendimento da equipe")).trim();
+  const primaryIntent = architecture?.intents.find((item) => item.semanticKey === primary?.key) || architecture?.intents[0];
+  const primaryBlueprint = architecture?.journeyBlueprints.find((item) => item.intentId === primaryIntent?.id);
+  const channel = architecture?.channels.find((item) => item.id === primaryBlueprint?.completion.channelId);
+  const declaredObjective = String(answers["qualification.objective"] || primaryBlueprint?.objective || primary?.label || "Orientar o visitante").trim();
+  const destination = String(answers["qualification.destination"] || channel?.label || (session.initialInput.phone ? "WhatsApp" : "Atendimento da equipe")).trim();
   const signature = discoveryContextSignature({
     businessName: session.initialInput.businessName,
     businessDescription: session.initialInput.description,
@@ -200,11 +213,22 @@ export async function reconcileActivationState(
   const baseProfile = session.extractedProfile || new RuleBasedBusinessAnalyzer().analyze(compositionInput(session));
   const selectedActions = session.visitorActions.length
     ? session.visitorActions
+    : session.commercialArchitecture
+      ? visitorActionsFromCommercialArchitecture(session.commercialArchitecture, Boolean(session.architectureReviewed))
     : session.activationUnderstanding
       ? actionsFromActivationUnderstanding(session.activationUnderstanding)
       : defaultVisitorActions(baseProfile, session.initialInput.description);
   const profile = profileWithVisitorActions(baseProfile, selectedActions);
   let answers = { ...session.answers };
+  if (session.commercialArchitecture && recommendationSelected({ ...session, visitorActions: selectedActions })) {
+    const primary = selectedActions.find((action) => action.isPrimary) || selectedActions[0];
+    const intent = session.commercialArchitecture.intents.find((item) => item.semanticKey === primary?.key) || session.commercialArchitecture.intents[0];
+    const blueprint = session.commercialArchitecture.journeyBlueprints.find((item) => item.intentId === intent?.id);
+    answers["qualification.objective"] ??= blueprint?.objective;
+    answers["qualification.offerings"] ??= session.commercialArchitecture.offerings.map((item) => item.name).join("\n");
+    const channel = session.commercialArchitecture.channels.find((item) => item.id === blueprint?.completion.channelId);
+    answers["qualification.destination"] ??= channel?.label;
+  }
   const discoveryPlan = await composePersistedDiscoveryPlan(actor, {
     ...session,
     extractedProfile: profile,
@@ -218,9 +242,18 @@ export async function reconcileActivationState(
     answers = answersWithoutStaleQuestions;
   }
 
-  const capabilities = capabilityPlanner.planForVisitorActions(profile, selectedActions);
+  if (session.commercialArchitecture && discoveryPlan && discoveryPlanIsReady(discoveryPlan)) {
+    answers["qualification.questions"] ??= discoveryPlan.questions;
+  }
+
+  const legacyCapabilities = capabilityPlanner.planForVisitorActions(profile, selectedActions);
+  const capabilities = session.commercialArchitecture
+    ? capabilitiesFromCommercialArchitecture(session.commercialArchitecture, legacyCapabilities)
+    : legacyCapabilities;
   const requirements = resolvedRequirements(
-    requirementsForActions(draftCapabilityRequirements(capabilities), selectedActions, session.id, discoveryPlan),
+    session.commercialArchitecture
+      ? requirementsFromCommercialArchitecture(session.commercialArchitecture, session.id)
+      : requirementsForActions(draftCapabilityRequirements(capabilities), selectedActions, session.id, discoveryPlan),
     answers,
   );
   const validKeys = new Set(requirements.filter((item) => item.status !== "verified").map((item) => item.key));
@@ -250,6 +283,34 @@ function scalarFactValue(value: unknown): string | number | boolean | null {
   } catch {
     return String(value);
   }
+}
+
+function sourceReference(input: { id: string; name: string; type: string; status: string; processingError?: string }): SourceReference {
+  return {
+    id: input.id,
+    name: input.name,
+    type: input.type === "website" ? "website" : input.type === "pdf" ? "pdf" : input.type === "image" ? "image" : input.type === "csv" ? "csv" : "text",
+    status: ["pending", "uploaded", "processing", "processed", "failed"].includes(input.status)
+      ? input.status as SourceReference["status"]
+      : "failed",
+    processingError: input.processingError,
+  };
+}
+
+async function enrichPrimaryWebsite(actor: AISetupActor, session: AISetupSession) {
+  if (actor.persistence !== "database" || !session.initialInput.websiteUrl) return session;
+  const hostname = new URL(session.initialInput.websiteUrl).hostname;
+  if (session.sources.some((item) => item.type === "website" && item.name === hostname)) return session;
+  const created = await createWebsiteSource(actor, { url: session.initialInput.websiteUrl, setupSessionId: session.id });
+  let reference = sourceReference(created);
+  try {
+    const processed = await processWebsiteSource(actor, created.id);
+    reference = sourceReference(processed.source);
+  } catch {
+    const failed = await sourceRepository.get(actor, created.id);
+    if (failed) reference = sourceReference(failed);
+  }
+  return { ...session, sources: [...session.sources, reference].slice(0, 10) } satisfies AISetupSession;
 }
 
 function mergeProjectRequirements(project: Project, session: AISetupSession) {
@@ -336,6 +397,8 @@ export class AISetupService {
       workspaceId: actor.workspaceId,
       status: "collecting",
       initialInput: { businessName: "", description: "" },
+      architectureReviewed: false,
+      architectureEdited: false,
       visitorActions: [],
       actionsConfirmed: false,
       answers: {},
@@ -383,6 +446,8 @@ export class AISetupService {
       workspaceId: actor.workspaceId,
       status: "collecting",
       initialInput: normalizedInput,
+      architectureReviewed: false,
+      architectureEdited: false,
       visitorActions: [],
       actionsConfirmed: false,
       answers: {},
@@ -444,6 +509,9 @@ export class AISetupService {
         initialInput: revisedInput,
         extractedProfile: undefined,
         activationUnderstanding: undefined,
+        commercialArchitecture: undefined,
+        architectureReviewed: false,
+        architectureEdited: false,
         visitorActions: [],
         actionsConfirmed: false,
         answers: {},
@@ -467,17 +535,22 @@ export class AISetupService {
       session = await this.repository.update(actor, { ...session, status: "analyzing", lastError: undefined });
     }
     setupInitialInputSchema.parse(session.initialInput);
+    let sourceEnrichmentFailed = false;
+    try {
+      const enriched = await enrichPrimaryWebsite(actor, session);
+      if (enriched.sources.length !== session.sources.length) session = await this.repository.update(actor, enriched);
+    } catch {
+      // Instagram and public sites are best-effort. Other sources and explicit facts remain usable.
+      sourceEnrichmentFailed = true;
+    }
     const input = compositionInput(session);
     const fallbackProfile = new RuleBasedBusinessAnalyzer().analyze(input);
     let profile = fallbackProfile;
-    let activationUnderstanding = deterministicActivationUnderstanding({
-      profile: fallbackProfile,
-      businessDescription: session.initialInput.description,
-      phone: session.initialInput.phone,
-      websiteUrl: session.initialInput.websiteUrl,
-    });
+    let commercialArchitecture: CommercialArchitecture;
+    let activationUnderstanding = deterministicActivationUnderstanding({ profile: fallbackProfile, businessDescription: session.initialInput.description, phone: session.initialInput.phone, websiteUrl: session.initialInput.websiteUrl });
     let providerQuestions: SetupQuestion[] | undefined;
-    let usedFallback = !isAIConfigured();
+    let usedFallback = !isAIConfigured() || sourceEnrichmentFailed;
+    let contextualArchitectureProduced = false;
 
     const sourceData: ExtractedBusinessSource[] = [];
     if (actor.persistence === "database") {
@@ -491,6 +564,16 @@ export class AISetupService {
       }
     }
 
+    commercialArchitecture = deterministicCommercialArchitecture({
+      businessName: session.initialInput.businessName,
+      businessDescription: session.initialInput.description,
+      phone: session.initialInput.phone,
+      websiteUrl: session.initialInput.websiteUrl,
+      profile,
+      sources: sourceData,
+    });
+    activationUnderstanding = activationUnderstandingFromCommercialArchitecture(commercialArchitecture);
+
     if (isAIConfigured()) {
       try {
         const analysisInput = {
@@ -501,14 +584,26 @@ export class AISetupService {
           userId: actor.userId,
         };
         const provider = getAIProvider();
-        const [businessResult, understandingResult] = await Promise.allSettled([
+        const architecturePromise = provider.analyzeCommercialArchitecture
+          ? provider.analyzeCommercialArchitecture(analysisInput)
+          : provider.analyzeActivationUnderstanding(analysisInput).then((understanding) => commercialArchitectureFromActivationUnderstanding(understanding, {
+              businessName: session.initialInput.businessName,
+              businessDescription: session.initialInput.description,
+              phone: session.initialInput.phone,
+              websiteUrl: session.initialInput.websiteUrl,
+              profile,
+              sources: sourceData,
+            }));
+        const [businessResult, architectureResult] = await Promise.allSettled([
           provider.analyzeBusiness(analysisInput),
-          provider.analyzeActivationUnderstanding(analysisInput),
+          architecturePromise,
         ]);
         if (businessResult.status === "fulfilled") profile = businessResult.value.profile;
         else usedFallback = true;
-        if (understandingResult.status === "fulfilled") {
-          activationUnderstanding = normalizeActivationUnderstanding(understandingResult.value);
+        if (architectureResult.status === "fulfilled") {
+          commercialArchitecture = normalizeCommercialArchitecture(architectureResult.value);
+          activationUnderstanding = normalizeActivationUnderstanding(activationUnderstandingFromCommercialArchitecture(commercialArchitecture));
+          contextualArchitectureProduced = true;
         } else {
           usedFallback = true;
         }
@@ -517,11 +612,19 @@ export class AISetupService {
       }
     }
 
-    const proposedActions = actionsFromActivationUnderstanding(activationUnderstanding);
+    if (!contextualArchitectureProduced) {
+      commercialArchitecture = normalizeCommercialArchitecture({ ...commercialArchitecture, status: "degraded", issues: [...commercialArchitecture.issues, "A análise contextual não ficou disponível. Seus fatos e fontes foram preservados para uma nova tentativa."] });
+      activationUnderstanding = normalizeActivationUnderstanding(activationUnderstandingFromCommercialArchitecture(commercialArchitecture));
+    }
+
+    const proposedActions = visitorActionsFromCommercialArchitecture(commercialArchitecture);
     const provisional = await reconcileActivationState(actor, {
       ...session,
       extractedProfile: profile,
       activationUnderstanding,
+      commercialArchitecture,
+      architectureReviewed: false,
+      architectureEdited: false,
       visitorActions: proposedActions,
       actionsConfirmed: false,
       usedFallback: usedFallback || activationUnderstanding.status === "degraded",
@@ -548,7 +651,17 @@ export class AISetupService {
       ...reconciled,
       status: "waiting_answers",
     });
-    await this.repository.addMessage(actor, id, "assistant", "Analisei o negócio e destaquei as ações mais importantes. Confirme-as antes de continuarmos.", { kind: "analysis", usedFallback });
+    if (actor.persistence === "database") {
+      const database = createServiceClient();
+      if (database) await recordPlatformGrowthEvent(database, {
+        eventName: revision ? "commercial_architecture_regenerated" : "commercial_architecture_generated",
+        userId: actor.userId,
+        workspaceId: actor.workspaceId,
+        metadata: { numberOfSources: session.sources.length, numberOfIntents: commercialArchitecture.intents.length, numberOfJourneyBlueprints: commercialArchitecture.journeyBlueprints.length, numberOfBlockingQuestions: commercialArchitecture.journeyBlueprints.flatMap((item) => item.requiredFacts).filter((item) => item.severity === "blocking").length, architectureConfidence: commercialArchitecture.confidence, usedFallback, sourceCoverage: [...new Set(session.sources.map((item) => item.type))] },
+        idempotencyKey: `${revision ? "commercial_architecture_regenerated" : "commercial_architecture_generated"}:${id}:${next.updatedAt}`,
+      }).catch(() => undefined);
+    }
+    await this.repository.addMessage(actor, id, "assistant", "Estudei os fatos e as fontes e montei uma arquitetura comercial completa para você revisar.", { kind: "commercial_architecture", usedFallback, numberOfIntents: commercialArchitecture.intents.length, numberOfJourneyBlueprints: commercialArchitecture.journeyBlueprints.length, numberOfBlockingQuestions: commercialArchitecture.journeyBlueprints.flatMap((item) => item.requiredFacts).filter((item) => item.severity === "blocking").length, architectureConfidence: commercialArchitecture.confidence });
     return next;
   }
 
@@ -581,18 +694,77 @@ export class AISetupService {
       return { ...action, semanticKey };
     }));
     const confirmation = markActionsConfirmed(session.activationUnderstanding, classifiedActions);
+    const legacyAnswers = { ...session.answers };
+    if (session.commercialArchitecture) {
+      delete legacyAnswers["qualification.objective"];
+      delete legacyAnswers["qualification.offerings"];
+      delete legacyAnswers["qualification.destination"];
+      delete legacyAnswers["qualification.questions"];
+    }
     const reconciled = await reconcileActivationState(actor, {
       ...session,
       activationUnderstanding: confirmation.understanding,
+      commercialArchitecture: undefined,
       visitorActions: confirmation.actions,
       actionsConfirmed: true,
+      architectureReviewed: false,
+      architectureEdited: Boolean(session.commercialArchitecture),
       discoveryPlan: undefined,
+      answers: legacyAnswers,
       status: "waiting_answers",
     });
     const next = await this.repository.update(actor, {
       ...reconciled,
     });
     await this.repository.addMessage(actor, id, "user", confirmation.actions.map((action) => action.label).join(", "), { kind: "visitor_actions", source: confirmation.understanding.source });
+    return next;
+  }
+
+  async confirmCommercialArchitecture(actor: AISetupActor, id: string) {
+    const session = await this.get(actor, id);
+    if (!session.extractedProfile || !session.commercialArchitecture) throw new Error("Analise o negócio antes de confirmar a interpretação.");
+    if (session.commercialArchitecture.status === "degraded") throw new Error("A interpretação ainda não tem segurança suficiente. Tente analisar novamente com mais contexto.");
+    const actions = visitorActionsFromCommercialArchitecture(session.commercialArchitecture, true);
+    const reconciled = await reconcileActivationState(actor, {
+      ...session,
+      architectureReviewed: true,
+      visitorActions: actions,
+      actionsConfirmed: true,
+      status: "waiting_answers",
+      discoveryPlan: undefined,
+    });
+    const next = await this.repository.update(actor, reconciled);
+    if (actor.persistence === "database") {
+      const database = createServiceClient();
+      if (database) await recordPlatformGrowthEvent(database, { eventName: "commercial_architecture_confirmed", userId: actor.userId, workspaceId: actor.workspaceId, metadata: { numberOfIntents: actions.length, architectureConfidence: session.commercialArchitecture.confidence, userEditedArchitecture: false }, idempotencyKey: `commercial_architecture_confirmed:${id}` }).catch(() => undefined);
+    }
+    await this.repository.addMessage(actor, id, "user", "A interpretação comercial está correta.", { kind: "commercial_architecture_confirmed", numberOfIntents: actions.length });
+    return next;
+  }
+
+  async updateCommercialArchitecture(actor: AISetupActor, id: string, input: CommercialArchitecture) {
+    const session = await this.get(actor, id);
+    if (!session.extractedProfile || !session.commercialArchitecture) throw new Error("Analise o negócio antes de ajustar a interpretação.");
+    const architecture = normalizeCommercialArchitecture(commercialArchitectureSchema.parse(input));
+    if (architecture.status === "degraded") throw new Error("O ajuste precisa manter ao menos um caminho comercial completo.");
+    const actions = visitorActionsFromCommercialArchitecture(architecture, true);
+    const reconciled = await reconcileActivationState(actor, {
+      ...session,
+      commercialArchitecture: architecture,
+      activationUnderstanding: normalizeActivationUnderstanding(activationUnderstandingFromCommercialArchitecture(architecture)),
+      architectureReviewed: true,
+      architectureEdited: true,
+      visitorActions: actions,
+      actionsConfirmed: true,
+      status: "waiting_answers",
+      discoveryPlan: undefined,
+    });
+    const next = await this.repository.update(actor, reconciled);
+    if (actor.persistence === "database") {
+      const database = createServiceClient();
+      if (database) await recordPlatformGrowthEvent(database, { eventName: "commercial_architecture_edited", userId: actor.userId, workspaceId: actor.workspaceId, metadata: { numberOfIntents: actions.length, architectureConfidence: architecture.confidence, userEditedArchitecture: true }, idempotencyKey: `commercial_architecture_edited:${id}:${next.updatedAt}` }).catch(() => undefined);
+    }
+    await this.repository.addMessage(actor, id, "user", "Ajustei a interpretação comercial sugerida.", { kind: "commercial_architecture_edited", numberOfIntents: actions.length });
     return next;
   }
 
@@ -658,7 +830,10 @@ export class AISetupService {
     await this.repository.addMessage(actor, id, "user", typeof value === "string" ? value : JSON.stringify(value), { kind: "answer", key });
     if (actor.persistence === "database") {
       const database = createServiceClient();
-      if (database) await recordPlatformGrowthEvent(database, { eventName: "onboarding_stage_completed", userId: actor.userId, workspaceId: actor.workspaceId, metadata: { stage: key }, idempotencyKey: `onboarding_stage_completed:${id}:${key}` }).catch(() => undefined);
+      if (database) await Promise.all([
+        recordPlatformGrowthEvent(database, { eventName: "onboarding_stage_completed", userId: actor.userId, workspaceId: actor.workspaceId, metadata: { stage: key }, idempotencyKey: `onboarding_stage_completed:${id}:${key}` }),
+        recordPlatformGrowthEvent(database, { eventName: "onboarding_blocking_question_answered", userId: actor.userId, workspaceId: actor.workspaceId, metadata: { key }, idempotencyKey: `onboarding_blocking_question_answered:${id}:${key}` }),
+      ]).catch(() => undefined);
     }
     return next;
   }
@@ -668,11 +843,14 @@ export class AISetupService {
     await requireActivationPreflight(actor);
     if (!session.extractedProfile) session = await this.analyze(actor, id);
     session = await reconcileActivationState(actor, session);
-    if (!session.actionsConfirmed) throw new Error("Confirme a estratégia sugerida antes de criar a primeira versão.");
+    if (session.commercialArchitecture ? !session.architectureReviewed : !session.actionsConfirmed) throw new Error("Confirme a interpretação do negócio antes de criar a primeira versão.");
     const blocking = session.missingRequirements.filter((item) => item.severity === "blocking" && item.status !== "verified");
     if (blocking.length) throw new Error("Confirme todas as informações necessárias antes de criar a primeira versão.");
     if (session.activationUnderstanding?.status === "degraded") {
       throw new Error("A análise contextual está degradada. Tente analisar novamente antes de criar a primeira versão.");
+    }
+    if (session.commercialArchitecture?.status === "degraded") {
+      throw new Error("A arquitetura comercial está degradada. Tente analisar novamente com mais contexto antes de criar a primeira versão.");
     }
     if (recommendationSelected(session) && (
       !session.discoveryPlan
@@ -686,17 +864,22 @@ export class AISetupService {
     const baseProfile = session.extractedProfile || new RuleBasedBusinessAnalyzer().analyze(input);
     const selectedActions = session.visitorActions?.length
       ? session.visitorActions
+      : session.commercialArchitecture
+        ? visitorActionsFromCommercialArchitecture(session.commercialArchitecture, true)
       : session.activationUnderstanding
         ? actionsFromActivationUnderstanding(session.activationUnderstanding)
         : defaultVisitorActions(baseProfile, session.initialInput.description);
     const profile = profileWithVisitorActions(baseProfile, selectedActions);
-    const selectedCapabilities = capabilityPlanner.planForVisitorActions(profile, selectedActions);
+    const selectedCapabilities = session.commercialArchitecture
+      ? capabilitiesFromCommercialArchitecture(session.commercialArchitecture, capabilityPlanner.planForVisitorActions(profile, selectedActions))
+      : capabilityPlanner.planForVisitorActions(profile, selectedActions);
     const aiJourney = isAIConfigured() ? async () => getAIProvider().composeJourney({
       input,
       profile,
       capabilities: selectedCapabilities,
       answers: session.answers,
       discoveryPlan: session.discoveryPlan,
+      commercialArchitecture: session.commercialArchitecture,
       workspaceId: actor.workspaceId,
       setupSessionId: id,
       userId: actor.userId,
@@ -707,6 +890,7 @@ export class AISetupService {
       journeyComposer,
       visualComposer,
       aiJourney,
+      session.commercialArchitecture,
     );
     try {
       const generated = await orchestrator.compose(input);
@@ -748,6 +932,7 @@ export class AISetupService {
               conversionGoals: project.conversionGoals,
               commercialConfig: project.commercialConfig,
             },
+            commercialArchitecture: session.commercialArchitecture,
           }));
           siteUsedFallback = false;
         } catch {
@@ -775,6 +960,10 @@ export class AISetupService {
     const persistedProjectId = projectId || session.projectId;
     if (!persistedProjectId) throw new Error("Salve o negócio antes de concluir a configuração.");
     await assertProjectAccess(actor, persistedProjectId, "write");
+    if (session.commercialArchitecture && session.architectureReviewed) {
+      const persistedProject = actor.persistence === "database" ? await loadProjectForActor(actor, persistedProjectId) : null;
+      await projectCommercialContextService.materializeActivationContext(actor, session, persistedProjectId, persistedProject || { ...(session.projectDraft as Project), id: persistedProjectId });
+    }
     return this.repository.update(actor, { ...session, status: "completed", projectId: persistedProjectId });
   }
 
@@ -783,8 +972,11 @@ export class AISetupService {
     if (!session.projectDraft) throw new Error("Crie a primeira versão antes de concluir o onboarding.");
     await assertProjectAccess(actor, projectId, "write");
     if (actor.persistence === "memory") {
+      const commercialContext = session.commercialArchitecture && session.architectureReviewed
+        ? await projectCommercialContextService.materializeActivationContext(actor, session, projectId, { ...(session.projectDraft as Project), id: projectId })
+        : null;
       const completed = await this.repository.update(actor, { ...session, status: "completed", projectId });
-      return { session: completed, project: session.projectDraft, summary: { sourcesAttached: 0, factsAttached: 0, applied: 0, skipped: 0 } };
+      return { session: completed, project: session.projectDraft, summary: { sourcesAttached: 0, factsAttached: 0, applied: 0, skipped: 0, ...(commercialContext ? { commercialContextRevision: commercialContext.revision } : {}) } };
     }
     const client = createServiceClient();
     if (!client) throw new Error("Supabase não configurado.");
@@ -804,6 +996,11 @@ export class AISetupService {
       if (factIds.length) applied = await applyExtractedFacts(actor, { projectId, factIds });
     }
     const requirements = await reconcileProjectRequirements(actor, projectId);
+    const persistedProject = await loadProjectForActor(actor, projectId);
+    if (!persistedProject) throw new Error("Não foi possível carregar o projeto para materializar o contexto comercial.");
+    const commercialContext = session.commercialArchitecture && session.architectureReviewed
+      ? await projectCommercialContextService.materializeActivationContext(actor, session, projectId, persistedProject)
+      : null;
     await activateTrialAfterFirstStructure(client, actor.workspaceId);
     await Promise.all([
       recordPlatformGrowthEvent(client, {
@@ -831,8 +1028,8 @@ export class AISetupService {
     const completed = await this.repository.update(actor, { ...session, status: "completed", projectId });
     return {
       session: completed,
-      project: await loadProjectForActor(actor, projectId),
-      summary: { ...(attached as Record<string, number>), ...applied, requirementsUpdated: requirements.length },
+      project: persistedProject,
+      summary: { ...(attached as Record<string, number>), ...applied, requirementsUpdated: requirements.length, ...(commercialContext ? { commercialContextRevision: commercialContext.revision } : {}) },
     };
   }
 }

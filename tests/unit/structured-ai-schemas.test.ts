@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { zodTextFormat } from "openai/helpers/zod";
-import { activationUnderstandingSchema, brandAIResultSchema, extractedBusinessSourceSchema } from "@/features/ai-setup/ai-setup.schema";
+import { activationUnderstandingSchema, brandAIResultSchema, commercialArchitectureSchema, extractedBusinessSourceSchema } from "@/features/ai-setup/ai-setup.schema";
 
 describe("OpenAI Structured Outputs schemas", () => {
   it("keeps source extraction fields required or nullable", () => {
@@ -13,5 +13,9 @@ describe("OpenAI Structured Outputs schemas", () => {
 
   it("mantém ActivationUnderstanding compatível com Structured Outputs", () => {
     expect(() => zodTextFormat(activationUnderstandingSchema, "activation_understanding")).not.toThrow();
+  });
+
+  it("mantém CommercialArchitecture compatível com Structured Outputs", () => {
+    expect(() => zodTextFormat(commercialArchitectureSchema, "commercial_architecture")).not.toThrow();
   });
 });

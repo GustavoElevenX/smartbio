@@ -9,6 +9,7 @@ import { aiActivationDraftSchema } from "@/features/activations/ai-activation.sc
 import {
   brandAIResultSchema,
   activationUnderstandingSchema,
+  commercialArchitectureSchema,
   businessAnalysisResultSchema,
   copyGenerationResultSchema,
   customVisitorActionClassificationSchema,
@@ -20,6 +21,7 @@ import { AIConfigurationError, normalizeAIError } from "@/server/ai/ai-errors";
 import type {
   BrandAIInput,
   ActivationUnderstandingInput,
+  CommercialArchitectureInput,
   BusinessAnalysisInput,
   CopyGenerationInput,
   JourneyAIInput,
@@ -37,6 +39,7 @@ import type {
 import { recordAIUsage } from "@/server/ai/ai-usage";
 import { brandAnalysisPrompt } from "@/server/ai/prompts/brand-analysis";
 import { activationUnderstandingPrompt } from "@/server/ai/prompts/activation-understanding";
+import { commercialArchitecturePrompt } from "@/server/ai/prompts/commercial-architecture";
 import { businessAnalysisPrompt } from "@/server/ai/prompts/business-analysis";
 import { copyGenerationPrompt } from "@/server/ai/prompts/copy-generation";
 import { journeyCompositionPrompt } from "@/server/ai/prompts/journey-composition";
@@ -64,6 +67,7 @@ const questionListSchema = z.object({
 const operationFeatures: Record<string, EntitlementFeature> = {
   business_analysis: "ai_business_analysis",
   activation_understanding: "ai_business_analysis",
+  commercial_architecture: "ai_business_analysis",
   missing_questions: "ai_business_analysis",
   discovery_planning: "ai_journey",
   journey_composition: "ai_journey",
@@ -241,6 +245,17 @@ export class OpenAIVirouProvider implements VirouAIProvider {
       schemaName: "activation_understanding",
       schema: activationUnderstandingSchema,
       systemPrompt: activationUnderstandingPrompt,
+      payload: { business: input.input, sources: input.sources || [] },
+      context: input,
+    });
+  }
+
+  analyzeCommercialArchitecture(input: CommercialArchitectureInput) {
+    return this.structured({
+      operation: "commercial_architecture",
+      schemaName: "commercial_architecture",
+      schema: commercialArchitectureSchema,
+      systemPrompt: commercialArchitecturePrompt,
       payload: { business: input.input, sources: input.sources || [] },
       context: input,
     });

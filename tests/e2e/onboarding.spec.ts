@@ -11,38 +11,20 @@ test("onboarding adaptativo funciona sem login e gera um rascunho", async ({ pag
   await page.getByLabel("WhatsApp ou telefone (opcional)").fill("(11) 98765-4321");
   await page.getByRole("button", { name: /analisar meu negócio/i }).click();
 
-  await expect(page.getByRole("heading", { name: /o que você quer que essa pessoa consiga fazer/i })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText("Recomendamos de 2 a 5 ações")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /entendi seu negócio assim/i })).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: /editar informações do negócio/i }).click();
   await expect(page.getByLabel("O que você vende e como atende?")).toBeEnabled();
   await page.getByLabel("O que você vende e como atende?").fill("Clínica de estética com tratamentos faciais e corporais. Quero orientar possibilidades sem diagnosticar e encaminhar o visitante para uma avaliação profissional pelo WhatsApp.");
   await page.getByRole("button", { name: /analisar novamente/i }).click();
-  await expect(page.getByRole("heading", { name: /o que você quer que essa pessoa consiga fazer/i })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: /entendi seu negócio assim/i })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("Roteamento", { exact: true })).toHaveCount(0);
-  const removeScheduling = page.getByRole("button", { name: "Remover Agendar", exact: true });
-  if (await removeScheduling.count()) await removeScheduling.click();
-  await page.getByRole("button", { name: "Continuar", exact: true }).click();
-  await expect(page.getByRole("button", { name: /criar minha primeira versão/i })).toHaveCount(0);
-  for (let index = 0; index < 8; index += 1) {
-    if (await page.getByRole("heading", { name: /pronto para montar a primeira versão/i }).isVisible().catch(() => false)) break;
-    const offerings = page.locator("[data-setup-question]").filter({ hasText: /Encontramos estas opções|Encontramos estes serviços|Quais opções a Sobe pode recomendar\?/i });
-    if (await offerings.isVisible().catch(() => false)) {
-      await offerings.getByPlaceholder("Digite sua resposta…").fill("Limpeza de pele; Tratamento facial; Tratamento corporal");
-      await offerings.getByRole("button", { name: /salvar resposta/i }).click();
-    } else {
-      const suggestion = page.getByRole("button", { name: /usar assim/i }).first();
-      await expect(suggestion).toBeVisible();
-      await suggestion.click();
-    }
-    await expect(page.getByText(/salvo\. a sobe atualizou|salvo\. esta confirmação/i)).toBeVisible();
-    await page.waitForTimeout(600);
-  }
-  await expect(page.getByRole("heading", { name: /pronto para montar a primeira versão/i })).toBeVisible();
+  await page.getByRole("button", { name: /está certo, continuar/i }).click();
+  await expect(page.getByRole("heading", { name: /pronto para montar a primeira versão/i })).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: /criar minha primeira versão/i }).click();
 
   await expect(page).toHaveURL(/\/app\/projects\/.+\/launch$/, { timeout: 30_000 });
   await expect(page.getByRole("heading", { name: /sua primeira versão está pronta/i })).toBeVisible();
-  await expect(page.getByText(/pronto para publicar:/i)).toBeVisible();
+  await expect(page.getByText("Rascunho", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Editar página" }).click();
   await expect(page.getByTestId("site-editor-simple")).toBeVisible();
 });
@@ -76,7 +58,7 @@ test("sessão órfã entra em recuperação e nunca dispara analyze com id invá
   await name.fill("Studio Nexo Interiores");
   await page.getByLabel("O que você vende e como atende?").fill("Escritório de arquitetura e interiores que orienta o visitante para o serviço adequado e depois encaminha para conversar com a equipe.");
   await page.getByRole("button", { name: /analisar meu negócio/i }).click();
-  await expect(page.getByRole("heading", { name: /o que você quer que essa pessoa consiga fazer/i })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: /entendi seu negócio assim/i })).toBeVisible({ timeout: 15_000 });
   expect(analyzeRequests).toHaveLength(1);
   expect(analyzeRequests[0]).not.toContain("00000000-0000-4000-8000-000000000099");
 });
@@ -154,25 +136,22 @@ test("WhatsApp inválido permanece visível e mostra como corrigir", async ({ pa
 
   await phone.fill("5511000000000");
   await page.getByRole("button", { name: /analisar meu negócio/i }).click();
-  await expect(page.getByRole("heading", { name: /o que você quer que essa pessoa consiga fazer/i })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: /entendi seu negócio assim/i })).toBeVisible({ timeout: 15_000 });
   await expect(phone).toHaveValue("+5511000000000");
 });
 
-test("orienta quando há ações demais e aceita uma ação personalizada", async ({ page }) => {
+test("mostra múltiplos caminhos inferidos e permite ajustar a interpretação", async ({ page }) => {
   await page.goto("/app/onboarding/ai?new=1");
   await page.getByLabel("Nome do negócio").fill("Ateliê Norte");
   await page.getByLabel("O que você vende e como atende?").fill("Ateliê que vende peças autorais, mostra catálogo e recebe pedidos e orçamentos pelo WhatsApp.");
+  await page.getByLabel("WhatsApp ou telefone (opcional)").fill("(11) 98765-4321");
   await page.getByRole("button", { name: /analisar meu negócio/i }).click();
-  await expect(page.getByRole("heading", { name: /o que você quer que essa pessoa consiga fazer/i })).toBeVisible({ timeout: 15_000 });
-
-  const actions = page.getByRole("region", { name: /o que você quer que essa pessoa consiga fazer/i });
-  while (await actions.locator('button[aria-pressed="true"]').count() < 6) {
-    await actions.getByRole("button", { name: /^Adicionar / }).first().click();
-  }
-  await expect(actions.getByRole("alert")).toContainText("Muitas opções podem deixar a primeira página confusa");
-
-  const otherToggle = actions.getByRole("button", { name: /^(Adicionar|Remover) Outro$/ });
-  if ((await otherToggle.getAttribute("aria-label"))?.startsWith("Adicionar")) await otherToggle.click();
-  await actions.getByLabel("Descreva a outra ação").fill("Baixar catálogo");
-  await expect(actions.getByLabel("Descreva a outra ação")).toHaveValue("Baixar catálogo");
+  await expect(page.getByRole("heading", { name: /entendi seu negócio assim/i })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/ver produtos|fazer um pedido|pedir orçamento/i).first()).toBeVisible();
+  await page.getByRole("button", { name: "Ajustar", exact: true }).click();
+  const pathName = page.getByLabel("Nome do caminho").first();
+  await expect(pathName).toBeVisible();
+  await pathName.fill("Baixar catálogo");
+  await page.getByRole("button", { name: /salvar e continuar/i }).click();
+  await expect(page.getByRole("heading", { name: /pronto para montar a primeira versão/i })).toBeVisible({ timeout: 15_000 });
 });

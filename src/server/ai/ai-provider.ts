@@ -3,7 +3,7 @@ import type { ResponseInputContent } from "openai/resources/responses/responses"
 import type { AttributionContext, BrandProfile, BusinessCapabilityProfile, ConversionGoal, ExperienceCompositionInput, MediaAsset, OptimizationSuggestion, Project, ProjectCapability } from "@/types";
 import type { AIPresenceDraft } from "@/features/presence/ai-presence.schema";
 import type { AIJourneyDraftPayload } from "@/features/composition/composition.schema";
-import type { ActivationUnderstanding, BrandAIResult, BusinessAnalysisResult, CopyGenerationResult, CustomVisitorActionClassification, ExtractedBusinessSource, SetupQuestion } from "@/features/ai-setup/ai-setup.schema";
+import type { ActivationUnderstanding, BrandAIResult, BusinessAnalysisResult, CommercialArchitecture, CopyGenerationResult, CustomVisitorActionClassification, ExtractedBusinessSource, SetupQuestion } from "@/features/ai-setup/ai-setup.schema";
 import type { AIActivationDraft } from "@/features/activations/ai-activation.schema";
 import type { ConversionActivation } from "@/features/activations/activation.types";
 import type { BusinessShape, SuggestedSiteStructure } from "@/features/site-composer/site-composer.types";
@@ -23,6 +23,7 @@ export interface BusinessAnalysisInput extends AIRequestContext {
 }
 
 export type ActivationUnderstandingInput = BusinessAnalysisInput;
+export type CommercialArchitectureInput = BusinessAnalysisInput;
 
 export interface MissingQuestionInput extends AIRequestContext {
   profile: BusinessCapabilityProfile;
@@ -37,6 +38,7 @@ export interface JourneyAIInput extends AIRequestContext {
   answers: Record<string, unknown>;
   confirmedCommercialData?: Project["commercialConfig"];
   discoveryPlan?: DiscoveryPlan;
+  commercialArchitecture?: CommercialArchitecture;
 }
 
 export interface DiscoveryPlanningInput extends AIRequestContext {
@@ -100,6 +102,7 @@ export interface SiteCompositionInput extends AIRequestContext {
   plannerSuggestion: SuggestedSiteStructure;
   currentSite: Project["presence"];
   business: Pick<Project, "name" | "description" | "category" | "audience" | "primaryGoal" | "visualDirection" | "brand" | "businessProfile" | "conversionGoals" | "commercialConfig">;
+  commercialArchitecture?: CommercialArchitecture;
 }
 export interface OptimizationExplanationInput extends AIRequestContext {
   project: Pick<Project, "name" | "category" | "audience" | "primaryGoal">;
@@ -110,6 +113,7 @@ export interface ActivationCompositionInput extends AIRequestContext { businessP
 export interface VirouAIProvider {
   analyzeBusiness(input: BusinessAnalysisInput): Promise<BusinessAnalysisResult>;
   analyzeActivationUnderstanding(input: ActivationUnderstandingInput): Promise<ActivationUnderstanding>;
+  analyzeCommercialArchitecture?(input: CommercialArchitectureInput): Promise<CommercialArchitecture>;
   generateMissingQuestions(input: MissingQuestionInput): Promise<SetupQuestion[]>;
   composeDiscoveryPlan(input: DiscoveryPlanningInput): Promise<DiscoveryPlanDraft>;
   composeJourney(input: JourneyAIInput): Promise<AIJourneyDraftPayload>;

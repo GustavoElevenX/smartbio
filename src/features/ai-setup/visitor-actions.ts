@@ -57,14 +57,15 @@ export function inferDeclaredVisitorActionKeys(value: string): VisitorActionKey[
   };
 
   add("recommendation", /(?:ajud|orient).{0,90}(?:descobrir|entender|escolher|identificar|caminho|opcao|sintoma|necessidade|problema|situacao)|(?:descobrir|entender|encontrar|escolher).{0,70}(?:melhor|ideal|caminho|opcao|necessidade|servico)|(?:receber|recebe|obter).{0,35}(?:orientacao|recomendacao)|(?:descrev|explic).{0,100}(?:orientacao|recomendacao)|recomend/);
-  add("order", /(?:fazer|receber|montar|enviar).{0,30}(?:pedido|encomenda)|pedir (?:comida|produto)/);
+  add("order", /(?:fazer|receber|recebe|montar|enviar).{0,30}(?:pedido|encomenda)|pedir (?:comida|produto)/);
   add("buy", /(?:comprar|adquirir|finalizar compra)/);
-  add("quote", /(?:pedir|solicitar|receber).{0,35}(?:orcamento|cotacao|proposta comercial)|(?:orcamento|cotacao) online/);
+  add("quote", /(?:pedir|solicitar|receber|recebe).{0,35}(?:orcamento|cotacao|proposta comercial)|(?:orcamento|cotacao) online/);
   add("schedule", /(?:agendar|marcar).{0,35}(?:horario|consulta|avaliacao|visita|atendimento)|escolher (?:um )?horario/);
-  add("reserve", /(?:fazer|solicitar|consultar).{0,25}(?:reserva|disponibilidade)|reservar/);
+  add("reserve", /(?:fazer|solicitar|consultar|receber|recebe).{0,35}(?:reserva|disponibilidade|solicitacoes? de reserva)|reservar/);
   add("find_location", /(?:encontrar|achar|localizar).{0,30}(?:unidade|loja|endereco)|como chegar/);
-  add("view_products", /(?:ver|conhecer|explorar).{0,30}(?:produtos|catalogo|cardapio|portfolio)/);
+  add("view_products", /(?:ver|conhecer|explorar|mostrar|mostra).{0,30}(?:produtos|catalogo|cardapio|portfolio)/);
   add("contact", /(?:falar|conversar|entrar em contato).{0,30}(?:equipe|especialista|atendimento)|continuar (?:no|pelo) whatsapp/);
+  add("resale", /(?:revenda|revender|revendedor|atacado|distribuidor|comprar para empresa|venda b2b)/);
 
   return unique(keys);
 }
@@ -250,7 +251,8 @@ function optionSupportsVisitorAction(
     linkedTarget &&
     directStepSupportsVisitorAction(linkedTarget, key)
   ) return true;
-  if (["contact", "support", "other"].includes(key) && optionHasRealDestination(option)) return true;
+  if (["contact", "support", "resale", "quote", "other"].includes(key) && optionHasRealDestination(option)) return true;
+  if (["view_products", "order", "buy"].includes(key) && option.actionType === "open_url" && optionHasRealDestination(option)) return true;
   const target = option.targetStepId
     ? project.steps.find((step) => step.id === option.targetStepId && step.isActive)
     : undefined;

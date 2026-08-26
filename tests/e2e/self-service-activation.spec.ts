@@ -23,6 +23,8 @@ type DiscoveryPlan = {
   offerIntelligenceProfiles: OfferProfile[];
 };
 type SetupSession = {
+  commercialArchitecture?: { intents: Array<{ semanticKey?: string; label: string }>; journeyBlueprints: Array<{ intentId: string; mode: string }> };
+  architectureReviewed?: boolean;
   visitorActions: Array<{ key: string; label: string; isPrimary: boolean }>;
   answers: Record<string, unknown>;
   questions: Array<{ key: string; suggestedAnswer?: string; structuredAnswer?: StructuredQuestion[] }>;
@@ -41,8 +43,6 @@ test("SELF-SERVICE UI PLUMBING — SonoLeve apenas confirma o contrato inferido"
   test.setTimeout(90_000);
   const sentinels = ["Casa Clara", "persiana", "Casa Mix", "suco detox", "suco de laranja", "limpeza de pele", "banho e tosa"];
   const strategicInterventions = 0;
-  let confirmedAutomaticOfferings = false;
-  let confirmedVisiblePlanQuestions = false;
 
   const session = async (sessionId: string) => {
     const response = await page.request.get(`/api/ai/setup/${sessionId}`);
@@ -56,11 +56,7 @@ test("SELF-SERVICE UI PLUMBING — SonoLeve apenas confirma o contrato inferido"
   await page.getByLabel("WhatsApp ou telefone (opcional)").fill("(11) 98765-4321");
   await page.getByRole("button", { name: /analisar meu negócio/i }).click();
 
-  await expect(page.getByRole("heading", { name: /o que você quer que essa pessoa consiga fazer/i })).toBeVisible({ timeout: 20_000 });
-  const recommendationSelection = page.getByRole("button", { name: "Remover Receber uma recomendação", exact: true });
-  const recommendationPriority = page.getByRole("button", { name: "Marcar Receber uma recomendação como ação principal", exact: true });
-  await expect(recommendationSelection).toBeVisible();
-  await expect(recommendationPriority).toContainText("Principal");
+  await expect(page.getByRole("heading", { name: /entendi seu negócio assim/i })).toBeVisible({ timeout: 20_000 });
 
   const sessionId = await page.evaluate(() => {
     const raw = localStorage.getItem("smartbio:last-ai-setup-session");
@@ -70,52 +66,12 @@ test("SELF-SERVICE UI PLUMBING — SonoLeve apenas confirma o contrato inferido"
   expect(sessionId).not.toBe("");
   const analyzed = await session(sessionId);
   expect(analyzed.visitorActions.find((action) => action.key === "recommendation")).toMatchObject({ isPrimary: true });
+  expect(analyzed.commercialArchitecture?.intents.some((intent) => intent.semanticKey === "recommendation")).toBe(true);
+  expect(analyzed.architectureReviewed).toBe(false);
 
-  await page.getByRole("button", { name: "Continuar", exact: true }).click();
-  await expect(page.getByRole("heading", { name: /o que você quer que essa pessoa consiga fazer/i })).not.toBeVisible({ timeout: 20_000 });
-  await expect(page.locator("[data-setup-question]").first()).toBeVisible({ timeout: 20_000 });
-
-  for (let index = 0; index < 10; index += 1) {
-    const readyHeading = page.getByRole("heading", { name: /pronto para montar a primeira versão/i });
-    const current = page.locator("[data-setup-question]").first();
-    await expect.poll(async () => await readyHeading.isVisible().catch(() => false) || await current.isVisible().catch(() => false)).toBe(true);
-    if (await readyHeading.isVisible().catch(() => false)) break;
-
-    const beforeConfirmation = await session(sessionId);
-    const currentQuestion = beforeConfirmation.questions[0];
-    expect(currentQuestion).toBeDefined();
-    const useSuggestion = current.getByRole("button", { name: /usar assim/i });
-    await expect(useSuggestion).toBeVisible();
-
-    if (currentQuestion.key === "qualification.offerings") {
-      expect(currentQuestion.suggestedAnswer?.split("\n")).toEqual(offerNames);
-      for (const offerName of offerNames) await expect(current).toContainText(offerName);
-      await useSuggestion.click();
-      confirmedAutomaticOfferings = true;
-    } else if (currentQuestion.key === "qualification.questions") {
-      const plan = beforeConfirmation.discoveryPlan;
-      expect(plan).toBeDefined();
-      expect(plan).toMatchObject({ status: "ready", version: 1 });
-      expect(plan?.offerings.map((item) => item.name)).toEqual(offerNames);
-      expect(plan?.offerIntelligenceProfiles).toHaveLength(offerNames.length);
-      expect(plan?.offerIntelligenceProfiles.every((profile) => profile.provenance.source !== "deterministic_placeholder")).toBe(true);
-      expect(currentQuestion.suggestedAnswer).toBeUndefined();
-      expect(currentQuestion.structuredAnswer).toEqual(plan?.questions);
-
-      const visibleQuestions = await current.locator("[data-structured-question]").allTextContents();
-      expect(visibleQuestions).toEqual(plan?.questions.map((question) => question.question));
-      await useSuggestion.click();
-      await expect.poll(async () => (await session(sessionId)).answers["qualification.questions"]).toEqual(plan?.questions);
-      confirmedVisiblePlanQuestions = true;
-    } else {
-      await useSuggestion.click();
-    }
-
-    await expect(page.getByText(/salvo\. a sobe atualizou|salvo\. esta confirmação/i)).toBeVisible();
-  }
-
-  expect(confirmedAutomaticOfferings).toBe(true);
-  expect(confirmedVisiblePlanQuestions).toBe(true);
+  await page.getByRole("button", { name: /está certo, continuar/i }).click();
+  await expect(page.getByRole("heading", { name: /entendi seu negócio assim/i })).not.toBeVisible({ timeout: 20_000 });
+  await expect(page.locator("[data-setup-question]")).toHaveCount(0);
   expect(strategicInterventions).toBe(0);
   await expect(page.getByRole("heading", { name: /pronto para montar a primeira versão/i })).toBeVisible({ timeout: 20_000 });
 
