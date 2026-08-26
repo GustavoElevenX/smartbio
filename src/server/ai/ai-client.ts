@@ -3,7 +3,7 @@ import "server-only";
 import { readServerEnv } from "@/lib/env/server";
 import type { VirouAIProvider } from "@/server/ai/ai-provider";
 import { OpenAIVirouProvider } from "@/server/ai/openai-provider";
-import { ActivationGateFakeProvider } from "@/server/ai/activation-gate-fake-provider";
+import { ContractActivationProvider } from "@/server/ai/activation-gate-fake-provider";
 
 let provider: VirouAIProvider | undefined;
 
@@ -16,7 +16,7 @@ function fakeProviderEnabled() {
 }
 
 export function getAIProvider(): VirouAIProvider {
-  if (!provider) provider = fakeProviderEnabled() ? new ActivationGateFakeProvider() : new OpenAIVirouProvider();
+  if (!provider) provider = fakeProviderEnabled() ? new ContractActivationProvider() : new OpenAIVirouProvider();
   return provider;
 }
 

@@ -133,15 +133,6 @@ export const extractedBusinessSourceSchema = z.object({
   warnings: z.array(z.string().max(400)).max(50),
 });
 
-export const businessAnalysisResultSchema = z.object({
-  profile: businessCapabilityProfileSchema,
-  confirmedFacts: z.array(extractedFactSchema).max(200),
-  inferences: z.array(z.string().max(400)).max(40),
-  missingInformation: z.array(z.string().max(300)).max(60),
-  inconsistencies: z.array(z.string().max(400)).max(40),
-  requirements: z.array(dataRequirementSchema).max(100),
-});
-
 export const setupDraftInputSchema = z.object({
   requestedSurface: z.enum(["business_site", "landing_page", "conversion_direct", "recommend"]).optional(),
   businessName: z.string().trim().max(160),
@@ -167,6 +158,57 @@ export const visitorActionKeySchema = z.enum([
   "contact", "find_location", "support", "resale", "recommendation", "other",
 ]);
 
+export const activationDecisionSourceSchema = z.enum([
+  "contextual_ai",
+  "business_confirmed",
+  "deterministic_fallback",
+]);
+
+export const activationUnderstandingSchema = z.object({
+  status: z.enum(["ready", "needs_confirmation", "degraded"]),
+  source: activationDecisionSourceSchema,
+  declaredObjective: z.string().trim().min(1).max(600),
+  primaryAction: z.object({
+    key: visitorActionKeySchema,
+    label: z.string().trim().min(1).max(80),
+    confidence: z.number().min(0).max(1),
+    evidence: z.array(z.string().trim().min(1).max(500)).max(8),
+    source: activationDecisionSourceSchema,
+  }),
+  secondaryActions: z.array(z.object({
+    key: visitorActionKeySchema,
+    label: z.string().trim().min(1).max(80),
+    confidence: z.number().min(0).max(1),
+    source: activationDecisionSourceSchema,
+  })).max(7),
+  completionAction: z.object({
+    key: z.string().trim().min(1).max(80),
+    label: z.string().trim().min(1).max(120),
+    destination: z.enum(["whatsapp", "email", "phone", "native", "external_url"]),
+    confidence: z.number().min(0).max(1),
+    source: activationDecisionSourceSchema,
+  }),
+  offerings: z.array(z.object({
+    name: z.string().trim().min(1).max(160),
+    kind: z.enum(["product", "service", "plan", "package", "other"]),
+    evidence: z.string().trim().min(1).max(500),
+    confidence: z.number().min(0).max(1),
+    source: activationDecisionSourceSchema,
+  })).max(100),
+  needsAssistedDiscovery: z.boolean(),
+  confidence: z.number().min(0).max(1),
+  issues: z.array(z.string().trim().min(1).max(400)).max(40),
+});
+
+export const businessAnalysisResultSchema = z.object({
+  profile: businessCapabilityProfileSchema,
+  confirmedFacts: z.array(extractedFactSchema).max(200),
+  inferences: z.array(z.string().max(400)).max(40),
+  missingInformation: z.array(z.string().max(300)).max(60),
+  inconsistencies: z.array(z.string().max(400)).max(40),
+  requirements: z.array(dataRequirementSchema).max(100),
+});
+
 export const customVisitorActionSemanticKeySchema = z.enum([
   "order", "buy", "view_products", "quote", "schedule", "reserve",
   "contact", "find_location", "support", "resale", "recommendation",
@@ -177,6 +219,10 @@ export const visitorActionSelectionSchema = z.object({
   label: z.string().trim().min(1).max(80),
   isPrimary: z.boolean(),
   semanticKey: customVisitorActionSemanticKeySchema.optional(),
+  source: activationDecisionSourceSchema.optional(),
+  confidence: z.number().min(0).max(1).optional(),
+  evidence: z.array(z.string().trim().min(1).max(500)).max(8).optional(),
+  confirmedByBusiness: z.boolean().optional(),
 });
 
 export const customVisitorActionClassificationSchema = z.object({
@@ -200,6 +246,7 @@ export const aiSetupSessionSchema = z.object({
   status: z.enum(["collecting", "analyzing", "waiting_answers", "generating", "review", "completed", "failed"]),
   initialInput: setupDraftInputSchema,
   extractedProfile: businessCapabilityProfileSchema.optional(),
+  activationUnderstanding: activationUnderstandingSchema.optional(),
   visitorActions: z.array(visitorActionSelectionSchema).max(8).default([]),
   actionsConfirmed: z.boolean().default(false),
   answers: z.record(z.string(), z.unknown()),
@@ -238,3 +285,5 @@ export type BrandIdentity = z.infer<typeof brandIdentitySchema>;
 export type SourceReference = z.infer<typeof sourceReferenceSchema>;
 export type VisitorActionSelection = z.infer<typeof visitorActionSelectionSchema>;
 export type CustomVisitorActionClassification = z.infer<typeof customVisitorActionClassificationSchema>;
+export type ActivationUnderstanding = z.infer<typeof activationUnderstandingSchema>;
+export type ActivationDecisionSource = z.infer<typeof activationDecisionSourceSchema>;

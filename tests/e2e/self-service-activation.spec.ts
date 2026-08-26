@@ -1,7 +1,16 @@
 import { expect, test } from "@playwright/test";
 
-const description = "A Casa Clara vende persianas e ajuda clientes que não sabem qual modelo escolher. Serviços: Persiana Rolô Blackout, Persiana Romana e Persiana Double Vision. O visitante deve explicar necessidade de luz, privacidade e estilo, receber uma orientação e depois continuar pelo WhatsApp.";
-const offerNames = ["Persiana Rolô Blackout", "Persiana Romana", "Persiana Double Vision"];
+const description = `A SonoLeve é uma loja especializada em colchões e conforto para o sono. Muitos clientes sabem o que os incomoda, mas não sabem qual opção escolher.
+
+Produtos reais:
+- Colchão de espuma
+- Colchão de molas ensacadas
+- Colchão ortopédico
+- Pillow top
+- Protetor impermeável
+
+Queremos que a pessoa explique o que busca, responda poucas perguntas e receba uma orientação entre essas opções antes de continuar pelo WhatsApp.`;
+const offerNames = ["Colchão de espuma", "Colchão de molas ensacadas", "Colchão ortopédico", "Pillow top", "Protetor impermeável"];
 
 type StructuredQuestion = { id: string; question: string; type: string; purpose: string; required: boolean };
 type OfferProfile = { offerId: string; offerName: string; provenance: { source: string; discoveryPlanId?: string; projectId: string } };
@@ -28,9 +37,9 @@ type SetupSession = {
   };
 };
 
-test("SELF-SERVICE ACTIVATION E2E — Casa Clara confirma a estratégia inferida sem corrigi-la", async ({ page }, testInfo) => {
+test("SELF-SERVICE UI PLUMBING — SonoLeve apenas confirma o contrato inferido", async ({ page }, testInfo) => {
   test.setTimeout(90_000);
-  const sentinels = ["Casa Mix", "suco detox", "suco de laranja", "limpeza de pele", "banho e tosa"];
+  const sentinels = ["Casa Clara", "persiana", "Casa Mix", "suco detox", "suco de laranja", "limpeza de pele", "banho e tosa"];
   const strategicInterventions = 0;
   let confirmedAutomaticOfferings = false;
   let confirmedVisiblePlanQuestions = false;
@@ -42,7 +51,7 @@ test("SELF-SERVICE ACTIVATION E2E — Casa Clara confirma a estratégia inferida
   };
 
   await page.goto("/app/onboarding/ai?new=1");
-  await page.getByLabel("Nome do negócio").fill("Casa Clara");
+  await page.getByLabel("Nome do negócio").fill("SonoLeve Colchões");
   await page.getByLabel("O que você vende e como atende?").fill(description);
   await page.getByLabel("WhatsApp ou telefone (opcional)").fill("(11) 98765-4321");
   await page.getByRole("button", { name: /analisar meu negócio/i }).click();
@@ -115,13 +124,13 @@ test("SELF-SERVICE ACTIVATION E2E — Casa Clara confirma a estratégia inferida
   expect(persistedPlan).toMatchObject({ status: "ready", version: 1 });
   expect(persistedPlan?.offerings.map((item) => item.name)).toEqual(offerNames);
   expect(persistedPlan?.questions).toHaveLength(3);
-  expect(persistedPlan?.offerIntelligenceProfiles).toHaveLength(3);
+  expect(persistedPlan?.offerIntelligenceProfiles).toHaveLength(offerNames.length);
   expect(persistedPlan?.offerIntelligenceProfiles.every((profile) => profile.provenance.source !== "deterministic_placeholder")).toBe(true);
 
   await page.getByRole("button", { name: /criar minha primeira versão/i }).click();
   await expect(page).toHaveURL(/\/app\/projects\/.+\/launch$/, { timeout: 40_000 });
   await expect(page.getByRole("heading", { name: /sua primeira versão está pronta/i })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Casa Clara", exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "SonoLeve Colchões", exact: true }).first()).toBeVisible();
   const visiblePage = await page.locator("body").innerText();
   for (const offerName of offerNames) expect(visiblePage).toContain(offerName);
   for (const sentinel of sentinels) expect(visiblePage.toLowerCase()).not.toContain(sentinel.toLowerCase());
@@ -145,10 +154,10 @@ test("SELF-SERVICE ACTIVATION E2E — Casa Clara confirma a estratégia inferida
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
     await expect(page.getByRole("link", { name: "Editar página" })).toBeVisible();
   }
-  const screenshotPath = process.env.ACTIVATION_GATE_SCREENSHOT_PATH || testInfo.outputPath("casa-clara-generated-mobile-390.png");
+  const screenshotPath = process.env.ACTIVATION_GATE_SCREENSHOT_PATH || testInfo.outputPath("sonoleve-generated-mobile-390.png");
   await page.screenshot({ path: screenshotPath, fullPage: true });
   console.log("ACTIVATION_SCREENSHOT_METADATA", JSON.stringify({
-    projectName: "Casa Clara",
+    projectName: "SonoLeve Colchões",
     projectId: generated.id,
     route: `/app/projects/${generated.id}/launch`,
     generatedByPipeline: true,
@@ -160,5 +169,5 @@ test("SELF-SERVICE ACTIVATION E2E — Casa Clara confirma a estratégia inferida
 
   await page.getByRole("link", { name: "Editar página" }).click();
   await expect(page.getByTestId("site-editor-simple")).toBeVisible();
-  await expect(page.getByText("Casa Clara").filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByText("SonoLeve Colchões").filter({ visible: true }).first()).toBeVisible();
 });

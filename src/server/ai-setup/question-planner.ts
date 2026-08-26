@@ -44,7 +44,7 @@ const humanTitles: Record<string, string> = {
   "qualification.questions": "Perguntas iniciais sugeridas pela Sobe",
   "qualification.outcome": "Encaminhamento sugerido",
   "qualification.destination": "Como o atendimento vai continuar",
-  "qualification.offerings": "Encontramos estes serviços",
+  "qualification.offerings": "Encontramos estas opções",
   "quote.services": "Quais serviços o cliente pode pedir orçamento por aqui?",
   "quote.mode": "Como você costuma informar o valor de um orçamento?",
   "quote.destination": "Quem deve receber o pedido de orçamento?",

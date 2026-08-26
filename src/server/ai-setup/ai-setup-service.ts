@@ -2,11 +2,13 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { extractedBusinessSourceSchema, setupDraftInputSchema, setupInitialInputSchema, structuredJourneyQuestionSchema, type AISetupSession, type ExtractedBusinessSource, type SetupDraftInput, type SetupInitialInput, type SetupQuestion, type SourceReference } from "@/features/ai-setup/ai-setup.schema";
+import { actionsFromActivationUnderstanding, deterministicActivationUnderstanding, markActionsConfirmed, markOfferingsConfirmed, normalizeActivationUnderstanding, understandingOfferingNames } from "@/features/ai-setup/activation-understanding";
+import { assertActivationStateInvariants } from "@/features/ai-setup/activation-state-invariants";
 import { materializeSetupAnswers } from "@/features/ai-setup/materialize-setup-answers";
 import { stageGeneratedDraft } from "@/features/ai-setup/stage-generated-draft";
 import { normalizeSetupPhone } from "@/features/ai-setup/setup-phone";
 import { buildQualificationSuggestions } from "@/features/ai-setup/qualification-proposal";
-import { createDiscoveryPlan, discoveryContextSignature } from "@/features/qualification/discovery-plan";
+import { createDiscoveryPlan, discoveryContextSignature, discoveryPlanIsReady } from "@/features/qualification/discovery-plan";
 import { offerNamesFromSetup } from "@/features/qualification/offer-context";
 import { applyVisitorActionsToProject, classifyCustomVisitorAction, defaultVisitorActions, ensureVisitorActionTargets, profileWithVisitorActions, type VisitorActionSelection } from "@/features/ai-setup/visitor-actions";
 import { RuleBasedBusinessAnalyzer } from "@/features/business-understanding/rule-based-business-analyzer";
@@ -96,11 +98,17 @@ function requirementsForActions(
   requirements: DataRequirement[],
   actions: VisitorActionSelection[],
   projectId = "setup",
+  discoveryPlan?: AISetupSession["discoveryPlan"],
 ) {
   const primary = actions.find((action) => action.isPrimary) || actions[0];
   const recommends = primary && (primary.key === "recommendation" || primary.semanticKey === "recommendation");
-  if (!recommends || requirements.some((item) => item.key === "qualification.offerings")) return requirements;
-  const questionsIndex = requirements.findIndex((item) => item.key === "qualification.questions");
+  const withoutOrphanQuestions = discoveryPlan
+    ? requirements
+    : requirements.filter((item) => item.key !== "qualification.questions");
+  if (!recommends) return withoutOrphanQuestions;
+  if (withoutOrphanQuestions.some((item) => item.key === "qualification.offerings")) return withoutOrphanQuestions;
+  const questionsIndex = withoutOrphanQuestions.findIndex((item) => item.key === "qualification.questions");
+  const objectiveIndex = withoutOrphanQuestions.findIndex((item) => item.key === "qualification.objective");
   const offering: DataRequirement = {
     id: `${projectId}:qualification.offerings`,
     key: "qualification.offerings",
@@ -110,8 +118,8 @@ function requirementsForActions(
     severity: "blocking",
     reason: "Quais opções reais podem aparecer no resultado?",
   };
-  const next = [...requirements];
-  next.splice(questionsIndex < 0 ? next.length : questionsIndex, 0, offering);
+  const next = [...withoutOrphanQuestions];
+  next.splice(questionsIndex >= 0 ? questionsIndex : objectiveIndex >= 0 ? objectiveIndex + 1 : next.length, 0, offering);
   return next;
 }
 
@@ -147,9 +155,12 @@ async function composePersistedDiscoveryPlan(
   session: AISetupSession,
   answers: Record<string, unknown>,
 ) {
-  if (!recommendationSelected(session)) return undefined;
-  if (answers["qualification.offerings"] == null) return undefined;
-  const offeringNames = offerNamesFromSetup(session.initialInput.description, answers["qualification.offerings"]);
+  if (!session.actionsConfirmed || !recommendationSelected(session)) return undefined;
+  if (answers["qualification.objective"] == null || answers["qualification.offerings"] == null) return undefined;
+  const contextualNames = understandingOfferingNames(session.activationUnderstanding);
+  const offeringNames = contextualNames.length
+    ? contextualNames
+    : offerNamesFromSetup(session.initialInput.description, answers["qualification.offerings"]);
   if (offeringNames.length < 2) return undefined;
   const primary = session.visitorActions.find((action) => action.isPrimary) || session.visitorActions[0];
   const declaredObjective = String(answers["qualification.objective"] || primary?.label || "Orientar o visitante").trim();
@@ -179,6 +190,56 @@ async function composePersistedDiscoveryPlan(
   } catch {
     return createDiscoveryPlan({ ...planningInput, providerFailed: true });
   }
+}
+
+export async function reconcileActivationState(
+  actor: AISetupActor,
+  session: AISetupSession,
+  providerQuestions?: SetupQuestion[],
+) {
+  const baseProfile = session.extractedProfile || new RuleBasedBusinessAnalyzer().analyze(compositionInput(session));
+  const selectedActions = session.visitorActions.length
+    ? session.visitorActions
+    : session.activationUnderstanding
+      ? actionsFromActivationUnderstanding(session.activationUnderstanding)
+      : defaultVisitorActions(baseProfile, session.initialInput.description);
+  const profile = profileWithVisitorActions(baseProfile, selectedActions);
+  let answers = { ...session.answers };
+  const discoveryPlan = await composePersistedDiscoveryPlan(actor, {
+    ...session,
+    extractedProfile: profile,
+    visitorActions: selectedActions,
+    answers,
+  }, answers);
+
+  if (session.discoveryPlan && discoveryPlan && session.discoveryPlan.id !== discoveryPlan.id) {
+    const { ["qualification.questions"]: _discardedQuestions, ...answersWithoutStaleQuestions } = answers;
+    void _discardedQuestions;
+    answers = answersWithoutStaleQuestions;
+  }
+
+  const capabilities = capabilityPlanner.planForVisitorActions(profile, selectedActions);
+  const requirements = resolvedRequirements(
+    requirementsForActions(draftCapabilityRequirements(capabilities), selectedActions, session.id, discoveryPlan),
+    answers,
+  );
+  const validKeys = new Set(requirements.filter((item) => item.status !== "verified").map((item) => item.key));
+  const validProviderQuestions = providerQuestions?.filter((item) => validKeys.has(item.key)).slice(0, 3);
+  const reconciled = {
+    ...session,
+    extractedProfile: profile,
+    visitorActions: selectedActions,
+    answers,
+    discoveryPlan,
+    missingRequirements: requirements,
+    usedFallback: session.usedFallback
+      || session.activationUnderstanding?.status === "degraded"
+      || discoveryPlan?.status === "degraded",
+  } satisfies AISetupSession;
+  return assertActivationStateInvariants({
+    ...reconciled,
+    questions: plannedQuestions(reconciled, requirements, validProviderQuestions),
+  } satisfies AISetupSession);
 }
 
 function scalarFactValue(value: unknown): string | number | boolean | null {
@@ -382,6 +443,7 @@ export class AISetupService {
         status: "analyzing",
         initialInput: revisedInput,
         extractedProfile: undefined,
+        activationUnderstanding: undefined,
         visitorActions: [],
         actionsConfirmed: false,
         answers: {},
@@ -408,6 +470,12 @@ export class AISetupService {
     const input = compositionInput(session);
     const fallbackProfile = new RuleBasedBusinessAnalyzer().analyze(input);
     let profile = fallbackProfile;
+    let activationUnderstanding = deterministicActivationUnderstanding({
+      profile: fallbackProfile,
+      businessDescription: session.initialInput.description,
+      phone: session.initialInput.phone,
+      websiteUrl: session.initialInput.websiteUrl,
+    });
     let providerQuestions: SetupQuestion[] | undefined;
     let usedFallback = !isAIConfigured();
 
@@ -425,28 +493,40 @@ export class AISetupService {
 
     if (isAIConfigured()) {
       try {
-        const result = await getAIProvider().analyzeBusiness({
+        const analysisInput = {
           input,
           sources: sourceData,
           workspaceId: actor.workspaceId,
           setupSessionId: id,
           userId: actor.userId,
-        });
+        };
+        const provider = getAIProvider();
+        const [result, contextualUnderstanding] = await Promise.all([
+          provider.analyzeBusiness(analysisInput),
+          provider.analyzeActivationUnderstanding(analysisInput),
+        ]);
         profile = result.profile;
+        activationUnderstanding = normalizeActivationUnderstanding(contextualUnderstanding);
       } catch {
         usedFallback = true;
       }
     }
 
-    const capabilities = capabilityPlanner.plan(profile);
-    const proposedActions = session.visitorActions?.length ? session.visitorActions : defaultVisitorActions(profile, session.initialInput.description);
-    const requirements = resolvedRequirements(requirementsForActions(draftCapabilityRequirements(capabilities), proposedActions, session.id), session.answers);
+    const proposedActions = actionsFromActivationUnderstanding(activationUnderstanding);
+    const provisional = await reconcileActivationState(actor, {
+      ...session,
+      extractedProfile: profile,
+      activationUnderstanding,
+      visitorActions: proposedActions,
+      actionsConfirmed: false,
+      usedFallback: usedFallback || activationUnderstanding.status === "degraded",
+    });
     if (isAIConfigured() && !usedFallback) {
       try {
         providerQuestions = await getAIProvider().generateMissingQuestions({
           profile,
-          requirements,
-          answers: session.answers,
+          requirements: provisional.missingRequirements,
+          answers: provisional.answers,
           workspaceId: actor.workspaceId,
           setupSessionId: id,
           userId: actor.userId,
@@ -455,22 +535,13 @@ export class AISetupService {
         usedFallback = true;
       }
     }
-    const validKeys = new Set(requirements.filter((item) => item.status !== "verified").map((item) => item.key));
-    const questions = providerQuestions?.filter((item) => validKeys.has(item.key)).slice(0, 3);
-    const questionSession = {
-      ...session,
-      extractedProfile: profile,
-      visitorActions: proposedActions,
-    };
+    const reconciled = await reconcileActivationState(actor, {
+      ...provisional,
+      usedFallback: usedFallback || provisional.usedFallback,
+    }, providerQuestions);
     const next = await this.repository.update(actor, {
-      ...session,
+      ...reconciled,
       status: "waiting_answers",
-      extractedProfile: profile,
-      visitorActions: questionSession.visitorActions,
-      actionsConfirmed: session.actionsConfirmed || false,
-      missingRequirements: requirements,
-      questions: plannedQuestions(questionSession, requirements, questions),
-      usedFallback,
     });
     await this.repository.addMessage(actor, id, "assistant", "Analisei o negócio e destaquei as ações mais importantes. Confirme-as antes de continuarmos.", { kind: "analysis", usedFallback });
     return next;
@@ -479,6 +550,7 @@ export class AISetupService {
   async confirmVisitorActions(actor: AISetupActor, id: string, actions: VisitorActionSelection[]) {
     const session = await this.get(actor, id);
     if (!session.extractedProfile) throw new Error("Analise o negócio antes de confirmar as ações.");
+    if (!session.activationUnderstanding) throw new Error("A análise não produziu um entendimento de Activation confirmável.");
     if (!actions.length) throw new Error("Escolha ao menos uma ação para o visitante.");
     if (actions.filter((action) => action.isPrimary).length !== 1) throw new Error("Marque uma única ação como principal.");
     const provider = isAIConfigured() ? getAIProvider() : undefined;
@@ -503,58 +575,80 @@ export class AISetupService {
       }
       return { ...action, semanticKey };
     }));
-    const profile = profileWithVisitorActions(session.extractedProfile, classifiedActions);
-    const requirements = resolvedRequirements(requirementsForActions(draftCapabilityRequirements(capabilityPlanner.planForVisitorActions(profile, classifiedActions)), classifiedActions, session.id), session.answers);
-    const next = await this.repository.update(actor, {
+    const confirmation = markActionsConfirmed(session.activationUnderstanding, classifiedActions);
+    const reconciled = await reconcileActivationState(actor, {
       ...session,
-      extractedProfile: profile,
-      visitorActions: classifiedActions,
+      activationUnderstanding: confirmation.understanding,
+      visitorActions: confirmation.actions,
       actionsConfirmed: true,
       discoveryPlan: undefined,
-      missingRequirements: requirements,
-      questions: plannedQuestions({ ...session, extractedProfile: profile, visitorActions: classifiedActions, discoveryPlan: undefined }, requirements),
       status: "waiting_answers",
     });
-    await this.repository.addMessage(actor, id, "user", classifiedActions.map((action) => action.label).join(", "), { kind: "visitor_actions" });
+    const next = await this.repository.update(actor, {
+      ...reconciled,
+    });
+    await this.repository.addMessage(actor, id, "user", confirmation.actions.map((action) => action.label).join(", "), { kind: "visitor_actions", source: confirmation.understanding.source });
     return next;
   }
 
   async answer(actor: AISetupActor, id: string, key: string, value: unknown) {
     const session = await this.get(actor, id);
     if (!session.missingRequirements.some((item) => item.key === key)) throw new Error("Essa pergunta não pertence à sessão atual.");
-    let answers = { ...session.answers, [key]: value };
-    let requirements = resolvedRequirements(session.missingRequirements, answers);
-    let discoveryPlan = await composePersistedDiscoveryPlan(actor, { ...session, answers }, answers);
-    if (session.discoveryPlan && discoveryPlan && session.discoveryPlan.id !== discoveryPlan.id && key !== "qualification.questions") {
-      const { ["qualification.questions"]: _discardedQuestions, ...answersWithoutStaleQuestions } = answers;
-      void _discardedQuestions;
-      answers = answersWithoutStaleQuestions;
-      requirements = requirements.map((requirement) => requirement.key === "qualification.questions"
-        ? { ...requirement, status: "missing", value: undefined, origin: undefined, sourceId: undefined, reason: "O contexto mudou; confirme as perguntas da nova versão do DiscoveryPlan." }
-        : requirement);
+    let activationUnderstanding = session.activationUnderstanding;
+    if (activationUnderstanding && key === "qualification.offerings") {
+      const confirmedOfferings = offerNamesFromSetup("", value);
+      if (confirmedOfferings.length < 2) throw new Error("Confirme pelo menos duas opções reais para montar a recomendação.");
+      activationUnderstanding = markOfferingsConfirmed(
+        activationUnderstanding,
+        confirmedOfferings,
+      );
     }
-    if (key === "qualification.questions" && discoveryPlan && Array.isArray(value)) {
+    if (activationUnderstanding && key === "qualification.objective" && typeof value === "string" && value.trim()) {
+      activationUnderstanding = normalizeActivationUnderstanding({
+        ...activationUnderstanding,
+        declaredObjective: value.trim(),
+      });
+    }
+    if (activationUnderstanding && key === "qualification.destination" && typeof value === "string" && value.trim()) {
+      const normalized = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      activationUnderstanding = normalizeActivationUnderstanding({
+        ...activationUnderstanding,
+        completionAction: {
+          ...activationUnderstanding.completionAction,
+          label: value.trim(),
+          destination: normalized.includes("whatsapp") ? "whatsapp"
+            : normalized.includes("mail") ? "email"
+              : normalized.includes("telefone") ? "phone"
+                : normalized.includes("http") ? "external_url"
+                  : "native",
+          confidence: 1,
+          source: "business_confirmed",
+        },
+      });
+    }
+    let reconciled = await reconcileActivationState(actor, {
+      ...session,
+      activationUnderstanding,
+      answers: { ...session.answers, [key]: value },
+    });
+    if (key === "qualification.questions" && reconciled.discoveryPlan && Array.isArray(value)) {
       const confirmedQuestions = value
         .map((item) => structuredJourneyQuestionSchema.safeParse(item))
         .filter((item) => item.success)
         .map((item) => item.data);
-      if (confirmedQuestions.length >= 2) discoveryPlan = {
-        ...discoveryPlan,
+      if (confirmedQuestions.length < 2) throw new Error("Confirme pelo menos duas perguntas para a descoberta assistida.");
+      reconciled = await reconcileActivationState(actor, {
+        ...reconciled,
+        discoveryPlan: {
+        ...reconciled.discoveryPlan,
         questions: confirmedQuestions.slice(0, 4),
-        provenance: { ...discoveryPlan.provenance, source: "business_confirmed" },
-      };
+        provenance: { ...reconciled.discoveryPlan.provenance, source: "business_confirmed" },
+        },
+      });
     }
-    const sessionWithPlan = {
-      ...session,
-      answers,
-      discoveryPlan,
-      usedFallback: session.usedFallback || discoveryPlan?.status === "degraded",
-    };
     const next = await this.repository.update(actor, {
-      ...sessionWithPlan,
+      ...reconciled,
       status: "waiting_answers",
-      missingRequirements: requirements,
-      questions: plannedQuestions(sessionWithPlan, requirements),
     });
     await this.repository.addMessage(actor, id, "user", typeof value === "string" ? value : JSON.stringify(value), { kind: "answer", key });
     if (actor.persistence === "database") {
@@ -568,10 +662,28 @@ export class AISetupService {
     let session = await this.get(actor, id);
     await requireActivationPreflight(actor);
     if (!session.extractedProfile) session = await this.analyze(actor, id);
+    session = await reconcileActivationState(actor, session);
+    if (!session.actionsConfirmed) throw new Error("Confirme a estratégia sugerida antes de criar a primeira versão.");
+    const blocking = session.missingRequirements.filter((item) => item.severity === "blocking" && item.status !== "verified");
+    if (blocking.length) throw new Error("Confirme todas as informações necessárias antes de criar a primeira versão.");
+    if (session.activationUnderstanding?.status === "degraded") {
+      throw new Error("A análise contextual está degradada. Tente analisar novamente antes de criar a primeira versão.");
+    }
+    if (recommendationSelected(session) && (
+      !session.discoveryPlan
+      || !discoveryPlanIsReady(session.discoveryPlan)
+      || session.answers["qualification.questions"] == null
+    )) {
+      throw new Error("A recomendação precisa de ofertas, DiscoveryPlan e perguntas confirmadas antes da geração.");
+    }
     session = await this.repository.update(actor, { ...session, status: "generating", lastError: undefined });
     const input = compositionInput(session);
     const baseProfile = session.extractedProfile || new RuleBasedBusinessAnalyzer().analyze(input);
-    const selectedActions = session.visitorActions?.length ? session.visitorActions : defaultVisitorActions(baseProfile, session.initialInput.description);
+    const selectedActions = session.visitorActions?.length
+      ? session.visitorActions
+      : session.activationUnderstanding
+        ? actionsFromActivationUnderstanding(session.activationUnderstanding)
+        : defaultVisitorActions(baseProfile, session.initialInput.description);
     const profile = profileWithVisitorActions(baseProfile, selectedActions);
     const selectedCapabilities = capabilityPlanner.planForVisitorActions(profile, selectedActions);
     const aiJourney = isAIConfigured() ? async () => getAIProvider().composeJourney({

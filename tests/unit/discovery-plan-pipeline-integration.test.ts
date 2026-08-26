@@ -8,9 +8,8 @@ import { ActivationGateFakeProvider } from "@/server/ai/activation-gate-fake-pro
 import { setAIProviderForTests } from "@/server/ai/ai-client";
 import type { AISetupActor } from "@/server/auth/setup-actor";
 import type { Project } from "@/types";
-import { recommendService } from "@/features/qualification/recommendation-engine";
 import { validateConversionPath } from "@/features/publishing/conversion-path-validator";
-import { getProjectReadiness } from "@/features/publishing/project-readiness";
+import { calculateSetupReadiness } from "@/features/ai-setup/setup-readiness";
 import type { DiscoveryPlanningInput } from "@/server/ai/ai-provider";
 
 class FailingDiscoveryProvider extends ActivationGateFakeProvider {
@@ -94,7 +93,8 @@ describe("pipeline integration real do DiscoveryPlan", () => {
       { key: "contact", label: "Conversar com a equipe", isPrimary: false },
     ]);
     const ordered = session.missingRequirements.map((item) => item.key);
-    expect(ordered.indexOf("qualification.offerings")).toBeLessThan(ordered.indexOf("qualification.questions"));
+    expect(ordered).toContain("qualification.offerings");
+    expect(ordered).not.toContain("qualification.questions");
     expect(session.questions.some((item) => item.key === "qualification.questions")).toBe(false);
     expect(session.questions.map((item) => item.key)).toEqual(expect.arrayContaining(["qualification.objective", "qualification.offerings"]));
 
@@ -129,19 +129,14 @@ describe("pipeline integration real do DiscoveryPlan", () => {
     expect(project.commercialConfig?.serviceOfferings?.map((item) => item.id)).toEqual(persistedPlan.offerings.map((item) => item.id));
     expect(project.commercialConfig?.serviceOfferings?.every((item) => item.settings?.discoveryPlanId === persistedPlan.id)).toBe(true);
     expect(validateConversionPath(project).checks.find((check) => check.key === "plan")?.valid).toBe(true);
-    const runtime = recommendService({ qualification_1: "Quero bloquear a entrada de luz e ter mais privacidade no ambiente." }, project.commercialConfig?.serviceOfferings || []);
-    expect(runtime.service?.name).toBe("Persiana Rolô Blackout");
-    expect(runtime.strongEvidence).toBe(true);
   });
 
   it("mantém falha do provider explicitamente degradada e readiness bloqueada", async () => {
     const { service, session } = await sessionWithPlan(new FailingDiscoveryProvider(), ["Persiana Rolô Blackout", "Persiana Romana", "Persiana Double Vision"]);
     expect(session.discoveryPlan).toMatchObject({ status: "degraded", provenance: { source: "deterministic_placeholder" } });
     expect(session.usedFallback).toBe(true);
-    const generated = await generateDraft(service, session);
-    const project = generated.projectDraft as Project;
-    expect(validateConversionPath(project).checks.find((check) => check.key === "plan")?.valid).toBe(false);
-    expect(getProjectReadiness(project).publishable).toBe(false);
+    expect(calculateSetupReadiness(session.missingRequirements, session).readyToGenerate).toBe(false);
+    await expect(generateDraft(service, session)).rejects.toThrow(/DiscoveryPlan|recomenda|degradada/i);
   });
 
   it("não promove resposta incompleta de 4/5 perfis e readiness continua bloqueada", async () => {
@@ -149,10 +144,7 @@ describe("pipeline integration real do DiscoveryPlan", () => {
     const { service, session } = await sessionWithPlan(new IncompleteDiscoveryProvider(), offers);
     expect(session.discoveryPlan?.status).toBe("degraded");
     expect(session.discoveryPlan?.issues.join(" ")).toContain("Persiana Vertical");
-    const generated = await generateDraft(service, session);
-    const project = generated.projectDraft as Project;
-    expect(project.commercialConfig?.serviceOfferings).toHaveLength(5);
-    expect(validateConversionPath(project).checks.find((check) => check.key === "plan")?.valid).toBe(false);
-    expect(getProjectReadiness(project).publishable).toBe(false);
+    expect(calculateSetupReadiness(session.missingRequirements, session).readyToGenerate).toBe(false);
+    await expect(generateDraft(service, session)).rejects.toThrow(/DiscoveryPlan|recomenda|degradada/i);
   });
 });

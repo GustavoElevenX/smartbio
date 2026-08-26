@@ -1,5 +1,6 @@
 import type { AISetupSession } from "@/features/ai-setup/ai-setup.schema";
 import { offerNamesFromSetup } from "@/features/qualification/offer-context";
+import { understandingOfferingNames } from "@/features/ai-setup/activation-understanding";
 import {
   buildDeterministicOfferIntelligence,
   questionsFromOfferIntelligenceProfiles,
@@ -19,16 +20,21 @@ function isHealthRelated(session: Pick<AISetupSession, "initialInput" | "extract
 }
 
 export function buildQualificationSuggestions(
-  session: Pick<AISetupSession, "initialInput" | "extractedProfile" | "visitorActions"> & Partial<Pick<AISetupSession, "answers">>,
+  session: Pick<AISetupSession, "initialInput" | "extractedProfile" | "visitorActions"> & Partial<Pick<AISetupSession, "answers" | "activationUnderstanding">>,
 ) {
   const primary = session.visitorActions.find((action) => action.isPrimary) || session.visitorActions[0];
   const primaryIsRecommendation = primary?.key === "recommendation" || primary?.semanticKey === "recommendation";
   const completion = primaryIsRecommendation
     ? session.visitorActions.find((action) => action.key !== "recommendation" && action.semanticKey !== "recommendation")
     : primary;
-  const nextAction = completion?.label.toLowerCase() || "conversar com a equipe";
+  const nextAction = session.activationUnderstanding?.completionAction.label.toLowerCase()
+    || completion?.label.toLowerCase()
+    || "conversar com a equipe";
   const healthRelated = isHealthRelated(session);
-  const extractedOfferings = offerNamesFromSetup(session.initialInput.description, session.answers?.["qualification.offerings"]);
+  const contextualOfferings = understandingOfferingNames(session.activationUnderstanding);
+  const extractedOfferings = session.answers?.["qualification.offerings"] == null && contextualOfferings.length
+    ? contextualOfferings
+    : offerNamesFromSetup(session.initialInput.description, session.answers?.["qualification.offerings"]);
   const outcome = healthRelated
     ? "Apresentar possibilidades relevantes com base nas respostas, sem diagnosticar ou indicar um procedimento, e encaminhar para avaliação profissional."
     : `Apresentar os caminhos mais compatíveis com as respostas e encaminhar o visitante para ${nextAction}.`;
@@ -37,11 +43,11 @@ export function buildQualificationSuggestions(
     : "Enviar os dados pelo formulário da Sobe para o negócio continuar o atendimento.";
 
   return {
-    "qualification.objective": healthRelated
+    "qualification.objective": session.activationUnderstanding?.declaredObjective || (healthRelated
       ? "Entender a necessidade do visitante, orientar possibilidades e encaminhar para uma avaliação profissional."
       : primaryIsRecommendation
         ? "Entender a necessidade do visitante e indicar uma opção adequada ao que ele procura."
-        : `Entender a necessidade do visitante e ajudá-lo a ${nextAction}.`,
+        : `Entender a necessidade do visitante e ajudá-lo a ${nextAction}.`),
     "qualification.outcome": outcome,
     "qualification.destination": destination,
     ...(extractedOfferings.length ? { "qualification.offerings": extractedOfferings.join("\n") } : {}),
@@ -49,9 +55,11 @@ export function buildQualificationSuggestions(
 }
 
 export function buildQualificationQuestionPlan(
-  session: Pick<AISetupSession, "initialInput" | "extractedProfile" | "visitorActions"> & Partial<Pick<AISetupSession, "answers">>,
+  session: Pick<AISetupSession, "initialInput" | "extractedProfile" | "visitorActions"> & Partial<Pick<AISetupSession, "answers" | "activationUnderstanding">>,
 ): StructuredJourneyQuestion[] {
-  const offerNames = offerNamesFromSetup(session.initialInput.description, session.answers?.["qualification.offerings"]);
+  const offerNames = understandingOfferingNames(session.activationUnderstanding).length
+    ? understandingOfferingNames(session.activationUnderstanding)
+    : offerNamesFromSetup(session.initialInput.description, session.answers?.["qualification.offerings"]);
   const context = `${session.initialInput.businessName} ${session.initialInput.description} ${offerNames.join(" ")}`;
   const profiles = offerNames.map((offerName) => buildDeterministicOfferIntelligence({
     projectId: "setup-draft",

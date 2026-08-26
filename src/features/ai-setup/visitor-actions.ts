@@ -1,4 +1,4 @@
-import type { AISetupSession } from "@/features/ai-setup/ai-setup.schema";
+import type { ActivationDecisionSource, AISetupSession } from "@/features/ai-setup/ai-setup.schema";
 import type {
   BusinessCapabilityProfile,
   CapabilityKey,
@@ -33,6 +33,10 @@ export type VisitorActionSelection = {
   label: string;
   isPrimary: boolean;
   semanticKey?: Exclude<VisitorActionKey, "other">;
+  source?: ActivationDecisionSource;
+  confidence?: number;
+  evidence?: string[];
+  confirmedByBusiness?: boolean;
 };
 
 const byKey = new Map(visitorActionCatalog.map((item) => [item.key, item]));

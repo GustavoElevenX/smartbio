@@ -52,6 +52,14 @@ export async function consumeRateLimit(
   rule: RateLimitRule,
   options: { private?: boolean; failClosed?: boolean } = {},
 ) {
+  if (process.env.NODE_ENV !== "production" && process.env.E2E_DISABLE_RATE_LIMITS === "true") {
+    return {
+      allowed: true,
+      limit: rule.limit,
+      remaining: rule.limit,
+      resetAt: Date.now() + rule.windowMs,
+    } satisfies RateLimitResult;
+  }
   try {
     return await provider().consume(
       `${scope}:${options.private === false ? identifier : privateIdentifier(identifier)}`,

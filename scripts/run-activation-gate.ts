@@ -15,7 +15,7 @@ const baseEnv: NodeJS.ProcessEnv = {
   NEXT_PUBLIC_FEATURE_MULTI_UNIT: "true",
 };
 const artifactDir = join(tmpdir(), "sobe-activation-gate");
-const screenshotPath = join(artifactDir, "casa-clara-generated-mobile-390.png");
+const screenshotPath = join(artifactDir, "sonoleve-generated-mobile-390.png");
 mkdirSync(artifactDir, { recursive: true });
 
 async function runLayer(label: string, args: string[], env = baseEnv) {
@@ -54,10 +54,12 @@ function stopServer(child: ChildProcess) {
 }
 
 await runLayer("UNIT ENGINE", ["node_modules/vitest/vitest.mjs", "run", "tests/unit/activation-v6-offer-intelligence.test.ts"]);
-await runLayer("CONTRACT", ["node_modules/vitest/vitest.mjs", "run", "tests/unit/discovery-plan-contract.test.ts", "tests/unit/adaptive-question-suggestion.test.ts"]);
-await runLayer("PIPELINE INTEGRATION", ["node_modules/vitest/vitest.mjs", "run", "tests/unit/discovery-plan-pipeline-integration.test.ts"]);
+await runLayer("ACTION/UNDERSTANDING CONTRACT", ["node_modules/vitest/vitest.mjs", "run", "tests/unit/activation-understanding.test.ts", "-t", "ACTION/UNDERSTANDING CONTRACT|CONTEXTUAL CATALOG CONTRACT"]);
+await runLayer("STATE MACHINE INVARIANTS", ["node_modules/vitest/vitest.mjs", "run", "tests/unit/activation-understanding.test.ts", "-t", "STATE MACHINE INVARIANTS"]);
+await runLayer("DISCOVERY PLAN CONTRACT", ["node_modules/vitest/vitest.mjs", "run", "tests/unit/discovery-plan-contract.test.ts", "tests/unit/adaptive-question-suggestion.test.ts"]);
+await runLayer("DISCOVERY PLAN PIPELINE", ["node_modules/vitest/vitest.mjs", "run", "tests/unit/discovery-plan-pipeline-integration.test.ts"]);
 
-process.stdout.write("\n=== SELF-SERVICE ACTIVATION E2E ===\n");
+process.stdout.write("\n=== SELF-SERVICE UI PLUMBING ===\n");
 const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--hostname", "127.0.0.1", "--port", String(port)], {
   env: baseEnv,
   stdio: "inherit",
@@ -65,7 +67,7 @@ const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev"
 });
 try {
   await waitForServer(`http://127.0.0.1:${port}`, server);
-  await runLayer("SELF-SERVICE ACTIVATION E2E", ["node_modules/@playwright/test/cli.js", "test", "tests/e2e/self-service-activation.spec.ts", "--project=mobile-chrome"], {
+  await runLayer("SELF-SERVICE UI PLUMBING", ["node_modules/@playwright/test/cli.js", "test", "tests/e2e/self-service-activation.spec.ts", "--project=mobile-chrome"], {
     ...baseEnv,
     E2E_PORT: String(port),
     E2E_REUSE_SERVER: "true",
@@ -75,5 +77,5 @@ try {
   stopServer(server);
 }
 
-process.stdout.write(`\nActivation gate concluído. Screenshot: ${screenshotPath}\n`);
+process.stdout.write(`\nActivation gate de engine/contrato/plumbing concluído. A qualidade semântica do provider online exige reteste separado. Screenshot: ${screenshotPath}\n`);
 process.exit(0);

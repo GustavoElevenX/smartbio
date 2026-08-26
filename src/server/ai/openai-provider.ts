@@ -8,6 +8,7 @@ import { aiPresenceDraftSchema } from "@/features/presence/ai-presence.schema";
 import { aiActivationDraftSchema } from "@/features/activations/ai-activation.schema";
 import {
   brandAIResultSchema,
+  activationUnderstandingSchema,
   businessAnalysisResultSchema,
   copyGenerationResultSchema,
   customVisitorActionClassificationSchema,
@@ -18,6 +19,7 @@ import { readServerEnv } from "@/lib/env/server";
 import { AIConfigurationError, normalizeAIError } from "@/server/ai/ai-errors";
 import type {
   BrandAIInput,
+  ActivationUnderstandingInput,
   BusinessAnalysisInput,
   CopyGenerationInput,
   JourneyAIInput,
@@ -34,6 +36,7 @@ import type {
 } from "@/server/ai/ai-provider";
 import { recordAIUsage } from "@/server/ai/ai-usage";
 import { brandAnalysisPrompt } from "@/server/ai/prompts/brand-analysis";
+import { activationUnderstandingPrompt } from "@/server/ai/prompts/activation-understanding";
 import { businessAnalysisPrompt } from "@/server/ai/prompts/business-analysis";
 import { copyGenerationPrompt } from "@/server/ai/prompts/copy-generation";
 import { journeyCompositionPrompt } from "@/server/ai/prompts/journey-composition";
@@ -60,6 +63,7 @@ const questionListSchema = z.object({
 });
 const operationFeatures: Record<string, EntitlementFeature> = {
   business_analysis: "ai_business_analysis",
+  activation_understanding: "ai_business_analysis",
   missing_questions: "ai_business_analysis",
   discovery_planning: "ai_journey",
   journey_composition: "ai_journey",
@@ -226,6 +230,17 @@ export class OpenAIVirouProvider implements VirouAIProvider {
       schemaName: "business_analysis",
       schema: businessAnalysisResultSchema,
       systemPrompt: businessAnalysisPrompt,
+      payload: { business: input.input, sources: input.sources || [] },
+      context: input,
+    });
+  }
+
+  analyzeActivationUnderstanding(input: ActivationUnderstandingInput) {
+    return this.structured({
+      operation: "activation_understanding",
+      schemaName: "activation_understanding",
+      schema: activationUnderstandingSchema,
+      systemPrompt: activationUnderstandingPrompt,
       payload: { business: input.input, sources: input.sources || [] },
       context: input,
     });

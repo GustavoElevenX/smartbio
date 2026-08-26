@@ -1,4 +1,5 @@
 import type { AISetupSession } from "@/features/ai-setup/ai-setup.schema";
+import { discoveryPlanIsReady } from "@/features/qualification/discovery-plan";
 import type { DataRequirement } from "@/types";
 
 export interface SetupReadiness {
@@ -18,7 +19,7 @@ export interface SetupProgressStage {
 
 export function calculateSetupReadiness(
   requirements: DataRequirement[],
-  session?: Pick<AISetupSession, "initialInput"> & Partial<Pick<AISetupSession, "actionsConfirmed" | "extractedProfile">>,
+  session?: Pick<AISetupSession, "initialInput"> & Partial<Pick<AISetupSession, "actionsConfirmed" | "extractedProfile" | "activationUnderstanding" | "visitorActions" | "discoveryPlan" | "answers">>,
 ): SetupReadiness {
   const businessReady = Boolean(
     session?.initialInput.businessName && session.initialInput.description.length >= 15,
@@ -29,12 +30,20 @@ export function calculateSetupReadiness(
   ).length;
   const baseCompleted = Number(businessReady) + Number(Boolean(session?.extractedProfile)) + Number(Boolean(session?.actionsConfirmed));
   const total = requirements.length + 3;
+  const primary = session?.visitorActions?.find((action) => action.isPrimary) || session?.visitorActions?.[0];
+  const recommendation = primary?.key === "recommendation" || primary?.semanticKey === "recommendation";
+  const contextualReady = session?.activationUnderstanding?.status !== "degraded";
+  const discoveryReady = !recommendation || Boolean(
+    session?.discoveryPlan
+    && discoveryPlanIsReady(session.discoveryPlan)
+    && session.answers?.["qualification.questions"] != null,
+  );
   return {
     progress: total ? Math.round(((verified + baseCompleted) / total) * 100) : 0,
     verified,
     total: requirements.length,
     blocking,
-    readyToGenerate: businessReady && Boolean(session?.actionsConfirmed) && blocking === 0,
+    readyToGenerate: businessReady && Boolean(session?.actionsConfirmed) && blocking === 0 && contextualReady && discoveryReady,
   };
 }
 
