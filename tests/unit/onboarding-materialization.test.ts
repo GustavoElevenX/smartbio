@@ -104,7 +104,7 @@ describe("materialização do onboarding adaptativo", () => {
     expect(multiple.capacityKinds).toContain("location");
   });
 
-  it("aplica identidade visual e copy específicas para pet", () => {
+  it("aplica identidade visual estável e copy específica para o objetivo", () => {
     const project = new RuleBasedExperienceComposer().compose({
       businessName: initialInput.businessName,
       businessDescription: initialInput.description,
@@ -115,7 +115,7 @@ describe("materialização do onboarding adaptativo", () => {
     });
 
     expect(project.brand.extractedColors[0]).toBe("#2F6B5B");
-    expect(project.subtitle).toContain("pet");
+    expect(project.subtitle).toContain("Agendar");
     expect(project.steps[0].description).not.toBe(initialInput.description);
     expect(project.steps[0].options?.[0].label).toBe("Ver serviços e horários");
   });

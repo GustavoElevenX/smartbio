@@ -52,16 +52,21 @@ export function LocationFinder({
   emit: (name: "route_resolved" | "whatsapp_clicked" | "location_selected", metadata?: Record<string, unknown>) => void;
   allowDirectHandoff?: boolean;
 }) {
-  const [mode, setMode] = useState<"options" | "postal" | "area" | "manual">("options");
+  const manualLocations = (project.commercialConfig?.locations || []).filter(
+    (location) => location.isActive,
+  );
+  const supportsProximitySearch = manualLocations.some(
+    (location) => location.latitude != null && location.longitude != null,
+  );
+  const [mode, setMode] = useState<"options" | "postal" | "area" | "manual">(
+    supportsProximitySearch ? "options" : "manual",
+  );
   const [postalCode, setPostalCode] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
   const [city, setCity] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<RoutingPayload["data"]>();
-  const manualLocations = (project.commercialConfig?.locations || []).filter(
-    (location) => location.isActive,
-  );
 
   function select(location: PublicLocationResult) {
     setRuntime((current) => ({
@@ -143,9 +148,17 @@ export function LocationFinder({
     );
   }
 
-  const selected = result?.recommended || result?.alternatives.find(
+  const selected: PublicLocationResult | undefined = result?.recommended || result?.alternatives.find(
     (location) => location.id === runtime.selectedLocationId,
-  );
+  ) || (() => {
+    const location = manualLocations.find((item) => item.id === runtime.selectedLocationId);
+    return location ? {
+      id: location.id,
+      name: location.name,
+      address: [location.addressLine || location.address, location.city].filter(Boolean).join(", "),
+      destination: project.commercialConfig?.routingDestinations?.find((item) => item.id === location.routingDestinationId),
+    } : undefined;
+  })();
 
   return (
     <section className={cn(cardClass, "grid gap-4")}>
@@ -154,9 +167,11 @@ export function LocationFinder({
           <MapPin size={20} />
         </span>
         <div>
-          <strong className="block text-base">Encontrar a melhor unidade</strong>
+          <strong className="block text-base">{supportsProximitySearch ? "Encontrar a melhor unidade" : "Escolha a unidade"}</strong>
           <p className="mt-1 text-xs leading-5 text-[var(--muted-fg)]">
-            Usaremos sua localização apenas para encontrar a unidade mais adequada nesta consulta.
+            {supportsProximitySearch
+              ? "Usaremos sua localização apenas para encontrar a unidade mais adequada nesta consulta."
+              : "Selecione onde deseja continuar o atendimento."}
           </p>
         </div>
       </div>
@@ -214,7 +229,7 @@ export function LocationFinder({
         </div>
       ) : null}
 
-      {mode !== "options" ? <button type="button" onClick={() => { setMode("options"); setError(""); }} className="justify-self-start text-xs font-bold text-[var(--primary)]">Ver outras opções</button> : null}
+      {supportsProximitySearch && mode !== "options" ? <button type="button" onClick={() => { setMode("options"); setError(""); }} className="justify-self-start text-xs font-bold text-[var(--primary)]">Ver outras opções</button> : null}
     </section>
   );
 }

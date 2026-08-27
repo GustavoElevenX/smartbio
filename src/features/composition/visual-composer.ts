@@ -5,44 +5,25 @@ function hash(value: string) {
   return [...value].reduce((accumulator, character) => ((accumulator << 5) - accumulator + character.charCodeAt(0)) | 0, 0);
 }
 
-function normalized(value: string) {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-}
-
 function defaultIdentity(input: ExperienceCompositionInput) {
-  const text = normalized(`${input.businessName} ${input.businessDescription} ${input.category || ""}`);
-  if (["pet", "cao", "caes", "gato", "banho e tosa", "veterin"].some((term) => text.includes(term))) {
-    return {
-      colors: ["#2F6B5B", "#F2B45B", "#D97A61"],
-      personality: ["Acolhedora", "Confiável", "Leve"],
-      subtitle: "Cuidado, confiança e o próximo passo para o seu pet.",
-    };
-  }
-  if (["clinica", "saude", "terapia", "fisioterapia", "odontologia"].some((term) => text.includes(term))) {
-    return {
-      colors: ["#246B76", "#76C7B7", "#E8B86D"],
-      personality: ["Confiável", "Calma", "Humana"],
-      subtitle: "Acolhimento claro para chegar ao atendimento certo.",
-    };
-  }
-  if (["restaurante", "comida", "sucos", "cafe", "confeitaria"].some((term) => text.includes(term))) {
-    return {
-      colors: ["#B55235", "#F2B84B", "#496B3E"],
-      personality: ["Apetitosa", "Próxima", "Vibrante"],
-      subtitle: "Escolha fácil, pedido direto e sabor no próximo passo.",
-    };
-  }
-  if (["hotel", "pousada", "chale", "hospedagem"].some((term) => text.includes(term))) {
-    return {
-      colors: ["#315B65", "#D7A86E", "#7C9A78"],
-      personality: ["Acolhedora", "Natural", "Elegante"],
-      subtitle: "Da descoberta à estadia, com clareza e acolhimento.",
-    };
-  }
+  const palettes = [
+    ["#0054FC", "#FF806B", "#20A985"],
+    ["#315B65", "#D7A86E", "#7C9A78"],
+    ["#6D4AFF", "#EC6F66", "#20A4A8"],
+    ["#2F6B5B", "#F2B45B", "#D97A61"],
+  ];
+  const personalities = [
+    ["Equilibrada", "Clara", "Confiante"],
+    ["Acolhedora", "Natural", "Elegante"],
+    ["Expressiva", "Próxima", "Contemporânea"],
+    ["Humana", "Confiável", "Leve"],
+  ];
+  const identityIndex = Math.abs(hash(`${input.businessName}:${input.primaryGoal}:${input.primaryDestination}`)) % palettes.length;
+  const goal = input.primaryGoal.trim().replace(/[.!?]+$/, "");
   return {
-    colors: ["#0054fc", "#FF806B", "#20A985"],
-    personality: ["Equilibrada", "Clara", "Confiante"],
-    subtitle: "Da atenção ao próximo passo comercial.",
+    colors: palettes[identityIndex],
+    personality: personalities[identityIndex],
+    subtitle: goal ? `${goal}, com um caminho claro do início ao próximo passo.` : "Um caminho claro do interesse ao próximo passo.",
   };
 }
 

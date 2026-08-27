@@ -178,6 +178,8 @@ describe("SONOLEVE REGRESSION + STATE MACHINE INVARIANTS", () => {
     expect(project.discoveryPlan?.offerings.map((offering) => offering.name)).toEqual(offerNames);
     expect(project.discoveryPlan?.questions.length).toBeGreaterThanOrEqual(2);
     expect(project.steps.some((step) => step.formFields?.length)).toBe(true);
+    session = await service.generate(actor, session.id);
+    expect(session.projectDraft).toMatchObject({ id: project.id, slug: project.slug, createdAt: project.createdAt });
   });
 
   it("preserva ofertas explícitas e recupera o fluxo quando só o entendimento contextual falha", async () => {

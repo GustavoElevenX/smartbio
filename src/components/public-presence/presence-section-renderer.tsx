@@ -335,6 +335,12 @@ export function PresenceSectionRenderer({
         {chosen.map((service, index) => {
           const image = asset(project, service.imageAssetId);
           const activation = publicActivations.find((candidate) => candidate.placements.some((placement) => placement.placementType === "service_badge") && (!candidate.offer?.scope.serviceOfferingIds?.length || candidate.offer.scope.serviceOfferingIds.includes(service.id)));
+          const blueprintId = typeof service.settings?.blueprintId === "string" ? service.settings.blueprintId : undefined;
+          const serviceGoal = blueprintId ? project.conversionGoals?.find((goal) => {
+            const target = project.steps.find((step) => step.id === goal.targetStepId);
+            return goal.isActive && target?.settings?.blueprintId === blueprintId;
+          }) : undefined;
+          const serviceAction: PresenceAction | undefined = content.itemAction || (serviceGoal ? { type: "start_conversion_goal", label: "Continuar", conversionGoalId: serviceGoal.id, style: "secondary" } : undefined);
           return (
             <article
               key={service.id}
@@ -363,11 +369,11 @@ export function PresenceSectionRenderer({
                     {money(service.price || service.minPrice, service.currency)}
                   </p>
                 ) : null}
-                {activation || content.itemAction ? (
+                {activation || serviceAction ? (
                   <div className="mt-5">
                     <PresenceActionButton
-                      action={activation ? { type: "start_activation", label: "Quero aproveitar", activationId: activation.id, style: "primary" } : content.itemAction}
-                      pageHref={activation ? undefined : pageHref(project, content.itemAction)}
+                      action={activation ? { type: "start_activation", label: "Quero aproveitar", activationId: activation.id, style: "primary" } : serviceAction!}
+                      pageHref={activation ? undefined : pageHref(project, serviceAction)}
                       context={{ ...context, serviceId: service.id }}
                     />
                   </div>
@@ -613,11 +619,16 @@ export function PresenceSectionRenderer({
         item.isActive &&
         (!content.locationIds?.length || content.locationIds.includes(item.id)),
     );
+    const canFindNearest = locations.some(
+      (location) => location.latitude != null && location.longitude != null,
+    );
     return wrap(
       <>
-        <div className="mb-6">
-          <NearestLocationButton projectId={project.id} />
-        </div>
+        {canFindNearest ? (
+          <div className="mb-6">
+            <NearestLocationButton projectId={project.id} />
+          </div>
+        ) : null}
         <div className="grid gap-4 md:grid-cols-3">
           {locations.map((location) => (
             <article

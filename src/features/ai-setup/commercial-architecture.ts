@@ -15,6 +15,7 @@ import {
 import { extractExplicitOfferNames } from "@/features/qualification/offer-context";
 import type { BusinessCapabilityProfile, CapabilityKey, DataRequirement, ProjectCapability } from "@/types";
 import { createCapability } from "@/features/capabilities/capability-registry";
+import { validCommercialChannel } from "@/features/routing/completion-destination";
 
 function normalized(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -100,10 +101,33 @@ export function normalizeCommercialArchitecture(input: CommercialArchitecture): 
     ...location,
     channelIds: [...new Set(location.channelIds.filter((id) => channelIds.has(id)))],
   }));
-  const intents = uniqueBy(parsed.intents, (item) => `${item.semanticKey || "custom"}:${normalized(item.label)}`)
-    .sort((left, right) => right.priority - left.priority);
+  const inferredBlueprints = parsed.journeyBlueprints.map((blueprint) => {
+    if (blueprint.completion.destinationStrategy !== "by_answer") return blueprint;
+    const usedLocationIds = [...new Set(blueprint.steps.flatMap((step) => step.usesLocations))];
+    const locationIds = usedLocationIds.length ? usedLocationIds : locations.map((location) => location.id);
+    const canRouteByLocation = locationIds.length > 0 && locationIds.every((locationId) => {
+      const location = locations.find((item) => item.id === locationId);
+      const compatible = location?.channelIds
+        .map((id) => channels.find((channel) => channel.id === id))
+        .filter((channel) => channel?.type === blueprint.completion.type && validCommercialChannel(channel));
+      return compatible?.length === 1;
+    });
+    return canRouteByLocation
+      ? { ...blueprint, completion: { ...blueprint.completion, channelId: null, destinationStrategy: "by_location" as const } }
+      : blueprint;
+  });
+  const parsedBlueprintByIntent = new Map(inferredBlueprints.map((blueprint) => [blueprint.intentId, blueprint]));
+  const intents = uniqueBy(
+    parsed.intents.toSorted((left, right) => right.priority - left.priority),
+    (item) => {
+      const blueprint = parsedBlueprintByIntent.get(item.id);
+      const semanticKey = item.semanticKey || classifyCustomVisitorAction(item.label);
+      if (blueprint?.mode === "routing" && ["contact", "find_location"].includes(semanticKey)) return "routing:location_contact";
+      return `${semanticKey || "custom"}:${normalized(item.label)}`;
+    },
+  );
   const intentIds = new Set(intents.map((item) => item.id));
-  const blueprints = uniqueBy(parsed.journeyBlueprints, (item) => item.intentId)
+  const blueprints = uniqueBy(inferredBlueprints, (item) => item.intentId)
     .filter((item) => intentIds.has(item.intentId))
     .map((blueprint) => ({
       ...blueprint,
@@ -277,9 +301,15 @@ export function visitorActionsFromCommercialArchitecture(architecture: Commercia
 export function capabilitiesFromCommercialArchitecture(architecture: CommercialArchitecture, fallback: ProjectCapability[] = []) {
   const keys = new Set<CapabilityKey>();
   for (const blueprint of architecture.journeyBlueprints) {
-    for (const step of blueprint.steps) if (step.expectedCapability) keys.add(step.expectedCapability);
+    if (blueprint.completion.destinationStrategy === "by_location") keys.add("routing");
+    for (const step of blueprint.steps) {
+      if (!step.expectedCapability) continue;
+      if (step.expectedCapability === "routing" && blueprint.completion.destinationStrategy !== "by_location") continue;
+      if (["scheduling", "reservation"].includes(step.expectedCapability) && blueprint.completion.destinationStrategy !== "native") continue;
+      keys.add(step.expectedCapability);
+    }
   }
-  return keys.size ? [...keys].map((key) => createCapability(key)) : fallback;
+  return architecture.journeyBlueprints.length ? [...keys].map((key) => createCapability(key)) : fallback;
 }
 
 export function requirementsFromCommercialArchitecture(architecture: CommercialArchitecture, projectId = "setup"): DataRequirement[] {

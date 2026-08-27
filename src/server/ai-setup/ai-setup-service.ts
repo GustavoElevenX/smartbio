@@ -5,6 +5,7 @@ import { commercialArchitectureSchema, extractedBusinessSourceSchema, setupDraft
 import { actionsFromActivationUnderstanding, deterministicActivationUnderstanding, markActionsConfirmed, markOfferingsConfirmed, normalizeActivationUnderstanding, understandingOfferingNames } from "@/features/ai-setup/activation-understanding";
 import { activationUnderstandingFromCommercialArchitecture, capabilitiesFromCommercialArchitecture, commercialArchitectureFromActivationUnderstanding, deterministicCommercialArchitecture, normalizeCommercialArchitecture, requirementsFromCommercialArchitecture, visitorActionsFromCommercialArchitecture } from "@/features/ai-setup/commercial-architecture";
 import { reconcileCommercialArchitectureRequirements, resolveArchitectureRequirement, validateCommercialArchitectureForMaterialization } from "@/features/ai-setup/architecture-resolution";
+import { assertArchitectureRuntimeContract, reconcileProjectWithCommercialArchitecture } from "@/features/ai-setup/architecture-materialization";
 import { assertActivationStateInvariants } from "@/features/ai-setup/activation-state-invariants";
 import { materializeSetupAnswers } from "@/features/ai-setup/materialize-setup-answers";
 import { stageGeneratedDraft } from "@/features/ai-setup/stage-generated-draft";
@@ -913,7 +914,11 @@ export class AISetupService {
       session.commercialArchitecture,
     );
     try {
-      const generated = await orchestrator.compose(input);
+      const composed = await orchestrator.compose(input);
+      const previousDraft = session.projectDraft as Project | undefined;
+      const generated = previousDraft
+        ? { ...composed, id: previousDraft.id, slug: previousDraft.slug, createdAt: previousDraft.createdAt }
+        : composed;
       let project = materializeSetupAnswers({
         ...generated,
         workspaceId: actor.workspaceId,
@@ -921,8 +926,19 @@ export class AISetupService {
         capabilities: selectedCapabilities,
         dataRequirements: mergeProjectRequirements(generated, session),
       }, session);
-      project = ensureVisitorActionTargets(project, selectedActions);
-      project = applyVisitorActionsToProject(project, { visitorActions: selectedActions });
+      if (session.commercialArchitecture) {
+        project = reconcileProjectWithCommercialArchitecture({
+          project,
+          architecture: session.commercialArchitecture,
+          compositionInput: input,
+          profile,
+          capabilities: selectedCapabilities,
+        });
+        assertArchitectureRuntimeContract(session.commercialArchitecture, project);
+      } else {
+        project = ensureVisitorActionTargets(project, selectedActions);
+        project = applyVisitorActionsToProject(project, { visitorActions: selectedActions });
+      }
       project = applyBrandIdentity(project, session);
       const instruction = initialSiteInstruction(project, { ...session, visitorActions: selectedActions });
       const plannerSuggestion = suggestSiteStructure(project, instruction);
@@ -991,12 +1007,20 @@ export class AISetupService {
     const session = await this.get(actor, id);
     if (!session.projectDraft) throw new Error("Crie a primeira versão antes de concluir o onboarding.");
     await assertProjectAccess(actor, projectId, "write");
+    if (session.status === "completed") {
+      if (session.projectId !== projectId) throw new Error("Este onboarding já foi concluído em outro negócio.");
+      const existingProject = actor.persistence === "database" ? await loadProjectForActor(actor, projectId) : { ...(session.projectDraft as Project), id: projectId };
+      if (!existingProject) throw new Error("O negócio concluído não está mais disponível.");
+      return { session, project: existingProject, summary: { alreadyFinalized: 1, sourcesAttached: 0, factsAttached: 0, applied: 0, skipped: 0 } };
+    }
     if (actor.persistence === "memory") {
+      const project = { ...(session.projectDraft as Project), id: projectId };
+      if (session.commercialArchitecture && session.architectureReviewed) assertArchitectureRuntimeContract(session.commercialArchitecture, project);
       const commercialContext = session.commercialArchitecture && session.architectureReviewed
-        ? await projectCommercialContextService.materializeActivationContext(actor, session, projectId, { ...(session.projectDraft as Project), id: projectId })
+        ? await projectCommercialContextService.materializeActivationContext(actor, session, projectId, project)
         : null;
       const completed = await this.repository.update(actor, { ...session, status: "completed", projectId });
-      return { session: completed, project: session.projectDraft, summary: { sourcesAttached: 0, factsAttached: 0, applied: 0, skipped: 0, ...(commercialContext ? { commercialContextRevision: commercialContext.revision } : {}) } };
+      return { session: completed, project, summary: { sourcesAttached: 0, factsAttached: 0, applied: 0, skipped: 0, ...(commercialContext ? { commercialContextRevision: commercialContext.revision } : {}) } };
     }
     const client = createServiceClient();
     if (!client) throw new Error("Supabase não configurado.");
@@ -1018,6 +1042,7 @@ export class AISetupService {
     const requirements = await reconcileProjectRequirements(actor, projectId);
     const persistedProject = await loadProjectForActor(actor, projectId);
     if (!persistedProject) throw new Error("Não foi possível carregar o projeto para materializar o contexto comercial.");
+    if (session.commercialArchitecture && session.architectureReviewed) assertArchitectureRuntimeContract(session.commercialArchitecture, persistedProject);
     const commercialContext = session.commercialArchitecture && session.architectureReviewed
       ? await projectCommercialContextService.materializeActivationContext(actor, session, projectId, persistedProject)
       : null;

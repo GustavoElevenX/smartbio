@@ -38,7 +38,7 @@ export class CompositionOrchestrator {
     let capabilities = this.planner.plan(profile);
     let composition = this.journey.compose(input, profile, capabilities, this.commercialArchitecture);
     let conversionGoals: Project["conversionGoals"];
-    if (features.aiJourneyComposition && this.aiJourney) {
+    if (features.aiJourneyComposition && this.aiJourney && !this.commercialArchitecture) {
       try {
         const draft = aiJourneyDraftSchema.parse(await this.aiJourney(input, profile, capabilities));
         const applied = applyAIJourneyDraft({ deterministic: composition, draft, profile, projectId: id, existingCapabilities: capabilities });

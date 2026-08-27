@@ -199,6 +199,20 @@ function runtimeFromStorage(
           conversionGoalId: direct.conversionGoalId,
           entryPointId: direct.entryPointId,
           attribution: direct.attribution,
+          answers: direct.answers,
+          selectedOfferIds: [],
+          selectedLocationId: launchContext?.locationId,
+          selectedResourceId: undefined,
+          selectedSlot: undefined,
+          selectedDateRange: undefined,
+          guests: undefined,
+          quoteDraft: undefined,
+          recommendationKey: undefined,
+          recommendationReason: undefined,
+          recommendationConfidence: undefined,
+          routeResult: undefined,
+          idempotencyKeys: undefined,
+          cart: fallback.cart,
         }
       : merged;
   } catch {
@@ -988,15 +1002,17 @@ export function ExperienceCanvas({
           routeResult: result,
           selectedLocationId: current.selectedLocationId || selectedLocationId,
         }));
-        await fetch("/api/public/routing/resolve", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            projectId: project.id,
-            sessionId: runtime.sessionId,
-            context: routeContext,
-          }),
-        }).catch(() => undefined);
+        if (!preview) {
+          await fetch("/api/public/routing/resolve", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              projectId: project.id,
+              sessionId: runtime.sessionId,
+              context: routeContext,
+            }),
+          }).catch(() => undefined);
+        }
         emit(result.destination ? "route_resolved" : "route_unresolved", { ruleId: result.ruleId, destinationId: result.destination?.id, fallback: result.fallback, locationId: runtime.selectedLocationId });
         if (result.destination?.type === "whatsapp" && runtime.conversionGoalId)
           addOpportunity(
@@ -1035,6 +1051,22 @@ export function ExperienceCanvas({
     if (option.conversionGoalId) {
       setRuntime((current) => ({
         ...current,
+        ...(current.conversionGoalId !== option.conversionGoalId ? {
+          answers: {},
+          selectedOfferIds: [],
+          selectedLocationId: undefined,
+          selectedResourceId: undefined,
+          selectedSlot: undefined,
+          selectedDateRange: undefined,
+          guests: undefined,
+          cart: { items: [], totals: { subtotal: 0, total: 0, currency: "BRL" } },
+          quoteDraft: undefined,
+          recommendationKey: undefined,
+          recommendationReason: undefined,
+          recommendationConfidence: undefined,
+          routeResult: undefined,
+          idempotencyKeys: undefined,
+        } : {}),
         conversionGoalId: option.conversionGoalId,
         attribution: current.attribution
           ? {

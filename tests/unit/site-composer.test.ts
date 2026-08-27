@@ -8,8 +8,9 @@ import type { Project } from "@/types";
 import { createPresencePage } from "@/features/presence/presence-page-service";
 import { materializeSuggestedSiteStructure } from "@/features/site-composer/materialize-site-structure";
 
-function vertical(category: string, config: Partial<NonNullable<Project["commercialConfig"]>> = {}): Project {
-  return { ...structuredClone(casaDeSucos), id: `vertical-${category}`, category, commercialConfig: { ...structuredClone(casaDeSucos.commercialConfig), catalogItems: [], serviceOfferings: [], locations: [], ...config } };
+function vertical(category: string, config: Partial<NonNullable<Project["commercialConfig"]>> = {}, profile: Partial<NonNullable<Project["businessProfile"]>> = {}): Project {
+  const base = structuredClone(casaDeSucos);
+  return { ...base, id: `vertical-${category}`, category, businessProfile: base.businessProfile ? { ...base.businessProfile, ...profile } : undefined, commercialConfig: { ...base.commercialConfig, catalogItems: [], serviceOfferings: [], locations: [], ...config } };
 }
 
 describe("adaptive site composer", () => {
@@ -36,9 +37,9 @@ describe("adaptive site composer", () => {
       vertical("varejo", { catalogItems: fortyProductCatalog }),
       vertical("serviços", { serviceOfferings: casaDeSucos.commercialConfig?.serviceOfferings }),
       vertical("misto", { catalogItems: fortyProductCatalog.slice(0, 4), serviceOfferings: casaDeSucos.commercialConfig?.serviceOfferings }),
-      vertical("hotel e pousada"),
-      vertical("consultoria profissional"),
-      vertical("indústria b2b"),
+      vertical("hotel e pousada", {}, { offerKinds: ["hospitality"], capacityKinds: ["room"] }),
+      vertical("consultoria profissional", {}, { offerKinds: ["professional_service"] }),
+      vertical("indústria b2b", {}, { requiresQualification: true, primaryIntents: ["request_proposal"] }),
       vertical("loja local", { locations: casaDeSucos.commercialConfig?.locations }),
       vertical(""),
     ];

@@ -19,6 +19,13 @@ const memoryProposals = globalThis.__sobeCommercialContextProposals ??= new Map<
 
 export class CommercialContextRevisionConflictError extends Error {}
 
+export function normalizeDatabaseTimestamp(value: unknown) {
+  if (value == null || value === "") return value;
+  const date = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toISOString();
+}
+
 function rowToContext(row: Record<string, unknown>) {
   return projectCommercialContextSchema.parse({
     ...(row.context as Record<string, unknown>),
@@ -26,9 +33,9 @@ function rowToContext(row: Record<string, unknown>) {
     schemaVersion: row.schema_version,
     revision: row.revision,
     sourceCoverage: row.source_coverage,
-    lastAnalyzedAt: row.last_analyzed_at,
-    lastConfirmedAt: row.last_confirmed_at,
-    updatedAt: row.updated_at,
+    lastAnalyzedAt: normalizeDatabaseTimestamp(row.last_analyzed_at),
+    lastConfirmedAt: normalizeDatabaseTimestamp(row.last_confirmed_at),
+    updatedAt: normalizeDatabaseTimestamp(row.updated_at),
   });
 }
 
@@ -42,8 +49,8 @@ function rowToProposal(row: Record<string, unknown>) {
     evidence: row.evidence,
     proposedContext: row.proposed_context,
     affectedIntentIds: row.affected_intent_ids,
-    createdAt: row.created_at,
-    resolvedAt: row.resolved_at,
+    createdAt: normalizeDatabaseTimestamp(row.created_at),
+    resolvedAt: normalizeDatabaseTimestamp(row.resolved_at),
   });
 }
 

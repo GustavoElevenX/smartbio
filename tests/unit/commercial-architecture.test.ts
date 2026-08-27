@@ -74,6 +74,46 @@ describe("CommercialArchitecture context-first", () => {
     expect(capabilitiesFromCommercialArchitecture(architecture).map((item) => item.key)).toEqual(["routing"]);
   });
 
+  it("unifica contato e localização quando ambos encaminham para a mesma escolha de unidade", () => {
+    const evidence = [{ sourceId: "user", origin: "user" as const, excerpt: "Atendimento nas unidades", confidence: 1 }];
+    const base = {
+      status: "ready" as const, confidence: 0.95,
+      businessSummary: { whatItSells: "Sucos", commercialModel: "Atendimento por unidade", evidence },
+      offerings: [], audienceContexts: [], channels: [], locations: [], issues: [],
+      intents: [
+        { id: "contato", semanticKey: "contact" as const, label: "Falar com uma unidade", visitorNeed: "Falar com uma unidade", priority: 100, visibleOnEntry: true, evidence, confidence: 0.95 },
+        { id: "local", semanticKey: "find_location" as const, label: "Encontrar uma unidade", visitorNeed: "Encontrar uma unidade", priority: 90, visibleOnEntry: true, evidence, confidence: 0.95 },
+      ],
+      journeyBlueprints: ["contato", "local"].map((intentId) => ({ id: `bp-${intentId}`, intentId, objective: "Escolher unidade", mode: "routing" as const, steps: [{ purpose: "Escolher unidade", expectedCapability: "routing" as const, collects: [], usesOfferings: [], usesLocations: [] }], completion: { type: "whatsapp" as const, channelId: null, destinationStrategy: "by_location" as const, handoffSummary: false }, requiredFacts: [], assumptions: [], confidence: 0.95 })),
+    };
+
+    const architecture = normalizeCommercialArchitecture(base);
+
+    expect(architecture.intents.map((intent) => intent.label)).toEqual(["Falar com uma unidade"]);
+    expect(architecture.journeyBlueprints.map((blueprint) => blueprint.intentId)).toEqual(["contato"]);
+  });
+
+  it("infere roteamento por unidade quando cada unidade já possui um único canal compatível", () => {
+    const evidence = [{ sourceId: "user", origin: "user" as const, excerpt: "WhatsApp por unidade", confidence: 1 }];
+    const architecture = normalizeCommercialArchitecture({
+      status: "needs_confirmation", confidence: 0.95,
+      businessSummary: { whatItSells: "Sucos", commercialModel: "Atendimento por unidade", evidence },
+      offerings: [], audienceContexts: [], issues: [],
+      channels: [
+        { id: "wa-centro", type: "whatsapp", label: "Centro", value: "+5511987654101", purpose: "Centro", isFallback: false, evidence, confidence: 1 },
+        { id: "wa-praia", type: "whatsapp", label: "Praia", value: "+5511987654102", purpose: "Praia", isFallback: false, evidence, confidence: 1 },
+      ],
+      locations: [
+        { id: "centro", label: "Centro", address: null, channelIds: ["wa-centro"], evidence, confidence: 1 },
+        { id: "praia", label: "Praia", address: null, channelIds: ["wa-praia"], evidence, confidence: 1 },
+      ],
+      intents: [{ id: "contato", semanticKey: "contact", label: "Falar com uma unidade", visitorNeed: "Escolher unidade", priority: 100, visibleOnEntry: true, evidence, confidence: 0.95 }],
+      journeyBlueprints: [{ id: "bp-contato", intentId: "contato", objective: "Escolher unidade", mode: "routing", steps: [{ purpose: "Escolher unidade", expectedCapability: "routing", collects: ["unidade"], usesOfferings: [], usesLocations: ["centro", "praia"] }], completion: { type: "whatsapp", channelId: null, destinationStrategy: "by_answer", handoffSummary: false }, requiredFacts: [], assumptions: [], confidence: 0.95 }],
+    });
+
+    expect(architecture.journeyBlueprints[0].completion.destinationStrategy).toBe("by_location");
+  });
+
   it("transforma cardápio real em caminho direto e mantém revenda em um caminho independente", () => {
     const description = "Vendemos produtos, recebemos encomendas e atendemos também revendedores pelo comercial.";
     const architecture = deterministicCommercialArchitecture({

@@ -24,6 +24,7 @@ export function ConversionLauncher({ projectSlug, projectId, pageId, presentatio
   const [project, setProject] = useState<Project | null>(previewProject || null);
   const [error, setError] = useState("");
   const [complete, setComplete] = useState(false);
+  const [launchId, setLaunchId] = useState(0);
   const preview = Boolean(previewProject);
   const track = useCallback((eventName: AnalyticsEventName, metadata: Record<string, unknown> = {}) => {
     if (preview) return;
@@ -32,6 +33,7 @@ export function ConversionLauncher({ projectSlug, projectId, pageId, presentatio
   }, [pageId, preview, projectId]);
   const close = useCallback(() => { setContext(undefined); setComplete(false); setError(""); if (!preview && history.state?.virouConversion) history.back(); }, [preview]);
   const open = useCallback(async (next: PresenceLaunchContext) => {
+    setLaunchId((current) => current + 1);
     setContext({ ...next, pageId: next.pageId || pageId }); setComplete(false); setError("");
     track("presence_conversion_started", { ...next, pageId: next.pageId || pageId });
     if (!preview) history.pushState({ virouConversion: true }, "", `${location.pathname}${location.search}#converter`);
@@ -53,7 +55,7 @@ export function ConversionLauncher({ projectSlug, projectId, pageId, presentatio
       <button type="button" aria-label="Fechar" onClick={close} className="absolute inset-0 cursor-default" />
       <section className="relative z-10 mx-auto max-h-[100dvh] w-full overflow-auto bg-white shadow-2xl md:max-h-[92dvh] md:max-w-[760px] md:rounded-[32px]">
         <button type="button" onClick={close} aria-label="Fechar atendimento" className="absolute right-4 top-4 z-20 grid size-10 place-items-center rounded-full border border-black/10 bg-white/90 shadow-sm"><X size={18} /></button>
-        {complete ? <div className="grid min-h-[420px] place-items-center p-8 text-center"><div><CheckCircle2 className="mx-auto size-12 text-emerald-600" /><h2 className="mt-4 text-2xl font-extrabold">Recebemos suas informações.</h2><p className="mt-2 text-sm text-slate-600">A equipe já pode continuar o atendimento com o contexto que você enviou.</p><button type="button" onClick={close} className="mt-6 rounded-full bg-black px-5 py-3 font-bold text-white">Voltar ao site</button></div></div> : error ? <div className="grid min-h-[360px] place-items-center p-8 text-center"><div><p className="font-bold">{error}</p><button type="button" onClick={close} className="mt-5 underline">Fechar</button></div></div> : project ? <ExperienceCanvas project={project} preview={preview} launchContext={context} onComplete={() => setComplete(true)} onClose={close} /> : <div role="status" className="grid min-h-[420px] place-items-center"><LoaderCircle className="animate-spin" /></div>}
+        {complete ? <div className="grid min-h-[420px] place-items-center p-8 text-center"><div><CheckCircle2 className="mx-auto size-12 text-emerald-600" /><h2 className="mt-4 text-2xl font-extrabold">Recebemos suas informações.</h2><p className="mt-2 text-sm text-slate-600">A equipe já pode continuar o atendimento com o contexto que você enviou.</p><button type="button" onClick={close} className="mt-6 rounded-full bg-black px-5 py-3 font-bold text-white">Voltar ao site</button></div></div> : error ? <div className="grid min-h-[360px] place-items-center p-8 text-center"><div><p className="font-bold">{error}</p><button type="button" onClick={close} className="mt-5 underline">Fechar</button></div></div> : project ? <ExperienceCanvas key={launchId} project={project} preview={preview} launchContext={context} onComplete={() => setComplete(true)} onClose={close} /> : <div role="status" className="grid min-h-[420px] place-items-center"><LoaderCircle className="animate-spin" /></div>}
       </section>
     </div> : null}
   </LauncherContext.Provider>;

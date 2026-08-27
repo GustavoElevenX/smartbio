@@ -13,6 +13,7 @@ import { commercialContextForAI, projectCommercialContextFromActivation } from "
 import { CompositionOrchestrator } from "@/features/composition/composition-orchestrator";
 import { journeyComposer } from "@/features/composition/journey-composer";
 import { buildJourneyHandoff } from "@/features/handoff/journey-handoff";
+import { evaluateCapabilityRequirements } from "@/features/capabilities/capability-requirements";
 import { validateConversionPath } from "@/features/publishing/conversion-path-validator";
 import { resolveRoute } from "@/features/routing/routing-engine";
 import { resolveCompletionDestination, semanticJourneyRouteKey } from "@/features/routing/completion-destination";
@@ -203,9 +204,11 @@ describe("Activation hardening — composer, routing e handoff", () => {
     expect(resolveCompletionDestination({ architecture: external, blueprint: external.journeyBlueprints[0], selectedLocationId: "b" })).toMatchObject({ status: "resolved", channel: { id: "booking-b" } });
 
     const composed = journeyComposer.compose({ businessName: "Rede", businessDescription: "Atendimento por unidade", primaryGoal: "Atender", primaryDestination: "WhatsApp", slug: "rede" }, profile(), [], whatsapp);
-    const rule = composed.commercialConfig.routingRules?.find((item) => item.condition.value === semanticJourneyRouteKey("blueprint-main", "b"));
-    expect(rule?.destinationId).toBe("wa-b");
-    expect(composed.commercialConfig.locations?.find((item) => item.id === "b")?.routingDestinationId).toBe("wa-b");
+    const runtimeLocation = composed.commercialConfig.locations?.find((item) => item.settings?.architectureId === "b");
+    const runtimeDestination = composed.commercialConfig.routingDestinations?.find((item) => item.key === "wa-b");
+    const rule = composed.commercialConfig.routingRules?.find((item) => item.condition.value === semanticJourneyRouteKey("blueprint-main", runtimeLocation!.id));
+    expect(rule?.destinationId).toBe(runtimeDestination?.id);
+    expect(runtimeLocation?.routingDestinationId).toBe(runtimeDestination?.id);
   });
 
   it("valida continue_with_answers como transição, capture_lead como conclusão e legado como compatível", async () => {
@@ -225,6 +228,16 @@ describe("Activation hardening — composer, routing e handoff", () => {
 });
 
 describe("Activation hardening — memória comercial e cenários obrigatórios", () => {
+  it("trata nova tentativa de finalização como sucesso idempotente", async () => {
+    const current = architecture({ channels: [channel("wa", "5511999999999")], channelId: "wa", collects: ["Contexto"] });
+    const project = await new CompositionOrchestrator(undefined, undefined, undefined, undefined, undefined, current).compose({ businessName: "Idempotente", businessDescription: "Atendimento", primaryGoal: "Atender", primaryDestination: "WhatsApp", slug: "idempotente", phone: "5511999999999" });
+    const completed = { ...setupSession(current, project), status: "completed" as const, projectId: project.id };
+    const actor: AISetupActor = { userId: "owner", email: "owner@sobe.test", workspaceId: "workspace", role: "owner", persistence: "memory", mode: "workspace" };
+    const result = await new AISetupService(repositoryDouble(completed)).finalizeProject(actor, completed.id, project.id, true);
+    expect(result.session.status).toBe("completed");
+    expect(result.summary).toMatchObject({ alreadyFinalized: 1, applied: 0 });
+  });
+
   it("projeta memória compacta com decisões confirmadas antes de inferências", async () => {
     const current = architecture({ channels: [channel("wa", "5511999999999")], channelId: "wa", collects: ["Contexto"] });
     const project = await new CompositionOrchestrator(undefined, undefined, undefined, undefined, undefined, current).compose({ businessName: "Memória", businessDescription: "Atendimento", primaryGoal: "Atender", primaryDestination: "WhatsApp", slug: "memoria", phone: "5511999999999" });
@@ -242,10 +255,19 @@ describe("Activation hardening — memória comercial e cenários obrigatórios"
     const channels = [channel("menu", "https://menu.example.com", "external_url"), channel("wa-a", "5511111111111"), channel("wa-b", "5522999999999"), channel("wa-c", "5533999999999"), channel("wa-d", "5544999999999"), channel("wa-b2b", "5511988887777")];
     const multi = multiIntentArchitecture(channels, locations);
     const project = await new CompositionOrchestrator(undefined, undefined, undefined, undefined, undefined, multi).compose({ businessName: "Operação Mix", businessDescription: "Quatro unidades, encomendas e revenda", primaryGoal: "Atender", primaryDestination: "WhatsApp", slug: "operacao-mix" });
+    const context = projectCommercialContextFromActivation({ projectId: project.id, project, session: setupSession(multi, project), now: "2026-08-27T12:00:00.000Z" });
     expect(project.steps.find((step) => step.type === "choice")?.options?.find((option) => option.label === "Ver cardápio")?.actionType).toBe("open_url");
-    expect(resolveRoute({ location_id: "b" }, project.commercialConfig?.routingRules || [], project.commercialConfig?.routingDestinations || [], undefined, project.commercialConfig?.locations || []).destination?.id).toBe("wa-b");
+    const runtimeLocation = project.commercialConfig?.locations?.find((item) => item.settings?.architectureId === "b");
+    const runtimeDestination = project.commercialConfig?.routingDestinations?.find((item) => item.key === "wa-b");
+    expect(context.locationContexts.find((item) => item.id === "location-context-b")?.locationId).toBe(runtimeLocation?.id);
+    expect(context.channelContexts.find((item) => item.id === "wa-b")?.destinationId).toBe(runtimeDestination?.id);
+    expect(validateCommercialRuntimeConsistency({ context, project, architecture: multi }).valid).toBe(true);
+    expect(evaluateCapabilityRequirements(project).filter((item) => item.capability === "routing" && item.status !== "verified")).toEqual([]);
+    expect(resolveRoute({ location_id: runtimeLocation?.id }, project.commercialConfig?.routingRules || [], project.commercialConfig?.routingDestinations || [], undefined, project.commercialConfig?.locations || []).destination?.key).toBe("wa-b");
     expect(project.steps.find((step) => step.title === "Fazer encomenda")?.options?.[0].actionType).toBe("continue_with_answers");
     expect(project.steps.find((step) => step.title === "Comprar para revenda")?.options?.[0].actionType).toBe("continue_with_answers");
+    expect(project.steps.flatMap((step) => step.formFields || []).every((field) => /^[a-z][a-z0-9_]*$/.test(field.key))).toBe(true);
+    expect(project.commercialConfig?.serviceOfferings?.every((service) => typeof service.settings?.blueprintId === "string")).toBe(true);
 
     const consultive = architecture({ mode: "guided_flow", strategy: "fixed", channels: [channel("seller", "5566666666666")], channelId: "seller", collects: ["Tipo de veículo", "Faixa de preço", "Financiamento"], semanticKey: "recommendation" });
     const consultiveProject = await new CompositionOrchestrator(undefined, undefined, undefined, undefined, undefined, consultive).compose({ businessName: "Veículos", businessDescription: "Venda consultiva", primaryGoal: "Encontrar veículo", primaryDestination: "WhatsApp", slug: "veiculos" });
@@ -255,6 +277,10 @@ describe("Activation hardening — memória comercial e cenários obrigatórios"
     const bookingProject = await new CompositionOrchestrator(undefined, undefined, undefined, undefined, undefined, booking).compose({ businessName: "Hotel", businessDescription: "Booking externo", primaryGoal: "Reservar", primaryDestination: "Site", slug: "hotel" });
     expect(bookingProject.steps.flatMap((step) => step.options || []).some((option) => option.actionType === "open_url")).toBe(true);
     expect(bookingProject.steps.some((step) => step.type === "availability" || step.type === "reservation")).toBe(false);
+
+    const guidedBooking = architecture({ mode: "hybrid", strategy: "external_url", completionType: "external_url", channels: [channel("booking-guided", "https://booking.example.com", "external_url")], channelId: "booking-guided", collects: ["Data de entrada", "Data de saída", "Adultos", "Crianças"], steps: [{ purpose: "Encaminhar ao sistema externo", expectedCapability: "routing", collects: [], usesOfferings: [], usesLocations: [] }], semanticKey: "reserve" });
+    const guidedBookingProject = await new CompositionOrchestrator(undefined, undefined, undefined, undefined, undefined, guidedBooking).compose({ businessName: "Hotel guiado", businessDescription: "Coleta dados e conclui no booking externo", primaryGoal: "Reservar", primaryDestination: "Site", slug: "hotel-guiado" });
+    expect(guidedBookingProject.steps.some((step) => step.type === "routing")).toBe(false);
 
     const request = architecture({ mode: "hybrid", strategy: "fixed", channels: [channel("hotel-wa", "5577777777777")], channelId: "hotel-wa", collects: ["Data de entrada", "Data de saída", "Quantidade de hóspedes"], semanticKey: "reserve" });
     const requestProject = await new CompositionOrchestrator(undefined, undefined, undefined, undefined, undefined, request).compose({ businessName: "Hotel", businessDescription: "Solicitação via WhatsApp", primaryGoal: "Solicitar hospedagem", primaryDestination: "WhatsApp", slug: "hotel-request" });
@@ -289,7 +315,10 @@ function multiIntentArchitecture(channels: CommercialArchitecture["channels"], l
     ["menu", "view_products", "Ver cardápio"], ["unit", "contact", "Falar com unidade"], ["order", "order", "Fazer encomenda"], ["b2b", "resale", "Comprar para revenda"],
   ].map(([id, semanticKey, label], index) => ({ id: `intent-${id}`, semanticKey: semanticKey as CommercialArchitecture["intents"][number]["semanticKey"], label, visitorNeed: label, priority: 100 - index * 10, visibleOnEntry: true, evidence, confidence: 0.95 }));
   return {
-    status: "ready", confidence: 0.95, businessSummary: { whatItSells: "Produtos", commercialModel: "Autosserviço, unidades e B2B", evidence }, offerings: [], audienceContexts: [], channels, locations, intents, issues: [],
+    status: "ready", confidence: 0.95, businessSummary: { whatItSells: "Produtos", commercialModel: "Autosserviço, unidades e B2B", evidence }, offerings: [
+      { id: "off-order", name: "Encomendas", kind: "service", evidence, confidence: 0.95 },
+      { id: "off-b2b", name: "Atendimento para revenda", kind: "service", evidence, confidence: 0.95 },
+    ], audienceContexts: [], channels, locations, intents, issues: [],
     journeyBlueprints: [
       { id: "bp-menu", intentId: "intent-menu", objective: "Ver cardápio", mode: "direct_external", steps: [], completion: { type: "external_url", channelId: "menu", destinationStrategy: "external_url", handoffSummary: false }, requiredFacts: [], assumptions: [], confidence: 0.95 },
       { id: "bp-unit", intentId: "intent-unit", objective: "Falar com unidade", mode: "routing", steps: [{ purpose: "Escolher unidade", expectedCapability: "routing", collects: [], usesOfferings: [], usesLocations: locations.map((item) => item.id) }], completion: { type: "whatsapp", channelId: null, destinationStrategy: "by_location", handoffSummary: false }, requiredFacts: [], assumptions: [], confidence: 0.95 },

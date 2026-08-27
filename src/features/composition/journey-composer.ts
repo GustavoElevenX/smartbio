@@ -3,6 +3,7 @@ import { slugify, uid } from "@/lib/utils";
 import { isRecommendationIntent, synthesizePublicDescription } from "@/features/composition/public-copy";
 import type { CommercialArchitecture } from "@/features/ai-setup/ai-setup.schema";
 import { resolveCompletionDestination, semanticJourneyRouteKey } from "@/features/routing/completion-destination";
+import { formFieldKey } from "@/features/forms/form-field-utils";
 import type { BusinessCapabilityProfile, ContentBlockType, DataRequirement, ExperienceCompositionInput, JourneyStep, Project, ProjectCapability, RoutingDestination, StepOption } from "@/types";
 
 export type CommercialConfig = NonNullable<Project["commercialConfig"]>;
@@ -44,11 +45,13 @@ function configuredAction(input: ExperienceCompositionInput, finalStepId: string
   return { id: finalStepId, type: "action", title: "Pronto para o próximo passo?", description: "Revise seus dados antes de continuar.", order: 0, isActive: true, visualVariant: "conversion", options };
 }
 
-function architectureAction(channel: CommercialArchitecture["channels"][number] | undefined, label: string, metadata: Record<string, string | number | boolean> = {}): StepOption {
-  if (channel?.type === "whatsapp" && channel.value) return { id: uid("option"), label, value: channel.id, actionType: "open_whatsapp" as const, actionPayload: { phone: channel.value, destinationId: channel.id, ...metadata } };
-  if (channel?.type === "external_url" && channel.value) return { id: uid("option"), label, value: channel.id, actionType: "open_url" as const, actionPayload: { url: channel.value, ...metadata } };
-  if (channel?.type === "phone" && channel.value) return { id: uid("option"), label, value: channel.id, actionType: "open_url" as const, actionPayload: { url: `tel:${channel.value}`, destinationId: channel.id, ...metadata } };
-  if (channel?.type === "email" && channel.value) return { id: uid("option"), label, value: channel.id, actionType: "open_url" as const, actionPayload: { url: `mailto:${channel.value}`, destinationId: channel.id, ...metadata } };
+function architectureAction(channel: CommercialArchitecture["channels"][number] | undefined, label: string, metadata: Record<string, string | number | boolean> = {}, runtimeDestinationId?: string): StepOption {
+  if (!channel?.value) throw new Error(`A jornada “${label}” não possui um canal final válido.`);
+  const destinationId = runtimeDestinationId || channel.id;
+  if (channel.type === "whatsapp") return { id: uid("option"), label, value: destinationId, actionType: "open_whatsapp" as const, actionPayload: { phone: channel.value, destinationId, ...metadata } };
+  if (channel.type === "external_url") return { id: uid("option"), label, value: destinationId, actionType: "open_url" as const, actionPayload: { url: channel.value, destinationId, ...metadata } };
+  if (channel.type === "phone") return { id: uid("option"), label, value: destinationId, actionType: "open_url" as const, actionPayload: { url: `tel:${channel.value}`, destinationId, ...metadata } };
+  if (channel.type === "email") return { id: uid("option"), label, value: destinationId, actionType: "open_url" as const, actionPayload: { url: `mailto:${channel.value}`, destinationId, ...metadata } };
   throw new Error(`A jornada “${label}” não possui um canal final válido.`);
 }
 
@@ -77,9 +80,16 @@ function fieldType(label: string): NonNullable<JourneyStep["formFields"]>[number
   return "text";
 }
 
+function isLocationSelectionLabel(label: string) {
+  return /unidade|local|loja|filial|cidade|bairro/i.test(label.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+}
+
 function architectureComposition(input: ExperienceCompositionInput, architecture: CommercialArchitecture): JourneyComposition {
   const welcomeId = uid("step");
   const choiceId = uid("step");
+  const offeringRuntimeIds = new Map(architecture.offerings.map((offering) => [offering.id, uid("offering")]));
+  const channelRuntimeIds = new Map(architecture.channels.map((channel) => [channel.id, uid("destination")]));
+  const locationRuntimeIds = new Map(architecture.locations.map((location) => [location.id, uid("location")]));
   const steps: JourneyStep[] = [{
     id: welcomeId,
     type: "welcome",
@@ -95,15 +105,37 @@ function architectureComposition(input: ExperienceCompositionInput, architecture
   const targetByBlueprint = new Map<string, string>();
 
   for (const blueprint of architecture.journeyBlueprints) {
-    if (["direct_external", "direct_contact"].includes(blueprint.mode)) continue;
     const intent = intentById.get(blueprint.intentId);
     if (!intent) continue;
     const completionId = uid("step");
-    const declaredSteps = blueprint.steps.length ? blueprint.steps : [{ purpose: blueprint.objective, expectedCapability: null, collects: [], usesOfferings: [], usesLocations: [] }];
+    const blueprintSteps = blueprint.completion.destinationStrategy === "by_location"
+      && !blueprint.steps.some((declared) => declared.usesLocations.length > 0)
+      ? [{ purpose: "Escolher a unidade", expectedCapability: "routing" as const, collects: [], usesOfferings: [], usesLocations: architecture.locations.map((location) => location.id) }, ...blueprint.steps]
+      : blueprint.steps;
+    const locationStepIndex = blueprintSteps.findIndex((declared) => declared.usesLocations.length > 0);
+    const candidateSteps = blueprint.mode.startsWith("direct_") && blueprint.completion.destinationStrategy !== "by_location" ? [] : blueprintSteps;
+    const declaredSteps = candidateSteps.filter((declared, index) => {
+      const externalizedNativeCapability = ["scheduling", "reservation"].includes(declared.expectedCapability || "")
+        && blueprint.completion.destinationStrategy !== "native";
+      const externalizedRoutingCapability = declared.expectedCapability === "routing"
+        && blueprint.completion.destinationStrategy !== "by_location";
+      const isLocationSelection = blueprint.completion.destinationStrategy === "by_location" && index === locationStepIndex;
+      return isLocationSelection || declared.collects.length > 0 || (Boolean(declared.expectedCapability) && !externalizedNativeCapability && !externalizedRoutingCapability);
+    });
     const stepIds = declaredSteps.map(() => uid("step"));
-    targetByBlueprint.set(blueprint.id, stepIds[0]);
+    targetByBlueprint.set(blueprint.id, stepIds[0] || completionId);
     for (const [index, declared] of declaredSteps.entries()) {
-      const capability = declared.expectedCapability;
+      const isLocationSelection = blueprint.completion.destinationStrategy === "by_location"
+        && declared.usesLocations.length > 0
+        && declared === blueprint.steps[locationStepIndex];
+      const capability = isLocationSelection
+        ? "routing"
+        : declared.expectedCapability === "routing" && blueprint.completion.destinationStrategy !== "by_location"
+          ? null
+        : ["scheduling", "reservation"].includes(declared.expectedCapability || "")
+        && blueprint.completion.destinationStrategy !== "native"
+        ? null
+        : declared.expectedCapability;
       const type: JourneyStep["type"] = capability === "quote" ? "quote"
         : capability === "scheduling" ? "schedule"
           : capability === "catalog_order" ? "catalog"
@@ -112,6 +144,14 @@ function architectureComposition(input: ExperienceCompositionInput, architecture
                 : "form";
       const stepId = stepIds[index];
       const targetStepId = stepIds[index + 1] || completionId;
+      const fieldKeys: string[] = [];
+      const formFields = declared.collects
+        .filter((label) => !isLocationSelection || !isLocationSelectionLabel(label))
+        .map((label) => {
+          const key = formFieldKey(label, fieldKeys);
+          fieldKeys.push(key);
+          return { id: uid("field"), label, key, type: fieldType(label), required: true, includeInHandoff: blueprint.completion.handoffSummary, handoffLabel: label };
+        });
       steps.push({
         id: stepId,
         type,
@@ -121,7 +161,7 @@ function architectureComposition(input: ExperienceCompositionInput, architecture
         isActive: true,
         visualVariant: "commercial-intent",
         blocks: [{ id: uid("block"), type: capability ? blockFor[capability] : "form", content: { source: capability || "architecture", intentId: intent.id, blueprintId: blueprint.id, ...(capability === "routing" ? { allowDirectHandoff: false } : {}) } }],
-        formFields: declared.collects.map((label, fieldIndex) => ({ id: `${stepId}-field-${fieldIndex + 1}`, label, key: slugify(label) || `field_${fieldIndex + 1}`, type: fieldType(label), required: true, includeInHandoff: blueprint.completion.handoffSummary, handoffLabel: label })),
+        formFields,
         settings: { blueprintId: blueprint.id, intentId: intent.id },
         options: [{ id: uid("option"), label: capability === "quote" ? "Enviar solicitação" : "Continuar", value: blueprint.id, actionType: capability ? "start_capability" : "continue_with_answers", actionPayload: capability ? { capability, blueprintId: blueprint.id, intentId: intent.id, completionType: blueprint.completion.type } : { blueprintId: blueprint.id, intentId: intent.id, completionType: blueprint.completion.type }, targetStepId }],
       });
@@ -133,8 +173,8 @@ function architectureComposition(input: ExperienceCompositionInput, architecture
       ? routedCompletionOption(blueprint, metadata)
       : blueprint.completion.destinationStrategy === "native"
         ? { id: uid("option"), label: "Concluir", value: blueprint.id, actionType: "finish", actionPayload: metadata }
-        : architectureAction(channel, actionLabel(blueprint.completion.type, channel?.label), metadata);
-    steps.push({ id: completionId, type: "action", title: "Tudo pronto para continuar", description: blueprint.completion.handoffSummary ? "A Sobe leva um resumo do que foi informado para o atendimento." : "Siga pelo canal indicado pelo negócio.", order: steps.length, isActive: true, visualVariant: "conversion", settings: { blueprintId: blueprint.id, intentId: intent.id }, options: [completionOption] });
+        : architectureAction(channel, actionLabel(blueprint.completion.type, channel?.label), metadata, channel ? channelRuntimeIds.get(channel.id) : undefined);
+    steps.push({ id: completionId, type: "action", title: intent.label, description: blueprint.completion.handoffSummary ? "A Sobe leva um resumo do que foi informado para o atendimento." : "Siga pelo canal indicado pelo negócio.", order: steps.length, isActive: true, visualVariant: "conversion", settings: { blueprintId: blueprint.id, intentId: intent.id }, options: [completionOption] });
   }
 
   const visibleBlueprints = architecture.journeyBlueprints
@@ -154,15 +194,15 @@ function architectureComposition(input: ExperienceCompositionInput, architecture
       const resolution = resolveCompletionDestination({ architecture, blueprint });
       const channel = resolution.status === "resolved" ? resolution.channel : undefined;
       const metadata = { blueprintId: blueprint.id, intentId: intent.id, interestLabel: intent.label, completionType: blueprint.completion.type };
-      if (blueprint.mode === "direct_external") return architectureAction(channel, intent.label, metadata);
-      if (blueprint.mode === "direct_contact") return architectureAction(channel, intent.label, metadata);
+      if (blueprint.mode === "direct_external") return architectureAction(channel, intent.label, metadata, channel ? channelRuntimeIds.get(channel.id) : undefined);
+      if (blueprint.mode === "direct_contact") return architectureAction(channel, intent.label, metadata, channel ? channelRuntimeIds.get(channel.id) : undefined);
       return { id: uid("option"), label: intent.label, description: intent.visitorNeed, value: intent.id, actionType: "go_to_step" as const, targetStepId: targetByBlueprint.get(blueprint.id) };
     }),
   });
 
   const locationChannelIds = new Set(architecture.locations.flatMap((location) => location.channelIds));
   const channelLocationIds = new Map(architecture.channels.map((channel) => [channel.id, architecture.locations.filter((location) => location.channelIds.includes(channel.id)).map((location) => location.id)]));
-  const destinations: RoutingDestination[] = architecture.channels.flatMap((channel) => channel.value && channel.type !== "native" ? [{ id: channel.id, key: channel.id, type: channel.type === "external_url" ? "url" : channel.type, label: channel.label, value: channel.value, locationId: channelLocationIds.get(channel.id)?.length === 1 ? channelLocationIds.get(channel.id)?.[0] : undefined, isDefault: channel.isFallback === true, role: channel.isFallback ? "general_contact" as const : locationChannelIds.has(channel.id) ? "location_contact" as const : "intent_contact" as const }] : []);
+  const destinations: RoutingDestination[] = architecture.channels.flatMap((channel) => channel.value && channel.type !== "native" ? [{ id: channelRuntimeIds.get(channel.id)!, key: channel.id, type: channel.type === "external_url" ? "url" : channel.type, label: channel.label, value: channel.value, locationId: channelLocationIds.get(channel.id)?.length === 1 ? locationRuntimeIds.get(channelLocationIds.get(channel.id)![0]) : undefined, isDefault: channel.isFallback === true, role: channel.isFallback ? "general_contact" as const : locationChannelIds.has(channel.id) ? "location_contact" as const : "intent_contact" as const }] : []);
   const routeMaterializations = architecture.journeyBlueprints.flatMap((blueprint) => {
     if (blueprint.completion.destinationStrategy !== "by_location") return [];
     const declaredLocationIds = [...new Set(blueprint.steps.flatMap((step) => step.usesLocations))];
@@ -170,23 +210,44 @@ function architectureComposition(input: ExperienceCompositionInput, architecture
     return locationIds.map((locationId) => {
       const resolution = resolveCompletionDestination({ architecture, blueprint, selectedLocationId: locationId });
       if (resolution.status !== "resolved") throw new Error(`A jornada “${blueprint.objective}” não pode ser roteada para ${locationId}: ${resolution.reason}`);
-      return { blueprint, locationId, destinationId: resolution.channel.id };
+      return { blueprint, architectureLocationId: locationId, locationId: locationRuntimeIds.get(locationId)!, destinationId: channelRuntimeIds.get(resolution.channel.id)! };
     });
   });
-  const destinationsByLocation = new Map(architecture.locations.map((location) => [location.id, [...new Set(routeMaterializations.filter((item) => item.locationId === location.id).map((item) => item.destinationId))]]));
+  const destinationsByLocation = new Map(architecture.locations.map((location) => [location.id, [...new Set(routeMaterializations.filter((item) => item.architectureLocationId === location.id).map((item) => item.destinationId))]]));
   const locations = architecture.locations.map((location, index) => {
     const semanticDestinations = destinationsByLocation.get(location.id) || [];
-    return { id: location.id, projectId: "setup", name: location.label, address: location.address ?? undefined, countryCode: "BR", geocodingStatus: "pending" as const, timezone: "America/Sao_Paulo", openingHours: [], supportsDelivery: false, supportsPickup: false, supportsInPerson: true, priority: 100 - index, isActive: true, routingDestinationId: semanticDestinations.length === 1 ? semanticDestinations[0] : undefined };
+    return { id: locationRuntimeIds.get(location.id)!, projectId: "setup", name: location.label, address: location.address ?? undefined, countryCode: "BR", geocodingStatus: "pending" as const, timezone: "America/Sao_Paulo", openingHours: [], supportsDelivery: false, supportsPickup: false, supportsInPerson: true, priority: 100 - index, isActive: true, routingDestinationId: semanticDestinations.length === 1 ? semanticDestinations[0] : undefined, settings: { architectureId: location.id } };
   });
-  const routingRules = routeMaterializations.map((item, index) => ({ id: `route-${item.blueprint.id}-${item.locationId}`, projectId: "setup", priority: 10_000 - index, condition: { field: "journey_route", operator: "equals" as const, value: semanticJourneyRouteKey(item.blueprint.id, item.locationId) }, destinationId: item.destinationId, isActive: true }));
+  const routingRules = routeMaterializations.map((item, index) => ({ id: uid("route"), projectId: "setup", priority: 10_000 - index, condition: { field: "journey_route", operator: "equals" as const, value: semanticJourneyRouteKey(item.blueprint.id, item.locationId) }, destinationId: item.destinationId, isActive: true }));
   const catalogOfferings = architecture.offerings.filter((offering) => offering.kind === "product");
-  const categoryId = catalogOfferings.length ? "architecture-catalog" : undefined;
+  const serviceOfferings = architecture.offerings.filter((offering) => offering.kind !== "product");
+  const categoryId = catalogOfferings.length ? uid("category") : undefined;
+  const semanticTokens = (value: string) => new Set(value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().split(/[^a-z0-9]+/).filter((token) => token.length > 2 && !["para", "com", "uma", "das", "dos"].includes(token)).map((token) => token.length > 4 ? token.replace(/s$/, "") : token));
+  const blueprintForOffering = (offering: CommercialArchitecture["offerings"][number]) => {
+    const explicit = architecture.journeyBlueprints.find((blueprint) => blueprint.steps.some((step) => step.usesOfferings.includes(offering.id)));
+    if (explicit) return explicit;
+    const offeringTokens = semanticTokens(offering.name);
+    return architecture.journeyBlueprints
+      .map((blueprint) => {
+        const intent = intentById.get(blueprint.intentId);
+        const candidateTokens = semanticTokens(`${intent?.label || ""} ${intent?.visitorNeed || ""} ${blueprint.objective}`);
+        return { blueprint, score: [...offeringTokens].filter((token) => candidateTokens.has(token)).length };
+      })
+      .sort((left, right) => right.score - left.score)
+      .find((candidate) => candidate.score > 0)?.blueprint;
+  };
   return {
     steps: steps.map((step, order) => ({ ...step, order })),
     commercialConfig: {
       qualificationRules: architecture.journeyBlueprints.some((item) => item.steps.some((step) => step.expectedCapability === "qualification")) ? [] : undefined,
+      serviceOfferings: serviceOfferings.length ? serviceOfferings.map((offering, index) => {
+        const blueprint = blueprintForOffering(offering);
+        const resolution = blueprint ? resolveCompletionDestination({ architecture, blueprint }) : undefined;
+        const channel = resolution?.status === "resolved" ? resolution.channel : undefined;
+        return { id: offeringRuntimeIds.get(offering.id)!, projectId: "setup", name: offering.name, slug: slugify(offering.name), description: `Saiba mais sobre ${offering.name}.`, shortDescription: offering.name, serviceMode: channel?.type === "external_url" ? "external_url" as const : "contact" as const, priceMode: "on_request" as const, currency: "BRL", destinationId: channel && channel.type !== "external_url" ? channelRuntimeIds.get(channel.id) : undefined, externalUrl: channel?.type === "external_url" ? channel.value || undefined : undefined, isFeatured: index < 3, isActive: true, order: index, settings: { source: "commercial_architecture", offeringKind: offering.kind, architectureOfferingId: offering.id, ...(blueprint ? { blueprintId: blueprint.id, intentId: blueprint.intentId } : {}) } };
+      }) : undefined,
       catalogCategories: categoryId ? [{ id: categoryId, projectId: "setup", name: "Opções", order: 0, isActive: true }] : undefined,
-      catalogItems: categoryId ? catalogOfferings.map((offering, index) => ({ id: offering.id, projectId: "setup", categoryId, name: offering.name, currency: "BRL", isAvailable: true, variants: [], metadata: { source: "commercial_architecture" }, order: index })) : undefined,
+      catalogItems: categoryId ? catalogOfferings.map((offering, index) => ({ id: offeringRuntimeIds.get(offering.id)!, projectId: "setup", categoryId, name: offering.name, currency: "BRL", isAvailable: true, variants: [], metadata: { source: "commercial_architecture", architectureOfferingId: offering.id, priceMode: "manual" }, order: index })) : undefined,
       locations: locations.length ? locations : undefined,
       routingDestinations: destinations.length ? destinations : undefined,
       routingRules: routingRules.length ? routingRules : undefined,
@@ -258,7 +319,7 @@ export function assignProjectToCommercialConfig(config: CommercialConfig, projec
   const assign = <T extends { projectId: string }>(values?: T[]) => values?.map((value) => ({ ...value, projectId }));
   return {
     ...config,
-    qualificationRules: assign(config.qualificationRules), schedulableServices: assign(config.schedulableServices), resources: assign(config.resources),
+    qualificationRules: assign(config.qualificationRules), serviceOfferings: assign(config.serviceOfferings), schedulableServices: assign(config.schedulableServices), resources: assign(config.resources),
     availabilityRules: assign(config.availabilityRules), availabilityExceptions: assign(config.availabilityExceptions), catalogCategories: assign(config.catalogCategories),
     catalogItems: assign(config.catalogItems), reservableUnits: assign(config.reservableUnits), reservationBlocks: assign(config.reservationBlocks), locations: assign(config.locations), routingRules: assign(config.routingRules),
     quoteDefinition: config.quoteDefinition ? { ...config.quoteDefinition, projectId } : undefined,

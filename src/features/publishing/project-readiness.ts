@@ -148,7 +148,12 @@ export function getProjectReadiness(project: Project): ProjectReadinessResult {
     }
   }
   for (const service of config?.serviceOfferings?.filter((item) => item.isActive) || []) {
-    if (!service.destinationId && !service.externalUrl) {
+    const blueprintId = typeof service.settings?.blueprintId === "string" ? service.settings.blueprintId : undefined;
+    const hasJourneyDestination = Boolean(blueprintId && project.conversionGoals?.some((goal) => {
+      const target = project.steps.find((step) => step.id === goal.targetStepId);
+      return goal.isActive && target?.settings?.blueprintId === blueprintId;
+    }));
+    if (!service.destinationId && !service.externalUrl && !hasJourneyDestination) {
       issues.push(requirement(project, `service.${service.id}.destination`, "Serviço sem destino", `Defina como o visitante continua após escolher “${service.name}”.`, `${dataPath}?tab=services`, "blocking", "project"));
     }
     if (service.externalUrl && !isHttpUrl(service.externalUrl)) {
@@ -175,8 +180,10 @@ export function getProjectReadiness(project: Project): ProjectReadinessResult {
     }
   }
   const geoRoutingEnabled = process.env.NEXT_PUBLIC_FEATURE_GEO_ROUTING === "true";
-  if (geoRoutingEnabled && hasCapability(project, "routing")) {
-    for (const location of config?.locations?.filter((item) => item.isActive) || []) {
+  const activeLocations = config?.locations?.filter((item) => item.isActive) || [];
+  const usesGeoRouting = activeLocations.some((location) => location.latitude != null && location.longitude != null);
+  if (geoRoutingEnabled && hasCapability(project, "routing") && usesGeoRouting) {
+    for (const location of activeLocations) {
       if (
         location.latitude == null ||
         location.longitude == null ||

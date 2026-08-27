@@ -39,6 +39,14 @@ const descriptions: Record<string, string> = {
   "payment.url": "Use apenas o endereço seguro do checkout que já existe.",
 };
 
+const completionStrategyLabels: Record<string, { label: string; description: string }> = {
+  fixed: { label: "Um contato único", description: "Todos seguem para o mesmo WhatsApp, telefone ou e-mail." },
+  by_location: { label: "Contato de cada unidade", description: "A unidade escolhida define o destino do atendimento." },
+  by_answer: { label: "Conforme as respostas", description: "As respostas do visitante definem o destino." },
+  external_url: { label: "Link externo", description: "A conclusão acontece em outro site ou sistema." },
+  native: { label: "Concluir na Sobe", description: "A própria Sobe conclui essa etapa." },
+};
+
 const humanTitles: Record<string, string> = {
   "qualification.objective": "Objetivo que a Sobe entendeu",
   "qualification.questions": "Perguntas iniciais sugeridas pela Sobe",
@@ -112,7 +120,7 @@ export function planAdaptiveQuestions(
       description: descriptions[requirement.key],
       type: questionType(requirement, architecture),
       options: target?.type === "completion_strategy"
-        ? target.acceptedStrategies.map((value) => ({ label: value.replaceAll("_", " "), value }))
+        ? target.acceptedStrategies.map((value) => ({ label: completionStrategyLabels[value]?.label || value, value, description: completionStrategyLabels[value]?.description }))
         : choiceQuestions[requirement.key],
       required: requirement.severity === "blocking",
       reason: architecture ? requirement.reason : "Essa resposta é necessária para que a ação escolhida funcione do início ao fim.",

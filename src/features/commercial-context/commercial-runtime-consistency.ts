@@ -43,17 +43,20 @@ export function validateCommercialRuntimeConsistency(input: {
         const mapped = (used.length ? used : architecture.locations.map((item) => item.id)).every((locationId) => {
           const resolution = resolveCompletionDestination({ architecture, blueprint, selectedLocationId: locationId });
           if (resolution.status !== "resolved") return false;
-          const destinationId = context.channelContexts.find((item) => item.id === resolution.channel.id)?.destinationId;
-          const destination = destinations.find((item) => item.id === destinationId);
-          const operationalLocationId = context.locationContexts.find((item) => item.id === `location-context-${locationId}`)?.locationId || locationId;
-          const routeKey = semanticJourneyRouteKey(blueprint.id, operationalLocationId);
-          return Boolean(destinationId && destinationMatchesCompletion(destination, blueprint.completion.type) && project.commercialConfig?.routingRules?.some((rule) => rule.isActive && rule.destinationId === destinationId && rule.condition.field === "journey_route" && rule.condition.value === routeKey));
+          const operationalDestination = destinations.find((item) => item.key === resolution.channel.id || item.id === resolution.channel.id)
+            || destinations.find((item) => item.id === context.channelContexts.find((channel) => channel.id === resolution.channel.id)?.destinationId);
+          const operationalLocation = locations.find((item) => item.settings?.architectureId === locationId || item.id === locationId);
+          const routeKey = semanticJourneyRouteKey(blueprint.id, operationalLocation?.id || locationId);
+          return Boolean(operationalLocation && operationalDestination && destinationMatchesCompletion(operationalDestination, blueprint.completion.type) && project.commercialConfig?.routingRules?.some((rule) => rule.isActive && rule.destinationId === operationalDestination.id && rule.condition.field === "journey_route" && rule.condition.value === routeKey));
         });
         if (!mapped) issues.push({ code: "incomplete_by_location", referenceId: blueprint.id, message: `A jornada ${blueprint.id} não possui mapping completo por unidade.` });
       } else if (blueprint.completion.type !== "native") {
         const resolution = resolveCompletionDestination({ architecture, blueprint });
-        const destinationId = resolution.status === "resolved" ? context.channelContexts.find((item) => item.id === resolution.channel.id)?.destinationId : undefined;
-        if (resolution.status !== "resolved" || !destinationMatchesCompletion(destinations.find((item) => item.id === destinationId), blueprint.completion.type)) issues.push({ code: "incompatible_completion_destination", referenceId: blueprint.id, message: `A jornada ${blueprint.id} não materializou um destination compatível com ${blueprint.completion.type}.` });
+        const destination = resolution.status === "resolved"
+          ? destinations.find((item) => item.key === resolution.channel.id || item.id === resolution.channel.id)
+            || destinations.find((item) => item.id === context.channelContexts.find((channel) => channel.id === resolution.channel.id)?.destinationId)
+          : undefined;
+        if (resolution.status !== "resolved" || !destinationMatchesCompletion(destination, blueprint.completion.type)) issues.push({ code: "incompatible_completion_destination", referenceId: blueprint.id, message: `A jornada ${blueprint.id} não materializou um destination compatível com ${blueprint.completion.type}.` });
       }
       const hasHandoffContext = blueprint.steps.some((step) => step.collects.length || ["catalog_order", "qualification", "quote", "routing"].includes(step.expectedCapability || ""));
       if (blueprint.completion.handoffSummary && !hasHandoffContext) issues.push({ code: "handoff_without_collection", referenceId: blueprint.id, message: `A jornada ${blueprint.id} configura handoff sem coletar respostas.` });

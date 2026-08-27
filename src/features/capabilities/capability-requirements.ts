@@ -41,8 +41,8 @@ export const capabilityRequirements: Record<CapabilityKey, CapabilityRequirement
   ],
   routing: [
     { key: "routing.destinations", label: "Destinos de atendimento", required: true, question: "Quais unidades ou canais podem receber o visitante?", validate: (p) => Boolean(p.commercialConfig?.routingDestinations?.length), actionPath: dataPath },
-    { key: "routing.fallback", label: "Fallback de roteamento", required: true, question: "O que deve acontecer quando nenhuma unidade for elegível?", validate: (p) => Boolean(p.commercialConfig?.routingDestinations?.some((item) => item.type === "unavailable")), actionPath: dataPath },
-    { key: "routing.location", label: "Localização das unidades", required: true, question: "Quais são os endereços e coordenadas das unidades?", validate: (p) => Boolean(p.commercialConfig?.locations?.some((item) => item.latitude != null && item.longitude != null)), actionPath: dataPath },
+    { key: "routing.fallback", label: "Fallback de roteamento", required: true, question: "O que deve acontecer quando nenhuma unidade for elegível?", validate: (p) => Boolean(p.capabilities?.find((item) => item.enabled && item.key === "routing")?.configuration?.fallback || p.commercialConfig?.routingDestinations?.some((item) => item.type === "unavailable" || item.isDefault)), actionPath: dataPath },
+    { key: "routing.location", label: "Unidades de atendimento", required: true, question: "Quais unidades o visitante pode escolher?", validate: (p) => Boolean(p.commercialConfig?.locations?.some((item) => item.isActive) && p.commercialConfig.locations.filter((item) => item.isActive).every((item) => item.routingDestinationId)), actionPath: dataPath },
   ],
   payment: [
     { key: "payment.url", label: "URL de pagamento", required: true, question: "Qual é a URL segura do checkout?", validate: (p) => isHttpUrl(p.commercialConfig?.paymentUrl), actionPath: dataPath },

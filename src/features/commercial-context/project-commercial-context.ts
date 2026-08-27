@@ -65,8 +65,16 @@ function operationalOfferingId(project: Project, architectureId: string, label: 
 function operationalDestinationId(project: Project, channel: CommercialArchitecture["channels"][number]) {
   const destinations = project.commercialConfig?.routingDestinations || [];
   return destinations.find((item) => item.id === channel.id)?.id
+    || destinations.find((item) => item.key === channel.id)?.id
     || destinations.find((item) => item.value && channel.value && item.value === channel.value)?.id
     || null;
+}
+
+function operationalLocationId(project: Project, architectureId: string) {
+  const locations = project.commercialConfig?.locations || [];
+  return locations.find((item) => item.id === architectureId)?.id
+    || locations.find((item) => item.settings?.architectureId === architectureId)?.id
+    || architectureId;
 }
 
 function contextStatus(confirmed: boolean): CommercialContextStatus {
@@ -176,7 +184,7 @@ export function projectCommercialContextFromActivation(input: {
     })),
     locationContexts: architecture.locations.map((location) => ({
       id: `location-context-${location.id}`,
-      locationId: project.commercialConfig?.locations?.find((item) => item.id === location.id)?.id || location.id,
+      locationId: operationalLocationId(project, location.id),
       commercialRoles: unique(architecture.journeyBlueprints.filter((blueprint) => blueprint.steps.some((step) => step.usesLocations.includes(location.id))).map((blueprint) => blueprint.mode)),
       destinationIds: unique(location.channelIds.map((channelId) => destinationByChannel.get(channelId) || channelId)),
       servesIntentIds: architecture.journeyBlueprints.filter((blueprint) => blueprint.steps.some((step) => step.usesLocations.includes(location.id))).map((blueprint) => blueprint.intentId),
