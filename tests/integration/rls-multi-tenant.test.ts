@@ -22,6 +22,10 @@ type Fixture = {
   ownerA: string;
   ownerB: string;
   memberA: string;
+  supportRead: string;
+  supportWrite: string;
+  expiredSupport: string;
+  revokedSupport: string;
   workspaceA: string;
   workspaceB: string;
   projectA: string;
@@ -29,6 +33,8 @@ type Fixture = {
   publicProject: string;
   leadB: string;
   opportunityB: string;
+  catalogItemA: string;
+  versionA: string;
 };
 
 let admin: SupabaseClient;
@@ -65,6 +71,10 @@ suite("P0-03 RLS / multi-tenant isolation (real Supabase)", () => {
   let ownerA: SupabaseClient;
   let ownerB: SupabaseClient;
   let memberA: SupabaseClient;
+  let supportRead: SupabaseClient;
+  let supportWrite: SupabaseClient;
+  let expiredSupport: SupabaseClient;
+  let revokedSupport: SupabaseClient;
 
   beforeAll(async () => {
     admin = createClient(
@@ -72,10 +82,14 @@ suite("P0-03 RLS / multi-tenant isolation (real Supabase)", () => {
       process.env.RLS_TEST_SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { persistSession: false, autoRefreshToken: false } },
     );
-    const [a, b, member] = await Promise.all([
+    const [a, b, member, supportReadUser, supportWriteUser, expiredSupportUser, revokedSupportUser] = await Promise.all([
       createUser("owner-a"),
       createUser("owner-b"),
       createUser("member-a"),
+      createUser("support-read"),
+      createUser("support-write"),
+      createUser("support-expired"),
+      createUser("support-revoked"),
     ]);
     const suffix = crypto.randomUUID().slice(0, 8);
     const workspaces = await admin
@@ -95,6 +109,31 @@ suite("P0-03 RLS / multi-tenant isolation (real Supabase)", () => {
       { workspace_id: workspaceB, user_id: b.id, role: "owner" },
     ]);
     if (memberships.error) throw memberships.error;
+    const admins = await admin.from("platform_admins").insert([
+      { user_id: supportReadUser.id, role: "support_admin", is_active: true },
+      { user_id: supportWriteUser.id, role: "support_admin", is_active: true },
+      { user_id: expiredSupportUser.id, role: "support_admin", is_active: true },
+      { user_id: revokedSupportUser.id, role: "support_admin", is_active: true },
+    ]);
+    if (admins.error) throw admins.error;
+    const startedAt = new Date(Date.now() - 60_000).toISOString();
+    const expiresAt = new Date(Date.now() + 30 * 60_000).toISOString();
+    const expiredAt = new Date(Date.now() - 60_000).toISOString();
+    const supportSessions = await admin.from("platform_support_sessions").insert([
+      { admin_user_id: supportReadUser.id, workspace_id: workspaceA, reason: "RLS QA read-only", status: "active", started_at: startedAt, expires_at: expiresAt },
+      { admin_user_id: supportWriteUser.id, workspace_id: workspaceA, reason: "RLS QA write grant", status: "active", started_at: startedAt, expires_at: expiresAt },
+      { admin_user_id: expiredSupportUser.id, workspace_id: workspaceA, reason: "RLS QA expired", status: "active", started_at: new Date(Date.now() - 120_000).toISOString(), expires_at: expiredAt },
+      { admin_user_id: revokedSupportUser.id, workspace_id: workspaceA, reason: "RLS QA revoked", status: "active", started_at: startedAt, expires_at: expiresAt },
+    ]).select("id,admin_user_id");
+    if (supportSessions.error || !supportSessions.data || supportSessions.data.length !== 4) throw supportSessions.error || new Error("support session fixture failed");
+    const sessionFor = (userId: string) => supportSessions.data.find((row) => row.admin_user_id === userId)!.id;
+    const grants = await admin.from("platform_support_grants").insert([
+      { support_session_id: sessionFor(supportReadUser.id), admin_user_id: supportReadUser.id, workspace_id: workspaceA, can_read: true, can_write: false, expires_at: expiresAt },
+      { support_session_id: sessionFor(supportWriteUser.id), admin_user_id: supportWriteUser.id, workspace_id: workspaceA, can_read: true, can_write: true, expires_at: expiresAt },
+      { support_session_id: sessionFor(expiredSupportUser.id), admin_user_id: expiredSupportUser.id, workspace_id: workspaceA, can_read: true, can_write: true, expires_at: expiredAt },
+      { support_session_id: sessionFor(revokedSupportUser.id), admin_user_id: revokedSupportUser.id, workspace_id: workspaceA, can_read: true, can_write: true, expires_at: expiresAt, revoked_at: new Date().toISOString() },
+    ]);
+    if (grants.error) throw grants.error;
     const projects = await admin
       .from("projects")
       .insert([
@@ -120,10 +159,20 @@ suite("P0-03 RLS / multi-tenant isolation (real Supabase)", () => {
       .select("id")
       .single();
     if (opportunity.error || !opportunity.data) throw opportunity.error || new Error("opportunity fixture failed");
-    fixture = { ownerA: a.id, ownerB: b.id, memberA: member.id, workspaceA, workspaceB, projectA, projectB, publicProject, leadB: lead.data.id, opportunityB: opportunity.data.id };
+    const category = await admin.from("catalog_categories").insert({ project_id: projectA, name: "RLS QA category" }).select("id").single();
+    if (category.error || !category.data) throw category.error || new Error("catalog category fixture failed");
+    const item = await admin.from("catalog_items").insert({ project_id: projectA, category_id: category.data.id, name: "RLS QA item", price: 10 }).select("id").single();
+    if (item.error || !item.data) throw item.error || new Error("catalog item fixture failed");
+    const version = await admin.from("project_versions").insert({ project_id: projectA, version_number: 1, snapshot: { id: projectA, qa: true }, created_by: a.id }).select("id").single();
+    if (version.error || !version.data) throw version.error || new Error("version fixture failed");
+    fixture = { ownerA: a.id, ownerB: b.id, memberA: member.id, supportRead: supportReadUser.id, supportWrite: supportWriteUser.id, expiredSupport: expiredSupportUser.id, revokedSupport: revokedSupportUser.id, workspaceA, workspaceB, projectA, projectB, publicProject, leadB: lead.data.id, opportunityB: opportunity.data.id, catalogItemA: item.data.id, versionA: version.data.id };
     ownerA = await signIn(a);
     ownerB = await signIn(b);
     memberA = await signIn(member);
+    supportRead = await signIn(supportReadUser);
+    supportWrite = await signIn(supportWriteUser);
+    expiredSupport = await signIn(expiredSupportUser);
+    revokedSupport = await signIn(revokedSupportUser);
   });
 
   it("owners read only their own tenant in both directions", async () => {
@@ -172,10 +221,45 @@ suite("P0-03 RLS / multi-tenant isolation (real Supabase)", () => {
     expect(deleteAttempt.data || []).toEqual([]);
   });
 
+  it("allows support read-only to read but blocks every mutation path", async () => {
+    const own = await supportRead.from("catalog_items").select("id").eq("id", fixture.catalogItemA);
+    const other = await supportRead.from("projects").select("id").eq("id", fixture.projectB);
+    expect(own.data).toHaveLength(1);
+    expect(other.data).toEqual([]);
+    const insert = await supportRead.from("catalog_items").insert({ project_id: fixture.projectA, name: "must-not-insert" }).select("id");
+    const update = await supportRead.from("catalog_items").update({ name: "must-not-update" }).eq("id", fixture.catalogItemA).select("id");
+    const remove = await supportRead.from("catalog_items").delete().eq("id", fixture.catalogItemA).select("id");
+    expect(insert.data || []).toEqual([]);
+    expect(update.data || []).toEqual([]);
+    expect(remove.data || []).toEqual([]);
+    const publish = await supportRead.rpc("publish_project", { target_project: fixture.projectA });
+    const restore = await supportRead.rpc("restore_project_version", { target_version: fixture.versionA });
+    expect(publish.error).toBeTruthy();
+    expect(restore.error).toBeTruthy();
+  });
+
+  it("allows support write only inside its grant scope", async () => {
+    const updateOwn = await supportWrite.from("catalog_items").update({ name: "support-write-ok" }).eq("id", fixture.catalogItemA).select("id,name");
+    expect(updateOwn.data).toEqual([{ id: fixture.catalogItemA, name: "support-write-ok" }]);
+    const updateOther = await supportWrite.from("projects").update({ name: "must-not-cross-tenant" }).eq("id", fixture.projectB).select("id");
+    expect(updateOther.data || []).toEqual([]);
+  });
+
+  it("removes read and write access for expired and revoked grants", async () => {
+    const expiredRead = await expiredSupport.from("projects").select("id").eq("id", fixture.projectA);
+    const expiredWrite = await expiredSupport.from("catalog_items").update({ name: "expired" }).eq("id", fixture.catalogItemA).select("id");
+    const revokedRead = await revokedSupport.from("projects").select("id").eq("id", fixture.projectA);
+    const revokedWrite = await revokedSupport.from("catalog_items").delete().eq("id", fixture.catalogItemA).select("id");
+    expect(expiredRead.data || []).toEqual([]);
+    expect(expiredWrite.data || []).toEqual([]);
+    expect(revokedRead.data || []).toEqual([]);
+    expect(revokedWrite.data || []).toEqual([]);
+  });
+
   afterAll(async () => {
     if (!admin || !fixture) return;
     await admin.from("workspaces").delete().in("id", [fixture.workspaceA, fixture.workspaceB]);
-    await Promise.all([fixture.ownerA, fixture.ownerB, fixture.memberA].map((id) => admin.auth.admin.deleteUser(id)));
+    await Promise.all([fixture.ownerA, fixture.ownerB, fixture.memberA, fixture.supportRead, fixture.supportWrite, fixture.expiredSupport, fixture.revokedSupport].map((id) => admin.auth.admin.deleteUser(id)));
   });
 });
 

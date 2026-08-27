@@ -5,6 +5,10 @@ const migration = readFileSync(
   "supabase/migrations/202608270061_rls_multi_tenant_hardening.sql",
   "utf8",
 );
+const v2Migration = readFileSync(
+  "supabase/migrations/202608270062_rls_support_write_boundary.sql",
+  "utf8",
+);
 const suite = readFileSync("tests/integration/rls-multi-tenant.test.ts", "utf8");
 
 describe("P0-03 RLS contract", () => {
@@ -22,5 +26,14 @@ describe("P0-03 RLS contract", () => {
     expect(suite).toContain(".update({ workspace_id: fixture.workspaceB, project_id: fixture.projectB })");
     expect(suite).toContain("ownerA.rpc(\"publish_project\"");
     expect(suite).toContain("service-role client is intentionally limited");
+  });
+
+  it("adds a restrictive write policy for every legacy member mutation policy", () => {
+    expect(v2Migration).toContain("p.polcmd <> 'r'");
+    expect(v2Migration).toContain("is_workspace_member");
+    expect(v2Migration).toContain("is_workspace_writer");
+    expect(v2Migration).toContain("as restrictive for insert");
+    expect(v2Migration).toContain("as restrictive for update");
+    expect(v2Migration).toContain("as restrictive for delete");
   });
 });
