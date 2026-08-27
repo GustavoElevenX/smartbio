@@ -17,6 +17,7 @@ describe("P0-03 RLS contract", () => {
     expect(migration).toContain("has_active_platform_support_access(target_workspace, 'write')");
     expect(migration).toContain("p0_03_projects_writer_update");
     expect(migration).toContain("revoke all on function public.is_workspace_member(uuid) from public, anon");
+    expect(migration).toContain("to_regclass(format('public.%I', table_name))");
   });
 
   it("proves both directions with real anon-key sessions and adversarial mutations", () => {

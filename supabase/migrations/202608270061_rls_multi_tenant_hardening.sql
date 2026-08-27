@@ -105,29 +105,35 @@ create policy "p0_03_media_storage_writer_delete" on storage.objects as restrict
 
 -- Private operational data must never be readable by anon, even if a future
 -- permissive policy is added accidentally.
-revoke all on public.workspaces, public.workspace_members, public.media_assets,
-  public.project_versions, public.visitor_sessions, public.analytics_events,
-  public.leads, public.chat_sessions, public.chat_messages, public.knowledge_entries,
-  public.subscriptions, public.quote_requests, public.quote_attachments,
-  public.order_requests, public.order_request_items, public.reservations,
-  public.reservation_change_requests, public.project_integrations,
-  public.commercial_audit_log, public.ai_setup_sessions, public.ai_setup_messages,
-  public.ai_generation_runs, public.project_data_requirements, public.business_sources,
-  public.business_source_facts, public.notifications, public.notification_preferences,
-  public.notification_deliveries, public.notification_outbox,
-  public.commercial_opportunities, public.opportunity_timeline,
-  public.optimization_suggestions, public.presence_pages, public.presence_sections,
-  public.conversion_activations, public.activation_offers, public.activation_placements,
-  public.activation_entry_points, public.activation_locations, public.customer_identities,
-  public.customer_identity_evidence, public.customer_import_batches,
-  public.redemption_validators, public.benefit_claims, public.benefit_redemptions,
-  public.activation_handoffs, public.workspace_invitations,
-  public.workspace_plan_assignments, public.workspace_entitlement_overrides,
-  public.workspace_plan_history, public.ai_site_proposals,
-  public.project_member_product_state, public.optimization_experiments,
-  public.workspace_optimization_policies, public.subscription_cancellation_feedback,
-  public.project_commercial_contexts, public.project_commercial_context_proposals
-from anon;
+do $$
+declare
+  table_name text;
+begin
+  foreach table_name in array array[
+    'workspaces','workspace_members','media_assets','project_versions',
+    'visitor_sessions','analytics_events','leads','chat_sessions','chat_messages',
+    'knowledge_entries','subscriptions','quote_requests','quote_attachments',
+    'order_requests','order_request_items','reservations','reservation_change_requests',
+    'project_integrations','commercial_audit_log','ai_setup_sessions','ai_setup_messages',
+    'ai_generation_runs','project_data_requirements','business_sources','business_source_facts',
+    'notifications','notification_preferences','notification_deliveries','notification_outbox',
+    'commercial_opportunities','opportunity_timeline','optimization_suggestions',
+    'presence_pages','presence_sections','conversion_activations','activation_offers',
+    'activation_placements','activation_entry_points','activation_locations',
+    'customer_identities','customer_identity_evidence','customer_import_batches',
+    'redemption_validators','benefit_claims','benefit_redemptions','activation_handoffs',
+    'workspace_invitations','workspace_plan_assignments','workspace_entitlement_overrides',
+    'workspace_plan_history','ai_site_proposals','project_member_product_state',
+    'optimization_experiments','workspace_optimization_policies',
+    'subscription_cancellation_feedback','project_commercial_contexts',
+    'project_commercial_context_proposals'
+  ] loop
+    if to_regclass(format('public.%I', table_name)) is not null then
+      execute format('revoke all on table public.%I from anon', table_name);
+    end if;
+  end loop;
+end;
+$$;
 
 comment on function public.is_workspace_writer(uuid) is
   'P0-03 mutation boundary: workspace members or active support grants with can_write=true.';
