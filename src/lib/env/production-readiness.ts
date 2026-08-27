@@ -102,6 +102,10 @@ export function productionReadinessIssues(source: NodeJS.ProcessEnv = process.en
         : "UPSTASH_REDIS_REST_URL",
       message: "configure URL e token juntos ou deixe ambos ausentes",
     });
+  if (source.NODE_ENV === "production") {
+    if (!upstashUrl) issues.push({ variable: "UPSTASH_REDIS_REST_URL", message: "rate limiting distribuído é obrigatório em produção" });
+    if (!upstashToken) issues.push({ variable: "UPSTASH_REDIS_REST_TOKEN", message: "rate limiting distribuído é obrigatório em produção" });
+  }
 
   for (const variable of secretVariables) {
     const configured = value(source, variable);

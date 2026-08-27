@@ -749,7 +749,8 @@ export async function getPublishedProject(
     .eq(column, value)
     .eq("status", "published")
     .maybeSingle();
-  if (error || !data) return null;
+  if (error) throw error;
+  if (!data) return null;
   const settings =
     data.settings && typeof data.settings === "object"
       ? (data.settings as Record<string, unknown>)

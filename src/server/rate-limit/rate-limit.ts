@@ -36,8 +36,10 @@ function provider() {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (url && token) return new UpstashRateLimitProvider(url, token);
-  // A instância em memória mantém o primeiro deploy funcional. Para escala
-  // horizontal, a integração Upstash passa a ser usada automaticamente.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Rate limiting distribuído não configurado para produção.");
+  }
+  // O provider em memória é deliberadamente restrito a desenvolvimento/testes.
   return new MemoryRateLimitProvider();
 }
 
@@ -66,7 +68,7 @@ export async function consumeRateLimit(
       rule,
     );
   } catch (error) {
-    if (options.failClosed !== false) throw error;
+    if (process.env.NODE_ENV === "production" || options.failClosed !== false) throw error;
     return {
       allowed: true,
       limit: rule.limit,

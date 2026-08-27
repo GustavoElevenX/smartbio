@@ -27,18 +27,28 @@ describe("readiness do ambiente de produção", () => {
     expect(productionReadinessIssues(productionEnv)).toEqual([]);
   });
 
-  it("aceita a URL automática da Vercel e o limitador local inicial", () => {
+  it("aceita a URL automática da Vercel quando o limitador distribuído está configurado", () => {
     const vercelEnv: NodeJS.ProcessEnv = { ...productionEnv };
     delete vercelEnv.NEXT_PUBLIC_APP_URL;
     delete vercelEnv.NEXT_PUBLIC_PUBLIC_BASE_URL;
-    delete vercelEnv.UPSTASH_REDIS_REST_URL;
-    delete vercelEnv.UPSTASH_REDIS_REST_TOKEN;
     expect(
       productionReadinessIssues({
         ...vercelEnv,
         VERCEL_PROJECT_PRODUCTION_URL: "sobe.vercel.app",
       }),
     ).toEqual([]);
+  });
+
+  it("exige Upstash em produção para endpoints públicos e IA", () => {
+    const issues = productionReadinessIssues({
+      ...productionEnv,
+      UPSTASH_REDIS_REST_URL: "",
+      UPSTASH_REDIS_REST_TOKEN: "",
+    });
+    expect(issues.map((issue) => issue.variable)).toEqual(expect.arrayContaining([
+      "UPSTASH_REDIS_REST_URL",
+      "UPSTASH_REDIS_REST_TOKEN",
+    ]));
   });
 
   it("rejeita modo local, HTTP e segredos fracos ou repetidos", () => {

@@ -16,6 +16,7 @@ describe("publicação na Vercel", () => {
   it("mantém o agendamento compatível com o plano Hobby", () => {
     const config = JSON.parse(read("vercel.json"));
     expect(config.framework).toBe("nextjs");
+    expect(config.buildCommand).toBe("npm run production:check");
     expect(config.crons).toEqual([
       {
         path: "/api/internal/notifications/process",

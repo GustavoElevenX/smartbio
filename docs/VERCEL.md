@@ -24,7 +24,7 @@ Na Vercel, abra **Settings → Environment Variables**, importe `.env.vercel` e 
 - Framework Preset: **Next.js**
 - Root Directory: diretório raiz do repositório
 - Install Command: `npm install`
-- Build Command: `npm run build`
+- Build Command: `npm run production:check`
 - Node.js: `22.x`
 - Ative **Automatically expose System Environment Variables**. Assim a aplicação usa `VERCEL_PROJECT_PRODUCTION_URL` sem exigir que o domínio exista antes do primeiro deploy.
 
@@ -41,7 +41,7 @@ Ao adicionar um domínio próprio, atualize essas duas URLs. Você também pode 
 
 ## 4. Serviços opcionais
 
-- **Upstash Redis:** recomendado para limites de uso distribuídos. Ao cadastrar `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN`, a aplicação passa a usá-lo automaticamente.
+- **Upstash Redis:** obrigatório em produção para limites de uso distribuídos. Cadastre `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN`; sem ambos, `npm run production:check` bloqueia o deploy.
 - **Resend:** exige `RESEND_API_KEY` e `EMAIL_FROM`; depois, ative `NEXT_PUBLIC_FEATURE_NOTIFICATIONS=true` e use `EMAIL_PROVIDER=resend`.
 - **Google Maps:** exige `GOOGLE_MAPS_SERVER_API_KEY` e `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY`; depois, ative `NEXT_PUBLIC_FEATURE_GEO_ROUTING=true`.
 - **Stripe Billing:** exige `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRO_PRICE_ID` e `STRIPE_PRO_PRODUCT_ID`. Consulte `docs/STRIPE-BILLING.md` antes do deploy.
