@@ -51,8 +51,8 @@ import { resolveEntryPoint } from "@/features/entry-points/resolve";
 import { resolveAttribution } from "@/features/attribution/attribution";
 import { readUtm } from "@/features/attribution/utm";
 import { createOpportunity } from "@/server/opportunities/factory";
+import type { PublicAnalyticsEventName } from "@/lib/validation/schemas";
 import type {
-  AnalyticsEventName,
   Booking,
   CapabilityKey,
   FormField,
@@ -475,7 +475,7 @@ export function ExperienceCanvas({
     : undefined;
 
   function emit(
-    eventName: AnalyticsEventName,
+    eventName: PublicAnalyticsEventName,
     metadata?: Record<string, unknown>,
   ) {
     if (preview || !step) return;
@@ -638,7 +638,18 @@ export function ExperienceCanvas({
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        ...lead,
+        projectId: lead.projectId,
+        sessionId: lead.sessionId,
+        name: lead.name,
+        email: lead.email,
+        phone: lead.phone,
+        company: lead.company,
+        source: lead.source,
+        campaign: lead.campaign,
+        recommendation: lead.recommendation,
+        answers: lead.answers,
+        capability,
+        locationName: lead.locationName,
         conversionGoalId: runtime.conversionGoalId,
         entryPointId: runtime.entryPointId,
         destinationId: runtime.routeResult?.destination?.id,
@@ -679,7 +690,6 @@ export function ExperienceCanvas({
       currency: input.currency,
     });
     localStore.saveOpportunity({ ...opportunity, id: uid("opportunity") });
-    emit("opportunity_created", { sourceType, sourceId });
   }
 
   async function submitCapability(capability: CapabilityKey, option?: StepOption) {
@@ -833,8 +843,6 @@ export function ExperienceCanvas({
         addOpportunity("booking", booking.id, `Agendamento · ${service.name}`, {
           summary: booking.startsAt,
         });
-        if (booking.status === "confirmed")
-          emit("booking_confirmed", { bookingId: booking.id });
         setConfirmation(
           booking.status === "confirmed"
             ? "Agendamento confirmado."
@@ -969,8 +977,6 @@ export function ExperienceCanvas({
             summary: `${reservation.checkIn} → ${reservation.checkOut}`,
           },
         );
-        if (reservation.status === "confirmed")
-          emit("reservation_confirmed", { reservationId: reservation.id });
         setConfirmation(
           reservation.status === "confirmed"
             ? "Reserva confirmada."
@@ -1418,7 +1424,6 @@ export function ExperienceCanvas({
       { summary: runtime.recommendationKey },
     );
     emit("form_submitted");
-    emit("lead_captured");
     emit("journey_completed");
     setSubmitted(true);
     setLeadForm(false);

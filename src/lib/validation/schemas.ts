@@ -11,36 +11,60 @@ const conversionContext = {
   attribution: z.object({ entryPointId: shortId.optional(), conversionGoalId: shortId.optional(), presencePageId: shortId.optional(), presenceSectionId: shortId.optional(), activationId: z.string().uuid().optional(), benefitClaimId: z.string().uuid().optional(), source: safeText, medium: safeText.optional(), campaign: safeText.optional(), content: safeText.optional(), term: safeText.optional(), referrer: z.string().url().max(1000).optional() }).optional(),
 };
 
-export const analyticsEventNames = [
+export const publicAnalyticsEventNames = [
   "page_view", "session_started", "step_viewed", "option_clicked", "form_started", "form_submitted", "recommendation_viewed", "cta_clicked", "whatsapp_clicked", "external_link_clicked", "journey_completed",
-  "journey_started", "journey_answered", "journey_context_completed", "location_selected", "route_unresolved", "handoff_built", "external_url_clicked", "lead_captured",
-  "capability_started", "qualification_completed", "quote_started", "quote_submitted", "quote_estimate_viewed", "media_uploaded", "availability_searched", "slot_selected", "booking_submitted", "booking_confirmed", "booking_cancel_requested", "catalog_viewed", "item_viewed", "item_added", "cart_viewed", "order_submitted", "reservation_search_started", "reservation_option_viewed", "reservation_submitted", "reservation_confirmed", "reservation_cancel_requested", "route_resolved", "payment_started",
-  "entry_point_loaded", "conversion_goal_selected", "conversion_goal_resolved", "opportunity_created", "conversion_confirmed", "conversion_lost",
+  "journey_started", "journey_answered", "journey_context_completed", "location_selected", "route_unresolved", "handoff_built", "external_url_clicked",
+  "capability_started", "qualification_completed", "quote_started", "quote_submitted", "quote_estimate_viewed", "media_uploaded", "availability_searched", "slot_selected", "booking_submitted", "booking_cancel_requested", "catalog_viewed", "item_viewed", "item_added", "cart_viewed", "order_submitted", "reservation_search_started", "reservation_option_viewed", "reservation_submitted", "reservation_cancel_requested", "route_resolved", "payment_started",
+  "entry_point_loaded", "conversion_goal_selected", "conversion_goal_resolved",
   "presence_page_viewed", "presence_section_viewed", "presence_cta_clicked", "presence_conversion_started",
-  "activation_viewed", "activation_cta_clicked", "activation_started", "customer_identified", "benefit_eligibility_checked", "benefit_claim_issued", "benefit_claim_presented", "benefit_claim_redeemed", "benefit_claim_rejected", "activation_opportunity_created",
+  "activation_viewed", "activation_cta_clicked", "activation_started",
 ] as const;
 
-export const analyticsEventSchema = z.object({
+export const serverAnalyticsEventNames = [
+  "lead_captured", "booking_confirmed", "reservation_confirmed",
+  "opportunity_created", "conversion_confirmed", "conversion_lost",
+  "customer_identified", "benefit_eligibility_checked", "benefit_claim_issued", "benefit_claim_presented", "benefit_claim_redeemed", "benefit_claim_rejected", "activation_opportunity_created",
+] as const;
+
+export const analyticsEventNames = [
+  ...publicAnalyticsEventNames,
+  ...serverAnalyticsEventNames,
+] as const;
+
+export type PublicAnalyticsEventName = (typeof publicAnalyticsEventNames)[number];
+export type ServerAnalyticsEventName = (typeof serverAnalyticsEventNames)[number];
+
+export const publicAnalyticsEventSchema = z.object({
   projectId: shortId, visitorId: shortId, sessionId: shortId,
   idempotencyKey: z.string().trim().min(12).max(180).optional(),
-  eventName: z.enum(analyticsEventNames),
+  eventName: z.enum(publicAnalyticsEventNames),
   stepId: shortId.optional(), optionId: shortId.optional(), conversionGoalId: shortId.optional(), entryPointId: shortId.optional(), destinationId: shortId.optional(), presencePageId: shortId.optional(), presenceSectionId: shortId.optional(), activationId: z.string().uuid().optional(), benefitClaimId: z.string().uuid().optional(), metadata: z.record(z.string().max(80), z.unknown()).optional(), referrer: z.string().url().max(1000).or(z.literal("")).optional(),
   utmSource: safeText.optional(), utmMedium: safeText.optional(), utmCampaign: safeText.optional(), utmContent: safeText.optional(), utmTerm: safeText.optional(), deviceType: z.enum(["mobile", "desktop", "tablet"]).optional(),
 });
 
-export const leadSchema = z.object({
-  ...conversionContext,
-  projectId: shortId, projectName: safeText, sessionId: shortId, name: safeText.optional(),
-  email: z.string().email().max(250).optional().or(z.literal("")), phone: z.string().max(40).regex(/^[\d+()\s-]*$/).optional().or(z.literal("")), company: safeText.optional(),
-  status: z.enum(["new", "contacted", "qualified", "converted", "lost"]).default("new"), source: safeText.optional(), campaign: safeText.optional(), recommendation: safeText.optional(),
-  answers: z.record(z.string(), z.string().max(1000)), score: z.number().int().min(-1000).max(1000).optional(), qualificationBand: z.enum(["cold", "potential", "qualified"]).optional(),
-  qualificationReason: safeText.optional(), commercialAction: z.enum(["qualification", "quote", "scheduling", "catalog_order", "reservation", "routing", "payment"]).optional(), commercialObjectId: shortId.optional(), operationalStatus: safeText.optional(),
-  estimatedValue: z.number().nonnegative().max(100_000_000).optional(), scheduledAt: z.string().datetime().optional(), locationName: safeText.optional(),
-  items: z.array(z.object({ itemId: shortId, name: safeText, quantity: z.number().int().positive(), unitPrice: z.number().nonnegative(), variantId: shortId.optional(), notes: safeText.optional() })).max(100).optional(),
-  attachments: z.array(z.object({ id: shortId, name: safeText, mimeType: safeText, size: z.number().int().nonnegative(), url: z.string().url().optional(), storagePath: z.string().max(500).optional() })).max(12).optional(),
-  timeline: z.array(z.object({ label: safeText, at: z.string().datetime(), metadata: z.record(z.string(), z.unknown()).optional() })).max(100).optional(),
-  honeypot: z.string().max(0).optional(),
+// Internal consumers may parse the complete event vocabulary. Public routes
+// must use publicAnalyticsEventSchema so server-only events cannot cross the
+// browser boundary.
+export const serverAnalyticsEventSchema = publicAnalyticsEventSchema.extend({
+  eventName: z.enum(analyticsEventNames),
 });
+export const analyticsEventSchema = serverAnalyticsEventSchema;
+
+export const leadSchema = z.object({
+  conversionGoalId: conversionContext.conversionGoalId,
+  entryPointId: conversionContext.entryPointId,
+  destinationId: conversionContext.destinationId,
+  presencePageId: conversionContext.presencePageId,
+  presenceSectionId: conversionContext.presenceSectionId,
+  attribution: conversionContext.attribution,
+  projectId: shortId, sessionId: shortId, name: safeText.optional(),
+  email: z.string().email().max(250).optional().or(z.literal("")), phone: z.string().max(40).regex(/^[\d+()\s-]*$/).optional().or(z.literal("")), company: safeText.optional(),
+  source: safeText.optional(), campaign: safeText.optional(), recommendation: safeText.optional(),
+  answers: z.record(z.string().max(80), z.string().max(1000)),
+  capability: z.enum(["qualification", "quote", "scheduling", "catalog_order", "reservation", "routing", "payment"]).optional(),
+  locationName: safeText.optional(),
+  honeypot: z.string().max(0).optional(),
+}).strict();
 
 export const quoteRequestSchema = z.object({
   ...conversionContext,

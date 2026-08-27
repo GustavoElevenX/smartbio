@@ -1,4 +1,4 @@
-import { analyticsEventSchema } from "@/lib/validation/schemas";
+import { publicAnalyticsEventSchema } from "@/lib/validation/schemas";
 import { createServiceClient } from "@/lib/supabase/server";
 import { apiError, apiSuccess } from "@/server/http/api-response";
 import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   }), rateLimitRules.publicAnalytics, { failClosed: true });
   const respond = <T extends Response>(response: T) => applyRateLimitHeaders(response, rate);
   if (!rate.allowed) return respond(apiError("Muitas requisições.", 429, "rate_limited"));
-  const parsed = analyticsEventSchema.safeParse(raw);
+  const parsed = publicAnalyticsEventSchema.safeParse(raw);
   if (!parsed.success) return respond(apiError("Evento inválido.", 400, "validation_error"));
   const supabase = createServiceClient();
   if (!supabase) return respond(apiSuccess({ accepted: true, persisted: false }, 202));

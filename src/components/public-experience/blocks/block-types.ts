@@ -1,10 +1,10 @@
 import type { MutableRefObject } from "react";
 import type {
-  AnalyticsEventName,
   ContentBlock,
   JourneyRuntimeState,
   Project,
 } from "@/types";
+import type { PublicAnalyticsEventName } from "@/lib/validation/schemas";
 
 export interface BlockRendererProps {
   block: ContentBlock;
@@ -12,7 +12,7 @@ export interface BlockRendererProps {
   runtime: JourneyRuntimeState;
   setRuntime: React.Dispatch<React.SetStateAction<JourneyRuntimeState>>;
   mediaFilesRef: MutableRefObject<File[]>;
-  emit: (name: AnalyticsEventName, metadata?: Record<string, unknown>) => void;
+  emit: (name: PublicAnalyticsEventName, metadata?: Record<string, unknown>) => void;
 }
 
 export type BlockRenderer = React.ComponentType<BlockRendererProps>;

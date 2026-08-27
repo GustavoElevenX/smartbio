@@ -44,17 +44,15 @@ export function buildConversionFunnel(
     "conversion_goal_resolved",
   ]);
   const action = sessionSet(events, actionEvents);
-  const opportunity = new Set([
-    ...opportunities.map((item) => item.sessionId).filter(Boolean),
-    ...sessionSet(events, ["opportunity_created"]),
-  ]);
-  const conversion = new Set([
-    ...opportunities
+  const opportunity = new Set(
+    opportunities.map((item) => item.sessionId).filter(Boolean),
+  );
+  const conversion = new Set(
+    opportunities
       .filter((item) => item.status === "converted")
       .map((item) => item.sessionId)
       .filter(Boolean),
-    ...sessionSet(events, ["conversion_confirmed"]),
-  ]);
+  );
   const sets = [attention, intention, action, opportunity, conversion];
   const labels = [
     "Atenção",
