@@ -31,12 +31,23 @@ export async function assertProjectAccess(
       .eq("admin_user_id", actor.platform!.realUserId)
       .eq("workspace_id", actor.workspaceId)
       .maybeSingle();
+    const { data: grant } = await supabase
+      .from("platform_support_grants")
+      .select("can_write,revoked_at,expires_at")
+      .eq("support_session_id", actor.platform!.supportSessionId!)
+      .eq("admin_user_id", actor.platform!.realUserId)
+      .eq("workspace_id", actor.workspaceId)
+      .is("revoked_at", null)
+      .gt("expires_at", new Date().toISOString())
+      .maybeSingle();
     if (
       !session ||
+      !grant ||
       session.status !== "active" ||
       new Date(session.expires_at) <= new Date() ||
       (session.project_id && session.project_id !== projectId) ||
-      permission === "delete"
+      permission === "delete" ||
+      (permission === "write" && !grant.can_write)
     )
       throw new WorkspaceAccessDeniedError(
         "A sessão de suporte não permite esta operação.",

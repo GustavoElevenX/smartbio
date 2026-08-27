@@ -14,6 +14,7 @@
     "test:e2e": "playwright test",
     "test:activation-gate": "node --experimental-strip-types scripts/run-activation-gate.ts",
     "test:integration": "node --experimental-strip-types --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/run-integration.ts",
+    "test:integration:rls": "node --experimental-strip-types --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/run-rls-integration.ts",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run build",
     "production:env": "node --experimental-strip-types --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/check-production-env.ts",
     "production:check": "npm run production:env && npm run verify",

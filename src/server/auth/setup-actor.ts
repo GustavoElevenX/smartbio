@@ -104,7 +104,7 @@ const resolveActor = cache(async (): Promise<AuthenticatedActor | null> => {
     const { data: support } = await service
       .from("platform_support_sessions")
       .select(
-        "id,workspace_id,expires_at,platform_support_grants!inner(can_read,revoked_at,expires_at)",
+        "id,workspace_id,expires_at,platform_support_grants!inner(can_read,can_write,revoked_at,expires_at)",
       )
       .eq("id", supportSessionId)
       .eq("admin_user_id", user.id)
