@@ -49,6 +49,7 @@ export function CommercialArchitectureReview({ architecture, busy, onConfirm, on
         ...blueprint,
         completion: {
           ...blueprint.completion,
+          type: channelId ? current.channels.find((channel) => channel.id === channelId)?.type || "native" : "native",
           channelId: channelId || null,
           destinationStrategy: channelId ? (current.channels.find((channel) => channel.id === channelId)?.type === "external_url" ? "external_url" : "fixed") : "native",
         },

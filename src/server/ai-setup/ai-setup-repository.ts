@@ -23,7 +23,17 @@ function compatibleCommercialArchitecture(value: unknown) {
   if (Array.isArray(architecture.journeyBlueprints)) architecture.journeyBlueprints = architecture.journeyBlueprints.map((blueprint) => {
     if (!blueprint || typeof blueprint !== "object") return blueprint;
     const item = blueprint as Record<string, unknown>;
-    return { ...item, requiredFacts: Array.isArray(item.requiredFacts) ? item.requiredFacts.map((fact) => fact && typeof fact === "object" ? { resolutionTarget: null, ...fact as Record<string, unknown> } : fact) : item.requiredFacts };
+    const completion = item.completion && typeof item.completion === "object" ? item.completion as Record<string, unknown> : undefined;
+    const channel = completion?.channelId && Array.isArray(architecture.channels)
+      ? architecture.channels.find((candidate) => candidate && typeof candidate === "object" && (candidate as Record<string, unknown>).id === completion.channelId) as Record<string, unknown> | undefined
+      : undefined;
+    const inferredCompletionType = channel?.type
+      || (completion?.destinationStrategy === "external_url" ? "external_url" : completion?.destinationStrategy === "native" ? "native" : "whatsapp");
+    return {
+      ...item,
+      completion: completion ? { type: inferredCompletionType, ...completion } : completion,
+      requiredFacts: Array.isArray(item.requiredFacts) ? item.requiredFacts.map((fact) => fact && typeof fact === "object" ? { resolutionTarget: null, ...fact as Record<string, unknown> } : fact) : item.requiredFacts,
+    };
   });
   return architecture;
 }

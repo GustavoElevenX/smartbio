@@ -91,7 +91,7 @@ describe("ProjectCommercialContext", () => {
   });
 
   it("sincroniza uma nova unidade sem apagar caminhos B2B e identifica intenções impactadas", async () => {
-    const { project, session } = await fixture("Temos unidades, recebemos pedidos e também atendemos revendedores pelo comercial.", { phone: "5511999999999", sources: [source({ locations: [{ name: "Centro", description: null, attributes: [] }, { name: "Norte", description: null, attributes: [] }] })] });
+    const { project, session } = await fixture("Recebemos pedidos e também atendemos revendedores pelo comercial.", { phone: "5511999999999" });
     const current = projectCommercialContextFromActivation({ projectId: project.id, project, session, now });
     const resaleId = current.intentContexts.find((item) => item.semanticKey === "resale")?.id;
     const updatedProject: Project = {

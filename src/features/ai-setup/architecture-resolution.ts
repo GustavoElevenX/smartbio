@@ -4,6 +4,7 @@ import {
 } from "@/features/ai-setup/ai-setup.schema";
 import { normalizeCommercialArchitecture } from "@/features/ai-setup/commercial-architecture";
 import { validateSetupPhone } from "@/features/ai-setup/setup-phone";
+import { resolveCompletionDestination, validCommercialChannel } from "@/features/routing/completion-destination";
 import type { Project } from "@/types";
 
 type RequiredFact = CommercialArchitecture["journeyBlueprints"][number]["requiredFacts"][number];
@@ -17,14 +18,6 @@ function validHttpUrl(value: unknown) {
   }
 }
 
-function channelHasValidValue(channel: CommercialArchitecture["channels"][number] | undefined) {
-  if (!channel?.value) return false;
-  if (channel.type === "external_url") return validHttpUrl(channel.value);
-  if (channel.type === "whatsapp" || channel.type === "phone") return validateSetupPhone(channel.value).valid;
-  if (channel.type === "email") return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(channel.value);
-  return channel.type === "native";
-}
-
 function compatibilityTarget(
   architecture: CommercialArchitecture,
   blueprint: Blueprint,
@@ -34,11 +27,11 @@ function compatibilityTarget(
   const suffix = fact.key.split(".").at(-1);
   if (suffix === "url") return { type: "external_url", blueprintId: blueprint.id, intentId: blueprint.intentId };
   if (suffix === "destination") {
-    return { type: "channel_value", channelId: blueprint.completion.channelId, intentId: blueprint.intentId, channelType: "whatsapp" };
+    return { type: "channel_value", channelId: blueprint.completion.channelId, intentId: blueprint.intentId, channelType: blueprint.completion.type === "native" ? "whatsapp" : blueprint.completion.type };
   }
   if (suffix === "location_channels") {
     const used = [...new Set(blueprint.steps.flatMap((step) => step.usesLocations))];
-    return { type: "location_channel_mapping", intentId: blueprint.intentId, locationIds: used.length ? used : architecture.locations.map((location) => location.id), channelType: "whatsapp" };
+    return { type: "location_channel_mapping", intentId: blueprint.intentId, locationIds: used.length ? used : architecture.locations.map((location) => location.id), channelType: blueprint.completion.type === "native" ? "whatsapp" : blueprint.completion.type };
   }
   if (suffix === "completion") {
     return { type: "completion_strategy", blueprintId: blueprint.id, acceptedStrategies: ["fixed", "by_location", "external_url", "native"] };
@@ -64,29 +57,27 @@ export function isRequiredFactResolved(architecture: CommercialArchitecture, fac
   if (target.type === "channel_value" || target.type === "external_url") {
     const channel = architecture.channels.find((item) => item.id === blueprint.completion.channelId);
     const expectedType = target.type === "external_url" ? "external_url" : target.channelType;
-    return channel?.type === expectedType && channelHasValidValue(channel);
+    return channel?.type === expectedType && validCommercialChannel(channel);
   }
   if (target.type === "location_channel_mapping") {
     const ids = target.locationIds.length ? target.locationIds : architecture.locations.map((location) => location.id);
-    return ids.length > 0 && ids.every((locationId) => {
-      const location = architecture.locations.find((item) => item.id === locationId);
-      return Boolean(location?.channelIds.some((channelId) => {
-        const channel = architecture.channels.find((item) => item.id === channelId);
-        return channel?.type === target.channelType && channelHasValidValue(channel);
-      }));
+    return blueprint.completion.type === target.channelType && ids.length > 0 && ids.every((selectedLocationId) => {
+      const resolution = resolveCompletionDestination({ architecture, blueprint, selectedLocationId });
+      return resolution.status === "resolved" && resolution.channel.type === target.channelType;
     });
   }
   if (target.type === "completion_strategy") {
     if (!target.acceptedStrategies.includes(blueprint.completion.destinationStrategy)) return false;
     if (blueprint.completion.destinationStrategy === "fixed" || blueprint.completion.destinationStrategy === "external_url") {
-      return channelHasValidValue(architecture.channels.find((item) => item.id === blueprint.completion.channelId));
+      const channel = architecture.channels.find((item) => item.id === blueprint.completion.channelId);
+      return channel?.type === blueprint.completion.type && validCommercialChannel(channel);
     }
     if (blueprint.completion.destinationStrategy === "by_location") {
       const locationTarget: ArchitectureResolutionTarget = {
         type: "location_channel_mapping",
         intentId: blueprint.intentId,
         locationIds: [...new Set(blueprint.steps.flatMap((step) => step.usesLocations))],
-        channelType: "whatsapp",
+        channelType: blueprint.completion.type === "native" ? "whatsapp" : blueprint.completion.type,
       };
       return isRequiredFactResolved(architecture, { ...fact, resolutionTarget: locationTarget });
     }
@@ -100,16 +91,18 @@ function structuralFacts(architecture: CommercialArchitecture, blueprint: Bluepr
   const intent = architecture.intents.find((item) => item.id === blueprint.intentId);
   const affects = intent?.label || blueprint.objective;
   const channel = architecture.channels.find((item) => item.id === blueprint.completion.channelId);
-  if (blueprint.completion.destinationStrategy === "external_url" && (channel?.type !== "external_url" || !channelHasValidValue(channel))) {
+  if (blueprint.completion.destinationStrategy === "external_url" && (blueprint.completion.type !== "external_url" || channel?.type !== "external_url" || !validCommercialChannel(channel))) {
     return [{ key: `architecture.${blueprint.intentId}.url`, label: `Link para ${affects}`, reason: "O caminho direto precisa de uma URL real.", affects, severity: "blocking", resolutionTarget: { type: "external_url", blueprintId: blueprint.id, intentId: blueprint.intentId } }];
   }
-  if (blueprint.completion.destinationStrategy === "fixed" && !channelHasValidValue(channel)) {
-    return [{ key: `architecture.${blueprint.intentId}.destination`, label: `Destino de ${affects}`, reason: "Precisamos saber qual canal real recebe este contato.", affects, severity: "blocking", resolutionTarget: { type: "channel_value", channelId: blueprint.completion.channelId, intentId: blueprint.intentId, channelType: channel?.type === "email" || channel?.type === "phone" ? channel.type : "whatsapp" } }];
+  if (blueprint.completion.destinationStrategy === "fixed" && (blueprint.completion.type === "native" || channel?.type !== blueprint.completion.type || !validCommercialChannel(channel))) {
+    const channelType = blueprint.completion.type === "native" ? "whatsapp" : blueprint.completion.type;
+    return [{ key: `architecture.${blueprint.intentId}.destination`, label: `Destino de ${affects}`, reason: `Precisamos de um canal ${channelType} real e compatível com esta jornada.`, affects, severity: "blocking", resolutionTarget: { type: "channel_value", channelId: blueprint.completion.channelId, intentId: blueprint.intentId, channelType } }];
   }
   if (blueprint.completion.destinationStrategy === "by_location") {
     const locationIds = [...new Set(blueprint.steps.flatMap((step) => step.usesLocations))];
-    const target = { type: "location_channel_mapping", intentId: blueprint.intentId, locationIds: locationIds.length ? locationIds : architecture.locations.map((location) => location.id), channelType: "whatsapp" } as const;
-    const fact: RequiredFact = { key: `architecture.${blueprint.intentId}.location_channels`, label: "WhatsApp de cada unidade", reason: "Cada unidade usada por esta jornada precisa ter um destino conhecido.", affects, severity: "blocking", resolutionTarget: target };
+    const channelType = blueprint.completion.type === "native" ? "whatsapp" : blueprint.completion.type;
+    const target = { type: "location_channel_mapping", intentId: blueprint.intentId, locationIds: locationIds.length ? locationIds : architecture.locations.map((location) => location.id), channelType } as const;
+    const fact: RequiredFact = { key: `architecture.${blueprint.intentId}.location_channels`, label: `Destino ${channelType} de cada unidade`, reason: `Cada unidade usada por esta jornada precisa ter exatamente um destino ${channelType} compatível.`, affects, severity: "blocking", resolutionTarget: target };
     if (!isRequiredFactResolved(architecture, fact)) return [fact];
   }
   if (blueprint.completion.destinationStrategy === "by_answer") {
@@ -202,7 +195,7 @@ export function resolveArchitectureRequirement(input: {
     patched = {
       ...architecture,
       channels: [...architecture.channels.filter((item) => item.id !== channelId), channel],
-      journeyBlueprints: architecture.journeyBlueprints.map((item) => item.id === blueprint.id ? { ...item, completion: { ...item.completion, channelId, destinationStrategy: channelType === "external_url" ? "external_url" : "fixed" } } : item),
+      journeyBlueprints: architecture.journeyBlueprints.map((item) => item.id === blueprint.id ? { ...item, completion: { ...item.completion, type: channelType, channelId, destinationStrategy: channelType === "external_url" ? "external_url" : "fixed" } } : item),
     };
   } else if (target.type === "location_channel_mapping") {
     const mappings = mappingAnswers(architecture, target, input.answer);
@@ -211,20 +204,20 @@ export function resolveArchitectureRequirement(input: {
     const locations = architecture.locations.map((location) => {
       const mapping = mappings.find((item) => item.locationId === location.id);
       if (!mapping) return location;
-      const value = target.channelType === "external_url" ? mapping.value.trim() : validateSetupPhone(mapping.value).normalized;
-      const valid = target.channelType === "external_url" ? validHttpUrl(value) : Boolean(validateSetupPhone(mapping.value).valid && value);
+      const value = target.channelType === "external_url" || target.channelType === "email" ? mapping.value.trim() : validateSetupPhone(mapping.value).normalized;
+      const valid = target.channelType === "external_url" ? validHttpUrl(value) : target.channelType === "email" ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value || "") : Boolean(validateSetupPhone(mapping.value).valid && value);
       if (!valid) { warnings.push(`O destino de ${location.label} é inválido.`); return location; }
       const channelId = `channel-${target.channelType}-${location.id}`;
-      const channel = { id: channelId, type: target.channelType, label: `${target.channelType === "external_url" ? "Link" : "WhatsApp"} · ${location.label}`, value: value || mapping.value, purpose: `Atendimento da unidade ${location.label}`, isFallback: false, evidence: [...location.evidence, evidence], confidence: 1 };
+      const channel = { id: channelId, type: target.channelType, label: `${target.channelType === "external_url" ? "Link" : target.channelType === "whatsapp" ? "WhatsApp" : target.channelType === "phone" ? "Telefone" : "E-mail"} · ${location.label}`, value: value || mapping.value, purpose: `Atendimento da unidade ${location.label}`, isFallback: false, evidence: [...location.evidence, evidence], confidence: 1 };
       const index = channels.findIndex((item) => item.id === channelId);
       if (index >= 0) channels[index] = channel; else channels.push(channel);
       return { ...location, channelIds: [...new Set([...location.channelIds.filter((id) => id !== channelId), channelId])], evidence: [...location.evidence, evidence], confidence: 1 };
     });
-    patched = { ...architecture, channels, locations };
+    patched = { ...architecture, channels, locations, journeyBlueprints: architecture.journeyBlueprints.map((item) => item.id === blueprint.id ? { ...item, completion: { ...item.completion, type: target.channelType } } : item) };
   } else if (target.type === "completion_strategy") {
     const strategy = answerString(input.answer) as Blueprint["completion"]["destinationStrategy"];
     if (!target.acceptedStrategies.includes(strategy)) return { architecture, resolved: false, warnings: ["Escolha uma estratégia de conclusão aceita para esta jornada."] };
-    patched = { ...architecture, journeyBlueprints: architecture.journeyBlueprints.map((item) => item.id === blueprint.id ? { ...item, completion: { ...item.completion, destinationStrategy: strategy } } : item) };
+    patched = { ...architecture, journeyBlueprints: architecture.journeyBlueprints.map((item) => item.id === blueprint.id ? { ...item, completion: { ...item.completion, type: strategy === "native" ? "native" : item.completion.type, destinationStrategy: strategy } } : item) };
   } else if (target.type === "required_field") {
     if (!answerString(input.answer)) return { architecture, resolved: false, warnings: ["Informe o campo necessário para continuar."] };
     patched = { ...architecture, journeyBlueprints: architecture.journeyBlueprints.map((item) => item.id === blueprint.id ? { ...item, steps: item.steps.map((step, index) => index === 0 ? { ...step, collects: [...new Set([...step.collects, target.fieldKey])] } : step) } : item) };
@@ -243,11 +236,13 @@ export function validateCommercialArchitectureForMaterialization(architecture: C
   for (const intent of normalized.intents.filter((item) => item.visibleOnEntry)) if (!blueprintIntentIds.has(intent.id)) issues.push({ code: "intent_without_blueprint", message: `O caminho “${intent.label}” ainda não possui uma jornada.` });
   for (const blueprint of normalized.journeyBlueprints) {
     const channel = normalized.channels.find((item) => item.id === blueprint.completion.channelId);
-    if (blueprint.completion.destinationStrategy === "fixed" && !channelHasValidValue(channel)) issues.push({ code: "invalid_fixed_destination", blueprintId: blueprint.id, message: `O destino de “${blueprint.objective}” ainda não é válido.` });
-    if (blueprint.completion.destinationStrategy === "external_url" && (channel?.type !== "external_url" || !channelHasValidValue(channel))) issues.push({ code: "invalid_external_url", blueprintId: blueprint.id, message: `O link de “${blueprint.objective}” ainda não é válido.` });
+    if (blueprint.completion.destinationStrategy === "fixed" && (channel?.type !== blueprint.completion.type || !validCommercialChannel(channel))) issues.push({ code: "invalid_fixed_destination", blueprintId: blueprint.id, message: `O destino de “${blueprint.objective}” não é compatível com completion.type=${blueprint.completion.type}.` });
+    if (blueprint.completion.destinationStrategy === "external_url" && (blueprint.completion.type !== "external_url" || channel?.type !== "external_url" || !validCommercialChannel(channel))) issues.push({ code: "invalid_external_url", blueprintId: blueprint.id, message: `O link de “${blueprint.objective}” ainda não é válido.` });
     if (blueprint.completion.destinationStrategy === "by_location") {
-      const fact = structuralFacts(normalized, blueprint)[0];
-      if (fact) issues.push({ code: "incomplete_location_mapping", blueprintId: blueprint.id, message: `Defina um destino válido para cada unidade usada por “${blueprint.objective}”.` });
+      const locationIds = [...new Set(blueprint.steps.flatMap((step) => step.usesLocations))];
+      const usedLocationIds = locationIds.length ? locationIds : normalized.locations.map((item) => item.id);
+      const unresolved = usedLocationIds.map((selectedLocationId) => resolveCompletionDestination({ architecture: normalized, blueprint, selectedLocationId })).find((result) => result.status !== "resolved");
+      if (unresolved) issues.push({ code: "incomplete_location_mapping", blueprintId: blueprint.id, message: `${unresolved.reason} Corrija “${blueprint.objective}” antes de materializar.` });
     }
     if (blueprint.completion.destinationStrategy === "by_answer") issues.push({ code: "missing_answer_routing", blueprintId: blueprint.id, message: `A regra que decide o destino de “${blueprint.objective}” ainda não foi materializada.` });
     const hasHandoffContext = blueprint.steps.some((step) => step.collects.length || ["catalog_order", "qualification", "quote", "routing"].includes(step.expectedCapability || ""));

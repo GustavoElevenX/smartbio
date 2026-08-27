@@ -195,7 +195,7 @@ export function projectCommercialContextFromActivation(input: {
         journeyBlueprintId: blueprint.id,
         mechanism: mechanismFor(blueprint, channel),
         requiredInformation: unique([...blueprint.steps.flatMap((step) => step.collects), ...blueprint.requiredFacts.map((fact) => fact.label)]),
-        completionStrategy: `${blueprint.completion.destinationStrategy}:${channel?.type || "native"}`,
+        completionStrategy: `${blueprint.completion.type}:${blueprint.completion.destinationStrategy}`,
         destinationIds: destinationId ? [destinationId] : [],
         status,
         confidence: blueprint.confidence,

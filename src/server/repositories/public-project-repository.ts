@@ -450,6 +450,9 @@ export function projectFromNormalizedRow(
                 : "location",
       label: String(item.label),
       value: String(item.value),
+      locationId: item.settings && typeof item.settings === "object" && (item.settings as Record<string, unknown>).locationId
+        ? String((item.settings as Record<string, unknown>).locationId)
+        : undefined,
       message:
         item.settings && typeof item.settings === "object"
           ? String((item.settings as Record<string, unknown>).message || "") ||

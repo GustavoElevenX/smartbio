@@ -188,6 +188,8 @@ export const commercialChannelSchema = z.object({
   confidence: z.number().min(0).max(1),
 });
 
+export const journeyCompletionTypeSchema = z.enum(["whatsapp", "external_url", "phone", "email", "native"]);
+
 export const architectureResolutionTargetSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("channel_value"),
@@ -199,7 +201,7 @@ export const architectureResolutionTargetSchema = z.discriminatedUnion("type", [
     type: z.literal("location_channel_mapping"),
     intentId: z.string().trim().min(1).max(160),
     locationIds: z.array(z.string().trim().min(1).max(160)).max(100),
-    channelType: z.enum(["whatsapp", "phone", "external_url"]),
+    channelType: z.enum(["whatsapp", "phone", "external_url", "email"]),
   }),
   z.object({
     type: z.literal("completion_strategy"),
@@ -272,6 +274,7 @@ export const commercialArchitectureSchema = z.object({
       usesLocations: z.array(z.string().trim().min(1).max(160)).max(100).default([]),
     })).max(12),
     completion: z.object({
+      type: journeyCompletionTypeSchema,
       channelId: z.string().trim().min(1).max(160).nullable(),
       destinationStrategy: z.enum(["fixed", "by_location", "by_answer", "external_url", "native"]),
       handoffSummary: z.boolean().default(false),
@@ -419,3 +422,4 @@ export type ActivationDecisionSource = z.infer<typeof activationDecisionSourceSc
 export type CommercialArchitecture = z.infer<typeof commercialArchitectureSchema>;
 export type CommercialEvidenceRef = z.infer<typeof commercialEvidenceRefSchema>;
 export type ArchitectureResolutionTarget = z.infer<typeof architectureResolutionTargetSchema>;
+export type JourneyCompletionType = z.infer<typeof journeyCompletionTypeSchema>;

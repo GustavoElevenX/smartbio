@@ -65,7 +65,7 @@ describe("CommercialArchitecture context-first", () => {
         { id: "pedido", semanticKey: "order", label: "Fazer pedido", visitorNeed: "Pedir", priority: 100, visibleOnEntry: true, evidence, confidence: 0.9 },
         { id: "pedido-duplicado", semanticKey: "order", label: "Fazer pedido", visitorNeed: "Pedir", priority: 90, visibleOnEntry: true, evidence, confidence: 0.8 },
       ],
-      journeyBlueprints: [{ id: "flow", intentId: "pedido", objective: "Pedir", mode: "routing", steps: [{ purpose: "Escolher unidade", expectedCapability: "routing", collects: [], usesOfferings: [], usesLocations: ["loc-a"] }], completion: { channelId: "wa-a", destinationStrategy: "by_location", handoffSummary: true }, requiredFacts: [], assumptions: [], confidence: 0.9 }],
+      journeyBlueprints: [{ id: "flow", intentId: "pedido", objective: "Pedir", mode: "routing", steps: [{ purpose: "Escolher unidade", expectedCapability: "routing", collects: [], usesOfferings: [], usesLocations: ["loc-a"] }], completion: { type: "whatsapp", channelId: "wa-a", destinationStrategy: "by_location", handoffSummary: true }, requiredFacts: [], assumptions: [], confidence: 0.9 }],
       issues: [],
     });
     expect(architecture.intents).toHaveLength(1);

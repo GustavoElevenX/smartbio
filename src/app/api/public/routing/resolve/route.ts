@@ -1,4 +1,5 @@
 import { resolveRoute } from "@/features/routing/routing-engine";
+import { journeyCompletionTypeSchema } from "@/features/ai-setup/ai-setup.schema";
 import { features } from "@/lib/constants";
 import { createServiceClient } from "@/lib/supabase/server";
 import { routingResolveSchema } from "@/lib/validation/schemas";
@@ -23,6 +24,7 @@ export async function POST(request: Request) {
   if (!project) return respond(apiError("Projeto não encontrado.", 404, "project_not_found"));
   const destinations = project.commercialConfig?.routingDestinations || [];
   const fallbackDestinationId = destinations.find((item) => item.isDefault && item.role === "general_contact")?.id;
-  const result = resolveRoute(parsed.data.context, project.commercialConfig?.routingRules || [], destinations, fallbackDestinationId, project.commercialConfig?.locations || []);
+  const completionType = journeyCompletionTypeSchema.safeParse(parsed.data.context.completion_type).data;
+  const result = resolveRoute(parsed.data.context, project.commercialConfig?.routingRules || [], destinations, fallbackDestinationId, project.commercialConfig?.locations || [], completionType);
   return respond(apiSuccess({ result }));
 }

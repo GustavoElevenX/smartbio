@@ -241,7 +241,7 @@ export function deterministicCommercialArchitecture(input: {
     return {
       id: stableId("blueprint", intent.id, index), intentId: intent.id, objective: intent.visitorNeed, mode,
       steps: mode.startsWith("direct_") ? [] : [{ purpose: intent.visitorNeed, expectedCapability: capability ?? null, collects, usesOfferings: offerings.map((item) => stableId("offering", item.name)), usesLocations: locations.map((item) => item.id) }],
-      completion: { channelId: channel?.id ?? null, destinationStrategy: mode === "direct_external" ? "external_url" : mode === "routing" ? "by_location" : channel ? "fixed" : "native", handoffSummary: !mode.startsWith("direct_") && Boolean(channel) },
+      completion: { type: mode === "routing" ? "whatsapp" : channel?.type || "native", channelId: channel?.id ?? null, destinationStrategy: mode === "direct_external" ? "external_url" : mode === "routing" ? "by_location" : channel ? "fixed" : "native", handoffSummary: !mode.startsWith("direct_") && Boolean(channel) },
       requiredFacts, assumptions: fallbackOnly ? ["Não foi possível identificar uma intenção comercial específica com segurança."] : [], confidence: intent.confidence,
     };
   });
@@ -334,7 +334,7 @@ export function commercialArchitectureFromActivationUnderstanding(understanding:
     const semanticKey = intent.semanticKey || classifyCustomVisitorAction(intent.label);
     const mode = modeFor(semanticKey, Boolean(channels.find((item) => item.type === "external_url" && item.value)), Boolean(channels.find((item) => item.type === "whatsapp" && item.value)));
     const capability = capabilityFor(semanticKey);
-    return { id: stableId("blueprint", intent.id, index), intentId: intent.id, objective: intent.visitorNeed, mode, steps: mode.startsWith("direct_") ? [] : [{ purpose: intent.visitorNeed.slice(0, 400), expectedCapability: capability ?? null, collects: [], usesOfferings: understanding.offerings.map((item) => stableId("offering", item.name)), usesLocations: base.locations.map((item) => item.id) }], completion: { channelId: completionChannel?.id ?? null, destinationStrategy: mode === "direct_external" ? "external_url" as const : mode === "routing" ? "by_location" as const : completionChannel ? "fixed" as const : "native" as const, handoffSummary: !mode.startsWith("direct_") }, requiredFacts: [], assumptions: [], confidence: intent.confidence };
+    return { id: stableId("blueprint", intent.id, index), intentId: intent.id, objective: intent.visitorNeed, mode, steps: mode.startsWith("direct_") ? [] : [{ purpose: intent.visitorNeed.slice(0, 400), expectedCapability: capability ?? null, collects: [], usesOfferings: understanding.offerings.map((item) => stableId("offering", item.name)), usesLocations: base.locations.map((item) => item.id) }], completion: { type: mode === "routing" ? (completionChannel?.type || (understanding.completionAction.destination === "native" ? "whatsapp" : understanding.completionAction.destination)) : completionChannel?.type || "native", channelId: completionChannel?.id ?? null, destinationStrategy: mode === "direct_external" ? "external_url" as const : mode === "routing" ? "by_location" as const : completionChannel ? "fixed" as const : "native" as const, handoffSummary: !mode.startsWith("direct_") }, requiredFacts: [], assumptions: [], confidence: intent.confidence };
   });
   const offerings = uniqueBy([
     ...(useContextualBase && !understanding.offerings.length ? base.offerings : []),

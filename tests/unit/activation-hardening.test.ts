@@ -15,6 +15,7 @@ import { journeyComposer } from "@/features/composition/journey-composer";
 import { buildJourneyHandoff } from "@/features/handoff/journey-handoff";
 import { validateConversionPath } from "@/features/publishing/conversion-path-validator";
 import { resolveRoute } from "@/features/routing/routing-engine";
+import { resolveCompletionDestination, semanticJourneyRouteKey } from "@/features/routing/completion-destination";
 import type { AISetupSession } from "@/features/ai-setup/ai-setup.schema";
 import type { BusinessLocation, Project, RoutingDestination } from "@/types";
 import { requirementsFromCommercialArchitecture } from "@/features/ai-setup/commercial-architecture";
@@ -24,7 +25,7 @@ import type { AISetupActor } from "@/server/auth/setup-actor";
 
 const evidence = [{ sourceId: "user", origin: "user" as const, excerpt: "Confirmado pelo negócio", confidence: 1 }];
 
-function channel(id: string, value: string, type: "whatsapp" | "external_url" = "whatsapp", isFallback = false): CommercialArchitecture["channels"][number] {
+function channel(id: string, value: string, type: "whatsapp" | "external_url" | "phone" | "email" = "whatsapp", isFallback = false): CommercialArchitecture["channels"][number] {
   return { id, type, label: id, value, purpose: "Atendimento", isFallback, evidence, confidence: 1 };
 }
 
@@ -38,6 +39,7 @@ function architecture(input: {
   channels?: CommercialArchitecture["channels"];
   locations?: CommercialArchitecture["locations"];
   channelId?: string | null;
+  completionType?: CommercialArchitecture["journeyBlueprints"][number]["completion"]["type"];
   collects?: string[];
   requiredFacts?: CommercialArchitecture["journeyBlueprints"][number]["requiredFacts"];
   steps?: CommercialArchitecture["journeyBlueprints"][number]["steps"];
@@ -46,6 +48,7 @@ function architecture(input: {
   const mode = input.mode || "guided_flow";
   const strategy = input.strategy || "fixed";
   const steps = input.steps || [{ purpose: "Coletar contexto", expectedCapability: null, collects: input.collects || ["Quantidade"], usesOfferings: [], usesLocations: (input.locations || []).map((item) => item.id) }];
+  const completionType = input.completionType || (strategy === "external_url" ? "external_url" : strategy === "native" ? "native" : input.channels?.find((item) => item.id === input.channelId)?.type || "whatsapp");
   return {
     status: input.requiredFacts?.length ? "needs_confirmation" : "ready",
     confidence: 0.95,
@@ -54,7 +57,7 @@ function architecture(input: {
     channels: input.channels || [],
     locations: input.locations || [],
     intents: [{ id: "intent-main", semanticKey: input.semanticKey ?? "contact", label: "Continuar atendimento", visitorNeed: "Receber atendimento", priority: 100, visibleOnEntry: true, evidence, confidence: 0.95 }],
-    journeyBlueprints: [{ id: "blueprint-main", intentId: "intent-main", objective: "Receber atendimento", mode, steps, completion: { channelId: input.channelId ?? null, destinationStrategy: strategy, handoffSummary: (input.collects || []).length > 0 }, requiredFacts: input.requiredFacts || [], assumptions: [], confidence: 0.95 }],
+    journeyBlueprints: [{ id: "blueprint-main", intentId: "intent-main", objective: "Receber atendimento", mode, steps, completion: { type: completionType, channelId: input.channelId ?? null, destinationStrategy: strategy, handoffSummary: (input.collects || []).length > 0 }, requiredFacts: input.requiredFacts || [], assumptions: [], confidence: 0.95 }],
     issues: [],
   };
 }
@@ -174,7 +177,35 @@ describe("Activation hardening — composer, routing e handoff", () => {
     const locations: BusinessLocation[] = [runtimeLocation("a", "wa-a"), runtimeLocation("b", "wa-b")];
     expect(resolveRoute({ location_id: "b" }, [], destinations.toReversed(), undefined, locations).destination?.id).toBe("wa-b");
     expect(resolveRoute({ location_id: "sem-mapping" }, [], destinations, undefined, locations).destination).toBeUndefined();
-    expect(resolveRoute({ location_id: "sem-mapping" }, [], destinations, "wa-a", locations).destination?.id).toBe("wa-a");
+    expect(resolveRoute({ location_id: "sem-mapping" }, [], destinations, "wa-a", locations).destination).toBeUndefined();
+  });
+
+  it("seleciona WhatsApp pela semântica mesmo sendo o terceiro ou o primeiro channel", () => {
+    const channels = [channel("phone-b", "5511333333333", "phone"), channel("url-b", "https://booking.example.com", "external_url"), channel("wa-b", "5511999999999")];
+    const selected = location("b", channels.map((item) => item.id));
+    const current = architecture({ mode: "routing", strategy: "by_location", completionType: "whatsapp", channels, locations: [selected], steps: [{ purpose: "Escolher unidade", expectedCapability: "routing", collects: [], usesOfferings: [], usesLocations: ["b"] }] });
+    const blueprint = current.journeyBlueprints[0];
+    expect(resolveCompletionDestination({ architecture: current, blueprint, selectedLocationId: "b" })).toMatchObject({ status: "resolved", channel: { id: "wa-b" } });
+    const reversed = { ...current, channels: current.channels.toReversed(), locations: [{ ...selected, channelIds: selected.channelIds.toReversed() }] };
+    expect(resolveCompletionDestination({ architecture: reversed, blueprint: reversed.journeyBlueprints[0], selectedLocationId: "b" })).toMatchObject({ status: "resolved", channel: { id: "wa-b" } });
+  });
+
+  it("restringe Unidade B e alterna WhatsApp/URL conforme completion.type", () => {
+    const channels = [
+      channel("wa-a", "5511111111111"), channel("phone-a", "5511222222222", "phone"),
+      channel("phone-b", "5522111111111", "phone"), channel("wa-b", "5522999999999"), channel("booking-b", "https://booking.example.com/b", "external_url"),
+      channel("url-c", "https://example.com/c", "external_url"), channel("wa-c", "5533999999999"),
+    ];
+    const locations = [location("a", ["wa-a", "phone-a"]), location("b", ["phone-b", "wa-b", "booking-b"]), location("c", ["url-c", "wa-c"])];
+    const whatsapp = architecture({ mode: "routing", strategy: "by_location", completionType: "whatsapp", channels, locations, steps: [{ purpose: "Escolher unidade", expectedCapability: "routing", collects: [], usesOfferings: [], usesLocations: locations.map((item) => item.id) }] });
+    const external = { ...whatsapp, journeyBlueprints: [{ ...whatsapp.journeyBlueprints[0], id: "blueprint-booking", completion: { ...whatsapp.journeyBlueprints[0].completion, type: "external_url" as const } }] };
+    expect(resolveCompletionDestination({ architecture: whatsapp, blueprint: whatsapp.journeyBlueprints[0], selectedLocationId: "b" })).toMatchObject({ status: "resolved", channel: { id: "wa-b" } });
+    expect(resolveCompletionDestination({ architecture: external, blueprint: external.journeyBlueprints[0], selectedLocationId: "b" })).toMatchObject({ status: "resolved", channel: { id: "booking-b" } });
+
+    const composed = journeyComposer.compose({ businessName: "Rede", businessDescription: "Atendimento por unidade", primaryGoal: "Atender", primaryDestination: "WhatsApp", slug: "rede" }, profile(), [], whatsapp);
+    const rule = composed.commercialConfig.routingRules?.find((item) => item.condition.value === semanticJourneyRouteKey("blueprint-main", "b"));
+    expect(rule?.destinationId).toBe("wa-b");
+    expect(composed.commercialConfig.locations?.find((item) => item.id === "b")?.routingDestinationId).toBe("wa-b");
   });
 
   it("valida continue_with_answers como transição, capture_lead como conclusão e legado como compatível", async () => {
@@ -208,7 +239,7 @@ describe("Activation hardening — memória comercial e cenários obrigatórios"
 
   it("cobre multi-intent/multi-location, B2B, venda consultiva e hotel sem falsa disponibilidade", async () => {
     const locations = [location("a", ["wa-a"]), location("b", ["wa-b"]), location("c", ["wa-c"]), location("d", ["wa-d"])];
-    const channels = [channel("menu", "https://menu.example.com", "external_url"), channel("wa-a", "5511111111111"), channel("wa-b", "5522222222222"), channel("wa-c", "5533333333333"), channel("wa-d", "5544444444444"), channel("wa-b2b", "5555555555555")];
+    const channels = [channel("menu", "https://menu.example.com", "external_url"), channel("wa-a", "5511111111111"), channel("wa-b", "5522999999999"), channel("wa-c", "5533999999999"), channel("wa-d", "5544999999999"), channel("wa-b2b", "5511988887777")];
     const multi = multiIntentArchitecture(channels, locations);
     const project = await new CompositionOrchestrator(undefined, undefined, undefined, undefined, undefined, multi).compose({ businessName: "Operação Mix", businessDescription: "Quatro unidades, encomendas e revenda", primaryGoal: "Atender", primaryDestination: "WhatsApp", slug: "operacao-mix" });
     expect(project.steps.find((step) => step.type === "choice")?.options?.find((option) => option.label === "Ver cardápio")?.actionType).toBe("open_url");
@@ -260,10 +291,10 @@ function multiIntentArchitecture(channels: CommercialArchitecture["channels"], l
   return {
     status: "ready", confidence: 0.95, businessSummary: { whatItSells: "Produtos", commercialModel: "Autosserviço, unidades e B2B", evidence }, offerings: [], audienceContexts: [], channels, locations, intents, issues: [],
     journeyBlueprints: [
-      { id: "bp-menu", intentId: "intent-menu", objective: "Ver cardápio", mode: "direct_external", steps: [], completion: { channelId: "menu", destinationStrategy: "external_url", handoffSummary: false }, requiredFacts: [], assumptions: [], confidence: 0.95 },
-      { id: "bp-unit", intentId: "intent-unit", objective: "Falar com unidade", mode: "routing", steps: [{ purpose: "Escolher unidade", expectedCapability: "routing", collects: [], usesOfferings: [], usesLocations: locations.map((item) => item.id) }], completion: { channelId: null, destinationStrategy: "by_location", handoffSummary: false }, requiredFacts: [], assumptions: [], confidence: 0.95 },
-      { id: "bp-order", intentId: "intent-order", objective: "Fazer encomenda", mode: "hybrid", steps: [{ purpose: "Detalhes da encomenda", expectedCapability: null, collects: ["Produto", "Quantidade", "Data desejada"], usesOfferings: [], usesLocations: [] }, { purpose: "Escolher unidade", expectedCapability: "routing", collects: [], usesOfferings: [], usesLocations: locations.map((item) => item.id) }], completion: { channelId: null, destinationStrategy: "by_location", handoffSummary: true }, requiredFacts: [], assumptions: [], confidence: 0.95 },
-      { id: "bp-b2b", intentId: "intent-b2b", objective: "Qualificar revenda", mode: "qualification", steps: [{ purpose: "Entender a empresa", expectedCapability: null, collects: ["Empresa", "Volume mensal"], usesOfferings: [], usesLocations: [] }], completion: { channelId: "wa-b2b", destinationStrategy: "fixed", handoffSummary: true }, requiredFacts: [], assumptions: [], confidence: 0.95 },
+      { id: "bp-menu", intentId: "intent-menu", objective: "Ver cardápio", mode: "direct_external", steps: [], completion: { type: "external_url", channelId: "menu", destinationStrategy: "external_url", handoffSummary: false }, requiredFacts: [], assumptions: [], confidence: 0.95 },
+      { id: "bp-unit", intentId: "intent-unit", objective: "Falar com unidade", mode: "routing", steps: [{ purpose: "Escolher unidade", expectedCapability: "routing", collects: [], usesOfferings: [], usesLocations: locations.map((item) => item.id) }], completion: { type: "whatsapp", channelId: null, destinationStrategy: "by_location", handoffSummary: false }, requiredFacts: [], assumptions: [], confidence: 0.95 },
+      { id: "bp-order", intentId: "intent-order", objective: "Fazer encomenda", mode: "hybrid", steps: [{ purpose: "Detalhes da encomenda", expectedCapability: null, collects: ["Produto", "Quantidade", "Data desejada"], usesOfferings: [], usesLocations: [] }, { purpose: "Escolher unidade", expectedCapability: "routing", collects: [], usesOfferings: [], usesLocations: locations.map((item) => item.id) }], completion: { type: "whatsapp", channelId: null, destinationStrategy: "by_location", handoffSummary: true }, requiredFacts: [], assumptions: [], confidence: 0.95 },
+      { id: "bp-b2b", intentId: "intent-b2b", objective: "Qualificar revenda", mode: "qualification", steps: [{ purpose: "Entender a empresa", expectedCapability: null, collects: ["Empresa", "Volume mensal"], usesOfferings: [], usesLocations: [] }], completion: { type: "whatsapp", channelId: "wa-b2b", destinationStrategy: "fixed", handoffSummary: true }, requiredFacts: [], assumptions: [], confidence: 0.95 },
     ],
   };
 }

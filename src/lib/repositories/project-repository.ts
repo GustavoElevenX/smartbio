@@ -153,7 +153,6 @@ function normalizeIds(project: Project): Project {
       commercialConfig.catalogItems,
       commercialConfig.reservableUnits,
       commercialConfig.reservationBlocks,
-      commercialConfig.locations,
       commercialConfig.routingRules,
       commercialConfig.policies,
     ];
@@ -162,16 +161,36 @@ function normalizeIds(project: Project): Project {
         item.id = isUuid(item.id) ? item.id : uuid();
         item.projectId = projectId;
       }
+    const locationIds = new Map<string, string>();
+    for (const location of commercialConfig.locations || []) {
+      const previousId = location.id;
+      location.id = isUuid(location.id) ? location.id : uuid();
+      location.projectId = projectId;
+      locationIds.set(previousId, location.id);
+    }
     const destinationIds = new Map<string, string>();
     for (const destination of commercialConfig.routingDestinations || []) {
       const previousId = destination.id;
       destination.id = isUuid(destination.id) ? destination.id : uuid();
+      if (destination.locationId) destination.locationId = locationIds.get(destination.locationId) || destination.locationId;
       destinationIds.set(previousId, destination.id);
     }
     for (const location of commercialConfig.locations || []) {
       if (location.routingDestinationId) location.routingDestinationId = destinationIds.get(location.routingDestinationId) || location.routingDestinationId;
     }
-    for (const rule of commercialConfig.routingRules || []) rule.destinationId = destinationIds.get(rule.destinationId) || rule.destinationId;
+    for (const rule of commercialConfig.routingRules || []) {
+      rule.destinationId = destinationIds.get(rule.destinationId) || rule.destinationId;
+      if (typeof rule.condition.value !== "string") continue;
+      if (rule.condition.field === "location_id") rule.condition.value = locationIds.get(rule.condition.value) || rule.condition.value;
+      if (rule.condition.field === "journey_route") {
+        const separator = rule.condition.value.lastIndexOf(":");
+        if (separator > 0) {
+          const blueprintId = rule.condition.value.slice(0, separator);
+          const locationId = rule.condition.value.slice(separator + 1);
+          rule.condition.value = `${blueprintId}:${locationIds.get(locationId) || locationId}`;
+        }
+      }
+    }
     for (const step of steps) for (const option of step.options || []) {
       const destinationId = typeof option.actionPayload?.destinationId === "string" ? option.actionPayload.destinationId : undefined;
       if (destinationId && destinationIds.has(destinationId)) option.actionPayload = { ...option.actionPayload, destinationId: destinationIds.get(destinationId)! };

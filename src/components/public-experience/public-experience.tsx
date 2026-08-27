@@ -36,6 +36,7 @@ import { journeyModeForProject } from "@/features/qualification/recommendation-s
 import { selectNextQualificationQuestion } from "@/features/qualification/offer-intelligence";
 import { calculateReservationTotal } from "@/features/reservations/reservation-engine";
 import { resolveRoute } from "@/features/routing/routing-engine";
+import { destinationMatchesCompletion, semanticJourneyRouteKey } from "@/features/routing/completion-destination";
 import { buildJourneyHandoff } from "@/features/handoff/journey-handoff";
 import {
   buildWhatsAppMessage,
@@ -64,6 +65,7 @@ import type {
   StepOption,
 } from "@/types";
 import type { PresenceLaunchContext } from "@/features/presence/presence.types";
+import type { JourneyCompletionType } from "@/features/ai-setup/ai-setup.schema";
 
 const iconMap = {
   ShoppingBag,
@@ -88,6 +90,10 @@ const iconMap = {
 function DynamicIcon({ name }: { name?: string }) {
   const Icon = iconMap[name as keyof typeof iconMap] || ArrowRight;
   return <Icon size={19} />;
+}
+
+function completionTypeFrom(value: unknown): JourneyCompletionType | undefined {
+  return ["whatsapp", "external_url", "phone", "email", "native"].includes(String(value)) ? String(value) as JourneyCompletionType : undefined;
 }
 
 function emptyRuntime(project: Project): JourneyRuntimeState {
@@ -662,7 +668,7 @@ export function ExperienceCanvas({
     emit("opportunity_created", { sourceType, sourceId });
   }
 
-  async function submitCapability(capability: CapabilityKey) {
+  async function submitCapability(capability: CapabilityKey, option?: StepOption) {
     setBusy(true);
     setError("");
     setConfirmation("");
@@ -960,17 +966,27 @@ export function ExperienceCanvas({
         const destinations =
           project.commercialConfig?.routingDestinations || [];
         const fallbackDestinationId = destinations.find((destination) => destination.isDefault && destination.role === "general_contact")?.id;
+        const completionType = completionTypeFrom(option?.actionPayload?.completionType);
+        const selectedLocationId = runtime.selectedLocationId || (typeof runtime.answers.location_id === "string" ? runtime.answers.location_id : undefined);
+        const blueprintId = typeof option?.actionPayload?.blueprintId === "string" ? option.actionPayload.blueprintId : undefined;
+        const routeContext = {
+          ...runtime.answers,
+          ...(selectedLocationId ? { location_id: selectedLocationId } : {}),
+          ...(completionType ? { completion_type: completionType } : {}),
+          ...(blueprintId && selectedLocationId ? { journey_route: semanticJourneyRouteKey(blueprintId, selectedLocationId) } : {}),
+        };
         const result = resolveRoute(
-          runtime.answers,
+          routeContext,
           project.commercialConfig?.routingRules || [],
           destinations,
           fallbackDestinationId,
           project.commercialConfig?.locations || [],
+          completionType,
         );
         setRuntime((current) => ({
           ...current,
           routeResult: result,
-          selectedLocationId: current.selectedLocationId || (typeof current.answers.location_id === "string" ? current.answers.location_id : undefined),
+          selectedLocationId: current.selectedLocationId || selectedLocationId,
         }));
         await fetch("/api/public/routing/resolve", {
           method: "POST",
@@ -978,7 +994,7 @@ export function ExperienceCanvas({
           body: JSON.stringify({
             projectId: project.id,
             sessionId: runtime.sessionId,
-            context: runtime.answers,
+            context: routeContext,
           }),
         }).catch(() => undefined);
         emit(result.destination ? "route_resolved" : "route_unresolved", { ruleId: result.ruleId, destinationId: result.destination?.id, fallback: result.fallback, locationId: runtime.selectedLocationId });
@@ -989,7 +1005,7 @@ export function ExperienceCanvas({
             `Contato encaminhado · ${result.destination.label}`,
             { destinationId: result.destination.id, summary: result.reason },
           );
-        if (!result.destination) throw new Error("Não encontramos um destino seguro para a unidade selecionada. Escolha outra unidade ou fale com a equipe.");
+        if (!result.destination) throw new Error(`Não encontramos um destino ${completionType || "compatível"} seguro para a unidade selecionada. Revise a configuração antes de continuar.`);
         setConfirmation(`Destino encontrado: ${result.destination.label}.`);
       } else if (capability === "payment") {
         const paymentUrl = project.commercialConfig?.paymentUrl;
@@ -1082,6 +1098,7 @@ export function ExperienceCanvas({
     if (option.actionType === "start_capability") {
       const completed = await submitCapability(
         String(option.actionPayload?.capability) as CapabilityKey,
+        option,
       );
       if (completed && option.targetStepId) go(option.targetStepId);
       return;
@@ -1098,8 +1115,9 @@ export function ExperienceCanvas({
     }
     if (option.actionType === "open_whatsapp") {
       const destinations = project.commercialConfig?.routingDestinations || [];
+      const completionType = completionTypeFrom(option.actionPayload?.completionType) || "whatsapp";
       let configuredDestination = destinations.find(
-        (destination) => destination.id === option.actionPayload?.destinationId && destination.type === "whatsapp",
+        (destination) => destination.id === option.actionPayload?.destinationId && destinationMatchesCompletion(destination, completionType),
       );
       if (option.actionPayload?.destinationId && !configuredDestination) {
         emit("route_unresolved", { destinationId: option.actionPayload.destinationId, blueprintId: option.actionPayload?.blueprintId, intentId: option.actionPayload?.intentId });
@@ -1108,14 +1126,22 @@ export function ExperienceCanvas({
       }
       if (option.actionPayload?.routing === true) {
         const fallbackDestinationId = destinations.find((destination) => destination.isDefault && destination.role === "general_contact")?.id;
+        const blueprintId = typeof option.actionPayload?.blueprintId === "string" ? option.actionPayload.blueprintId : undefined;
+        const routeContext = {
+          ...runtime.answers,
+          ...(runtime.selectedLocationId ? { location_id: runtime.selectedLocationId } : {}),
+          completion_type: completionType,
+          ...(blueprintId && runtime.selectedLocationId ? { journey_route: semanticJourneyRouteKey(blueprintId, runtime.selectedLocationId) } : {}),
+        };
         const result = resolveRoute(
-          { ...runtime.answers, ...(runtime.selectedLocationId ? { location_id: runtime.selectedLocationId } : {}) },
+          routeContext,
           project.commercialConfig?.routingRules || [],
           destinations,
           fallbackDestinationId,
           project.commercialConfig?.locations || [],
+          completionType,
         );
-        configuredDestination = result.destination?.type === "whatsapp" ? result.destination : undefined;
+        configuredDestination = destinationMatchesCompletion(result.destination, completionType) ? result.destination : undefined;
         if (!configuredDestination?.value) {
           emit("route_unresolved", { locationId: runtime.selectedLocationId, blueprintId: option.actionPayload?.blueprintId, intentId: option.actionPayload?.intentId });
           setError("Não encontramos um WhatsApp seguro para a unidade selecionada. Revise a unidade antes de continuar.");
@@ -1253,16 +1279,51 @@ export function ExperienceCanvas({
       return;
     }
     if (option.actionType === "open_url") {
-      emit("external_url_clicked", { url: option.actionPayload?.url, blueprintId: option.actionPayload?.blueprintId, intentId: option.actionPayload?.intentId });
+      const destinations = project.commercialConfig?.routingDestinations || [];
+      const completionType = completionTypeFrom(option.actionPayload?.completionType) || "external_url";
+      let configuredDestination = option.actionPayload?.destinationId
+        ? destinations.find((destination) => destination.id === option.actionPayload?.destinationId && destinationMatchesCompletion(destination, completionType))
+        : undefined;
+      if (option.actionPayload?.destinationId && !configuredDestination) {
+        emit("route_unresolved", { destinationId: option.actionPayload.destinationId, blueprintId: option.actionPayload?.blueprintId, intentId: option.actionPayload?.intentId });
+        setError(`O destination ${completionType} configurado não está mais disponível.`);
+        return;
+      }
+      if (option.actionPayload?.routing === true) {
+        const fallbackDestinationId = destinations.find((destination) => destination.isDefault && destination.role === "general_contact")?.id;
+        const blueprintId = typeof option.actionPayload?.blueprintId === "string" ? option.actionPayload.blueprintId : undefined;
+        const routeContext = {
+          ...runtime.answers,
+          ...(runtime.selectedLocationId ? { location_id: runtime.selectedLocationId } : {}),
+          completion_type: completionType,
+          ...(blueprintId && runtime.selectedLocationId ? { journey_route: semanticJourneyRouteKey(blueprintId, runtime.selectedLocationId) } : {}),
+        };
+        const result = resolveRoute(routeContext, project.commercialConfig?.routingRules || [], destinations, fallbackDestinationId, project.commercialConfig?.locations || [], completionType);
+        configuredDestination = destinationMatchesCompletion(result.destination, completionType) ? result.destination : undefined;
+        if (!configuredDestination) {
+          emit("route_unresolved", { locationId: runtime.selectedLocationId, blueprintId: option.actionPayload?.blueprintId, intentId: option.actionPayload?.intentId, completionType });
+          setError(`Não encontramos um destination ${completionType} seguro para a unidade selecionada.`);
+          return;
+        }
+        emit("route_resolved", { locationId: runtime.selectedLocationId, destinationId: configuredDestination.id, ruleId: result.ruleId, fallback: result.fallback, completionType });
+        setRuntime((current) => ({ ...current, routeResult: result }));
+      }
+      const destinationValue = configuredDestination?.value;
+      const resolvedUrl = completionType === "phone" && destinationValue ? `tel:${destinationValue}` : completionType === "email" && destinationValue ? `mailto:${destinationValue}` : destinationValue || String(option.actionPayload?.url || "");
+      if (!resolvedUrl) {
+        setError("O destination desta jornada não está configurado.");
+        return;
+      }
+      emit("external_url_clicked", { url: resolvedUrl, blueprintId: option.actionPayload?.blueprintId, intentId: option.actionPayload?.intentId, completionType });
       emit(
         option.value === "payment"
           ? "payment_started"
           : "external_link_clicked",
-        { url: option.actionPayload?.url },
+        { url: resolvedUrl },
       );
       if (!preview)
         window.open(
-          String(option.actionPayload?.url || "#"),
+          resolvedUrl,
           "_blank",
           "noopener,noreferrer",
         );

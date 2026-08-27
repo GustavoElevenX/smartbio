@@ -2,6 +2,7 @@ import { draftCapabilityRequirements } from "@/features/capabilities/capability-
 import { slugify, uid } from "@/lib/utils";
 import { isRecommendationIntent, synthesizePublicDescription } from "@/features/composition/public-copy";
 import type { CommercialArchitecture } from "@/features/ai-setup/ai-setup.schema";
+import { resolveCompletionDestination, semanticJourneyRouteKey } from "@/features/routing/completion-destination";
 import type { BusinessCapabilityProfile, ContentBlockType, DataRequirement, ExperienceCompositionInput, JourneyStep, Project, ProjectCapability, RoutingDestination, StepOption } from "@/types";
 
 export type CommercialConfig = NonNullable<Project["commercialConfig"]>;
@@ -46,7 +47,23 @@ function configuredAction(input: ExperienceCompositionInput, finalStepId: string
 function architectureAction(channel: CommercialArchitecture["channels"][number] | undefined, label: string, metadata: Record<string, string | number | boolean> = {}): StepOption {
   if (channel?.type === "whatsapp" && channel.value) return { id: uid("option"), label, value: channel.id, actionType: "open_whatsapp" as const, actionPayload: { phone: channel.value, destinationId: channel.id, ...metadata } };
   if (channel?.type === "external_url" && channel.value) return { id: uid("option"), label, value: channel.id, actionType: "open_url" as const, actionPayload: { url: channel.value, ...metadata } };
+  if (channel?.type === "phone" && channel.value) return { id: uid("option"), label, value: channel.id, actionType: "open_url" as const, actionPayload: { url: `tel:${channel.value}`, destinationId: channel.id, ...metadata } };
+  if (channel?.type === "email" && channel.value) return { id: uid("option"), label, value: channel.id, actionType: "open_url" as const, actionPayload: { url: `mailto:${channel.value}`, destinationId: channel.id, ...metadata } };
   throw new Error(`A jornada “${label}” não possui um canal final válido.`);
+}
+
+function actionLabel(type: CommercialArchitecture["journeyBlueprints"][number]["completion"]["type"], fallback?: string) {
+  if (type === "whatsapp") return "Continuar no WhatsApp";
+  if (type === "phone") return "Ligar agora";
+  if (type === "email") return "Continuar por e-mail";
+  return fallback || "Abrir link";
+}
+
+function routedCompletionOption(blueprint: CommercialArchitecture["journeyBlueprints"][number], metadata: Record<string, string | number | boolean>): StepOption {
+  const actionPayload = { ...metadata, routing: true, completionType: blueprint.completion.type };
+  if (blueprint.completion.type === "whatsapp") return { id: uid("option"), label: actionLabel("whatsapp"), value: blueprint.id, actionType: "open_whatsapp", actionPayload };
+  if (["external_url", "phone", "email"].includes(blueprint.completion.type)) return { id: uid("option"), label: actionLabel(blueprint.completion.type), value: blueprint.id, actionType: "open_url", actionPayload };
+  throw new Error(`A jornada “${blueprint.objective}” exige routing, mas completion.type=${blueprint.completion.type} não resolve um destination externo.`);
 }
 
 function fieldType(label: string): NonNullable<JourneyStep["formFields"]>[number]["type"] {
@@ -75,7 +92,6 @@ function architectureComposition(input: ExperienceCompositionInput, architecture
     options: [{ id: uid("option"), label: architecture.intents[0]?.label || "Ver próximos passos", value: "start", actionType: "go_to_step", targetStepId: choiceId }],
   }];
   const intentById = new Map(architecture.intents.map((intent) => [intent.id, intent]));
-  const channelById = new Map(architecture.channels.map((channel) => [channel.id, channel]));
   const targetByBlueprint = new Map<string, string>();
 
   for (const blueprint of architecture.journeyBlueprints) {
@@ -107,16 +123,17 @@ function architectureComposition(input: ExperienceCompositionInput, architecture
         blocks: [{ id: uid("block"), type: capability ? blockFor[capability] : "form", content: { source: capability || "architecture", intentId: intent.id, blueprintId: blueprint.id, ...(capability === "routing" ? { allowDirectHandoff: false } : {}) } }],
         formFields: declared.collects.map((label, fieldIndex) => ({ id: `${stepId}-field-${fieldIndex + 1}`, label, key: slugify(label) || `field_${fieldIndex + 1}`, type: fieldType(label), required: true, includeInHandoff: blueprint.completion.handoffSummary, handoffLabel: label })),
         settings: { blueprintId: blueprint.id, intentId: intent.id },
-        options: [{ id: uid("option"), label: capability === "quote" ? "Enviar solicitação" : "Continuar", value: blueprint.id, actionType: capability ? "start_capability" : "continue_with_answers", actionPayload: capability ? { capability, blueprintId: blueprint.id, intentId: intent.id } : { blueprintId: blueprint.id, intentId: intent.id }, targetStepId }],
+        options: [{ id: uid("option"), label: capability === "quote" ? "Enviar solicitação" : "Continuar", value: blueprint.id, actionType: capability ? "start_capability" : "continue_with_answers", actionPayload: capability ? { capability, blueprintId: blueprint.id, intentId: intent.id, completionType: blueprint.completion.type } : { blueprintId: blueprint.id, intentId: intent.id, completionType: blueprint.completion.type }, targetStepId }],
       });
     }
-    const channel = channelById.get(blueprint.completion.channelId || "");
-    const metadata = { blueprintId: blueprint.id, intentId: intent.id, interestLabel: intent.label };
+    const resolution = resolveCompletionDestination({ architecture, blueprint });
+    const channel = resolution.status === "resolved" ? resolution.channel : undefined;
+    const metadata = { blueprintId: blueprint.id, intentId: intent.id, interestLabel: intent.label, completionType: blueprint.completion.type };
     const completionOption: StepOption = blueprint.completion.destinationStrategy === "by_location"
-      ? { id: uid("option"), label: "Continuar no WhatsApp", value: blueprint.id, actionType: "open_whatsapp", actionPayload: { ...metadata, routing: true } }
+      ? routedCompletionOption(blueprint, metadata)
       : blueprint.completion.destinationStrategy === "native"
         ? { id: uid("option"), label: "Concluir", value: blueprint.id, actionType: "finish", actionPayload: metadata }
-        : architectureAction(channel, channel?.type === "whatsapp" ? "Continuar no WhatsApp" : channel?.label || "Concluir", metadata);
+        : architectureAction(channel, actionLabel(blueprint.completion.type, channel?.label), metadata);
     steps.push({ id: completionId, type: "action", title: "Tudo pronto para continuar", description: blueprint.completion.handoffSummary ? "A Sobe leva um resumo do que foi informado para o atendimento." : "Siga pelo canal indicado pelo negócio.", order: steps.length, isActive: true, visualVariant: "conversion", settings: { blueprintId: blueprint.id, intentId: intent.id }, options: [completionOption] });
   }
 
@@ -134,8 +151,9 @@ function architectureComposition(input: ExperienceCompositionInput, architecture
     blocks: [{ id: uid("block"), type: "choice_grid", variant: "brand-composed" }],
     options: visibleBlueprints.map((blueprint) => {
       const intent = intentById.get(blueprint.intentId)!;
-      const channel = channelById.get(blueprint.completion.channelId || "");
-      const metadata = { blueprintId: blueprint.id, intentId: intent.id, interestLabel: intent.label };
+      const resolution = resolveCompletionDestination({ architecture, blueprint });
+      const channel = resolution.status === "resolved" ? resolution.channel : undefined;
+      const metadata = { blueprintId: blueprint.id, intentId: intent.id, interestLabel: intent.label, completionType: blueprint.completion.type };
       if (blueprint.mode === "direct_external") return architectureAction(channel, intent.label, metadata);
       if (blueprint.mode === "direct_contact") return architectureAction(channel, intent.label, metadata);
       return { id: uid("option"), label: intent.label, description: intent.visitorNeed, value: intent.id, actionType: "go_to_step" as const, targetStepId: targetByBlueprint.get(blueprint.id) };
@@ -143,8 +161,24 @@ function architectureComposition(input: ExperienceCompositionInput, architecture
   });
 
   const locationChannelIds = new Set(architecture.locations.flatMap((location) => location.channelIds));
-  const destinations: RoutingDestination[] = architecture.channels.flatMap((channel) => channel.value && channel.type !== "native" ? [{ id: channel.id, key: channel.id, type: channel.type === "external_url" ? "url" : channel.type, label: channel.label, value: channel.value, isDefault: channel.isFallback === true, role: channel.isFallback ? "general_contact" as const : locationChannelIds.has(channel.id) ? "location_contact" as const : "intent_contact" as const }] : []);
-  const locations = architecture.locations.map((location, index) => ({ id: location.id, projectId: "setup", name: location.label, address: location.address ?? undefined, countryCode: "BR", geocodingStatus: "pending" as const, timezone: "America/Sao_Paulo", openingHours: [], supportsDelivery: false, supportsPickup: false, supportsInPerson: true, priority: 100 - index, isActive: true, routingDestinationId: location.channelIds[0] }));
+  const channelLocationIds = new Map(architecture.channels.map((channel) => [channel.id, architecture.locations.filter((location) => location.channelIds.includes(channel.id)).map((location) => location.id)]));
+  const destinations: RoutingDestination[] = architecture.channels.flatMap((channel) => channel.value && channel.type !== "native" ? [{ id: channel.id, key: channel.id, type: channel.type === "external_url" ? "url" : channel.type, label: channel.label, value: channel.value, locationId: channelLocationIds.get(channel.id)?.length === 1 ? channelLocationIds.get(channel.id)?.[0] : undefined, isDefault: channel.isFallback === true, role: channel.isFallback ? "general_contact" as const : locationChannelIds.has(channel.id) ? "location_contact" as const : "intent_contact" as const }] : []);
+  const routeMaterializations = architecture.journeyBlueprints.flatMap((blueprint) => {
+    if (blueprint.completion.destinationStrategy !== "by_location") return [];
+    const declaredLocationIds = [...new Set(blueprint.steps.flatMap((step) => step.usesLocations))];
+    const locationIds = declaredLocationIds.length ? declaredLocationIds : architecture.locations.map((location) => location.id);
+    return locationIds.map((locationId) => {
+      const resolution = resolveCompletionDestination({ architecture, blueprint, selectedLocationId: locationId });
+      if (resolution.status !== "resolved") throw new Error(`A jornada “${blueprint.objective}” não pode ser roteada para ${locationId}: ${resolution.reason}`);
+      return { blueprint, locationId, destinationId: resolution.channel.id };
+    });
+  });
+  const destinationsByLocation = new Map(architecture.locations.map((location) => [location.id, [...new Set(routeMaterializations.filter((item) => item.locationId === location.id).map((item) => item.destinationId))]]));
+  const locations = architecture.locations.map((location, index) => {
+    const semanticDestinations = destinationsByLocation.get(location.id) || [];
+    return { id: location.id, projectId: "setup", name: location.label, address: location.address ?? undefined, countryCode: "BR", geocodingStatus: "pending" as const, timezone: "America/Sao_Paulo", openingHours: [], supportsDelivery: false, supportsPickup: false, supportsInPerson: true, priority: 100 - index, isActive: true, routingDestinationId: semanticDestinations.length === 1 ? semanticDestinations[0] : undefined };
+  });
+  const routingRules = routeMaterializations.map((item, index) => ({ id: `route-${item.blueprint.id}-${item.locationId}`, projectId: "setup", priority: 10_000 - index, condition: { field: "journey_route", operator: "equals" as const, value: semanticJourneyRouteKey(item.blueprint.id, item.locationId) }, destinationId: item.destinationId, isActive: true }));
   const catalogOfferings = architecture.offerings.filter((offering) => offering.kind === "product");
   const categoryId = catalogOfferings.length ? "architecture-catalog" : undefined;
   return {
@@ -155,7 +189,7 @@ function architectureComposition(input: ExperienceCompositionInput, architecture
       catalogItems: categoryId ? catalogOfferings.map((offering, index) => ({ id: offering.id, projectId: "setup", categoryId, name: offering.name, currency: "BRL", isAvailable: true, variants: [], metadata: { source: "commercial_architecture" }, order: index })) : undefined,
       locations: locations.length ? locations : undefined,
       routingDestinations: destinations.length ? destinations : undefined,
-      routingRules: locations.length ? locations.flatMap((location, index) => location.routingDestinationId ? [{ id: `route-${location.id}`, projectId: "setup", priority: 10_000 - index, condition: { field: "location_id", operator: "equals" as const, value: location.id }, destinationId: location.routingDestinationId, isActive: true }] : []) : undefined,
+      routingRules: routingRules.length ? routingRules : undefined,
     },
     requirements: requirementsFromBlueprints(architecture),
   };
