@@ -12,6 +12,7 @@ import { safeNextPath } from "@/lib/safe-next";
 import { createClient } from "@/lib/supabase/client";
 import { trackMarketingEvent } from "@/components/marketing/marketing-analytics";
 import { useEffect, useRef } from "react";
+import { RECOVERY_REDIRECT_PATH } from "@/features/auth/password-recovery";
 
 export function AuthForm({ mode }: { mode: "login" | "register" | "forgot" }) {
   const router = useRouter();
@@ -42,7 +43,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" | "forgot" }) {
     try {
       const supabase = createClient();
       if (mode === "forgot") {
-        if (supabase) await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}/auth/callback?next=/app/settings/profile` });
+        if (supabase) await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(RECOVERY_REDIRECT_PATH)}` });
         setSent(true);
         return;
       }

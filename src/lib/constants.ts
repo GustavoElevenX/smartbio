@@ -47,7 +47,7 @@ export const capabilityLabels = {
 } as const;
 
 export const reservedSlugs = new Set([
-  "app", "api", "login", "register", "forgot-password", "pricing", "privacy", "terms", "smartbio", "virou",
+  "app", "api", "login", "register", "forgot-password", "reset-password", "pricing", "privacy", "terms", "smartbio", "virou",
 ]);
 
 export const goalOptions = [
