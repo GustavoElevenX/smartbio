@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import primaryLogo from "../../../imagens/logos/Logo Simbolo Sobe.png";
 import { cn } from "@/lib/utils";
+
+const primaryLogo = "/brand/sobe-symbol.png";
 
 type BrandProps = {
   tone?: "light" | "dark";
@@ -22,6 +23,8 @@ export function Brand({ tone, compact = false, size = "md", className, preload =
           className="brand__art"
           src={primaryLogo}
           alt=""
+          width={1254}
+          height={1254}
           sizes={compact ? "64px" : size === "sm" ? "28px" : "(max-width: 760px) 38px, 44px"}
           preload={preload}
           quality={90}

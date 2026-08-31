@@ -14,7 +14,7 @@ describe("SOBE landing — Arquitetura da Atenção", () => {
     expect(layout).toContain("IMPECCABLE_DIRECTION 430f8e2e");
     expect(landing).toContain("Transforme<br />atração em <span>ação.</span>");
     expect(landing).toContain("/visuals/attention-gate.png");
-    expect(brand).toContain("imagens/logos/Logo Simbolo Sobe.png");
+    expect(brand).toContain("/brand/sobe-symbol.png");
     expect(brand).toContain("quality={90}");
     expect(brand).toContain(">SOBE</span>");
     expect(palette).toContain("#02e5cd 0%, #01d2df 34%, #0186fc 68%, #0054fc 100%");
