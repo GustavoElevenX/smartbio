@@ -8,6 +8,7 @@ import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/serve
 import { publicRateLimitIdentifier } from "@/server/rate-limit/public-identifier";
 import { registerOpportunity } from "@/server/opportunities/service";
 import { BookingBoundaryError, resolveBookingIntent } from "@/server/scheduling/booking-boundary";
+import { getRequestId, logError, requestPathname, withRequestId } from "@/server/observability/log";
 import type { Booking } from "@/types";
 
 function bookingRows(data: Array<Record<string, unknown>> | null): Booking[] {
@@ -31,10 +32,11 @@ function boundaryError(error: BookingBoundaryError) {
 }
 
 export async function POST(request: Request) {
+  const requestId = getRequestId(request);
   const raw = await request.json().catch(() => null);
   const candidate = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
   const rate = await consumeRateLimit("public-booking-submit", publicRateLimitIdentifier(request, { projectId: typeof candidate.projectId === "string" ? candidate.projectId : undefined, sessionId: typeof candidate.sessionId === "string" ? candidate.sessionId : undefined }), rateLimitRules.publicFormSubmit, { failClosed: true });
-  const respond = <T extends Response>(response: T) => applyRateLimitHeaders(response, rate);
+  const respond = <T extends Response>(response: T) => withRequestId(applyRateLimitHeaders(response, rate), requestId);
   if (!rate.allowed) return respond(apiError("Muitas tentativas de agendamento.", 429, "rate_limited"));
   if (!features.nativeScheduling) return respond(apiError("Agenda nativa desativada.", 404, "feature_disabled"));
   const parsed = bookingRequestSchema.safeParse(raw);
@@ -100,7 +102,7 @@ export async function POST(request: Request) {
       P0005: ["Esta chave de envio já foi usada para outro agendamento.", "idempotency_conflict"],
     } as const;
     const mapped = known[error.code as keyof typeof known];
-    console.error("booking_submit_failed", { projectId: project.id, code: error.code });
+    logError("booking_submit_failed", { requestId, route: requestPathname(request), workspaceId: project.workspaceId, code: error.code });
     return respond(apiError(mapped?.[0] || "Não foi possível solicitar o agendamento.", error.code === "P0002" || error.code === "P0003" ? 404 : 409, mapped?.[1] || "booking_rejected"));
   }
   const row = Array.isArray(data) ? data[0] : data;

@@ -3,6 +3,7 @@ import { apiError, apiSuccess, validationError } from "@/server/http/api-respons
 import { withAuthenticatedActor } from "@/server/http/with-authenticated-actor";
 import { billingErrorResponse, saveBillingPaymentMethod } from "@/server/billing/billing-service";
 import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
+import { getRequestId, requestPathname } from "@/server/observability/log";
 
 const schema = z.object({ paymentMethodId: z.string().regex(/^pm_[A-Za-z0-9]+$/) });
 
@@ -21,6 +22,6 @@ export const POST = withAuthenticatedActor(async (request, _context, actor) => {
       expYear: method.expYear,
     }), rate);
   } catch (error) {
-    return applyRateLimitHeaders(billingErrorResponse(error), rate);
+    return applyRateLimitHeaders(billingErrorResponse(error, { requestId: getRequestId(request), route: requestPathname(request), workspaceId: actor.workspaceId, userId: actor.userId }), rate);
   }
 });

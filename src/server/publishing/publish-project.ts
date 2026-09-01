@@ -14,6 +14,9 @@ import { DEFAULT_CATALOG_THRESHOLDS } from "@/features/site-composer/catalog-str
 import { getSectionActions } from "@/features/presence/presence-page-utils";
 import { recordPlatformGrowthEvent } from "@/server/platform-acquisition/platform-acquisition";
 import { resolveAppUrl } from "@/lib/app-url";
+import { logError, type ErrorLogContext } from "@/server/observability/log";
+
+type PublicationLogContext = Pick<ErrorLogContext, "requestId" | "route">;
 
 function addBlocking(
   readiness: ProjectReadinessResult,
@@ -94,6 +97,9 @@ async function notify(
   project: Project,
   eventKey: "project.publish_blocked" | "project.published",
   data: Record<string, unknown>,
+  logContext: PublicationLogContext = {
+    route: "/api/projects/[projectId]/publish",
+  },
 ) {
   if (actor.persistence === "memory") return;
   try {
@@ -106,11 +112,11 @@ async function notify(
       recipientUserIds: [actor.userId],
       data,
     });
-  } catch (error) {
-    console.error("project_notification_failed", {
-      projectId: project.id,
-      eventKey,
-      message: error instanceof Error ? error.message : "unknown",
+  } catch {
+    logError("project_notification_failed", {
+      ...logContext,
+      workspaceId: actor.workspaceId,
+      userId: actor.userId,
     });
   }
 }
@@ -119,6 +125,7 @@ export async function prepareProjectPublication(
   actor: AuthenticatedActor,
   projectId: string,
   localSnapshot?: Project,
+  logContext?: PublicationLogContext,
 ) {
   const project = actor.persistence === "memory"
     ? localSnapshot
@@ -130,7 +137,7 @@ export async function prepareProjectPublication(
   if (!readiness.publishable) {
     await notify(actor, project, "project.publish_blocked", {
       blockerCount: readiness.blocking.length,
-    });
+    }, logContext);
     return { published: false as const, readiness, project };
   }
   return { published: false as const, readiness, project };
@@ -140,8 +147,9 @@ export async function publishProject(
   actor: AuthenticatedActor,
   projectId: string,
   localSnapshot?: Project,
+  logContext?: PublicationLogContext,
 ) {
-  const prepared = await prepareProjectPublication(actor, projectId, localSnapshot);
+  const prepared = await prepareProjectPublication(actor, projectId, localSnapshot, logContext);
   if (!prepared.readiness.publishable) return prepared;
 
   const snapshot = await createProjectSnapshot(actor, projectId, prepared.project, "project.published");
@@ -218,6 +226,6 @@ export async function publishProject(
   await notify(actor, published, "project.published", {
     name: published.name,
     url: `${appUrl}/${published.slug}`,
-  });
+  }, logContext);
   return { published: true as const, readiness: prepared.readiness, project: published };
 }

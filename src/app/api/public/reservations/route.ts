@@ -9,12 +9,14 @@ import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/serve
 import { publicRateLimitIdentifier } from "@/server/rate-limit/public-identifier";
 import type { Reservation, ReservationBlock } from "@/types";
 import { registerOpportunity } from "@/server/opportunities/service";
+import { getRequestId, logError, requestPathname, withRequestId } from "@/server/observability/log";
 
 export async function POST(request: Request) {
+  const requestId = getRequestId(request);
   const raw = await request.json().catch(() => null);
   const candidate = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
   const rate = await consumeRateLimit("public-reservation-submit", publicRateLimitIdentifier(request, { projectId: typeof candidate.projectId === "string" ? candidate.projectId : undefined, sessionId: typeof candidate.sessionId === "string" ? candidate.sessionId : undefined }), rateLimitRules.publicFormSubmit, { failClosed: true });
-  const respond = <T extends Response>(response: T) => applyRateLimitHeaders(response, rate);
+  const respond = <T extends Response>(response: T) => withRequestId(applyRateLimitHeaders(response, rate), requestId);
   if (!rate.allowed) return respond(apiError("Muitas tentativas de reserva.", 429, "rate_limited"));
   if (!features.nativeReservations) return respond(apiError("Reservas nativas estão desativadas.", 404, "feature_disabled"));
   const parsed = reservationRequestSchema.safeParse(raw);
@@ -31,7 +33,7 @@ export async function POST(request: Request) {
   const blocks = (blockRows || []).map((item) => ({ id: item.id, projectId: item.project_id, unitId: item.unit_id || undefined, startsOn: item.starts_on, endsOn: item.ends_on, quantity: item.quantity, reason: item.reason || undefined })) as ReservationBlock[];
   if (availableUnitQuantity(unit, parsed.data, reservations, blocks) <= 0) return respond(apiError("Esta opção acabou de ficar indisponível. Consulte outras datas.", 409, "reservation_conflict"));
   const { data, error } = await supabase.rpc("create_reservation_request", { target_project: project.id, request_session_key: parsed.data.sessionId, request_idempotency_key: parsed.data.idempotencyKey, target_unit: unit.id, requested_check_in: parsed.data.checkIn, requested_check_out: parsed.data.checkOut, requested_adults: parsed.data.adults, requested_children: parsed.data.children, requested_total: total, requested_deposit: depositAmount || null, requested_visitor_data: parsed.data.visitorData });
-  if (error) { console.error("reservation_submit_failed", { projectId: project.id, code: error.code }); return respond(apiError("A disponibilidade mudou. Consulte novamente.", 409, "reservation_conflict")); }
+  if (error) { logError("reservation_submit_failed", { requestId, route: requestPathname(request), workspaceId: project.workspaceId, code: error.code }); return respond(apiError("A disponibilidade mudou. Consulte novamente.", 409, "reservation_conflict")); }
   const reservationId = typeof data === "object" && data && "id" in data ? String(data.id) : String(data);
   const opportunity = await registerOpportunity(supabase, { workspaceId: project.workspaceId, projectId: project.id, projectName: project.name, sessionId: parsed.data.sessionId, sourceType: "reservation", sourceId: reservationId, title: `Reserva · ${unit.name}`, conversionGoalId: parsed.data.conversionGoalId, entryPointId: parsed.data.entryPointId, attribution: parsed.data.attribution, visitorData: parsed.data.visitorData, estimatedValue: total, currency: unit.currency, summary: `${parsed.data.checkIn} – ${parsed.data.checkOut}` }).catch(() => null);
   await enqueueProjectNotification(project.id, "reservation.submitted", "opportunity", opportunity?.id || reservationId, { ...parsed.data.visitorData, interest: unit.name, date: `${parsed.data.checkIn} – ${parsed.data.checkOut}` }).catch(() => undefined);

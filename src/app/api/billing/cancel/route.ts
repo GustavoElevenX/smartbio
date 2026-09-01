@@ -4,6 +4,7 @@ import { billingErrorResponse, scheduleSubscriptionCancellation } from "@/server
 import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
 import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/server";
+import { getRequestId, requestPathname } from "@/server/observability/log";
 
 export const feedbackSchema = z.object({ reason: z.enum(["not_using", "no_traffic", "no_result", "too_expensive", "alternative", "missing_feature", "other"]).optional(), comment: z.string().trim().max(1000).optional() });
 
@@ -24,6 +25,6 @@ export const POST = withAuthenticatedActor(async (request, _context, actor) => {
       currentPeriodEnd: subscription.currentPeriodEnd,
     }), rate);
   } catch (error) {
-    return applyRateLimitHeaders(billingErrorResponse(error), rate);
+    return applyRateLimitHeaders(billingErrorResponse(error, { requestId: getRequestId(request), route: requestPathname(request), workspaceId: actor.workspaceId, userId: actor.userId }), rate);
   }
 });

@@ -14,6 +14,7 @@ import type {
 } from "./billing-provider";
 import { readBillingConfig } from "./billing-config";
 import { StripeBillingProvider } from "./stripe-billing-provider";
+import { logError, type ErrorLogContext } from "@/server/observability/log";
 
 export class BillingOperationError extends Error {
   constructor(
@@ -48,14 +49,13 @@ function stripeRequestFailure(error: unknown): StripeRequestFailure | undefined 
   };
 }
 
-function stripeFailureResponse(error: StripeRequestFailure) {
-  console.error("billing_operation_failed", {
+function stripeFailureResponse(error: StripeRequestFailure, context: ErrorLogContext) {
+  logError("billing_operation_failed", {
+    ...context,
     provider: "stripe",
-    type: error.type,
     code: error.code,
     statusCode: error.statusCode,
-    requestId: error.requestId,
-    param: error.param,
+    providerRequestId: error.requestId,
   });
 
   if (error.statusCode === 401 || error.type === "StripeAuthenticationError") {
@@ -626,15 +626,19 @@ export async function processStripeWebhook(payload: string, signature: string) {
   }
 }
 
-export function billingErrorResponse(error: unknown) {
+export function billingErrorResponse(
+  error: unknown,
+  context: ErrorLogContext = { route: "/api/billing" },
+) {
   const stripeFailure = stripeRequestFailure(error);
-  if (stripeFailure) return billingErrorResponse(stripeFailureResponse(stripeFailure));
+  if (stripeFailure)
+    return billingErrorResponse(stripeFailureResponse(stripeFailure, context), context);
   if (error instanceof BillingOperationError)
     return Response.json(
       { ok: false, error: { code: error.code, message: error.message } },
       { status: error.status },
     );
-  console.error("billing_operation_failed");
+  logError("billing_operation_failed", context);
   return Response.json(
     { ok: false, error: { code: "billing_failed", message: "Não foi possível concluir a operação de cobrança." } },
     { status: 500 },

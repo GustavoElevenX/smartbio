@@ -7,14 +7,16 @@ import { getPublicProjectById } from "@/server/repositories/public-commercial-re
 import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
 import { publicRateLimitIdentifier } from "@/server/rate-limit/public-identifier";
 import type { Reservation, ReservationBlock } from "@/types";
+import { getRequestId, withRequestId } from "@/server/observability/log";
 
 export async function POST(request: Request) {
+  const requestId = getRequestId(request);
   const raw = await request.json().catch(() => null);
   const candidate = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
   const rate = await consumeRateLimit("public-reservation-availability", publicRateLimitIdentifier(request, {
     projectId: typeof candidate.projectId === "string" ? candidate.projectId : undefined,
   }), rateLimitRules.publicRead, { failClosed: false });
-  const respond = <T extends Response>(response: T) => applyRateLimitHeaders(response, rate);
+  const respond = <T extends Response>(response: T) => withRequestId(applyRateLimitHeaders(response, rate), requestId);
   if (!rate.allowed) return respond(apiError("Muitas consultas de disponibilidade.", 429, "rate_limited"));
   if (!features.nativeReservations) return respond(apiError("Reservas nativas estão desativadas.", 404, "feature_disabled"));
   const parsed = reservationAvailabilitySchema.safeParse(raw);

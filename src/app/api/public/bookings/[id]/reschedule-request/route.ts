@@ -4,13 +4,15 @@ import { apiError, apiSuccess, validationError } from "@/server/http/api-respons
 import { enqueueProjectNotification } from "@/server/notifications/notification-service";
 import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
 import { publicRateLimitIdentifier } from "@/server/rate-limit/public-identifier";
+import { getRequestId, withRequestId } from "@/server/observability/log";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const requestId = getRequestId(request);
   const { id } = await params;
   const raw = await request.json().catch(() => null);
   const candidate = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
   const rate = await consumeRateLimit("public-booking-reschedule", publicRateLimitIdentifier(request, { objectId: id, sessionId: typeof candidate.sessionId === "string" ? candidate.sessionId : undefined }), rateLimitRules.publicFormSubmit, { failClosed: true });
-  const respond = <T extends Response>(response: T) => applyRateLimitHeaders(response, rate);
+  const respond = <T extends Response>(response: T) => withRequestId(applyRateLimitHeaders(response, rate), requestId);
   if (!rate.allowed) return respond(apiError("Muitas solicitações.", 429, "rate_limited"));
   const parsed = bookingChangeSchema.refine((value) => Boolean(value.requestedStartsAt), { message: "Escolha um novo horário." }).safeParse(raw);
   if (!parsed.success) return respond(validationError(parsed.error));

@@ -8,6 +8,12 @@ import {
 } from "@/server/auth/setup-actor";
 import { createServiceClient } from "@/lib/supabase/server";
 import { EntitlementError } from "@/server/entitlements/entitlement-types";
+import {
+  getRequestId,
+  logError,
+  requestPathname,
+  withRequestId,
+} from "@/server/observability/log";
 
 export function withAuthenticatedActor<TContext = unknown>(
   handler: (
@@ -17,10 +23,10 @@ export function withAuthenticatedActor<TContext = unknown>(
   ) => Promise<Response>,
 ) {
   return async (request: Request, context: TContext) => {
-    const requestId =
-      request.headers.get("x-request-id") || crypto.randomUUID();
+    const requestId = getRequestId(request);
+    let actor: AuthenticatedActor | undefined;
     try {
-      const actor = await requireAuthenticatedActor();
+      actor = await requireAuthenticatedActor();
       const response = await handler(request, context, actor);
       if (
         actor.mode === "platform_support" &&
@@ -42,12 +48,16 @@ export function withAuthenticatedActor<TContext = unknown>(
             after_state: { method: request.method, status: response.status },
           });
       }
-      response.headers.set("x-request-id", requestId);
-      return response;
+      return withRequestId(response, requestId);
     } catch (error) {
       const status = authErrorStatus(error);
       if (status === 500)
-        console.error("authenticated_route_failed", { requestId });
+        logError("authenticated_route_failed", {
+          requestId,
+          route: requestPathname(request),
+          workspaceId: actor?.workspaceId,
+          userId: actor?.userId,
+        });
       return NextResponse.json(
         {
           ok: false,

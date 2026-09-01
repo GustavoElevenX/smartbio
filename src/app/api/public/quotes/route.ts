@@ -8,15 +8,17 @@ import { enqueueProjectNotification } from "@/server/notifications/notification-
 import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
 import { publicRateLimitIdentifier } from "@/server/rate-limit/public-identifier";
 import { registerOpportunity } from "@/server/opportunities/service";
+import { getRequestId, logError, requestPathname, withRequestId } from "@/server/observability/log";
 
 export async function POST(request: Request) {
+  const requestId = getRequestId(request);
   const raw = await request.json().catch(() => null);
   const candidate = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
   const rate = await consumeRateLimit("public-quote-submit", publicRateLimitIdentifier(request, {
     projectId: typeof candidate.projectId === "string" ? candidate.projectId : undefined,
     sessionId: typeof candidate.sessionId === "string" ? candidate.sessionId : undefined,
   }), rateLimitRules.publicFormSubmit, { failClosed: true });
-  const respond = <T extends Response>(response: T) => applyRateLimitHeaders(response, rate);
+  const respond = <T extends Response>(response: T) => withRequestId(applyRateLimitHeaders(response, rate), requestId);
   if (!rate.allowed) return respond(apiError("Muitas solicitações. Tente novamente em instantes.", 429, "rate_limited"));
   if (!features.nativeQuotes) return respond(apiError("Orçamentos nativos estão desativados neste ambiente.", 404, "feature_disabled"));
   const parsed = quoteRequestSchema.safeParse(raw);
@@ -32,7 +34,7 @@ export async function POST(request: Request) {
     project_id: project.id, session_key: parsed.data.sessionId, idempotency_key: parsed.data.idempotencyKey, status: "submitted", answers: parsed.data.answers,
     estimated_min: estimate.min || null, estimated_max: estimate.max || null, currency: estimate.currency, visitor_data: parsed.data.visitorData,
   }, { onConflict: "project_id,idempotency_key" }).select("id,status,estimated_min,estimated_max,currency,created_at").single();
-  if (error) { console.error("quote_request_failed", { projectId: project.id, code: error.code }); return respond(apiError("Não foi possível enviar o orçamento.", 400, "quote_submit_failed")); }
+  if (error) { logError("quote_request_failed", { requestId, route: requestPathname(request), workspaceId: project.workspaceId, code: error.code }); return respond(apiError("Não foi possível enviar o orçamento.", 400, "quote_submit_failed")); }
   const opportunity = await registerOpportunity(supabase, { workspaceId: project.workspaceId, projectId: project.id, projectName: project.name, sessionId: parsed.data.sessionId, sourceType: "quote", sourceId: data.id, title: `Orçamento · ${definition.title}`, conversionGoalId: parsed.data.conversionGoalId, entryPointId: parsed.data.entryPointId, attribution: parsed.data.attribution, visitorData: parsed.data.visitorData, estimatedValue: estimate.max || estimate.min, currency: estimate.currency }).catch(() => null);
   await enqueueProjectNotification(project.id, "quote.submitted", "opportunity", opportunity?.id || data.id, { ...parsed.data.visitorData, interest: definition.title }).catch(() => undefined);
   return respond(apiSuccess({ accepted: true, persisted: true, request: data, estimate }, 201));
