@@ -323,7 +323,13 @@ export function SobeLanding() {
       <FinalCta />
       <footer className={styles.footer}>
         <Brand tone="light" asLink={false} />
-        <p>© 2026 SOBE. Da atenção à próxima ação.</p>
+        <div className={styles.footerLegal}>
+          <p>© 2026 SOBE. Da atenção à próxima ação.</p>
+          <nav aria-label="Links legais">
+            <Link href="/terms">Termos</Link>
+            <Link href="/privacy">Privacidade</Link>
+          </nav>
+        </div>
         <Link href="/register?next=/app/onboarding" data-track="footer_register">Começar grátis <ArrowRight aria-hidden="true" /></Link>
       </footer>
     </main>

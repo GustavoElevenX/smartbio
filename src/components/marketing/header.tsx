@@ -25,7 +25,12 @@ export function MarketingFooter() {
     <div className="container-shell flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
       <Brand />
       <p className="text-sm text-[#777781]">© 2026 Sobe. Onde intenção vira ação.</p>
-      <div className="flex gap-5 text-sm font-medium text-[#5e5e68]"><Link href="/pricing">Preço</Link><Link href="/app">Abrir painel</Link></div>
+      <nav className="flex flex-wrap gap-x-5 gap-y-3 text-sm font-medium text-[#5e5e68]" aria-label="Rodapé">
+        <Link className="inline-flex min-h-11 items-center hover:text-[#07172f]" href="/pricing">Preço</Link>
+        <Link className="inline-flex min-h-11 items-center hover:text-[#07172f]" href="/terms">Termos</Link>
+        <Link className="inline-flex min-h-11 items-center hover:text-[#07172f]" href="/privacy">Privacidade</Link>
+        <Link className="inline-flex min-h-11 items-center hover:text-[#07172f]" href="/app">Abrir painel</Link>
+      </nav>
     </div>
   </footer>;
 }

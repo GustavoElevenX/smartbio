@@ -14,8 +14,22 @@ export default function AuthLayout({
         <div className="mx-auto my-auto w-full max-w-[430px] py-12">
           {children}
         </div>
-        <p className="text-center text-xs text-[#9797a0]">
-          Ao continuar, você concorda com os termos e a política de privacidade.
+        <p className="text-center text-xs text-[#6d7280]">
+          Ao continuar, você concorda com os{" "}
+          <Link
+            href="/terms"
+            className="font-medium text-[#667286] underline decoration-[#c2cad5] underline-offset-2 transition hover:text-[#0054fc] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8eb0ff]"
+          >
+            termos
+          </Link>{" "}
+          e a{" "}
+          <Link
+            href="/privacy"
+            className="font-medium text-[#667286] underline decoration-[#c2cad5] underline-offset-2 transition hover:text-[#0054fc] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8eb0ff]"
+          >
+            política de privacidade
+          </Link>
+          .
         </p>
       </section>
       <section className="relative hidden overflow-hidden bg-[#07172f] p-12 text-white lg:flex lg:flex-col lg:justify-between">
