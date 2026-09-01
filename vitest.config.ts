@@ -8,5 +8,10 @@ export default defineConfig({
       "server-only": fileURLToPath(new URL("./tests/server-only.ts", import.meta.url)),
     },
   },
-  test: { environment: "node", include: ["tests/unit/**/*.test.ts"], coverage: { reporter: ["text", "html"] } },
+  test: {
+    environment: "node",
+    include: ["tests/unit/**/*.test.ts"],
+    setupFiles: ["./tests/unit/setup-env.ts"],
+    coverage: { reporter: ["text", "html"] },
+  },
 });
