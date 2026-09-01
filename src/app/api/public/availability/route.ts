@@ -6,6 +6,7 @@ import { apiError, apiSuccess, validationError } from "@/server/http/api-respons
 import { getPublicProjectById } from "@/server/repositories/public-commercial-repository";
 import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
 import { publicRateLimitIdentifier } from "@/server/rate-limit/public-identifier";
+import { BookingBoundaryError, resolveSchedulingSelection } from "@/server/scheduling/booking-boundary";
 import type { Booking } from "@/types";
 
 export async function POST(request: Request) {
@@ -21,13 +22,20 @@ export async function POST(request: Request) {
   if (!parsed.success) return respond(validationError(parsed.error));
   const supabase = createServiceClient();
   const project = await getPublicProjectById(supabase, parsed.data.projectId);
-  const service = project?.commercialConfig?.schedulableServices?.find((item) => item.id === parsed.data.serviceId && item.isActive);
-  if (!project || !service) return respond(apiError("Serviço não disponível.", 404, "service_not_found"));
+  if (!project) return respond(apiError("Serviço não disponível.", 404, "service_not_found"));
+  let service;
+  try {
+    ({ service } = resolveSchedulingSelection(project, parsed.data.serviceId, parsed.data.resourceId));
+  } catch (error) {
+    if (error instanceof BookingBoundaryError) return respond(apiError(error.message, 404, error.code));
+    throw error;
+  }
   let bookings: Booking[] = [];
   if (supabase) {
-    const dayStart = `${parsed.data.date}T00:00:00`;
-    const dayEnd = `${parsed.data.date}T23:59:59`;
-    const { data } = await supabase.from("bookings").select("id,project_id,session_key,service_id,resource_id,starts_at,ends_at,status,confirmation_mode,visitor_data").eq("project_id", project.id).gte("starts_at", dayStart).lte("starts_at", dayEnd);
+    const day = new Date(`${parsed.data.date}T00:00:00.000Z`);
+    const dayStart = new Date(day.getTime() - 86_400_000).toISOString();
+    const dayEnd = new Date(day.getTime() + 172_800_000).toISOString();
+    const { data } = await supabase.from("bookings").select("id,project_id,session_key,service_id,resource_id,starts_at,ends_at,status,confirmation_mode,visitor_data").eq("project_id", project.id).gte("starts_at", dayStart).lt("starts_at", dayEnd);
     bookings = (data || []).map((item) => ({ id: item.id, projectId: item.project_id, sessionId: item.session_key, serviceId: item.service_id, resourceId: item.resource_id || undefined, startsAt: item.starts_at, endsAt: item.ends_at, status: item.status, confirmationMode: item.confirmation_mode, visitorData: item.visitor_data })) as Booking[];
   }
   const slots = generateAvailableSlots({ date: parsed.data.date, service, rules: project.commercialConfig?.availabilityRules || [], exceptions: project.commercialConfig?.availabilityExceptions || [], bookings, resourceId: parsed.data.resourceId });

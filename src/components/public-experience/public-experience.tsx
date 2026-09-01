@@ -814,12 +814,19 @@ export function ExperienceCanvas({
           createdAt: new Date().toISOString(),
         };
         localStore.saveBooking(booking);
+        let effectiveStatus = booking.status;
         if (shouldSubmitCommercialOperationRemotely()) {
           const response = await fetch("/api/public/bookings", {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
-              ...booking,
+              projectId: booking.projectId,
+              sessionId: booking.sessionId,
+              idempotencyKey: booking.idempotencyKey,
+              serviceId: booking.serviceId,
+              resourceId: booking.resourceId,
+              startsAt: booking.startsAt,
+              visitorData: booking.visitorData,
               conversionGoalId: runtime.conversionGoalId,
               entryPointId: runtime.entryPointId,
               attribution: runtime.attribution,
@@ -827,15 +834,17 @@ export function ExperienceCanvas({
             }),
           });
           const payload = (await response.json()) as {
+            data?: { booking?: { status?: Booking["status"] } };
             error?: { message?: string };
           };
           if (!response.ok)
             throw new Error(
               payload.error?.message || "Não foi possível agendar.",
             );
+          effectiveStatus = payload.data?.booking?.status || effectiveStatus;
         }
         addLead(
-          { operationalStatus: booking.status, scheduledAt: booking.startsAt },
+          { operationalStatus: effectiveStatus, scheduledAt: booking.startsAt },
           "scheduling",
           booking.id,
         );
@@ -844,7 +853,7 @@ export function ExperienceCanvas({
           summary: booking.startsAt,
         });
         setConfirmation(
-          booking.status === "confirmed"
+          effectiveStatus === "confirmed"
             ? "Agendamento confirmado."
             : "Solicitação enviada para aprovação.",
         );

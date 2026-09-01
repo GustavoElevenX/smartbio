@@ -96,11 +96,9 @@ export const bookingRequestSchema = z.object({
   serviceId: shortId,
   resourceId: shortId.optional(),
   startsAt: z.string().datetime({ local: true }),
-  endsAt: z.string().datetime({ local: true }),
-  confirmationMode: z.enum(["instant", "manual_approval", "external_system"]),
   visitorData,
   honeypot: z.string().max(0).optional(),
-}).refine((data) => new Date(data.endsAt) > new Date(data.startsAt), { message: "O horário final deve ser posterior ao inicial." });
+}).strict();
 
 export const bookingChangeSchema = z.object({
   sessionId: shortId,
