@@ -1,0 +1,213 @@
+
+> linkbio@0.1.0 build
+> next build
+
+▲ Next.js 16.2.12 (Turbopack)
+- Environments: .env.local, .env
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 12.8s
+  Running TypeScript ...
+  Finished TypeScript in 22.8s ...
+  Collecting page data using 11 workers ...
+  Generating static pages using 11 workers (0/80) ...
+  Generating static pages using 11 workers (20/80)
+  Generating static pages using 11 workers (40/80)
+  Generating static pages using 11 workers (60/80)
+✓ Generating static pages using 11 workers (80/80) in 658ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /[slug]
+├ ƒ /[slug]/p/[pageKey]
+├ ƒ /[slug]/preview
+├ ƒ /admin
+├ ƒ /admin/acquisition
+├ ƒ /admin/audit
+├ ƒ /admin/pages
+├ ƒ /admin/plans
+├ ƒ /admin/product
+├ ƒ /admin/projects
+├ ƒ /admin/projects/[projectId]
+├ ƒ /admin/support
+├ ƒ /admin/users
+├ ƒ /admin/users/[userId]
+├ ƒ /admin/workspaces
+├ ƒ /admin/workspaces/[workspaceId]
+├ ƒ /api/account/profile
+├ ƒ /api/admin/metrics
+├ ƒ /api/admin/plans/[planKey]
+├ ƒ /api/admin/support
+├ ƒ /api/admin/workspaces/[workspaceId]
+├ ƒ /api/admin/workspaces/[workspaceId]/overrides
+├ ƒ /api/admin/workspaces/[workspaceId]/plan
+├ ƒ /api/ai/brand/analyze
+├ ƒ /api/ai/copy
+├ ƒ /api/ai/projects/[projectId]/activations/compose
+├ ƒ /api/ai/projects/[projectId]/presence/compose
+├ ƒ /api/ai/projects/[projectId]/presence/generate
+├ ƒ /api/ai/projects/[projectId]/presence/pages/[pageId]/regenerate
+├ ƒ /api/ai/projects/[projectId]/presence/sections/[sectionId]/improve
+├ ƒ /api/ai/projects/[projectId]/site/suggest-structure
+├ ƒ /api/ai/projects/[projectId]/steps/[stepId]/regenerate
+├ ƒ /api/ai/projects/[projectId]/visual-direction
+├ ƒ /api/ai/setup/[sessionId]
+├ ƒ /api/ai/setup/[sessionId]/actions
+├ ƒ /api/ai/setup/[sessionId]/analyze
+├ ƒ /api/ai/setup/[sessionId]/answer
+├ ƒ /api/ai/setup/[sessionId]/architecture
+├ ƒ /api/ai/setup/[sessionId]/complete
+├ ƒ /api/ai/setup/[sessionId]/finalize-project
+├ ƒ /api/ai/setup/[sessionId]/generate
+├ ƒ /api/ai/setup/[sessionId]/regenerate
+├ ƒ /api/ai/setup/active
+├ ƒ /api/ai/setup/initialize
+├ ƒ /api/ai/setup/preflight
+├ ƒ /api/ai/setup/start
+├ ƒ /api/ai/sources/[sourceId]
+├ ƒ /api/ai/sources/[sourceId]/facts
+├ ƒ /api/ai/sources/[sourceId]/facts/[factId]
+├ ƒ /api/ai/sources/apply
+├ ƒ /api/ai/sources/upload
+├ ƒ /api/ai/sources/website
+├ ƒ /api/billing/cancel
+├ ƒ /api/billing/checkout
+├ ƒ /api/billing/payment-method
+├ ƒ /api/billing/reactivate
+├ ƒ /api/billing/setup-intent
+├ ƒ /api/billing/status
+├ ƒ /api/billing/stripe/webhook
+├ ƒ /api/billing/value-summary
+├ ƒ /api/brand/analyze
+├ ƒ /api/events
+├ ƒ /api/health/readiness
+├ ƒ /api/internal/notifications/process
+├ ƒ /api/invitations/[token]/accept
+├ ƒ /api/leads
+├ ƒ /api/notifications
+├ ƒ /api/notifications/preferences
+├ ƒ /api/platform/link-signup
+├ ƒ /api/platform/track
+├ ƒ /api/product-state/overview
+├ ƒ /api/product-state/surface
+├ ƒ /api/projects
+├ ƒ /api/projects/[projectId]
+├ ƒ /api/projects/[projectId]/activations
+├ ƒ /api/projects/[projectId]/activations/[activationId]
+├ ƒ /api/projects/[projectId]/activations/[activationId]/analytics
+├ ƒ /api/projects/[projectId]/activations/[activationId]/duplicate
+├ ƒ /api/projects/[projectId]/activations/[activationId]/end
+├ ƒ /api/projects/[projectId]/activations/[activationId]/pause
+├ ƒ /api/projects/[projectId]/activations/[activationId]/publish
+├ ƒ /api/projects/[projectId]/activations/[activationId]/resume
+├ ƒ /api/projects/[projectId]/analytics/[view]
+├ ƒ /api/projects/[projectId]/commercial-context
+├ ƒ /api/projects/[projectId]/commercial-context/proposals
+├ ƒ /api/projects/[projectId]/commercial-context/proposals/[proposalId]
+├ ƒ /api/projects/[projectId]/commercial-data
+├ ƒ /api/projects/[projectId]/customer-history/import
+├ ƒ /api/projects/[projectId]/locations/[locationId]/geocode
+├ ƒ /api/projects/[projectId]/media
+├ ƒ /api/projects/[projectId]/media/[assetId]
+├ ƒ /api/projects/[projectId]/media/[assetId]/usage
+├ ƒ /api/projects/[projectId]/opportunities
+├ ƒ /api/projects/[projectId]/optimization
+├ ƒ /api/projects/[projectId]/optimization/explain
+├ ƒ /api/projects/[projectId]/presence
+├ ƒ /api/projects/[projectId]/presence/pages/[pageId]
+├ ƒ /api/projects/[projectId]/publish
+├ ƒ /api/projects/[projectId]/site/apply-proposal
+├ ƒ /api/projects/[projectId]/snapshots
+├ ƒ /api/projects/[projectId]/sources
+├ ƒ /api/projects/[projectId]/sources/[sourceId]
+├ ƒ /api/projects/[projectId]/sources/[sourceId]/reprocess
+├ ƒ /api/projects/[projectId]/validators
+├ ƒ /api/projects/[projectId]/validators/[validatorId]
+├ ƒ /api/projects/compose
+├ ƒ /api/public/activations/[activationId]/claim
+├ ƒ /api/public/activations/[activationId]/handoff
+├ ƒ /api/public/availability
+├ ƒ /api/public/bookings
+├ ƒ /api/public/bookings/[id]/cancel-request
+├ ƒ /api/public/bookings/[id]/reschedule-request
+├ ƒ /api/public/catalog/[projectId]
+├ ƒ /api/public/handoff
+├ ƒ /api/public/orders
+├ ƒ /api/public/projects/[slug]/activations
+├ ƒ /api/public/projects/[slug]/experience
+├ ƒ /api/public/quotes
+├ ƒ /api/public/quotes/[id]/attachments
+├ ƒ /api/public/reservations
+├ ƒ /api/public/reservations/[id]/cancel-request
+├ ƒ /api/public/reservations/availability
+├ ƒ /api/public/routing/nearest
+├ ƒ /api/public/routing/resolve
+├ ƒ /api/redeem/activate
+├ ƒ /api/redeem/calculate
+├ ƒ /api/redeem/consume
+├ ƒ /api/redeem/logout
+├ ƒ /api/redeem/validate
+├ ƒ /api/support/current
+├ ƒ /api/workspace/entitlements
+├ ƒ /api/workspaces
+├ ƒ /api/workspaces/[workspaceId]
+├ ƒ /api/workspaces/[workspaceId]/invitations
+├ ƒ /api/workspaces/[workspaceId]/members
+├ ƒ /api/workspaces/[workspaceId]/members/[userId]
+├ ƒ /api/workspaces/active
+├ ƒ /app
+├ ƒ /app/notifications
+├ ƒ /app/onboarding
+├ ƒ /app/onboarding/ai
+├ ƒ /app/onboarding/manual
+├ ƒ /app/projects
+├ ƒ /app/projects/[projectId]
+├ ƒ /app/projects/[projectId]/activations
+├ ƒ /app/projects/[projectId]/activations/[activationId]
+├ ƒ /app/projects/[projectId]/activations/eligibility
+├ ƒ /app/projects/[projectId]/activations/new
+├ ƒ /app/projects/[projectId]/activations/redeem
+├ ƒ /app/projects/[projectId]/analytics
+├ ƒ /app/projects/[projectId]/brand
+├ ƒ /app/projects/[projectId]/conversion
+├ ƒ /app/projects/[projectId]/data
+├ ƒ /app/projects/[projectId]/editor
+├ ƒ /app/projects/[projectId]/entries
+├ ƒ /app/projects/[projectId]/launch
+├ ƒ /app/projects/[projectId]/leads
+├ ƒ /app/projects/[projectId]/media
+├ ƒ /app/projects/[projectId]/operations
+├ ƒ /app/projects/[projectId]/opportunities
+├ ƒ /app/projects/[projectId]/settings
+├ ƒ /app/projects/[projectId]/site
+├ ƒ /app/projects/[projectId]/sources
+├ ƒ /app/projects/new
+├ ƒ /app/settings
+├ ƒ /app/settings/billing
+├ ƒ /app/settings/notifications
+├ ƒ /app/settings/profile
+├ ƒ /app/settings/workspace
+├ ○ /apple-icon.png
+├ ƒ /auth/callback
+├ ƒ /auth/error
+├ ○ /confirm-email
+├ ○ /forgot-password
+├ ○ /icon.png
+├ ƒ /invite/[token]
+├ ○ /login
+├ ○ /pricing
+├ ○ /privacy
+├ ○ /redeem
+├ ƒ /redeem/activate
+├ ○ /register
+├ ○ /reset-password
+├ ○ /sitemap.xml
+└ ○ /terms
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand

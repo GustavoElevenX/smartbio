@@ -54,17 +54,36 @@ export function reconcileProjectWithCommercialArchitecture(input: {
   const { project, architecture } = input;
   const deterministic = journeyComposer.compose(input.compositionInput, input.profile, input.capabilities, architecture);
   const architectureConfig = assignProjectToCommercialConfig(deterministic.commercialConfig, project.id);
+  const serviceOfferings = architectureConfig.serviceOfferings?.map((offering) => {
+    const architectureOfferingId = offering.settings.architectureOfferingId;
+    const current = typeof architectureOfferingId === "string"
+      ? project.commercialConfig?.serviceOfferings?.find((candidate) => candidate.settings.architectureOfferingId === architectureOfferingId)
+      : undefined;
+    return current ? { ...offering, id: current.id, settings: { ...current.settings, ...offering.settings } } : offering;
+  });
+  const discoveryForm = project.steps.find((step) => (
+    step.type === "form"
+    && step.settings?.discoveryPlanId === project.discoveryPlan?.id
+  ));
+  const steps = deterministic.steps.map((step) => (
+    discoveryForm
+    && step.type === "form"
+    && !step.formFields?.length
+    && step.settings?.blueprintId === discoveryForm.settings?.blueprintId
+      ? { ...step, formFields: discoveryForm.formFields, settings: { ...step.settings, ...discoveryForm.settings } }
+      : step
+  ));
   const nativeScheduling = input.capabilities.some((item) => item.enabled && item.key === "scheduling");
   const nativeReservation = input.capabilities.some((item) => item.enabled && item.key === "reservation");
   const reconciled: Project = {
     ...project,
     description: architecture.businessSummary.whatItSells,
     subtitle: architecture.businessSummary.commercialModel,
-    steps: deterministic.steps,
+    steps,
     capabilities: input.capabilities,
     commercialConfig: {
       ...(project.commercialConfig || {}),
-      serviceOfferings: architectureConfig.serviceOfferings ?? project.commercialConfig?.serviceOfferings,
+      serviceOfferings: serviceOfferings ?? project.commercialConfig?.serviceOfferings,
       catalogCategories: architectureConfig.catalogCategories,
       catalogItems: architectureConfig.catalogItems,
       locations: architectureConfig.locations,

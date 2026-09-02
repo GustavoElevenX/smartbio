@@ -1,0 +1,20 @@
+
+> linkbio@0.1.0 verify
+> npm run lint && npm run typecheck && npm run test && npm run build
+
+
+> linkbio@0.1.0 lint
+> eslint . --max-warnings=0
+
+
+> linkbio@0.1.0 typecheck
+> next typegen && tsc --noEmit
+
+Generating route types...
+✓ Types generated successfully
+.next/dev/types/routes.d.ts(257,14): error TS1109: Expression expected.
+.next/dev/types/routes.d.ts(264,5): error TS1161: Unterminated regular expression literal.
+.next/dev/types/routes.d.ts(268,1): error TS1128: Declaration or statement expected.
+.next/dev/types/validator.ts(242,63): error TS1005: '?' expected.
+.next/dev/types/validator.ts(247,1): error TS1128: Declaration or statement expected.
+.next/dev/types/validator.ts(1739,1): error TS1128: Declaration or statement expected.
