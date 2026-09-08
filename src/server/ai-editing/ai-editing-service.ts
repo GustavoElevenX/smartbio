@@ -1,4 +1,6 @@
 import "server-only";
+import { resolveVisualIntent } from "@/features/composition/visual-intent";
+import { visualComposer } from "@/features/composition/visual-composer";
 import { z } from "zod";
 import { getAIProvider, isAIConfigured } from "@/server/ai/ai-client";
 import { assertProjectAccess } from "@/server/auth/project-access";
@@ -77,11 +79,18 @@ export async function regenerateVisualDirection(actor: AuthenticatedActor, proje
     try { const result = await getAIProvider().analyzeBrand!({ workspaceId: actor.workspaceId, projectId, userId: actor.userId, businessName: project.name, businessDescription: `${project.description}\nInstrução visual: ${input.instruction}`, extractedColors: project.brand.extractedColors }); aiDirection = result.visualDirection; usedFallback = false; }
     catch { usedFallback = true; }
   }
-  const lower = `${input.instruction} ${aiDirection}`.toLowerCase();
-  const after: Project["designSystem"] = structuredClone(before);
-  if (lower.includes("premium")) { after.spacing.density = "spacious"; after.typography.headingWeight = 800; after.elevation.cardShadow = "0 18px 60px rgba(20,18,32,.16)"; after.cards.style = "elevated"; }
-  if (lower.includes("minimal")) { after.spacing.density = "balanced"; after.cards.style = "outlined"; after.motion.transition = "fade"; after.shape.cardRadius = Math.min(after.shape.cardRadius, 18); }
-  if (lower.includes("vibr")) { after.cards.style = "gradient"; after.buttons.style = "gradient"; after.motion.cardHover = true; }
-  if (lower.includes("produto")) { after.spacing.cardGap = Math.max(after.spacing.cardGap, 18); after.cards.style = "elevated"; }
+  const direction = resolveVisualIntent({ visualDirection: input.instruction }) !== "clear" ? input.instruction : aiDirection;
+  const after = visualComposer.compose({
+    businessName: project.name, businessDescription: project.description,
+    primaryGoal: project.primaryGoal, primaryDestination: project.primaryDestination,
+    slug: project.slug, visualDirection: direction,
+    brandPersonality: project.brand.brandPersonality, preferredTheme: before.mode,
+    preferredDensity: before.spacing.density === "spacious" ? "immersive" : before.spacing.density,
+  }, { ...project.brand, activePalette: before.colors }, project.steps);
+  after.colors = structuredClone(before.colors);
+  after.cards.borderColor = before.cards.borderColor;
+  // Keep the owner's selected media and framing when refreshing the art direction.
+  after.imagery = { ...after.imagery, ...before.imagery, decorativeStyle: "none" };
+  aiDirection = direction;
   return { before, after, visualDirection: aiDirection, diff: { spacing: before.spacing, nextSpacing: after.spacing, cards: before.cards, nextCards: after.cards, typography: before.typography, nextTypography: after.typography }, usedFallback };
 }

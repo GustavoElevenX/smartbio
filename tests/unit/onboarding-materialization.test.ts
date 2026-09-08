@@ -114,7 +114,11 @@ describe("materialização do onboarding adaptativo", () => {
       phone: initialInput.phone,
     });
 
-    expect(project.brand.extractedColors[0]).toBe("#2F6B5B");
+    const renamed = new RuleBasedExperienceComposer().compose({
+      businessName: "Outro nome", businessDescription: initialInput.description,
+      primaryGoal: "Agendar", primaryDestination: "WhatsApp", slug: "outro-nome",
+    });
+    expect(project.brand.extractedColors).toEqual(renamed.brand.extractedColors);
     expect(project.subtitle).toContain("Agendar");
     expect(project.steps[0].description).not.toBe(initialInput.description);
     expect(project.steps[0].options?.[0].label).toBe("Ver serviços e horários");

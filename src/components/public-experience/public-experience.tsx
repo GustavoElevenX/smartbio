@@ -1543,11 +1543,13 @@ export function ExperienceCanvas({
       style={{
         ...style,
         fontFamily: `"${project.designSystem.typography.bodyFont}", Inter, ui-sans-serif, system-ui, sans-serif`,
+        fontWeight: project.designSystem.typography.bodyWeight,
         paddingBottom: "env(safe-area-inset-bottom)",
+        containerType: "inline-size",
       }}
       className="relative flex min-h-full min-w-0 flex-col overflow-x-clip bg-[var(--background)] text-[var(--foreground)]"
     >
-      <div className="pointer-events-none absolute -right-24 -top-24 size-64 rounded-full bg-[var(--primary)] opacity-[var(--glow-opacity,.1)] blur-3xl" />
+
       <header className="relative flex min-w-0 items-center justify-between gap-3 px-5 pt-[max(1rem,env(safe-area-inset-top))]">
         <button
           type="button"
@@ -1586,11 +1588,11 @@ export function ExperienceCanvas({
           }}
         />
       </div>
-      <main className="relative flex min-w-0 flex-1 items-center justify-center px-5 py-8 sm:px-8">
+      <main style={{ paddingBlock: project.designSystem.spacing.sectionGap }} className="relative flex min-w-0 flex-1 items-center justify-center px-5 sm:px-8">
         <AnimatePresence mode="wait">
           <motion.section
             key={step.id}
-            initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             exit={reduceMotion ? undefined : { opacity: 0, y: -8 }}
             transition={{
@@ -1600,13 +1602,10 @@ export function ExperienceCanvas({
             }}
             className="min-w-0 w-full max-w-[620px]"
           >
-            <p className="max-w-full break-normal text-xs font-extrabold uppercase tracking-[.16em] text-[var(--primary)] [hyphens:none] [overflow-wrap:break-word]">
-              {project.name}
-            </p>
             <h1
               className={cn(
-                "mt-4 max-w-full break-normal font-extrabold leading-[1.02] tracking-[-.04em] [hyphens:none] [overflow-wrap:break-word]",
-                preview ? "text-3xl" : "text-[clamp(2rem,8vw,3.6rem)]",
+                "max-w-full text-balance break-normal font-extrabold leading-[1.02] tracking-[-.04em] [hyphens:none] [overflow-wrap:break-word]",
+                project.designSystem.typography.scale === "compact" ? "text-[clamp(1.75rem,6cqw,2.5rem)]" : project.designSystem.typography.scale === "expressive" ? "text-[clamp(2.25rem,9cqw,3.75rem)]" : "text-[clamp(2rem,8cqw,3.25rem)]",
               )}
               style={{
                 fontFamily: `"${project.designSystem.typography.headingFont}", Inter, ui-sans-serif, system-ui, sans-serif`,
@@ -1672,7 +1671,7 @@ export function ExperienceCanvas({
                 ))}
               </div>
             ) : null}
-            <form onSubmit={submitStep} className="mt-7 flex min-w-0 flex-col gap-4">
+            <form onSubmit={submitStep} style={{ marginTop: project.designSystem.spacing.sectionGap, gap: project.designSystem.spacing.cardGap }} className="flex min-w-0 flex-col">
               {progressiveQualification && qualificationFields.length > 1 ? (
                 <p className="text-xs font-semibold text-[var(--muted-fg)]" aria-live="polite">
                   Pergunta {renderedFormFields.length} de até {qualificationFields.length}

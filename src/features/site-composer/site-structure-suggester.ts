@@ -1,3 +1,4 @@
+import { resolveVisualIntent } from "@/features/composition/visual-intent";
 import type { Project } from "@/types";
 import type { PresenceAction } from "@/features/presence/presence.types";
 import { inferBusinessShape } from "./business-shape";
@@ -28,11 +29,13 @@ function instructionFlags(instruction: string) {
 
 function bindInstructionToSections(project: Project, sections: SuggestedSection[], instruction: string) {
   const flags = instructionFlags(instruction);
+  const visualIntent = resolveVisualIntent({ visualDirection: instruction });
+  const visualVariant = visualIntent === "editorial" ? "editorial" : visualIntent === "essential" ? "minimal" : visualIntent === "expressive" ? "centered" : undefined;
   const normalized = instruction.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   return sections
     .filter((section) => !(flags.noFaq && section.sectionType === "faq"))
     .map((section) => {
-      if (section.sectionType === "hero") return { ...section, suggestedContent: { ...section.suggestedContent, variant: flags.minimal ? "minimal" : flags.delivery ? "offer_focus" : flags.b2b ? "editorial" : (section.suggestedContent.variant || "split") } };
+      if (section.sectionType === "hero") return { ...section, suggestedContent: { ...section.suggestedContent, variant: flags.minimal ? "minimal" : flags.delivery ? "offer_focus" : flags.b2b ? "editorial" : (visualVariant || section.suggestedContent.variant || "split") } };
       if (section.sectionType !== "products") return section;
       const categories = project.commercialConfig?.catalogCategories?.filter((category) => normalized.includes(category.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase())) || [];
       const items = project.commercialConfig?.catalogItems?.filter((item) => normalized.includes(item.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase())) || [];
