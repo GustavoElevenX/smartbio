@@ -21,7 +21,7 @@ import {
   Trash2,
   Undo2,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select, Textarea } from "@/components/ui/field";
 import { BlockEditor } from "@/components/editor/block-editor";
@@ -93,7 +93,7 @@ function newStep(type: StepType, order: number): JourneyStep {
     order,
     isActive: true,
     options:
-      type === "choice" || type === "action"
+      type === "choice" || type === "action" || type === "form"
         ? [
             {
               id: uid("option"),
@@ -135,10 +135,31 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
   );
   const [addOpen, setAddOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
-  const [previewAs, setPreviewAs] = useState("bio");
+  const [previewAs, setPreviewAs] = useState("selected");
+  const [previewRun, setPreviewRun] = useState(0);
   const [undoStack, setUndoStack] = useState<Project[]>([]);
   const [redoStack, setRedoStack] = useState<Project[]>([]);
   const projectRef = useRef<Project | null>(null);
+  const savedRef = useRef<Project | null>(null);
+  const saveQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const [saveError, setSaveError] = useState("");
+  const persist = useCallback((snapshot: Project) => {
+    setSaveState("saving");
+    setSaveError("");
+    const pending = saveQueue.current.catch(() => undefined).then(() => projectRepository.saveProject(snapshot));
+    saveQueue.current = pending;
+    return pending.then((saved) => {
+      savedRef.current = snapshot;
+      if (projectRef.current === snapshot) setSaveState("saved");
+      return saved;
+    }).catch((error: unknown) => {
+      if (projectRef.current === snapshot) {
+        setSaveState("error");
+        setSaveError(error instanceof Error ? error.message : "Não foi possível salvar o rascunho.");
+      }
+      throw error;
+    });
+  }, []);
   useEffect(() => {
     let active = true;
     void projectRepository
@@ -148,6 +169,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
         const value = found || null;
         setProject(value);
         projectRef.current = value;
+        savedRef.current = value;
         setSelectedId(value?.steps[0]?.id || "");
       })
       .catch(() => {
@@ -160,18 +182,17 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
   useEffect(() => {
     if (!project) return;
     projectRef.current = project;
+    if (savedRef.current === project) return;
     setSaveState("saving");
     const timer = setTimeout(() => {
-      void projectRepository
-        .saveProject(project)
-        .then(() => setSaveState("saved"))
-        .catch(() => setSaveState("error"));
+      void persist(project).catch(() => undefined);
     }, 650);
     return () => clearTimeout(timer);
-  }, [project]);
+  }, [project, persist]);
   useEffect(() => {
-    const saveBeforeLeaving = () => {
-      if (projectRef.current) localStore.saveProject(projectRef.current);
+    const saveBeforeLeaving = (event: BeforeUnloadEvent) => {
+      if (canUseLocalStore() && projectRef.current) localStore.saveProject(projectRef.current);
+      if (projectRef.current !== savedRef.current) { event.preventDefault(); event.returnValue = ""; }
     };
     window.addEventListener("beforeunload", saveBeforeLeaving);
     return () => window.removeEventListener("beforeunload", saveBeforeLeaving);
@@ -260,6 +281,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
       ...field,
       id: uid("field"),
     }));
+    cloned.blocks = cloned.blocks?.map((block) => ({ ...block, id: uid("block") }));
     const index = activeProject.steps.findIndex(
       (step) => step.id === selected.id,
     );
@@ -272,12 +294,19 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
     setSelectedId(cloned.id);
   }
   function remove() {
+    const usedBy = activeProject.conversionGoals?.find((goal) => goal.targetStepId === selected.id);
+    if (usedBy) {
+      setSaveError(`A etapa inicia o objetivo “${usedBy.name}”. Altere o destino desse objetivo antes de excluí-la.`);
+      return;
+    }
     if (
       activeProject.steps.length === 1 ||
       !confirm(`Excluir a etapa “${selected.title}”?`)
     )
       return;
-    const steps = activeProject.steps.filter((step) => step.id !== selected.id);
+    const steps = activeProject.steps.filter((step) => step.id !== selected.id).map((step) => ({
+      ...step, options: step.options?.map((option) => option.targetStepId === selected.id ? { ...option, targetStepId: undefined } : option),
+    }));
     commit((current) => ({
       ...current,
       steps: steps.map((step, order) => ({ ...step, order })),
@@ -315,7 +344,9 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
   async function publish() {
     setSaveState("saving");
     try {
-      const saved = await projectRepository.saveProject(activeProject);
+      const saved = await persist(activeProject);
+      savedRef.current = saved;
+      projectRef.current = saved;
       setProject(saved);
       setSaveState("saved");
       setPublishOpen(true);
@@ -349,13 +380,14 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
                 <LoaderCircle size={11} className="animate-spin" /> Salvando…
               </>
             ) : saveState === "error" ? (
-              "Erro ao salvar · tentar novamente"
+              <button type="button" onClick={() => void persist(activeProject).catch(() => undefined)}>Erro ao salvar · tentar novamente</button>
             ) : (
               <>
                 <Check size={11} /> Salvo
               </>
             )}
           </div>
+          {saveError ? <p role="alert" className="mt-1 text-xs text-red-700">{saveError}</p> : null}
         </div>
         <div className="flex items-center gap-1">
           <button
@@ -375,7 +407,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
             <Redo2 size={17} />
           </button>
         </div>
-        <div className="hidden items-center rounded-xl bg-[#f0eff4] p-1 sm:flex">
+        <div className="flex items-center rounded-xl bg-[#f0eff4] p-1">
           <button
             onClick={() => setMode("quick")}
             className={`rounded-lg px-3 py-2 text-xs font-bold ${mode === "quick" ? "bg-white shadow-sm" : "text-[#777781]"}`}
@@ -393,7 +425,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
           href={experiencePreviewUrl(project.slug, previewAs)}
           target="_blank"
           rel="noopener noreferrer"
-          className="focus-ring hidden min-h-10 items-center gap-2 rounded-xl border border-[#dfdee6] px-3 text-xs font-bold sm:inline-flex"
+          className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#dfdee6] px-3 text-xs font-bold"
         >
           <Eye size={16} /> Preview
         </a>
@@ -403,7 +435,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
         </Button>
       </div>
       <div className="grid min-h-0 min-w-0 flex-1 xl:grid-cols-[280px_minmax(390px,1fr)_360px]">
-        <aside className="order-2 min-w-0 border-r border-[#e5e4eb] bg-[#f7fbff] xl:order-1">
+        <aside aria-label="Etapas da jornada" className="order-2 min-w-0 border-r border-[#e5e4eb] bg-[#f7fbff] xl:order-1">
           <div className="flex items-center justify-between border-b border-[#e7e6ed] p-4">
             <div>
               <strong className="text-sm">Etapas</strong>
@@ -420,7 +452,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
                 <Plus size={17} />
               </button>
               {addOpen && (
-                <div className="absolute right-0 top-11 z-30 w-52 rounded-[16px] border border-[#dedde5] bg-white p-2 shadow-xl">
+                <div className="absolute right-0 top-11 z-30 max-h-[60vh] w-52 overflow-y-auto rounded-[16px] border border-[#dedde5] bg-white p-2 shadow-xl">
                   {(Object.keys(stepNames) as StepType[]).map((type) => (
                     <button
                       key={type}
@@ -438,7 +470,8 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
             {project.steps.map((step, index) => (
               <button
                 key={step.id}
-                onClick={() => setSelectedId(step.id)}
+                onClick={() => { setSelectedId(step.id); setPreviewAs("selected"); }}
+                aria-pressed={step.id === selected.id}
                 className={`focus-ring flex w-full items-center gap-3 rounded-[15px] border p-3 text-left transition ${step.id === selected.id ? "border-[#0054fc] bg-[#eaf3ff]" : "border-transparent bg-white hover:border-[#dedde5]"}`}
               >
                 <span
@@ -491,28 +524,31 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
             </button>
           </div>
         </aside>
-        <section className="order-1 flex min-h-[720px] min-w-0 items-center justify-center overflow-hidden bg-[#efedf4] p-5 xl:order-2 xl:min-h-0">
+        <section aria-label="Prévia da jornada" className="order-1 flex min-w-0 items-start justify-center bg-[#efedf4] p-5 xl:order-2">
           <div className="relative w-full max-w-[390px]">
-            <div className="mb-3 flex items-center justify-between gap-3 text-xs font-semibold text-[#777781]">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-xs font-semibold text-[#777781]">
               <span className="inline-flex items-center gap-2">
                 <Smartphone size={15} /> Preview mobile
               </span>
-              <label className="flex items-center gap-2">Preview como<select aria-label="Preview como" value={previewAs} onChange={(event) => setPreviewAs(event.target.value)} className="min-h-9 rounded-lg border border-[#d9d6df] bg-white px-2 text-[11px]"><option value="bio">Bio</option>{project.entryPoints?.map((entry) => <option key={entry.id} value={`entry:${entry.key}`}>{entry.name}</option>)}{project.conversionGoals?.map((goal) => <option key={goal.id} value={`goal:${goal.id}`}>{goal.name}</option>)}</select></label>
+              <label className="flex min-w-0 flex-1 items-center gap-2">Preview como<select aria-label="Preview como" value={previewAs} onChange={(event) => setPreviewAs(event.target.value)} className="min-h-9 min-w-0 flex-1 rounded-lg border border-[#d9d6df] bg-white px-2 text-[11px]"><option value="selected">Etapa selecionada</option><option value="bio">Bio · jornada completa</option>{project.entryPoints?.map((entry) => <option key={entry.id} value={`entry:${entry.key}`}>{entry.name}</option>)}{project.conversionGoals?.map((goal) => <option key={goal.id} value={`goal:${goal.id}`}>{goal.name}</option>)}</select></label>
             </div>
-            <div className="h-[680px] overflow-hidden rounded-[38px] border-[7px] border-[#222126] bg-white p-1.5 shadow-[0_30px_80px_rgba(29,25,55,.2)]">
-              <div className="h-full overflow-hidden rounded-[28px]">
+            <button type="button" className="mb-3 text-xs font-semibold text-[#0054fc]" onClick={() => setPreviewRun((value) => value + 1)}>Reiniciar prévia</button>
+            <div className="h-[clamp(360px,calc(100dvh-380px),680px)] overflow-hidden rounded-[38px] border-[7px] border-[#222126] bg-white p-1.5 shadow-[0_30px_80px_rgba(29,25,55,.2)]">
+              <div key={`${previewAs}-${selected.id}-${previewRun}`} tabIndex={0} aria-label="Conteúdo da prévia, role para ver mais" className="h-full overflow-y-auto overscroll-contain rounded-[28px] scrollbar-thin">
                 <ExperienceCanvas
-                  key={`${project.id}-${project.version}-${previewAs}`}
+                  key={`${project.id}-${previewAs}-${previewAs === "selected" ? selected.id : ""}-${previewRun}`}
                   project={project}
                   preview
+                  previewStepId={previewAs === "selected" ? selected.id : undefined}
                   previewEntryKey={previewAs.startsWith("entry:") ? previewAs.slice(6) : undefined}
                   previewGoalId={previewAs.startsWith("goal:") ? previewAs.slice(5) : undefined}
                 />
               </div>
             </div>
+            <p className="mt-3 text-center text-xs text-[#686471]">Role dentro do celular para ver todo o conteúdo.</p>
           </div>
         </section>
-        <aside className="order-3 min-w-0 border-l border-[#e5e4eb] bg-white">
+        <aside aria-label="Editar etapa" className="order-3 min-w-0 border-l border-[#e5e4eb] bg-white">
           <div className="flex items-center justify-between border-b border-[#e7e6ed] px-5 py-4">
             <div>
               <strong className="block text-sm">
@@ -534,17 +570,15 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
               Ativa
             </label>
           </div>
-          <div className="max-h-[700px] overflow-y-auto p-5 scrollbar-thin xl:max-h-[calc(100vh-140px)]">
-            <CapabilityPanel
-              project={activeProject}
-              onChange={(next) => commit(() => next)}
-            />
-            <AIScopeActions
+          <div key={selected.id} className="max-h-[700px] overflow-y-auto p-5 scrollbar-thin xl:max-h-[calc(100vh-220px)]">
+            <div className="mb-5"><Label htmlFor="step-type">Tipo de etapa</Label><Select id="step-type" value={selected.type} onChange={(event) => { const type = event.target.value as StepType; const defaults = newStep(type, selected.order); updateStep({ type, ...(type === "form" ? { formFields: selected.formFields || defaults.formFields } : {}), ...(type === "recommendation" ? { recommendation: selected.recommendation || defaults.recommendation } : {}), options: selected.options || defaults.options || [] }); }}>{(Object.keys(stepNames) as StepType[]).map((type) => <option key={type} value={type}>{stepNames[type]}</option>)}</Select></div>
+            <details className="mb-5"><summary className="cursor-pointer py-2 text-sm font-bold">Configuração comercial do negócio</summary><CapabilityPanel project={activeProject} onChange={(next) => commit(() => next)} /></details>
+            <details className="mb-5"><summary className="cursor-pointer py-2 text-sm font-bold">Editar com IA</summary><AIScopeActions
               project={activeProject}
               step={selected}
               onApplyStep={(next) => updateStep(next)}
               onApplyVisual={(designSystem, visualDirection) => commit((current) => ({ ...current, designSystem, visualDirection, version: current.version + 1 }))}
-            />
+            /></details>
             <div>
               <Label htmlFor="step-title">Título</Label>
               <Textarea
@@ -566,7 +600,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
               />
               <AIFieldActions projectId={project.id} stepId={selected.id} fieldPath={`steps.${selected.id}.description`} currentValue={selected.description || ""} onApply={(description) => updateStep({ description })} />
             </div>
-            {selected.options && (
+            {(
               <div className="mt-6">
                 <div className="flex items-center justify-between">
                   <Label>Opções</Label>
@@ -590,7 +624,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
                   </button>
                 </div>
                 <div className="space-y-3">
-                  {selected.options.map((option, optionIndex) => (
+                  {(selected.options || []).map((option, optionIndex) => (
                     <div
                       key={option.id}
                       className="rounded-[15px] border border-[#e3e2e9] bg-[#f7fbff] p-3"

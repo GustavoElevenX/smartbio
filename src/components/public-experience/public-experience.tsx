@@ -130,6 +130,7 @@ function runtimeFromStorage(
   previewGoalId?: string,
   previewEntryKey?: string,
   launchContext?: PresenceLaunchContext,
+  previewStepId?: string,
 ) {
   const fallback = emptyRuntime(project);
   if (typeof window === "undefined") return fallback;
@@ -178,7 +179,9 @@ function runtimeFromStorage(
     attribution,
     answers: seededAnswers,
   };
-  if (preview) return direct;
+  if (preview) return previewStepId && project.steps.some((step) => step.id === previewStepId)
+    ? { ...direct, currentStepId: previewStepId }
+    : direct;
   try {
     const raw = sessionStorage.getItem(`smartbio:journey:v3:${project.slug}`);
     if (!raw) return direct;
@@ -368,6 +371,7 @@ export function ExperienceCanvas({
   preview = false,
   previewGoalId,
   previewEntryKey,
+  previewStepId,
   launchContext,
   onComplete,
 }: {
@@ -375,6 +379,7 @@ export function ExperienceCanvas({
   preview?: boolean;
   previewGoalId?: string;
   previewEntryKey?: string;
+  previewStepId?: string;
   launchContext?: PresenceLaunchContext;
   onComplete?: () => void;
   onClose?: () => void;
@@ -384,7 +389,7 @@ export function ExperienceCanvas({
       .filter((goal) => goal.isActive)
       .sort((a, b) => a.order - b.order);
     const steps = project.steps
-      .filter((step) => step.isActive)
+      .filter((step) => step.isActive || (preview && step.id === previewStepId))
       .toSorted((a, b) => a.order - b.order);
     if (goals.length <= 1) return steps;
     return [
@@ -410,7 +415,7 @@ export function ExperienceCanvas({
       },
       ...steps,
     ];
-  }, [project]);
+  }, [project, preview, previewStepId]);
   const [runtime, setRuntime] = useState<JourneyRuntimeState>(() =>
     runtimeFromStorage(
       project,
@@ -418,6 +423,7 @@ export function ExperienceCanvas({
       previewGoalId,
       previewEntryKey,
       launchContext,
+      previewStepId,
     ),
   );
   const [history, setHistory] = useState<string[]>(() =>

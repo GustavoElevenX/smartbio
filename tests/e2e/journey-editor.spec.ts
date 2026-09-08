@@ -1,0 +1,32 @@
+import { expect, test } from "@playwright/test";
+import { findDemoProject } from "../../src/data/demo-projects";
+
+test("editor acompanha a etapa, rola a prévia e preserva edição ao recarregar", async ({ page, request }) => {
+  const project = findDemoProject("demo-casa-sucos")!;
+  await request.put(`/api/projects/${project.id}`, { data: project });
+  await page.goto(`/app/projects/${project.id}/editor`);
+  const steps = page.getByRole("complementary", { name: "Etapas da jornada" });
+  const panel = page.getByRole("complementary", { name: "Editar etapa" });
+  const preview = page.getByRole("region", { name: "Prévia da jornada", exact: true });
+  const b2b = project.steps.find((step) => step.id === "mix-b2b-form")!;
+  await steps.getByRole("button", { name: new RegExp(b2b.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).click();
+  await expect(preview.getByRole("heading", { name: b2b.title })).toBeVisible();
+  await expect(panel.getByText("Campos do formulário", { exact: true })).toBeVisible();
+  await panel.getByLabel("Título", { exact: true }).fill("Pedido para minha empresa");
+  await expect(preview.getByRole("heading", { name: "Pedido para minha empresa" })).toBeVisible();
+  await expect(page.getByText("Salvo", { exact: true })).toBeVisible();
+  await page.reload();
+  await steps.getByRole("button", { name: /Pedido para minha empresa/ }).click();
+  await expect(panel.getByLabel("Título", { exact: true })).toHaveValue("Pedido para minha empresa");
+  await page.getByLabel("Preview como").selectOption("bio");
+  const scroller = page.getByLabel("Conteúdo da prévia, role para ver mais", { exact: true });
+  await scroller.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+  await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await expect(preview.getByRole("link", { name: "Feito com Sobe" })).toBeVisible();
+  await page.getByRole("button", { name: "Avançado", exact: true }).click();
+  await page.getByRole("button", { name: "Rápido", exact: true }).click();
+  await panel.getByText("Configuração comercial do negócio", { exact: true }).click();
+  await panel.getByRole("button", { name: "Configurar Qualificação comercial" }).click();
+  await expect(panel.getByText(/A pontuação usa/)).toBeVisible();
+  await request.put(`/api/projects/${project.id}`, { data: project });
+});
