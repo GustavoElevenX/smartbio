@@ -538,7 +538,7 @@ export function projectFromNormalizedRow(
     status: item.status,
     severity: item.severity,
     value: item.value,
-    origin: item.origin,
+    origin: item.origin || undefined,
     sourceId: item.source_id ? String(item.source_id) : undefined,
     fieldMetadata: (item.field_metadata as Record<string, unknown>) || {},
     reason: String(item.reason),
