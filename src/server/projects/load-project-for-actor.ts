@@ -5,10 +5,14 @@ import type { AuthenticatedActor } from "@/server/auth/setup-actor";
 import type { Project } from "@/types";
 import { loadProjectAggregate } from "@/server/projects/load-project-aggregate";
 import { createServiceClient } from "@/lib/supabase/server";
+import { findLocalProject } from "./local-project-store";
 
 export async function loadProjectForActor(actor: AuthenticatedActor, projectId: string): Promise<Project | null> {
   await assertProjectAccess(actor, projectId, "read");
-  if (actor.persistence === "memory") return null;
+  if (actor.persistence === "memory") {
+    const local = findLocalProject(projectId);
+    return local?.workspaceId === actor.workspaceId ? local : null;
+  }
   const project = await loadProjectAggregate(actor, projectId);
   if (!project) return null;
   const logoIds = [project.brand.primaryLogoAssetId, project.brand.lightLogoAssetId, project.brand.darkLogoAssetId, project.brand.faviconAssetId].filter((value): value is string => Boolean(value));

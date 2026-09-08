@@ -38,6 +38,7 @@ import { calculateReservationTotal } from "@/features/reservations/reservation-e
 import { resolveRoute } from "@/features/routing/routing-engine";
 import { destinationMatchesCompletion, semanticJourneyRouteKey } from "@/features/routing/completion-destination";
 import { buildJourneyHandoff } from "@/features/handoff/journey-handoff";
+import { contactIdentityFromFields, isFormFieldVisible } from "@/features/forms/form-field-utils";
 import {
   buildWhatsAppMessage,
   buildWhatsAppUrl,
@@ -260,6 +261,7 @@ function FieldControl({
   const style =
     "min-h-12 w-full rounded-[var(--input-radius)] border border-[var(--border)] bg-[var(--surface)] px-3.5 text-sm text-[var(--foreground)] outline-none transition focus:ring-4 focus:ring-[var(--primary)]/10";
   const stringValue = value === undefined ? "" : String(value);
+  const optionLabel = (item: string) => field.key === "fulfillment" ? ({ delivery: "Entrega", pickup: "Retirada", digital: "Entrega digital", external: "Combinar com a equipe" }[item] || item) : item;
   if (field.type === "select")
     return (
       <select
@@ -272,7 +274,7 @@ function FieldControl({
       >
         <option value="">Selecione</option>
         {field.options?.map((item) => (
-          <option key={item}>{item}</option>
+          <option key={item} value={item}>{optionLabel(item)}</option>
         ))}
       </select>
     );
@@ -299,7 +301,7 @@ function FieldControl({
               required={field.required}
               className="accent-[var(--primary)]"
             />
-            {item}
+            {optionLabel(item)}
           </label>
         ))}
       </div>
@@ -439,15 +441,18 @@ export function ExperienceCanvas({
   );
   const palette = project.designSystem.colors;
   const journeyMode = journeyModeForProject(project);
-  const hasRecommendationJourney = activeSteps.some((candidate) => candidate.type === "recommendation");
+  const currentBlueprintId = step?.settings?.blueprintId;
+  const visitorIdentity = contactIdentityFromFields(project.steps.flatMap((item) => item.formFields || []), runtime.answers);
+  const hasRecommendationJourney = activeSteps.some((candidate) => candidate.type === "recommendation" && (!currentBlueprintId || candidate.settings?.blueprintId === currentBlueprintId));
+  const recommendationOfferings = useMemo(() => (project.commercialConfig?.serviceOfferings || []).filter((offering) => !currentBlueprintId || offering.settings?.blueprintId === currentBlueprintId), [currentBlueprintId, project.commercialConfig?.serviceOfferings]);
   const serviceRecommendation = useMemo(
-    () => recommendService(runtime.answers, project.commercialConfig?.serviceOfferings || [], { journeyMode }),
-    [journeyMode, project.commercialConfig?.serviceOfferings, runtime.answers],
+    () => recommendService(runtime.answers, recommendationOfferings, { journeyMode }),
+    [journeyMode, recommendationOfferings, runtime.answers],
   );
   const progressiveQualification = step?.type === "form"
     && step.settings?.progressiveQuestioning === true
     && hasRecommendationJourney;
-  const qualificationFields = step?.formFields || [];
+  const qualificationFields = (step?.formFields || []).filter((field) => isFormFieldVisible(field, runtime.answers));
   const renderedFormFields = progressiveQualification
     ? qualificationFields.filter((field, index) => index === 0 || revealedQualificationFieldIds.includes(field.id))
     : qualificationFields;
@@ -570,9 +575,14 @@ export function ExperienceCanvas({
   }, [onComplete, submitted]);
 
   function updateAnswer(key: string, value: string | number | boolean) {
+    const field = step?.formFields?.find((item) => item.key === key);
+    const offers = [...(project.commercialConfig?.serviceOfferings || []), ...(project.commercialConfig?.catalogItems || [])];
+    const selectedOffer = field?.options?.includes(String(value)) ? offers.find((item) => item.name === value) : undefined;
     setRuntime((current) => ({
       ...current,
       answers: { ...current.answers, [key]: value },
+      ...(selectedOffer ? { selectedOfferIds: [selectedOffer.id], selectedLocationId: undefined, routeResult: undefined } : {}),
+      ...(key === "fulfillment" && ["delivery", "pickup", "digital", "external"].includes(String(value)) ? { cart: { ...current.cart, fulfillment: value as OrderRequest["fulfillment"] }, selectedLocationId: undefined, routeResult: undefined } : {}),
       quoteDraft: current.quoteDraft
         ? {
             ...current.quoteDraft,
@@ -609,13 +619,13 @@ export function ExperienceCanvas({
     commercialObjectId?: string,
   ) {
     const answers = stringAnswers(runtime.answers);
-    const lead = localStore.addLead({
+    const leadInput = {
       projectId: project.id,
       projectName: project.name,
       sessionId: runtime.sessionId,
-      name: String(runtime.answers.name || input.name || ""),
-      email: String(runtime.answers.email || input.email || ""),
-      phone: String(runtime.answers.phone || input.phone || ""),
+      name: visitorIdentity.name || input.name || "",
+      email: visitorIdentity.email || input.email || "",
+      phone: visitorIdentity.phone || input.phone || "",
       company: String(runtime.answers.company || input.company || ""),
       status: input.status || "new",
       source:
@@ -633,8 +643,11 @@ export function ExperienceCanvas({
       estimatedValue: input.estimatedValue,
       scheduledAt: input.scheduledAt,
       locationName: input.locationName,
-    });
-    void fetch("/api/leads", {
+    } satisfies Parameters<typeof localStore.addLead>[0];
+    const lead = preview
+      ? { ...leadInput, id: uid("preview-lead"), createdAt: new Date().toISOString() }
+      : localStore.addLead(leadInput);
+    if (!preview) void fetch("/api/leads", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -672,6 +685,7 @@ export function ExperienceCanvas({
       destinationId?: string;
     } = {},
   ) {
+    if (preview) return;
     const opportunity = createOpportunity({
       workspaceId: project.workspaceId,
       projectId: project.id,
@@ -684,7 +698,7 @@ export function ExperienceCanvas({
       entryPointId: runtime.entryPointId,
       destinationId: input.destinationId,
       attribution: runtime.attribution,
-      visitorData: runtime.answers,
+      visitorData: { ...runtime.answers, ...visitorIdentity },
       summary: input.summary,
       estimatedValue: input.estimatedValue,
       currency: input.currency,
@@ -723,9 +737,9 @@ export function ExperienceCanvas({
           attachments: runtime.quoteDraft?.attachments || [],
           createdAt: new Date().toISOString(),
         };
-        localStore.saveQuoteRequest(request);
+        if (!preview) localStore.saveQuoteRequest(request);
         let remoteId: string | undefined;
-        if (shouldSubmitCommercialOperationRemotely()) {
+        if (!preview && shouldSubmitCommercialOperationRemotely()) {
           const response = await fetch("/api/public/quotes", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -813,9 +827,9 @@ export function ExperienceCanvas({
           visitorData: runtime.answers,
           createdAt: new Date().toISOString(),
         };
-        localStore.saveBooking(booking);
+        if (!preview) localStore.saveBooking(booking);
         let effectiveStatus = booking.status;
-        if (shouldSubmitCommercialOperationRemotely()) {
+        if (!preview && shouldSubmitCommercialOperationRemotely()) {
           const response = await fetch("/api/public/bookings", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -860,21 +874,22 @@ export function ExperienceCanvas({
       } else if (capability === "catalog_order") {
         if (!runtime.cart.items.length)
           throw new Error("Adicione ao menos um item ao pedido.");
+        if (!runtime.cart.fulfillment) throw new Error("Escolha como deseja receber o pedido antes de enviar.");
         const order: OrderRequest = {
           id: uid("order"),
           projectId: project.id,
           sessionId: runtime.sessionId,
           idempotencyKey,
           status: "submitted",
-          fulfillment: runtime.cart.fulfillment || "pickup",
+          fulfillment: runtime.cart.fulfillment,
           locationId: runtime.selectedLocationId,
           items: runtime.cart.items,
           totals: runtime.cart.totals,
           visitorData: runtime.answers,
           createdAt: new Date().toISOString(),
         };
-        localStore.saveOrder(order);
-        if (shouldSubmitCommercialOperationRemotely()) {
+        if (!preview) localStore.saveOrder(order);
+        if (!preview && shouldSubmitCommercialOperationRemotely()) {
           const response = await fetch("/api/public/orders", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -949,8 +964,8 @@ export function ExperienceCanvas({
           visitorData: runtime.answers,
           createdAt: new Date().toISOString(),
         };
-        localStore.saveReservation(reservation);
-        if (shouldSubmitCommercialOperationRemotely()) {
+        if (!preview) localStore.saveReservation(reservation);
+        if (!preview && shouldSubmitCommercialOperationRemotely()) {
           const response = await fetch("/api/public/reservations", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -1000,6 +1015,7 @@ export function ExperienceCanvas({
         const blueprintId = typeof option?.actionPayload?.blueprintId === "string" ? option.actionPayload.blueprintId : undefined;
         const routeContext = {
           ...runtime.answers,
+          fulfillment: runtime.cart.fulfillment || runtime.answers.fulfillment, selected_offering_ids: [...runtime.selectedOfferIds, ...runtime.cart.items.map((item) => item.itemId)],
           ...(selectedLocationId ? { location_id: selectedLocationId } : {}),
           ...(completionType ? { completion_type: completionType } : {}),
           ...(blueprintId && selectedLocationId ? { journey_route: semanticJourneyRouteKey(blueprintId, selectedLocationId) } : {}),
@@ -1123,7 +1139,7 @@ export function ExperienceCanvas({
     if (step.type === "form" && targetStep?.type === "recommendation") {
       const recommendation = recommendService(
         runtime.answers,
-        project.commercialConfig?.serviceOfferings || [],
+        recommendationOfferings,
         { journeyMode },
       );
       setRuntime((current) => ({
@@ -1151,6 +1167,10 @@ export function ExperienceCanvas({
       return;
     }
     if (option.actionType === "continue_with_answers") {
+      if (option.actionPayload?.requiresCart && !runtime.cart.items.length) {
+        setError("Escolha ao menos um item para continuar.");
+        return;
+      }
       const answeredFieldIds = (step.formFields || []).filter((field) => runtime.answers[field.key] !== undefined && runtime.answers[field.key] !== "").map((field) => field.id);
       for (const fieldId of answeredFieldIds) emit("journey_answered", { fieldId, blueprintId: option.actionPayload?.blueprintId, intentId: option.actionPayload?.intentId });
       emit("journey_context_completed", { blueprintId: option.actionPayload?.blueprintId, intentId: option.actionPayload?.intentId, conversionGoalId: runtime.conversionGoalId });
@@ -1177,6 +1197,7 @@ export function ExperienceCanvas({
         const routeContext = {
           ...runtime.answers,
           ...(runtime.selectedLocationId ? { location_id: runtime.selectedLocationId } : {}),
+          fulfillment: runtime.cart.fulfillment || runtime.answers.fulfillment, selected_offering_ids: [...runtime.selectedOfferIds, ...runtime.cart.items.map((item) => item.itemId)],
           completion_type: completionType,
           ...(blueprintId && runtime.selectedLocationId ? { journey_route: semanticJourneyRouteKey(blueprintId, runtime.selectedLocationId) } : {}),
         };
@@ -1205,7 +1226,7 @@ export function ExperienceCanvas({
       }
       emit("whatsapp_clicked", { destinationId: configuredDestination?.id || option.actionPayload?.destinationId, locationId: runtime.selectedLocationId, blueprintId: option.actionPayload?.blueprintId, intentId: option.actionPayload?.intentId });
       const cart = runtime.cart.items.length
-        ? `Pedido: ${runtime.cart.items.map((item) => `${item.quantity}x ${item.name}`).join(", ")}`
+        ? `${runtime.cart.items.map((item) => `${item.quantity}x ${item.name}`).join(", ")}`
         : undefined;
       const recommendationFields = project.steps.flatMap((candidate) => candidate.formFields || []);
       const recommendationHandoff = hasRecommendationJourney
@@ -1215,7 +1236,7 @@ export function ExperienceCanvas({
             serviceName: selectedRecommendation?.name,
             confidence: runtime.recommendationConfidence,
           })
-        : { answers: stringAnswers(runtime.answers), closing: undefined };
+        : { answers: {}, closing: undefined };
       const handoffFields = project.steps.flatMap((candidate) => candidate.formFields || []);
       const selectedLocation = project.commercialConfig?.locations?.find((location) => location.id === runtime.selectedLocationId);
       const allOfferings = [...(project.commercialConfig?.serviceOfferings || []), ...(project.commercialConfig?.catalogItems || [])];
@@ -1224,9 +1245,9 @@ export function ExperienceCanvas({
         answers: runtime.answers,
         fields: handoffFields,
         selectedLocation,
-        selectedOfferings: allOfferings.filter((offering) => runtime.selectedOfferIds.includes(offering.id)),
+        selectedOfferings: allOfferings.filter((offering) => runtime.selectedOfferIds.includes(offering.id) && !runtime.cart.items.some((item) => item.itemId === offering.id)),
       });
-      let message = String(option.actionPayload?.message || "") || buildWhatsAppMessage({
+      const message = String(option.actionPayload?.message || "") || buildWhatsAppMessage({
         businessName: project.name,
         interest: journeyHandoff.interest,
         location: journeyHandoff.location,
@@ -1238,11 +1259,14 @@ export function ExperienceCanvas({
           : undefined,
         answers: {
           ...(Object.keys(journeyHandoff.answers).length ? journeyHandoff.answers : recommendationHandoff.answers),
-          ...(cart ? { pedido: cart } : {}),
+          ...(cart ? { Pedido: cart } : {}),
         },
         closing: recommendationHandoff.closing,
       });
       emit("handoff_built", { destinationId: configuredDestination?.id || option.actionPayload?.destinationId, locationId: runtime.selectedLocationId, blueprintId: option.actionPayload?.blueprintId, intentId: option.actionPayload?.intentId });
+      // Keep the external action in the click gesture, even when analytics is slow.
+      if (!preview) window.open(buildWhatsAppUrl(phone, message), "_blank", "noopener,noreferrer");
+      try {
       if (
         !preview &&
         launchContext?.activationId &&
@@ -1252,6 +1276,7 @@ export function ExperienceCanvas({
           `/api/public/activations/${launchContext.activationId}/handoff`,
           {
             method: "POST",
+            keepalive: true,
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
               projectId: project.id,
@@ -1269,17 +1294,15 @@ export function ExperienceCanvas({
           },
         );
       } else if (!preview) {
-        const includedHandoffFields = project.steps
-          .flatMap((candidate) => candidate.formFields || [])
-          .filter((field) => field.includeInHandoff);
+        if (canUseLocalStore()) addOpportunity("routed_contact", `handoff:${runtime.sessionId}:${configuredDestination?.id || option.actionPayload?.destinationId || "direct"}`, `Contato · ${journeyHandoff.interest || project.name}`, { summary: message, destinationId: configuredDestination?.id });
         const response = await fetch("/api/public/handoff", {
           method: "POST",
+          keepalive: true,
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             projectId: project.id,
             sessionId: runtime.sessionId,
-            destinationId:
-              String(option.actionPayload?.destinationId || "") || undefined,
+            destinationId: configuredDestination?.id || String(option.actionPayload?.destinationId || "") || undefined,
             context: {
               projectId: project.id,
               conversionGoalId: runtime.conversionGoalId,
@@ -1289,25 +1312,17 @@ export function ExperienceCanvas({
                 campaign: runtime.attribution?.campaign,
                 pageId: launchContext?.pageId,
               },
-              identity: {
-                name: String(runtime.answers.name || "") || undefined,
-                phone: String(runtime.answers.phone || "") || undefined,
-                email: String(runtime.answers.email || "") || undefined,
-              },
+              identity: visitorIdentity,
               intent: {
                 label: step.title,
                 productIds: runtime.cart.items.map((item) => item.itemId),
                 serviceIds: runtime.selectedOfferIds,
                 locationId: runtime.selectedLocationId,
               },
-              qualification: includedHandoffFields.map((field) => ({
-                label: field.handoffLabel || field.label,
-                value: String(runtime.answers[field.key] ?? ""),
-                include: Boolean(
-                  runtime.answers[field.key] !== undefined &&
-                    runtime.answers[field.key] !== "",
-                ),
-              })),
+              qualification: [
+                ...journeyHandoff.entries.map((entry) => ({ label: entry.label, value: entry.value, include: true })),
+                ...(cart ? [{ label: "Pedido", value: runtime.cart.items.map((item) => `${item.quantity}x ${item.name}`).join(", "), include: true }] : []),
+              ],
               benefit: launchContext?.benefitClaimCode
                 ? { code: launchContext.benefitClaimCode }
                 : undefined,
@@ -1315,14 +1330,14 @@ export function ExperienceCanvas({
           }),
         });
         const payload = await response.json().catch(() => null) as { data?: { message?: string } } | null;
-        if (response.ok && payload?.data?.message) message = payload.data.message;
+        if (!response.ok) setError("Seu resumo está pronto, mas não conseguimos registrar o contato. Você pode continuar pelo WhatsApp.");
+        // The visitor-visible summary is the same message sent to WhatsApp.
+        // The server builds its own trusted copy for the opportunity record.
+        void payload;
       }
-      if (!preview)
-        window.open(
-          buildWhatsAppUrl(phone, message),
-          "_blank",
-          "noopener,noreferrer",
-        );
+      } catch {
+        setError("O WhatsApp foi aberto com seu resumo. Não conseguimos registrar o contato nesta página.");
+      }
       return;
     }
     if (option.actionType === "open_url") {
@@ -1392,7 +1407,7 @@ export function ExperienceCanvas({
     if (progressiveQualification && hasMoreQualificationQuestions && !canFinishQualificationEarly) {
       const nextQuestion = selectNextQualificationQuestion({
         answers: runtime.answers,
-        offerings: project.commercialConfig?.serviceOfferings || [],
+        offerings: recommendationOfferings,
         fields: qualificationFields,
         visibleFieldIds: renderedFormFields.map((field) => field.id),
       });
@@ -1452,15 +1467,20 @@ export function ExperienceCanvas({
   }
 
   if (!step) return null;
-  const previewWhatsAppOption = preview
-    ? step.options?.find((option) => option.actionType === "open_whatsapp")
-    : undefined;
-  const previewDestination = previewWhatsAppOption
+  const previewWhatsAppOption = step.options?.find((option) => option.actionType === "open_whatsapp");
+  const previewBlueprintId = String(previewWhatsAppOption?.actionPayload?.blueprintId || "");
+  const previewRoute = previewWhatsAppOption?.actionPayload?.routing === true ? resolveRoute(
+    { ...runtime.answers, fulfillment: runtime.cart.fulfillment || runtime.answers.fulfillment, selected_offering_ids: [...runtime.selectedOfferIds, ...runtime.cart.items.map((item) => item.itemId)], location_id: runtime.selectedLocationId, completion_type: "whatsapp", journey_route: semanticJourneyRouteKey(previewBlueprintId, runtime.selectedLocationId || "") },
+    project.commercialConfig?.routingRules || [], project.commercialConfig?.routingDestinations || [],
+    project.commercialConfig?.routingDestinations?.find((destination) => destination.isDefault && destination.role === "general_contact")?.id,
+    project.commercialConfig?.locations || [], "whatsapp",
+  ) : undefined;
+  const previewDestination = previewRoute?.destination || (previewWhatsAppOption
     ? project.commercialConfig?.routingDestinations?.find(
         (destination) => destination.id === previewWhatsAppOption.actionPayload?.destinationId && destination.type === "whatsapp",
       )
-    : undefined;
-  const previewPhone = String(previewDestination?.value || previewWhatsAppOption?.actionPayload?.phone || project.phone || "");
+    : undefined);
+  const previewPhone = String(previewDestination?.value || (!previewWhatsAppOption?.actionPayload?.routing ? previewWhatsAppOption?.actionPayload?.phone || project.phone : "") || "");
   const previewHandoff = hasRecommendationJourney
     ? buildRecommendationHandoff({
         answers: runtime.answers,
@@ -1468,12 +1488,19 @@ export function ExperienceCanvas({
         serviceName: selectedRecommendation?.name,
         confidence: runtime.recommendationConfidence,
       })
-    : { answers: stringAnswers(runtime.answers), closing: undefined };
+    : { answers: {}, closing: undefined };
+  const previewJourneyHandoff = buildJourneyHandoff({
+    intent: { label: String(previewWhatsAppOption?.actionPayload?.interestLabel || step.title) },
+    answers: runtime.answers, fields: project.steps.flatMap((candidate) => candidate.formFields || []),
+    selectedLocation: project.commercialConfig?.locations?.find((location) => location.id === runtime.selectedLocationId),
+    selectedOfferings: [...(project.commercialConfig?.serviceOfferings || []), ...(project.commercialConfig?.catalogItems || [])].filter((offering) => runtime.selectedOfferIds.includes(offering.id) && !runtime.cart.items.some((item) => item.itemId === offering.id)),
+  });
   const previewMessage = previewWhatsAppOption
     ? String(previewWhatsAppOption.actionPayload?.message || "") || buildWhatsAppMessage({
         businessName: project.name,
-        interest: step.title,
-        answers: previewHandoff.answers,
+        interest: previewJourneyHandoff.interest,
+        location: previewJourneyHandoff.location,
+        answers: { ...(Object.keys(previewJourneyHandoff.answers).length ? previewJourneyHandoff.answers : previewHandoff.answers), ...(runtime.cart.items.length ? { Pedido: `${runtime.cart.items.map((item) => `${item.quantity}x ${item.name}`).join(", ")}` } : {}) },
         closing: previewHandoff.closing,
       })
     : "";
@@ -1613,7 +1640,8 @@ export function ExperienceCanvas({
                 </ul>
               </div>
             ) : null}
-            {previewWhatsAppOption ? (
+            {previewRoute?.fallback && previewRoute.destination ? <p role="status" className="mt-5 text-sm leading-6 text-[var(--muted-fg)]">{previewRoute.reason}</p> : null}
+            {preview && previewWhatsAppOption ? (
               <aside className="mt-7 rounded-[var(--card-radius)] border border-dashed border-[var(--primary)] bg-[var(--muted)] p-4" aria-label="Verificação do destino">
                 <p className="text-xs font-extrabold uppercase tracking-wider text-[var(--primary)]">Verificação da prévia</p>
                 <p className="mt-2 text-sm font-bold">CTA: {previewWhatsAppOption.label}</p>
@@ -1645,7 +1673,7 @@ export function ExperienceCanvas({
                 </p>
               ) : null}
               {renderedFormFields.map((field) => (
-                <label key={field.id} className="block min-w-0">
+                <div key={field.id} className="block min-w-0" role={field.type === "radio" ? "group" : undefined} aria-label={field.type === "radio" ? field.label : undefined}>
                   <span className="mb-2 block text-xs font-bold">
                     {field.label}
                     {field.required ? " *" : ""}
@@ -1661,7 +1689,7 @@ export function ExperienceCanvas({
                       }
                     }}
                   />
-                </label>
+                </div>
               ))}
               {step.options?.map((option, index) => {
                 const submitsForm = Boolean(

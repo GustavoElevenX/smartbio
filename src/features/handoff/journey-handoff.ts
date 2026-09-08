@@ -1,10 +1,12 @@
 import type { CommercialArchitecture } from "@/features/ai-setup/ai-setup.schema";
 import type { BusinessLocation, FormField } from "@/types";
+import { isFormFieldVisible } from "@/features/forms/form-field-utils";
 
 function displayValue(value: unknown, field: FormField) {
   if (Array.isArray(value)) return value.filter(Boolean).join(", ");
   if (typeof value === "boolean") return value ? "Sim" : "Não";
   const text = String(value ?? "").trim();
+  if (field.key === "fulfillment") return ({ delivery: "Entrega", pickup: "Retirada", digital: "Entrega digital", external: "Combinar com a equipe" }[text] || text);
   if (field.type === "date" && /^\d{4}-\d{2}-\d{2}$/.test(text)) {
     const [year, month, day] = text.split("-");
     return `${day}/${month}/${year}`;
@@ -22,8 +24,10 @@ export function buildJourneyHandoff(input: {
 }) {
   const includeAll = input.blueprint?.completion.handoffSummary === true;
   const entries = input.fields.flatMap((field) => {
-    if (!includeAll && !field.includeInHandoff) return [];
+    if (!isFormFieldVisible(field, input.answers)) return [];
+    if (!includeAll && field.includeInHandoff === false) return [];
     const value = displayValue(input.answers[field.key], field);
+    if (input.selectedLocation && [input.selectedLocation.id, input.selectedLocation.name].includes(value)) return [];
     return value ? [{ key: field.key, label: field.handoffLabel || field.label, value }] : [];
   });
   if (input.selectedOfferings?.length && !entries.some((item) => /produto|oferta|servi/i.test(item.label))) {

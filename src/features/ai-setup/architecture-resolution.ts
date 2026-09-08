@@ -82,7 +82,7 @@ export function isRequiredFactResolved(architecture: CommercialArchitecture, fac
       return isRequiredFactResolved(architecture, { ...fact, resolutionTarget: locationTarget });
     }
     if (blueprint.completion.destinationStrategy === "by_answer") return false;
-    return blueprint.steps.some((step) => step.expectedCapability === "scheduling" || step.expectedCapability === "reservation");
+    return blueprint.steps.some((step) => step.expectedCapability === "scheduling" || step.expectedCapability === "reservation" || step.usesLocations.length > 0 || step.usesOfferings.length > 0);
   }
   return blueprint.steps.some((step) => step.collects.some((field) => field === target.fieldKey));
 }
@@ -245,7 +245,7 @@ export function validateCommercialArchitectureForMaterialization(architecture: C
       if (unresolved) issues.push({ code: "incomplete_location_mapping", blueprintId: blueprint.id, message: `${unresolved.reason} Corrija “${blueprint.objective}” antes de materializar.` });
     }
     if (blueprint.completion.destinationStrategy === "by_answer") issues.push({ code: "missing_answer_routing", blueprintId: blueprint.id, message: `A regra que decide o destino de “${blueprint.objective}” ainda não foi materializada.` });
-    const hasHandoffContext = blueprint.steps.some((step) => step.collects.length || ["catalog_order", "qualification", "quote", "routing"].includes(step.expectedCapability || ""));
+    const hasHandoffContext = blueprint.steps.some((step) => step.collects.length || step.fields?.length || step.usesOfferings.length || ["catalog_order", "qualification", "quote", "routing"].includes(step.expectedCapability || "")) || (blueprint.mode.startsWith("direct_") && Boolean(blueprint.objective));
     if (blueprint.completion.handoffSummary && !hasHandoffContext) issues.push({ code: "handoff_without_fields", blueprintId: blueprint.id, message: `“${blueprint.objective}” pede resumo, mas não coleta informações para o handoff.` });
     if (["scheduling", "reservation"].includes(blueprint.mode) && blueprint.completion.destinationStrategy === "native") {
       const backed = blueprint.mode === "scheduling"

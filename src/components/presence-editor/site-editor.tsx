@@ -419,6 +419,16 @@ export function SiteEditor({ projectId }: { projectId: string }) {
       type,
       pages,
     );
+    const goal = project.conversionGoals?.find((item) => item.isActive && item.isPrimary) || project.conversionGoals?.find((item) => item.isActive);
+    page.sections = page.sections.map((section) => ({
+      ...section,
+      title: section.type === "hero" ? project.name : goal?.name || "Fale com a equipe",
+      description: section.type === "hero" ? project.description : "Escolha o próximo passo para continuar seu atendimento.",
+      content: {
+        ...section.content,
+        ...(goal ? { primaryAction: { type: "start_conversion_goal", label: goal.name, conversionGoalId: goal.id, style: "primary" } } : {}),
+      },
+    }));
     commit([...pages, page]);
     setSelectedPageId(page.id);
     setSelectedSectionId(page.sections[0]?.id);

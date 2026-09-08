@@ -64,21 +64,28 @@ export function validateConversionPath(project: Project): ConversionPathValidati
     || project.conversionGoals?.find((goal) => goal.isActive);
   const journeyMode = journeyModeForProject(project);
   const recommendation = journeyMode === "assisted_discovery" || isRecommendationIntent(`${project.primaryGoal} ${primaryGoal?.name || ""} ${primaryGoal?.description || ""}`);
+  const goals = project.conversionGoals?.filter((goal) => goal.isActive) || [];
+  const brokenGoals = goals.filter((goal) => {
+    const entry = active.find((step) => step.id === goal.targetStepId);
+    return !entry || !reachesTerminal(project, entry);
+  });
+  const destinationsComplete = goals.length > 0 ? brokenGoals.length === 0 : active.some((step) => reachesTerminal(project, step));
   if (!recommendation) {
-    const complete = active.some((step) => reachesTerminal(project, step));
+    const complete = destinationsComplete;
     return {
       kind: "direct",
       complete,
-      checks: [{ key: "destination", valid: complete, label: "Próxima ação", reason: complete ? "Existe uma ação final funcional." : "A jornada não chega a um destino funcional." }],
+      checks: [{ key: "destination", valid: complete, label: "Próxima ação", reason: complete ? "Os caminhos ativos chegam a uma ação funcional." : brokenGoals.length ? `Revise o próximo passo de: ${brokenGoals.map((goal) => goal.name).join(", ")}.` : "A jornada não chega a um destino funcional." }],
     };
   }
 
-  const form = active.find((step) => step.type === "form" && Boolean(step.formFields?.length));
   const result = active.find((step) => step.type === "recommendation" && Boolean(step.recommendation));
-  const offerings = project.commercialConfig?.serviceOfferings?.filter((offering) => offering.isActive) || [];
-  const goalTarget = primaryGoal ? active.find((step) => step.id === primaryGoal.targetStepId) : undefined;
+  const form = active.find((step) => step.type === "form" && Boolean(step.formFields?.length) && (!result?.settings?.blueprintId || step.settings?.blueprintId === result.settings.blueprintId));
+  const offerings = project.commercialConfig?.serviceOfferings?.filter((offering) => offering.isActive && (!result?.settings?.blueprintId || offering.settings.blueprintId === result.settings.blueprintId)) || [];
+  const recommendationGoal = project.conversionGoals?.find((goal) => goal.isActive && (isRecommendationIntent(goal.name) || (result?.settings?.blueprintId && active.find((step) => step.id === goal.targetStepId)?.settings?.blueprintId === result.settings.blueprintId)));
+  const goalTarget = recommendationGoal ? active.find((step) => step.id === recommendationGoal.targetStepId) : undefined;
   const entryValid = Boolean(form && (!goalTarget || goalTarget.id === form.id || goalTarget.type === "choice" || goalTarget.type === "welcome"));
-  const destinationValid = Boolean(result && reachesTerminal(project, result));
+  const destinationValid = destinationsComplete && Boolean(result && reachesTerminal(project, result));
   const fields = form?.formFields || [];
   const invalidQuestions = fields.filter((field) => questionQualityIssues({
     question: field.label,
@@ -113,7 +120,7 @@ export function validateConversionPath(project: Project): ConversionPathValidati
     && offerings.every((offering) => offerIntelligenceIsSufficient(offering, project.id));
   const progressiveQuestioning = form?.settings?.progressiveQuestioning === true
     && result?.settings?.progressiveQuestioning === true;
-  const primaryActionValid = Boolean(primaryGoal && isRecommendationIntent(primaryGoal.name));
+  const primaryActionValid = Boolean(recommendationGoal);
   const planReady = Boolean(project.discoveryPlan && discoveryPlanIsReady(project.discoveryPlan)
     && project.discoveryPlan.projectId === project.id
     && offerings.every((offering) => offering.settings?.discoveryPlanId === project.discoveryPlan?.id));

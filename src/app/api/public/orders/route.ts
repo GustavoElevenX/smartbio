@@ -1,4 +1,5 @@
 import { calculateOrderTotals } from "@/features/catalog/order-engine";
+import { locationEligibilityIssue } from "@/features/routing/location-eligibility";
 import { features } from "@/lib/constants";
 import { createServiceClient } from "@/lib/supabase/server";
 import { orderRequestSchema } from "@/lib/validation/schemas";
@@ -25,7 +26,14 @@ export async function POST(request: Request) {
   const supabase = createServiceClient();
   const project = await getPublicProjectById(supabase, parsed.data.projectId);
   if (!project) return respond(apiError("Projeto não encontrado.", 404, "project_not_found"));
+  const locations = project.commercialConfig?.locations?.filter((location) => location.isActive) || [];
+  if (locations.length && ["delivery", "pickup"].includes(parsed.data.fulfillment)) {
+    const selected = locations.find((location) => location.id === parsed.data.locationId);
+    const issue = selected ? locationEligibilityIssue(selected, { fulfillment: parsed.data.fulfillment, selected_offering_ids: parsed.data.items.map((item) => item.itemId) }) : "Escolha uma unidade para este pedido.";
+    if (issue) return respond(apiError(issue, 422, "location_not_eligible"));
+  }
   const catalog = new Map((project.commercialConfig?.catalogItems || []).filter((item) => item.isAvailable).map((item) => [item.id, item]));
+  if (parsed.data.items.some((requested) => catalog.get(requested.itemId)?.price == null)) return respond(apiError("Um item precisa de confirmação de preço antes de enviar o pedido. Consulte a equipe.", 422, "price_unavailable"));
   const items = parsed.data.items.map((requested) => {
     const item = catalog.get(requested.itemId);
     if (!item) return null;

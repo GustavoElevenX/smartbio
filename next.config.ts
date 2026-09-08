@@ -12,6 +12,11 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["pdf-parse", "pdfjs-dist", "@napi-rs/canvas"],
+  outputFileTracingIncludes: {
+    "/api/ai/*": ["./node_modules/@napi-rs/canvas*/**/*", "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"],
+    "/api/projects/*/sources/*/reprocess": ["./node_modules/@napi-rs/canvas*/**/*", "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"],
+  },
   images: { qualities: [75, 90], remotePatterns: [{ protocol: "https", hostname: "**" }] },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

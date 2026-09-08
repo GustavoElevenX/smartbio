@@ -1,6 +1,7 @@
 "use client";
 
 import { localStore } from "@/lib/local-store";
+import { canUseLocalStore } from "@/lib/runtime-mode";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import type { AnalyticsEvent, CapabilityKey, Lead } from "@/types";
 
@@ -16,7 +17,7 @@ export interface CommercialOperation {
 }
 
 async function authenticatedClient() {
-  if (!isSupabaseConfigured()) return null;
+  if (!(isSupabaseConfigured() && !canUseLocalStore())) return null;
   const supabase = createClient();
   if (!supabase) return null;
   const { data } = await supabase.auth.getUser();
@@ -265,3 +266,4 @@ export const commercialRepository = {
     if (error) throw new Error(error.message);
   },
 };
+

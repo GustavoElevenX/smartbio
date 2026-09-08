@@ -5,6 +5,7 @@ import { getPresenceReadinessIssues } from "@/features/presence/presence-readine
 import { createPresencePage } from "@/features/presence/presence-page-service";
 import { findDemoProject } from "@/data/demo-projects";
 import type { FormField } from "@/types";
+import { buildJourneyHandoff } from "@/features/handoff/journey-handoff";
 
 describe("fechamento do Form Builder", () => {
   it("gera chaves semânticas, estáveis e sem colisão", () => {
@@ -20,9 +21,11 @@ describe("fechamento do Form Builder", () => {
   });
 
   it("mantém o handoff restrito aos campos explicitamente incluídos", () => {
-    const source = readFileSync("src/components/public-experience/public-experience.tsx", "utf8");
-    expect(source).toContain(".filter((field) => field.includeInHandoff)");
-    expect(source).toContain("field.handoffLabel || field.label");
+    const fields: FormField[] = [
+      { id: "a", key: "context", label: "Contexto", handoffLabel: "Necessidade", type: "text", required: true, includeInHandoff: true },
+      { id: "b", key: "private", label: "Não compartilhar", type: "text", required: false, includeInHandoff: false },
+    ];
+    expect(buildJourneyHandoff({ fields, answers: { context: "Preciso de ajuda", private: "Privado" } }).answers).toEqual({ Necessidade: "Preciso de ajuda" });
   });
 });
 

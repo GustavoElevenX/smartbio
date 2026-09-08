@@ -3,6 +3,8 @@ import "server-only";
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
+import { documentOutputInstruction, documentOutputSchema, parseDocumentOutput } from "./document-output";
+import { aiSiteStructureSchema } from "@/features/site-composer/site-composer.schema";
 import { aiJourneyDraftSchema } from "@/features/composition/composition.schema";
 import { aiPresenceDraftSchema } from "@/features/presence/ai-presence.schema";
 import { aiActivationDraftSchema } from "@/features/activations/ai-activation.schema";
@@ -11,10 +13,12 @@ import {
   activationUnderstandingSchema,
   commercialArchitectureSchema,
   businessAnalysisResultSchema,
+  aiBusinessAnalysisResultSchema,
   copyGenerationResultSchema,
   customVisitorActionClassificationSchema,
   extractedBusinessSourceSchema,
   setupQuestionSchema,
+  aiSetupQuestionSchema,
 } from "@/features/ai-setup/ai-setup.schema";
 import { readServerEnv } from "@/lib/env/server";
 import { AIConfigurationError, normalizeAIError } from "@/server/ai/ai-errors";
@@ -52,7 +56,7 @@ import { suggestedSiteStructureSchema } from "@/features/site-composer/site-comp
 import { optimizationAIExplanationSchema } from "@/features/optimization/schema";
 import { optimizationExplanationPrompt } from "@/server/ai/prompts/optimization-explanation";
 import { visitorActionClassificationPrompt } from "@/server/ai/prompts/visitor-action-classification";
-import { discoveryPlanDraftSchema } from "@/features/qualification/discovery-plan";
+import { aiDiscoveryPlanDraftSchema, discoveryPlanDraftSchema } from "@/features/qualification/discovery-plan";
 import { discoveryPlanPrompt } from "@/server/ai/prompts/discovery-plan";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
@@ -228,14 +232,19 @@ export class OpenAIVirouProvider implements VirouAIProvider {
     throw normalized;
   }
 
-  analyzeBusiness(input: BusinessAnalysisInput) {
-    return this.structured({
+  async analyzeBusiness(input: BusinessAnalysisInput) {
+    const draft = await this.structured({
       operation: "business_analysis",
       schemaName: "business_analysis",
-      schema: businessAnalysisResultSchema,
+      schema: aiBusinessAnalysisResultSchema,
       systemPrompt: businessAnalysisPrompt,
       payload: { business: input.input, sources: input.sources || [] },
       context: input,
+    });
+    return businessAnalysisResultSchema.parse({
+      ...draft,
+      profile: { ...draft.profile, analysisMetadata: draft.profile.analysisMetadata ?? undefined, businessRules: draft.profile.businessRules.map((rule) => ({ ...rule, value: rule.value ?? undefined })) },
+      requirements: draft.requirements.map((requirement) => Object.fromEntries(Object.entries(requirement).map(([key, value]) => [key, value ?? undefined]))),
     });
   }
 
@@ -265,7 +274,7 @@ export class OpenAIVirouProvider implements VirouAIProvider {
     const result = await this.structured({
       operation: "missing_questions",
       schemaName: "missing_questions",
-      schema: questionListSchema,
+      schema: z.object({ questions: z.array(aiSetupQuestionSchema).max(12) }),
       systemPrompt: missingQuestionsPrompt,
       payload: {
         profile: input.profile,
@@ -274,11 +283,24 @@ export class OpenAIVirouProvider implements VirouAIProvider {
       },
       context: input,
     });
-    return result.questions;
+    return questionListSchema.parse({ questions: result.questions.map((question) => ({
+      ...question, description: question.description ?? undefined, capability: question.capability ?? undefined, suggestedAnswer: question.suggestedAnswer ?? undefined,
+      options: question.options?.map((option) => ({ ...option, description: option.description ?? undefined })),
+      structuredAnswer: question.structuredAnswer?.map((item) => ({ ...item, options: item.options ?? undefined })),
+    })) }).questions;
+  }
+
+  private async structuredDocument<T>(request: StructuredAIRequest<T>): Promise<T> {
+    const output = await this.structured({
+      ...request,
+      schema: documentOutputSchema,
+      systemPrompt: `${request.systemPrompt}\n${documentOutputInstruction(request.schema)}`,
+    });
+    return parseDocumentOutput(request.schema, output);
   }
 
   composeJourney(input: JourneyAIInput) {
-    return this.structured({
+    return this.structuredDocument({
       operation: "journey_composition",
       schemaName: "journey_draft",
       schema: aiJourneyDraftSchema,
@@ -288,19 +310,31 @@ export class OpenAIVirouProvider implements VirouAIProvider {
     });
   }
 
-  composeDiscoveryPlan(input: DiscoveryPlanningInput) {
-    return this.structured({
+  async composeDiscoveryPlan(input: DiscoveryPlanningInput) {
+    const names = [...new Set(input.offeringNames)];
+    const schema = names.length ? aiDiscoveryPlanDraftSchema.extend({
+      offerIntelligenceProfiles: z.array(aiDiscoveryPlanDraftSchema.shape.offerIntelligenceProfiles.element.extend({
+        offerName: z.enum(names as [string, ...string[]]),
+      })).length(names.length),
+    }) : aiDiscoveryPlanDraftSchema;
+    const draft = await this.structured({
       operation: "discovery_planning",
       schemaName: "discovery_plan_draft",
-      schema: discoveryPlanDraftSchema,
+      schema,
       systemPrompt: discoveryPlanPrompt,
       payload: input,
       context: input,
     });
+    return discoveryPlanDraftSchema.parse({
+      ...draft,
+      offerIntelligenceProfiles: draft.offerIntelligenceProfiles.map((profile) => ({ ...profile, subjectLabel: profile.subjectLabel ?? undefined })),
+      questions: draft.questions.map((question) => ({ ...question, options: question.options ?? undefined })),
+      fallbackStrategy: { ...draft.fallbackStrategy, offerName: draft.fallbackStrategy.offerName ?? undefined },
+    });
   }
 
   composePresence(input: PresenceCompositionInput) {
-    return this.structured({
+    return this.structuredDocument({
       operation: "presence_composition",
       schemaName: "presence_draft",
       schema: aiPresenceDraftSchema,
@@ -310,15 +344,19 @@ export class OpenAIVirouProvider implements VirouAIProvider {
     });
   }
 
-  composeSiteStructure(input: SiteCompositionInput) {
-    return this.structured({
+  async composeSiteStructure(input: SiteCompositionInput) {
+    const draft = await this.structured({
       operation: "site_structure_composition",
       schemaName: "site_structure",
-      schema: suggestedSiteStructureSchema,
-      systemPrompt: siteCompositionPrompt,
+      schema: aiSiteStructureSchema,
+      systemPrompt: `${siteCompositionPrompt}\nEm cada seção, suggestedContentJson é uma string contendo o objeto JSON de conteúdo válido para o tipo da seção. Use o formato dos exemplos de plannerSuggestion; preserve IDs reais e não invente fatos. Use null para título, descrição ou meta ausentes.`,
       payload: input,
       context: input,
     });
+    return suggestedSiteStructureSchema.parse({ ...draft, pages: draft.pages.map((page) => ({
+      ...page, conversionGoalId: page.conversionGoalId ?? undefined,
+      sections: page.sections.map((section) => ({ ...section, title: section.title || undefined, description: section.description ?? undefined, conversionGoalId: section.conversionGoalId ?? undefined, suggestedContent: JSON.parse(section.suggestedContentJson) })),
+    })) });
   }
 
   explainOptimization(input: OptimizationExplanationInput) {
@@ -333,7 +371,7 @@ export class OpenAIVirouProvider implements VirouAIProvider {
   }
 
   composeActivation(input: ActivationCompositionInput) {
-    return this.structured({
+    return this.structuredDocument({
       operation: "activation.compose",
       schemaName: "activation_draft",
       schema: aiActivationDraftSchema,

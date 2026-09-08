@@ -31,8 +31,7 @@ export function calculateSetupReadiness(
   const reviewed = session?.commercialArchitecture ? Boolean(session.architectureReviewed) : Boolean(session?.actionsConfirmed);
   const baseCompleted = Number(businessReady) + Number(Boolean(session?.extractedProfile)) + Number(reviewed);
   const total = requirements.length + 3;
-  const primary = session?.visitorActions?.find((action) => action.isPrimary) || session?.visitorActions?.[0];
-  const recommendation = primary?.key === "recommendation" || primary?.semanticKey === "recommendation";
+  const recommendation = session?.visitorActions?.some((action) => action.key === "recommendation" || action.semanticKey === "recommendation");
   const contextualReady = session?.commercialArchitecture?.status !== "degraded" && session?.activationUnderstanding?.status !== "degraded";
   const discoveryReady = !recommendation || Boolean(
     session?.discoveryPlan

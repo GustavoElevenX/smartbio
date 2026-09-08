@@ -15,6 +15,7 @@ import { ContractActivationProvider } from "@/server/ai/activation-gate-fake-pro
 import { AISetupService } from "@/server/ai-setup/ai-setup-service";
 import type { AISetupRepository } from "@/server/ai-setup/ai-setup-repository";
 import { AISetupNotFoundError } from "@/server/ai-setup/ai-setup-errors";
+import { deriveRequiredFacts } from "@/features/ai-setup/architecture-resolution";
 import { setAIProviderForTests } from "@/server/ai/ai-client";
 import type { AISetupActor } from "@/server/auth/setup-actor";
 
@@ -43,6 +44,22 @@ function repositoryDouble() {
 }
 
 describe("CommercialArchitecture context-first", () => {
+  it("mostra unidades e horários sem exigir um destino de contato para uma consulta nativa", () => {
+    const evidence = [{ sourceId: "user", origin: "user" as const, excerpt: "Centro, retirada das 18h às 23h", confidence: 1 }];
+    const architecture = normalizeCommercialArchitecture({
+      status: "ready", confidence: 1,
+      businessSummary: { whatItSells: "Hambúrgueres", commercialModel: "Retirada", evidence },
+      offerings: [], channels: [], audienceContexts: [], issues: [],
+      locations: [{ id: "centro", label: "Centro", address: "Rua Flores, 120", hoursText: "18h às 23h", supportsPickup: true, channelIds: [], evidence, confidence: 1 }],
+      intents: [{ id: "unidades", semanticKey: "find_location", label: "Ver unidades e horários", visitorNeed: "Consultar onde retirar", priority: 50, visibleOnEntry: true, evidence, confidence: 1 }],
+      journeyBlueprints: [{ id: "consulta", intentId: "unidades", objective: "Consultar unidades", mode: "routing", steps: [], completion: { type: "native", channelId: null, destinationStrategy: "by_answer", handoffSummary: false }, requiredFacts: [], assumptions: [], confidence: 1 }],
+    });
+    expect(deriveRequiredFacts(architecture)).toEqual([]);
+    expect(architecture.journeyBlueprints[0].completion.destinationStrategy).toBe("native");
+    expect(architecture.journeyBlueprints[0].steps[0]).toMatchObject({ collects: [], usesLocations: ["centro"] });
+    expect(architecture.locations[0].hoursText).toBe("18h às 23h");
+    expect(architecture.locations[0].openingHours).toBeUndefined();
+  });
   it("preserva o entendimento contextual legado como adaptador, com recomendação antes do contato", async () => {
     const description = "Produtos reais:\n- Opção A\n- Opção B\n- Opção C\nQueremos orientar antes do WhatsApp.";
     const provider = new ContractActivationProvider();

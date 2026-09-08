@@ -5,9 +5,10 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getPublishedProjectBySlug } from "@/server/repositories/public-project-repository";
 import { canUseLocalStore, isProduction } from "@/lib/runtime-mode";
 import { ProductionConfigurationError } from "@/server/auth/auth-errors";
+import { findLocalProject } from "./local-project-store";
 
 export async function loadPublishedPublicProject(slug: string) {
-  if(canUseLocalStore())return findDemoProject(slug)||null;
+  if(canUseLocalStore())return findLocalProject(slug, true)||findDemoProject(slug)||null;
   const database = createServiceClient();
   if (!database) {
     if (isProduction()) throw new ProductionConfigurationError("O Supabase é obrigatório para projetos públicos em produção.");

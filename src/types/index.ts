@@ -757,6 +757,7 @@ export interface FormField {
   options?: string[];
   includeInHandoff?: boolean;
   handoffLabel?: string;
+  showWhen?: { field: string; values: string[] };
   purpose?: JourneyQuestionPurpose;
 }
 

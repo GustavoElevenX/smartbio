@@ -16,6 +16,8 @@ import {
 import type { ProjectReadinessResult } from "@/features/publishing/project-readiness";
 import type { Project } from "@/types";
 import { SurfaceViewMarker } from "@/components/product-lifecycle/surface-view-marker";
+import { canUseLocalStore } from "@/lib/runtime-mode";
+import { localStore } from "@/lib/local-store";
 
 interface PublishResponse {
   data?: {
@@ -73,6 +75,7 @@ export function PublishReadinessModal({
       const data = await request(true);
       setReadiness(data.readiness);
       if (!data.published) return;
+      if (canUseLocalStore()) localStore.saveProject(data.project);
       onPublished(data.project);
       onOpenChange(false);
     } catch (caught) {

@@ -1,5 +1,11 @@
 import type { FormField } from "@/types";
 
+export function isFormFieldVisible(field: FormField, answers: Record<string, unknown>) {
+  if (!field.showWhen) return true;
+  const answer = answers[field.showWhen.field];
+  return field.showWhen.values.some((value) => Array.isArray(answer) ? answer.includes(value) : String(answer ?? "") === value);
+}
+
 const semanticKeys: Array<[RegExp, string]> = [
   [/^(nome|nome completo)$/i, "name"],
   [/^(e-?mail|email)$/i, "email"],
@@ -22,6 +28,21 @@ export function formFieldKey(label: string, existing: string[] = []) {
   return `${base}_${suffix}`;
 }
 
+export function contactIdentityFromFields(fields: FormField[], answers: Record<string, unknown>) {
+  const identity: { name?: string; phone?: string; email?: string } = {};
+  for (const field of fields) {
+    if (!isFormFieldVisible(field, answers)) continue;
+    const key = field.type === "phone" ? "phone" : field.type === "email" ? "email" : formFieldKey(field.label);
+    if (key !== "name" && key !== "phone" && key !== "email") continue;
+    const value = answers[field.key];
+    if (typeof value === "string" && value.trim()) identity[key] = value.trim();
+  }
+  for (const key of ["name", "phone", "email"] as const) {
+    if (!identity[key] && !fields.some((field) => field.key === key) && typeof answers[key] === "string" && answers[key].trim()) identity[key] = answers[key].trim();
+  }
+  return identity;
+}
+
 export function formFieldIssues(field: FormField, fields: FormField[]) {
   const issues: string[] = [];
   if (!field.label.trim()) issues.push("Informe o rótulo do campo.");
@@ -33,4 +54,3 @@ export function formFieldIssues(field: FormField, fields: FormField[]) {
     issues.push("Adicione ao menos uma opção.");
   return issues;
 }
-

@@ -1,6 +1,7 @@
 "use client";
 
 import { isSupabaseConfigured } from "@/lib/supabase/client";
+import { canUseLocalStore } from "@/lib/runtime-mode";
 import { projectRepository } from "@/lib/repositories/project-repository";
 import type { PresencePage } from "./presence.types";
 import type { Project } from "@/types";
@@ -8,7 +9,7 @@ import type { Project } from "@/types";
 export class PresencePageConflictError extends Error {}
 
 export async function savePresencePage(project: Project, page: PresencePage, deletedSectionIds: string[] = []) {
-  if (!isSupabaseConfigured()) {
+  if (canUseLocalStore() || !isSupabaseConfigured()) {
     const pages = project.presence?.pages || [];
     const next = pages.some((item) => item.id === page.id) ? pages.map((item) => item.id === page.id ? page : item) : [...pages, page];
     const saved = await projectRepository.saveProject({ ...project, presence: { pages: next }, updatedAt: new Date().toISOString() });
@@ -27,7 +28,7 @@ export async function deletePresencePage(project: Project, pageId: string) {
   const page = project.presence?.pages.find((item) => item.id === pageId);
   if (!page || page.isHome) throw new Error("A página inicial não pode ser excluída.");
   if (project.entryPoints?.some((entry) => entry.presencePageId === pageId)) throw new Error("Remova as entradas ligadas a esta página antes de excluí-la.");
-  if (!isSupabaseConfigured()) return projectRepository.saveProject({ ...project, presence: { pages: (project.presence?.pages || []).filter((item) => item.id !== pageId) } });
+  if (canUseLocalStore() || !isSupabaseConfigured()) return projectRepository.saveProject({ ...project, presence: { pages: (project.presence?.pages || []).filter((item) => item.id !== pageId) } });
   const response = await fetch(`/api/projects/${encodeURIComponent(project.id)}/presence/pages/${encodeURIComponent(pageId)}`, { method: "DELETE" });
   const payload = await response.json() as { error?: string };
   if (!response.ok) throw new Error(payload.error || "Não foi possível excluir a página.");

@@ -52,3 +52,26 @@ export const applySiteProposalInputSchema = z.object({
   selectedOperations: z.array(z.string()).min(1).max(100),
   expectedVersion: z.number().int().min(0),
 });
+
+// The editor accepts arbitrary section content, but Structured Outputs requires
+// closed objects. Transport content as JSON and validate it with the registry.
+export const aiSiteStructureSchema = suggestedSiteStructureSchema.extend({
+  pages: z.array(z.object({
+    type: z.enum(["home", "landing", "page"]),
+    name: z.string().min(1).max(100),
+    purpose: z.string().min(1).max(400),
+    pathSuggestion: z.string().startsWith("/"),
+    conversionGoalId: z.string().nullable(),
+    sections: z.array(z.object({
+      sectionType: z.enum(sectionTypes),
+      purpose: z.string().min(1).max(300),
+      title: z.string().max(180).nullable(),
+      description: z.string().max(600).nullable(),
+      suggestedContentJson: z.string().max(20000),
+      sourceBindings: z.array(z.string()).max(30),
+      conversionGoalId: z.string().nullable(),
+      priority: z.enum(["essential", "recommended", "optional"]),
+      reasoning: z.string().min(1).max(600),
+    })).max(20),
+  })).min(1).max(12),
+});

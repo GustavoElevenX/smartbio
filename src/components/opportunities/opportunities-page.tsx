@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { backfillConversionGoals } from "@/features/conversion-goals/utils";
 import { localStore } from "@/lib/local-store";
+import { canUseLocalStore } from "@/lib/runtime-mode";
 import { projectRepository } from "@/lib/repositories/project-repository";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { transitionOpportunity } from "@/server/opportunities/status";
@@ -95,7 +96,7 @@ export function OpportunitiesPage({ projectId }: { projectId: string }) {
 
       try {
         let captured: CommercialOpportunity[];
-        if (!isSupabaseConfigured()) {
+        if (!(isSupabaseConfigured() && !canUseLocalStore())) {
           captured = localStore.getOpportunities(projectId);
         } else {
           const response = await fetch(
@@ -187,7 +188,7 @@ export function OpportunitiesPage({ projectId }: { projectId: string }) {
       current.map((item) => (item.id === selected.id ? updated : item)),
     );
 
-    if (!isSupabaseConfigured()) {
+    if (!(isSupabaseConfigured() && !canUseLocalStore())) {
       localStore.updateOpportunity(selected.id, updated);
       if (status === "converted" || status === "lost") {
         localStore.track({
@@ -409,3 +410,4 @@ export function OpportunitiesPage({ projectId }: { projectId: string }) {
     </div>
   );
 }
+

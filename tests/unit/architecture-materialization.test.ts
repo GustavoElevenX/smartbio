@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import type { CommercialArchitecture } from "@/features/ai-setup/ai-setup.schema";
 import { reconcileProjectWithCommercialArchitecture, validateArchitectureRuntimeContract } from "@/features/ai-setup/architecture-materialization";
-import { capabilitiesFromCommercialArchitecture } from "@/features/ai-setup/commercial-architecture";
+import { activationUnderstandingFromCommercialArchitecture, capabilitiesFromCommercialArchitecture, normalizeCommercialArchitecture } from "@/features/ai-setup/commercial-architecture";
+import { isFormFieldVisible } from "@/features/forms/form-field-utils";
+import { buildJourneyHandoff } from "@/features/handoff/journey-handoff";
+import { locationEligibilityIssue } from "@/features/routing/location-eligibility";
 import { RuleBasedBusinessAnalyzer } from "@/features/business-understanding/rule-based-business-analyzer";
 import { createCapability } from "@/features/capabilities/capability-registry";
 import { CompositionOrchestrator } from "@/features/composition/composition-orchestrator";
@@ -41,6 +44,57 @@ function architecture(): CommercialArchitecture {
 }
 
 describe("architecture materialization contract", () => {
+  it("limita modalidades de pedido à operação confirmada das unidades", () => {
+    const current = architecture();
+    current.locations = [{ id: "centro", label: "Centro", address: null, channelIds: ["wa"], evidence, confidence: 1, supportsDelivery: false, supportsPickup: true }];
+    current.journeyBlueprints[0].completion = { type: "whatsapp", channelId: null, destinationStrategy: "by_location", handoffSummary: true };
+    current.journeyBlueprints[0].steps[0].fields = [{ key: "fulfillment", label: "Modalidade", type: "select", required: true, options: ["delivery", "pickup", "digital", "external"], showWhen: null }];
+    expect(normalizeCommercialArchitecture(current).journeyBlueprints[0].steps[0].fields?.[0].options).toEqual(["pickup"]);
+  });
+  it("preserva descrição longa, preço, horários, modalidades e campos condicionais", () => {
+    const current = architecture();
+    current.businessSummary.whatItSells = "Informação importante do negócio. ".repeat(40);
+    current.offerings[0] = { ...current.offerings[0], price: 24, priceMode: "fixed", description: "Produto confirmado" };
+    current.locations = [{ id: "centro", label: "Centro", address: null, channelIds: ["wa"], evidence, confidence: 1, supportsDelivery: false, supportsPickup: true, openingHours: [{ weekday: 1, opensAt: "18:00", closesAt: "23:00", isClosed: false }] }];
+    current.journeyBlueprints[0].steps[0].collects = ["Modalidade", "Endereço"];
+    current.journeyBlueprints[0].steps[0].fields = [
+      { key: "fulfillment", label: "Modalidade", type: "select", required: true, options: ["delivery", "pickup"], showWhen: null },
+      { key: "address", label: "Endereço", type: "text", required: true, options: [], showWhen: { field: "fulfillment", values: ["delivery"] } },
+    ];
+    const normalized = normalizeCommercialArchitecture(current);
+    const result = journeyComposer.compose(input, new RuleBasedBusinessAnalyzer().analyze(input), capabilitiesFromCommercialArchitecture(normalized), normalized);
+    expect(result.commercialConfig.catalogItems?.[0].price).toBe(24);
+    const location = result.commercialConfig.locations![0];
+    expect(location.openingHours[0].opensAt).toBe("18:00");
+    expect(location.supportsPickup).toBe(true);
+    expect(locationEligibilityIssue(location, { fulfillment: "delivery" })).toContain("não atende");
+    const fields = result.steps.flatMap((step) => step.formFields || []);
+    const address = fields.find((field) => field.key === "address")!;
+    expect(isFormFieldVisible(address, { fulfillment: "pickup" })).toBe(false);
+    expect(isFormFieldVisible(address, { fulfillment: "delivery" })).toBe(true);
+    const handoff = buildJourneyHandoff({ fields, answers: { fulfillment: "pickup", address: "Resposta antiga" } });
+    expect(handoff.answers).not.toHaveProperty("Endereço");
+  });
+
+  it("qualificar um orçamento não obriga recomendação de produtos", () => {
+    const current = architecture();
+    current.journeyBlueprints[0].mode = "qualification";
+    current.intents[0].semanticKey = "quote";
+    expect(activationUnderstandingFromCommercialArchitecture(current).needsAssistedDiscovery).toBe(false);
+  });
+
+  it("mostra serviços nativos sem exigir canal externo nem enviar pedido ao explorar catálogo", () => {
+    const current = architecture();
+    const blueprint = current.journeyBlueprints[1];
+    blueprint.mode = "guided_flow";
+    blueprint.completion = { type: "native", channelId: null, destinationStrategy: "native", handoffSummary: false };
+    const result = journeyComposer.compose(input, new RuleBasedBusinessAnalyzer().analyze(input), [], current);
+    expect(result.steps.some((step) => step.type === "content" && step.blocks?.some((block) => String(block.content?.text).includes("Presente personalizado")))).toBe(true);
+    current.journeyBlueprints[0].steps[0].expectedCapability = "catalog_order";
+    const catalog = journeyComposer.compose(input, new RuleBasedBusinessAnalyzer().analyze(input), [], current).steps.find((step) => step.type === "catalog")!;
+    expect(catalog.options?.[0].actionType).toBe("continue_with_answers");
+    expect(catalog.options?.[0].actionPayload?.requiresCart).toBe(true);
+  });
   it("restaura campos confirmados, ofertas e entradas diretas depois de transformações posteriores", async () => {
     const current = architecture();
     const profile = new RuleBasedBusinessAnalyzer().analyze(input);

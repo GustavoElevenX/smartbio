@@ -27,10 +27,16 @@ export async function POST(request: Request) {
   const respond = <T extends Response>(response: T) => applyRateLimitHeaders(response, rate);
   if (!rate.allowed) return respond(apiError("Muitas tentativas em sequência.", 429, "rate_limited"));
   const database = createServiceClient();
-  if (!database) return respond(apiSuccess({ persisted: false, message: formatCommercialHandoff(parsed.data.context) }, 202));
   const project = await getPublicProjectById(database, parsed.data.projectId);
   if (!project) return respond(apiError("Projeto não encontrado.", 404, "project_not_found"));
-  const message = formatCommercialHandoff(parsed.data.context);
+  const destination = project.commercialConfig?.routingDestinations?.find((item) => item.id === parsed.data.destinationId);
+  if (parsed.data.destinationId && !destination) return respond(apiError("Destino não encontrado neste projeto.", 422, "invalid_handoff_destination"));
+  const locationId = parsed.data.context.intent.locationId;
+  if (locationId && !project.commercialConfig?.locations?.some((item) => item.id === locationId && item.isActive)) return respond(apiError("Unidade não disponível.", 422, "invalid_handoff_location"));
+  if (locationId && destination?.locationId && destination.locationId !== locationId) return respond(apiError("O destino não corresponde à unidade selecionada.", 422, "invalid_handoff_destination"));
+  if (parsed.data.context.conversionGoalId && !project.conversionGoals?.some((item) => item.id === parsed.data.context.conversionGoalId && item.isActive)) return respond(apiError("Caminho não disponível.", 422, "invalid_handoff_goal"));
+  const message = formatCommercialHandoff(parsed.data.context, project);
+  if (!database) return respond(apiSuccess({ persisted: false, message }, 202));
   const opportunity = await registerOpportunity(database, {
     workspaceId: project.workspaceId,
     projectId: project.id,

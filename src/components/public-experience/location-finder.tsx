@@ -4,6 +4,8 @@ import { LoaderCircle, LocateFixed, MapPin, MessageCircle, Search } from "lucide
 import { useState } from "react";
 
 import { cn } from "@/lib/utils";
+import { locationEligibilityIssue } from "@/features/routing/location-eligibility";
+import { isLocationOpen } from "@/features/routing/opening-hours";
 import type { JourneyRuntimeState, Project, RoutingDestination } from "@/types";
 
 interface PublicLocationResult {
@@ -53,7 +55,7 @@ export function LocationFinder({
   allowDirectHandoff?: boolean;
 }) {
   const manualLocations = (project.commercialConfig?.locations || []).filter(
-    (location) => location.isActive,
+    (location) => !locationEligibilityIssue(location, { ...runtime.answers, fulfillment: runtime.cart.fulfillment || runtime.answers.fulfillment, selected_offering_ids: [...runtime.selectedOfferIds, ...runtime.cart.items.map((item) => item.itemId)] }),
   );
   const supportsProximitySearch = manualLocations.some(
     (location) => location.latitude != null && location.longitude != null,
@@ -209,6 +211,7 @@ export function LocationFinder({
             <button key={location.id} type="button" onClick={() => select({ id: location.id, name: location.name, address: [location.addressLine, location.city].filter(Boolean).join(", "), destination: project.commercialConfig?.routingDestinations?.find((item) => item.id === location.routingDestinationId) })} className="rounded-[var(--input-radius)] border border-[var(--border)] p-3 text-left text-sm">
               <strong className="block">{location.name}</strong>
               <span className="text-xs text-[var(--muted-fg)]">{[location.neighborhood, location.city].filter(Boolean).join(" · ")}</span>
+              {typeof location.settings?.hoursText === "string" ? <span className="mt-1 block text-xs text-[var(--muted-fg)]">{location.settings.hoursText}</span> : null}{location.openingHours.length > 0 ? <span className="mt-1 block text-xs text-[var(--muted-fg)]">{isLocationOpen(location, new Date()) ? "Dentro do horário de atendimento" : "Fora do horário de atendimento · confirme com a equipe"}</span> : null}
             </button>
           ))}
           {!manualLocations.length ? <p className="text-xs text-[var(--muted-fg)]">Nenhuma unidade pública está disponível para seleção. Fale com a equipe para confirmar o destino correto.</p> : null}
@@ -233,3 +236,4 @@ export function LocationFinder({
     </section>
   );
 }
+

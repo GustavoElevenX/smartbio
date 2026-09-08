@@ -23,9 +23,8 @@ export function activationStateInvariantIssues(session: AISetupSession) {
     issues.push("DiscoveryPlan pronto sem perguntas visíveis para confirmação.");
   }
   if (session.activationUnderstanding?.needsAssistedDiscovery && session.activationUnderstanding.offerings.length >= 2) {
-    const primary = session.visitorActions.find((action) => action.isPrimary) || session.visitorActions[0];
-    if (primary && primary.key !== "recommendation" && primary.semanticKey !== "recommendation") {
-      issues.push("Descoberta assistida com múltiplas ofertas sem recommendation como ação principal.");
+    if (!session.visitorActions.some((action) => action.key === "recommendation" || action.semanticKey === "recommendation")) {
+      issues.push("Descoberta assistida com múltiplas ofertas sem uma ação de recomendação.");
     }
   }
   if (session.discoveryPlan && session.activationUnderstanding?.offerings.length) {

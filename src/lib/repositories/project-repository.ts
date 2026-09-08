@@ -243,7 +243,14 @@ export const projectRepository = {
     return payload.data || undefined;
   },
   async saveProject(project: Project): Promise<Project> {
-    if (canUseLocalStore()) return localStore.saveProject(project);
+    if (canUseLocalStore()) {
+      const saved = localStore.saveProject(project);
+      if (typeof window !== "undefined") {
+        const response = await fetch(`/api/projects/${encodeURIComponent(saved.id)}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(saved) });
+        if (!response.ok) throw new Error("O rascunho foi salvo neste navegador, mas não foi sincronizado com o servidor local. Tente salvar novamente.");
+      }
+      return saved;
+    }
     if (!isSupabaseConfigured())
       throw new Error("Persistência indisponível. Configure o Supabase.");
     const normalized = normalizeIds(project);

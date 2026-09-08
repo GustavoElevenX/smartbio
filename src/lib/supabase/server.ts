@@ -1,7 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { ProductionConfigurationError } from "@/server/auth/auth-errors";
+import { canUseLocalStore } from "@/lib/runtime-mode";
 
 export function createServiceClient() {
+  if (canUseLocalStore()) return null;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL; const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceKey) {
     if (process.env.NODE_ENV === "production") throw new ProductionConfigurationError("O Supabase server-side não está configurado.");

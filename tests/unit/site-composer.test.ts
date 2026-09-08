@@ -14,6 +14,14 @@ function vertical(category: string, config: Partial<NonNullable<Project["commerc
 }
 
 describe("adaptive site composer", () => {
+  it("cria uma página inicial quando a IA sugere apenas uma landing para um projeto novo", () => {
+    const project = { ...structuredClone(casaDeSucos), presence: { pages: [] } };
+    const suggestion = suggestSiteStructure(project);
+    suggestion.pages = [{ ...suggestion.pages[0], type: "landing", pathSuggestion: "/campanha" }];
+    const result = materializeSuggestedSiteStructure(project, suggestion).project;
+    expect(result.presence?.pages.filter((page) => page.isHome)).toHaveLength(1);
+    expect(result.presence?.pages[0].path).toBe("/");
+  });
   it.each([
     ["varejo", vertical("varejo", { catalogItems: fortyProductCatalog })],
     ["serviços", vertical("serviços", { serviceOfferings: casaDeSucos.commercialConfig?.serviceOfferings })],

@@ -213,7 +213,7 @@ export function PresenceSectionRenderer({
           />
         ) : null}
         <div
-          className={`mx-auto grid min-w-0 items-center ${variant === "minimal" ? "min-h-[360px]" : "min-h-[480px]"} ${variant === "editorial" ? "gap-8 md:grid-cols-[1.2fr_.8fr]" : showSideImage && !centered ? "gap-12 md:grid-cols-2" : "md:grid-cols-1"} ${sectionWidth(page, section)}`}
+          className={`mx-auto grid min-w-0 items-center ${showSideImage ? "min-h-[360px]" : ""} ${variant === "editorial" && showSideImage ? "gap-8 md:grid-cols-[1.2fr_.8fr]" : showSideImage && !centered ? "gap-12 md:grid-cols-2" : "grid-cols-1"} ${sectionWidth(page, section)}`}
         >
           <div
             className={`min-w-0 max-w-full ${centered ? "text-center md:col-span-2 md:mx-auto md:max-w-4xl" : ""} ${imageFirst && showSideImage ? "md:order-2" : ""} ${variant === "offer_focus" ? "rounded-2xl bg-white p-7 text-[#07172f] shadow-[0_24px_70px_rgba(15,23,42,.22)] md:p-10" : ""}`}
@@ -223,7 +223,7 @@ export function PresenceSectionRenderer({
                 {section.eyebrow}
               </p>
             ) : null}
-            <h1 className={`max-w-full break-normal text-balance font-black leading-[.98] tracking-[-.04em] [hyphens:none] [overflow-wrap:break-word] ${variant === "editorial" ? "text-[clamp(2.5rem,12vw,3.75rem)] md:text-8xl" : variant === "minimal" ? "text-[clamp(2.25rem,11vw,3.25rem)] md:text-6xl" : "text-[clamp(2.5rem,12vw,3.75rem)] md:text-7xl"}`}>
+            <h1 className="max-w-full break-normal text-balance text-[clamp(2.1rem,6cqi,4.5rem)] font-black leading-[1.06] tracking-[-.04em] [hyphens:none] [overflow-wrap:break-word]">
               {section.title || page.title || project.name}
             </h1>
             <p className="mt-6 max-w-2xl text-pretty text-lg leading-8 text-[var(--presence-section-muted,var(--presence-muted))] md:text-xl">
@@ -562,6 +562,7 @@ export function PresenceSectionRenderer({
           ))}
       </div>,
     );
+  if (section.type === "faq" && !(content.items || []).some((item: any) => item.question?.trim() && item.answer?.trim())) return null;
   if (section.type === "faq")
     return wrap(
       <div className="mx-auto max-w-3xl divide-y divide-black/10">

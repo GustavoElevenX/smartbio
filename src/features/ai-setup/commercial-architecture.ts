@@ -102,6 +102,24 @@ export function normalizeCommercialArchitecture(input: CommercialArchitecture): 
     channelIds: [...new Set(location.channelIds.filter((id) => channelIds.has(id)))],
   }));
   const inferredBlueprints = parsed.journeyBlueprints.map((blueprint) => {
+    const intent = parsed.intents.find((item) => item.id === blueprint.intentId);
+    // Looking up a location is complete when its information is shown. It
+    // does not need an invented contact or an answer-to-channel mapping.
+    if (blueprint.completion.type === "native" && intent?.semanticKey === "find_location" && locations.length > 0) {
+      return {
+        ...blueprint, mode: "guided_flow" as const,
+        completion: { ...blueprint.completion, channelId: null, destinationStrategy: "native" as const },
+        steps: [{ purpose: intent.visitorNeed, title: intent.label, expectedCapability: null, collects: [], usesOfferings: [], usesLocations: locations.map((location) => location.id) }],
+      };
+    }
+    if (blueprint.completion.type === "native" && blueprint.mode.startsWith("direct_")) {
+      const locationContent = intent?.semanticKey === "find_location" && locations.length > 0;
+      return {
+        ...blueprint, mode: "guided_flow" as const,
+        completion: { ...blueprint.completion, channelId: null, destinationStrategy: "native" as const },
+        steps: blueprint.steps.length ? blueprint.steps : [{ purpose: intent?.visitorNeed || blueprint.objective, title: intent?.label, expectedCapability: null, collects: [], usesOfferings: locationContent ? [] : offerings.map((item) => item.id), usesLocations: locationContent ? locations.map((item) => item.id) : [] }],
+      };
+    }
     if (blueprint.completion.destinationStrategy !== "by_answer") return blueprint;
     const usedLocationIds = [...new Set(blueprint.steps.flatMap((step) => step.usesLocations))];
     const locationIds = usedLocationIds.length ? usedLocationIds : locations.map((location) => location.id);
@@ -131,6 +149,19 @@ export function normalizeCommercialArchitecture(input: CommercialArchitecture): 
     .filter((item) => intentIds.has(item.intentId))
     .map((blueprint) => ({
       ...blueprint,
+      steps: blueprint.steps.map((step) => ({
+        ...step,
+        collects: step.fields?.length ? step.fields.map((field) => field.label) : step.collects,
+        fields: step.fields?.map((field) => {
+          const intent = intents.find((item) => item.id === blueprint.intentId);
+          if (field.key !== "fulfillment" || blueprint.completion.destinationStrategy !== "by_location" || !["order", "buy"].includes(intent?.semanticKey || "")) return field;
+          const physicalModes = [
+            ...(locations.some((location) => location.supportsDelivery) ? ["delivery"] : []),
+            ...(locations.some((location) => location.supportsPickup) ? ["pickup"] : []),
+          ];
+          return physicalModes.length ? { ...field, options: field.options.filter((option) => physicalModes.includes(option)) } : field;
+        }) ?? step.fields,
+      })),
       completion: {
         ...blueprint.completion,
         channelId: blueprint.completion.channelId && channelIds.has(blueprint.completion.channelId)
@@ -305,7 +336,7 @@ export function capabilitiesFromCommercialArchitecture(architecture: CommercialA
     for (const step of blueprint.steps) {
       if (!step.expectedCapability) continue;
       if (step.expectedCapability === "routing" && blueprint.completion.destinationStrategy !== "by_location") continue;
-      if (["scheduling", "reservation"].includes(step.expectedCapability) && blueprint.completion.destinationStrategy !== "native") continue;
+      if (["quote", "scheduling", "reservation"].includes(step.expectedCapability) && blueprint.completion.destinationStrategy !== "native") continue;
       keys.add(step.expectedCapability);
     }
   }
@@ -342,7 +373,7 @@ export function activationUnderstandingFromCommercialArchitecture(architecture: 
     secondaryActions: actions.slice(1).map((action) => ({ key: action.key, label: action.label, confidence: action.confidence || normalizedArchitecture.confidence, source: normalizedArchitecture.status === "degraded" ? "deterministic_fallback" as const : "contextual_ai" as const })),
     completionAction: { key: channel?.id || "native", label: channel?.label || "Concluir na Sobe", destination: channel?.type || "native", confidence: channel?.confidence || normalizedArchitecture.confidence, source: normalizedArchitecture.status === "degraded" ? "deterministic_fallback" : "contextual_ai" },
     offerings: normalizedArchitecture.offerings.map((offering) => ({ name: offering.name, kind: offering.kind, evidence: offering.evidence[0]?.excerpt || offering.name, confidence: offering.confidence, source: normalizedArchitecture.status === "degraded" ? "deterministic_fallback" as const : "contextual_ai" as const })),
-    needsAssistedDiscovery: primaryBlueprint?.mode === "qualification" && normalizedArchitecture.offerings.length >= 2,
+    needsAssistedDiscovery: actions.some((action) => action.key === "recommendation" || action.semanticKey === "recommendation") && normalizedArchitecture.offerings.length >= 2,
     confidence: normalizedArchitecture.confidence,
     issues: normalizedArchitecture.issues,
   };

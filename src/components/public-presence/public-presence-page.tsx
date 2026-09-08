@@ -340,7 +340,8 @@ export function PublicPresencePage({
     "--presence-floating-shadow": elevation.floatingShadow,
     background: colors.background,
     color: colors.foreground,
-    fontFamily: project.designSystem.typography.bodyFont,
+    fontFamily: `${project.designSystem.typography.bodyFont}, ui-sans-serif, system-ui, sans-serif`,
+    containerType: "inline-size",
   } as CSSProperties;
   return (
     <div

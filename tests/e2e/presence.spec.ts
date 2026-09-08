@@ -1,4 +1,13 @@
 import { expect, test } from "@playwright/test";
+import { findDemoProject } from "../../src/data/demo-projects";
+
+test.afterEach(async ({ request }) => {
+  // The local API now persists editor saves across requests. Restore this
+  // shared demo so later public-flow tests see their original fixture.
+  const project = findDemoProject("demo-casa-sucos")!;
+  const response = await request.put(`/api/projects/${project.id}`, { data: project });
+  expect(response.ok()).toBe(true);
+});
 
 test("Minha página abre no modo simples e permite editar pela prévia", async ({ page }, testInfo) => {
   await page.goto("/app/projects/demo-casa-sucos/site");
@@ -13,7 +22,7 @@ test("Minha página abre no modo simples e permite editar pela prévia", async (
   if (testInfo.project.name === "mobile-chrome") {
     await page.getByTestId("simple-editor-backdrop").click({ position: { x: 12, y: 90 } });
   }
-  await firstSection.getByRole("button").click();
+  await firstSection.getByRole("button", { name: /^Editar / }).click();
 
   const panel = testInfo.project.name === "mobile-chrome"
     ? page.getByRole("dialog", { name: "Editar esta parte" })
@@ -33,15 +42,15 @@ test("Minha página abre no modo simples e permite editar pela prévia", async (
   if (testInfo.project.name === "mobile-chrome") {
     await page.getByTestId("simple-editor-backdrop").click({ position: { x: 12, y: 90 } });
   }
-  const saved = page.waitForResponse((response) => response.request().method() === "PATCH" && response.url().includes("/presence/pages/"));
   await page.getByRole("button", { name: "Salvar" }).click();
-  const saveResponse = await saved;
-  expect(saveResponse.ok()).toBe(true);
-  const stored = await saveResponse.json();
-  const editedSection = stored.data.sections.find(
-    (section: { title?: string }) => section.title === "Um título editado na própria página",
-  );
-  expect(editedSection?.content.primaryAction?.conversionGoalId).toBe(selectedGoalId);
+  await expect(page.getByText(/Casa de Sucos Mix · Salvo/)).toBeAttached();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Um título editado na própria página" })).toBeVisible();
+  const savedGoal = await page.evaluate(() => {
+    const projects = JSON.parse(localStorage.getItem("smartbio:projects:v3") || "[]");
+    return projects.find((project: { id: string }) => project.id === "demo-casa-sucos")?.presence?.pages.flatMap((page: { sections: unknown[] }) => page.sections).find((section: { title: string }) => section.title === "Um título editado na própria página")?.content.primaryAction?.conversionGoalId;
+  });
+  expect(savedGoal).toBe(selectedGoalId);
 
   await page.getByTestId("site-editor-mode-toggle").click();
   await expect(page.getByTestId("site-editor-advanced")).toBeVisible();
@@ -74,8 +83,14 @@ test("Presence entrega conteúdo server-first e abre a jornada sob demanda", asy
     page.getByRole("dialog", { name: "Continuar atendimento" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Fechar atendimento" }),
+    page.getByRole("button", { name: "Fechar", exact: true }),
   ).toBeVisible();
+  const dialog = page.getByRole("dialog", { name: "Continuar atendimento" });
+  await page.keyboard.press("Tab");
+  await expect.poll(() => dialog.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("button", { name: "Montar meu pedido" })).toBeFocused();
 });
 
 test("Presence oferece navegação equivalente em desktop e mobile", async ({

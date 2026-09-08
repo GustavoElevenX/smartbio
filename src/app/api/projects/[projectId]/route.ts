@@ -11,6 +11,8 @@ import { requireResourceCapacity } from "@/server/entitlements/require-entitleme
 import { loadProjectForActor } from "@/server/projects/load-project-for-actor";
 import type { Project } from "@/types";
 import { recordPlatformGrowthEvent } from "@/server/platform-acquisition/platform-acquisition";
+import { saveLocalProject } from "@/server/projects/local-project-store";
+import { findDemoProject } from "@/data/demo-projects";
 
 const projectSchema = z.custom<Project>(
   (value) =>
@@ -42,12 +44,6 @@ export const PUT = withAuthenticatedActor(
     context: RouteContext<"/api/projects/[projectId]">,
     actor,
   ) => {
-    if (actor.persistence === "memory")
-      return apiError(
-        "Persistência indisponível.",
-        503,
-        "persistence_unavailable",
-      );
     const parsed = projectSchema.safeParse(
       await request.json().catch(() => null),
     );
@@ -59,6 +55,12 @@ export const PUT = withAuthenticatedActor(
         400,
         "project_id_mismatch",
       );
+
+    if (actor.persistence === "memory") {
+      if (parsed.data.workspaceId === "demo-workspace" && findDemoProject(parsed.data.slug)?.id === projectId) return apiSuccess(saveLocalProject({ ...parsed.data, workspaceId: actor.workspaceId }));
+      if (parsed.data.workspaceId !== actor.workspaceId) return apiError("Workspace inválido.", 403, "workspace_access_denied");
+      return apiSuccess(saveLocalProject(parsed.data));
+    }
 
     const db = createServiceClient()!;
     const { data: existing, error: lookupError } = await db

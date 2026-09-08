@@ -268,9 +268,8 @@ function qualificationQuestions(
 }
 
 function recommendationJourney(project: Project, session: AISetupSession) {
-  const primary = session.visitorActions.find((action) => action.isPrimary) || session.visitorActions[0];
-  return primary
-    ? visitorActionSemanticKey(primary) === "recommendation"
+  return session.visitorActions.length
+    ? session.visitorActions.some((action) => visitorActionSemanticKey(action) === "recommendation")
     : isRecommendationIntent(project.primaryGoal);
 }
 

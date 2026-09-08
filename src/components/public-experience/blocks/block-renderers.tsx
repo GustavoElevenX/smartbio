@@ -360,6 +360,9 @@ const ServiceSelectorBlock: BlockRenderer = ({
                 [config.fieldKey]: item.label,
                 serviceId: item.id,
               },
+              selectedOfferIds: [item.id],
+              selectedLocationId: undefined,
+              routeResult: undefined,
             }))
           }
           className={cn(
@@ -619,7 +622,8 @@ const CatalogCategoriesBlock: BlockRenderer = ({ project }) => (
 );
 const CatalogItemCardsBlock = LegacyProductCardsBlock;
 
-const CartSummaryBlock: BlockRenderer = ({ runtime, setRuntime, emit }) => {
+const CartSummaryBlock: BlockRenderer = ({ project, runtime, setRuntime, emit }) => {
+  const pricesKnown = runtime.cart.items.every((item) => project.commercialConfig?.catalogItems?.find((product) => product.id === item.itemId)?.price != null);
   function quantity(itemId: string, delta: number) {
     const items = runtime.cart.items
       .map((item) =>
@@ -630,6 +634,7 @@ const CartSummaryBlock: BlockRenderer = ({ runtime, setRuntime, emit }) => {
       .filter((item) => item.quantity > 0);
     setRuntime((current) => ({
       ...current,
+      selectedOfferIds: current.selectedOfferIds.filter((id) => !runtime.cart.items.some((item) => item.itemId === id) || items.some((item) => item.itemId === id)),
       cart: {
         ...current.cart,
         items,
@@ -660,7 +665,7 @@ const CartSummaryBlock: BlockRenderer = ({ runtime, setRuntime, emit }) => {
             <span className="flex-1">
               <strong className="block text-sm">{item.name}</strong>
               <small className="text-[var(--muted-fg)]">
-                {new Intl.NumberFormat("pt-BR", {
+                {project.commercialConfig?.catalogItems?.find((product) => product.id === item.itemId)?.price == null ? "Sob consulta" : new Intl.NumberFormat("pt-BR", {
                   style: "currency",
                   currency: runtime.cart.totals.currency,
                 }).format(item.unitPrice)}
@@ -687,12 +692,12 @@ const CartSummaryBlock: BlockRenderer = ({ runtime, setRuntime, emit }) => {
         ))}
       </div>
       <div className="mt-4 flex justify-between border-t border-[var(--border)] pt-4 text-sm">
-        <span>Total</span>
+        <span>{pricesKnown ? "Total dos itens" : "Valores a confirmar"}</span>
         <strong>
-          {new Intl.NumberFormat("pt-BR", {
+          {pricesKnown ? new Intl.NumberFormat("pt-BR", {
             style: "currency",
             currency: runtime.cart.totals.currency,
-          }).format(runtime.cart.totals.total)}
+          }).format(runtime.cart.totals.total) : "Sob consulta"}
         </strong>
       </div>
     </div>

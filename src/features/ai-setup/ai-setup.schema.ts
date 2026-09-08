@@ -46,6 +46,14 @@ export const setupQuestionSchema = z.object({
   structuredAnswer: z.array(structuredJourneyQuestionSchema).min(1).max(6).optional(),
 });
 
+export const aiSetupQuestionSchema = setupQuestionSchema.extend({
+  description: setupQuestionSchema.shape.description.unwrap().nullable(),
+  options: z.array(z.object({ label: z.string().min(1).max(120), value: z.string().min(1).max(120), description: z.string().max(240).nullable() })).max(8).nullable(),
+  capability: capabilityKeySchema.nullable(),
+  suggestedAnswer: setupQuestionSchema.shape.suggestedAnswer.unwrap().nullable(),
+  structuredAnswer: z.array(structuredJourneyQuestionSchema.extend({ options: structuredJourneyQuestionSchema.shape.options.unwrap().nullable() })).min(1).max(6).nullable(),
+});
+
 export const extractedFactSchema = z.object({
   key: z.string().min(1).max(160),
   value: z.union([z.string(), z.number(), z.boolean()]).nullable(),
@@ -224,7 +232,7 @@ export const commercialArchitectureSchema = z.object({
   status: z.enum(["ready", "needs_confirmation", "degraded"]),
   confidence: z.number().min(0).max(1),
   businessSummary: z.object({
-    whatItSells: z.string().trim().min(1).max(800),
+    whatItSells: z.string().trim().min(1).max(4000),
     commercialModel: z.string().trim().min(1).max(600),
     evidence: z.array(commercialEvidenceRefSchema).max(16),
   }),
@@ -232,6 +240,9 @@ export const commercialArchitectureSchema = z.object({
     id: z.string().trim().min(1).max(160),
     name: z.string().trim().min(1).max(160),
     kind: z.enum(["product", "service", "plan", "package", "other"]),
+    description: z.string().trim().max(1000).nullish(),
+    price: z.number().nonnegative().nullish(),
+    priceMode: z.enum(["fixed", "starting_at", "on_request", "free"]).nullish(),
     evidence: z.array(commercialEvidenceRefSchema).max(12),
     confidence: z.number().min(0).max(1),
   })).max(200),
@@ -247,6 +258,13 @@ export const commercialArchitectureSchema = z.object({
     id: z.string().trim().min(1).max(160),
     label: z.string().trim().min(1).max(160),
     address: z.string().trim().max(500).nullable(),
+    hoursText: z.string().trim().max(500).nullish(),
+    openingHours: z.array(z.object({ weekday: z.number().int().min(0).max(6), opensAt: z.string().regex(/^\d{2}:\d{2}$/), closesAt: z.string().regex(/^\d{2}:\d{2}$/), isClosed: z.boolean() })).max(21).nullish(),
+    supportsDelivery: z.boolean().nullish(),
+    supportsPickup: z.boolean().nullish(),
+    supportsInPerson: z.boolean().nullish(),
+    deliveryRadiusKm: z.number().positive().nullish(),
+    offeringIds: z.array(z.string()).max(200).nullish(),
     channelIds: z.array(z.string().trim().min(1).max(160)).max(12),
     evidence: z.array(commercialEvidenceRefSchema).max(12),
     confidence: z.number().min(0).max(1),
@@ -270,6 +288,15 @@ export const commercialArchitectureSchema = z.object({
       purpose: z.string().trim().min(1).max(400),
       expectedCapability: capabilityKeySchema.nullable(),
       collects: z.array(z.string().trim().min(1).max(160)).max(20).default([]),
+      title: z.string().trim().min(1).max(120).nullish(),
+      fields: z.array(z.object({
+        key: z.string().regex(/^[a-z][a-z0-9_]*$/).max(80),
+        label: z.string().trim().min(1).max(120),
+        type: z.enum(["text", "email", "phone", "number", "textarea", "select", "radio", "date", "time", "url"]),
+        required: z.boolean(),
+        options: z.array(z.string().trim().min(1).max(120)).max(30),
+        showWhen: z.object({ field: z.string().min(1).max(80), values: z.array(z.string()).min(1).max(30) }).nullable(),
+      })).max(20).nullish(),
       usesOfferings: z.array(z.string().trim().min(1).max(160)).max(100).default([]),
       usesLocations: z.array(z.string().trim().min(1).max(160)).max(100).default([]),
     })).max(12),
@@ -336,6 +363,22 @@ export const businessAnalysisResultSchema = z.object({
   missingInformation: z.array(z.string().max(300)).max(60),
   inconsistencies: z.array(z.string().max(400)).max(40),
   requirements: z.array(dataRequirementSchema).max(100),
+});
+
+export const aiBusinessAnalysisResultSchema = businessAnalysisResultSchema.extend({
+  profile: businessCapabilityProfileSchema.extend({
+    businessRules: z.array(businessCapabilityProfileSchema.shape.businessRules.element.extend({
+      value: z.union([z.string().max(500), z.number(), z.boolean()]).nullable(),
+    })).max(30),
+    analysisMetadata: businessCapabilityProfileSchema.shape.analysisMetadata.unwrap().nullable(),
+  }),
+  requirements: z.array(dataRequirementSchema.extend({
+    value: z.union([z.string(), z.number(), z.boolean()]).nullable(),
+    origin: dataOriginSchema.nullable(),
+    sourceId: z.string().nullable(),
+    actionLabel: z.string().max(100).nullable(),
+    actionPath: z.string().max(300).nullable(),
+  })).max(100),
 });
 
 export const customVisitorActionSemanticKeySchema = z.enum([

@@ -29,6 +29,13 @@ export const discoveryPlanDraftSchema = z.object({
   }),
 });
 
+// The provider requires every property; absent optional values travel as null.
+export const aiDiscoveryPlanDraftSchema = discoveryPlanDraftSchema.extend({
+  offerIntelligenceProfiles: z.array(offerIntelligenceDraftSchema.extend({ subjectLabel: z.string().min(1).max(120).nullable() })).max(100),
+  questions: z.array(structuredQuestionSchema.extend({ options: z.array(z.string().min(1).max(160)).max(10).nullable() })).min(2).max(4),
+  fallbackStrategy: discoveryPlanDraftSchema.shape.fallbackStrategy.extend({ offerName: z.string().min(1).max(160).nullable() }),
+});
+
 export const discoveryPlanSchema = z.object({
   id: z.string().min(1),
   version: z.literal(1),

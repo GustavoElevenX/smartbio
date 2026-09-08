@@ -26,6 +26,7 @@ export const journeyStepSchema = z.object({
     blocks: z.array(z.object({ id: z.string(), type: z.string(), variant: z.string().optional(), content: z.record(z.string(), z.unknown()).optional(), style: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional() })).optional(),
     formFields: z.array(z.object({
       id: z.string(), label: z.string(), key: z.string(), type: z.string(), placeholder: z.string().optional(), required: z.boolean(), options: z.array(z.string()).optional(), includeInHandoff: z.boolean().optional(), handoffLabel: z.string().max(120).optional(),
+      showWhen: z.object({ field: z.string(), values: z.array(z.string()) }).optional(),
     })).optional(),
     recommendation: z.object({ title: z.string(), description: z.string(), label: z.string().optional(), benefits: z.array(z.string()), deliverables: z.array(z.string()).optional() }).optional(),
     settings: z.record(z.string(), z.unknown()).optional(),

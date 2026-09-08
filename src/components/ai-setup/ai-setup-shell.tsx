@@ -68,7 +68,9 @@ async function apiCall<T>(url: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { "content-type": "application/json", ...init?.headers },
   });
-  const payload = (await response.json()) as {
+  const payload = (await response.json().catch(() => {
+    throw new SetupClientError("A conexão com a Sobe não respondeu corretamente. Tente novamente em instantes; suas informações foram mantidas.", response.status, "invalid_server_response");
+  })) as {
     ok: boolean;
     data?: T;
     error?: { code?: string; message?: string };
@@ -632,7 +634,7 @@ export function AISetupShell({
     );
   }
 
-  if (lifecycle === "invalid_session") {
+  if (lifecycle === "invalid_session" || (lifecycle === "idle" && !session)) {
     return (
       <div className="animate-enter">
         <div

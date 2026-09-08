@@ -1,4 +1,5 @@
 import "server-only";
+import { saveLocalProject } from "@/server/projects/local-project-store";
 
 import { getProjectReadiness, type ProjectReadinessResult } from "@/features/publishing/project-readiness";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -164,6 +165,7 @@ export async function publishProject(
     publishedVersionId: snapshot.versionId,
     publishedVersionNumber: snapshot.versionNumber,
   };
+  if (actor.persistence === "memory") saveLocalProject(published);
 
   if (actor.persistence === "database") {
     const supabase = createServiceClient();

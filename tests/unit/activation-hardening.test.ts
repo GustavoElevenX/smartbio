@@ -138,6 +138,14 @@ describe("Activation hardening — resolução estrutural de blockers", () => {
 });
 
 describe("Activation hardening — composer, routing e handoff", () => {
+  it("usa apenas a central declarada quando a unidade está fechada ou é incompatível", () => {
+    const unit = { ...runtimeLocation("a", "unit"), openingHours: [{ weekday: 1, opensAt: "08:00", closesAt: "18:00" }] };
+    const destinations: RoutingDestination[] = [channelDestination("unit", "5511000000001"), { id: "central", key: "central", type: "whatsapp", label: "Central", value: "5511000000002", role: "general_contact", isDefault: true }];
+    expect(resolveRoute({ location_id: "a", requestedAt: "2026-09-07T22:00:00Z" }, [], destinations, "central", [unit], "whatsapp")).toMatchObject({ destination: { id: "central" }, fallback: true });
+    expect(resolveRoute({ location_id: "a", fulfillment: "delivery" }, [], destinations, "central", [unit], "whatsapp")).toMatchObject({ destination: { id: "central" }, fallback: true });
+    expect(resolveRoute({ location_id: "a", fulfillment: "delivery" }, [], destinations, undefined, [unit], "whatsapp").destination).toBeUndefined();
+    expect(resolveRoute({ location_id: "a", requestedAt: "2026-09-07T15:00:00Z" }, [], destinations, "central", [unit], "whatsapp").destination?.id).toBe("unit");
+  });
   it("mantém direct_external sem formulário e gera open_url", () => {
     const current = architecture({ mode: "direct_external", strategy: "external_url", channels: [channel("menu", "https://menu.example.com", "external_url")], channelId: "menu", collects: [], steps: [] });
     const composed = journeyComposer.compose({ businessName: "Menu", businessDescription: "Cardápio", primaryGoal: "Ver cardápio", primaryDestination: "Site", slug: "menu" }, profile(), [], current);
@@ -216,11 +224,11 @@ describe("Activation hardening — composer, routing e handoff", () => {
     const project = await new CompositionOrchestrator(undefined, undefined, undefined, undefined, undefined, current).compose({ businessName: "Fluxo", businessDescription: "Fluxo guiado", primaryGoal: "Atender", primaryDestination: "WhatsApp", slug: "fluxo", phone: "5511999999999" });
     expect(validateConversionPath(project).complete).toBe(true);
     const form = project.steps.find((step) => step.formFields?.length);
-    const broken: Project = { ...project, steps: project.steps.map((step) => step.id === form?.id ? { ...step, options: step.options?.map((option) => ({ ...option, targetStepId: undefined })) } : step) };
-    expect(validateConversionPath(broken).complete).toBe(true); // outros caminhos de entrada ainda podem concluir
-    const continueOnly: Project = { ...project, steps: [{ id: "continue", type: "form", title: "Contexto", order: 0, isActive: true, options: [{ id: "next", label: "Continuar", value: "next", actionType: "continue_with_answers" }] }] };
+    const broken: Project = { ...project, conversionGoals: [{ id: "goal", projectId: project.id, name: "Enviar contexto", kind: "contact", targetStepId: form!.id, isActive: true, isPrimary: true, order: 0 }], steps: project.steps.map((step) => step.id === form?.id ? { ...step, options: step.options?.map((option) => ({ ...option, targetStepId: undefined })) } : step) };
+    expect(validateConversionPath(broken).complete).toBe(false); // um caminho válido não esconde outro interrompido
+    const continueOnly: Project = { ...project, conversionGoals: [], steps: [{ id: "continue", type: "form", title: "Contexto", order: 0, isActive: true, options: [{ id: "next", label: "Continuar", value: "next", actionType: "continue_with_answers" }] }] };
     expect(validateConversionPath(continueOnly).complete).toBe(false);
-    const captureOnly: Project = { ...project, steps: [{ id: "lead", type: "form", title: "Contato", order: 0, isActive: true, options: [{ id: "capture", label: "Enviar", value: "lead", actionType: "capture_lead" }] }] };
+    const captureOnly: Project = { ...project, conversionGoals: [], steps: [{ id: "lead", type: "form", title: "Contato", order: 0, isActive: true, options: [{ id: "capture", label: "Enviar", value: "lead", actionType: "capture_lead" }] }] };
     expect(validateConversionPath(captureOnly).complete).toBe(true);
     const legacyOnly: Project = { ...captureOnly, steps: [{ ...captureOnly.steps[0], options: [{ id: "legacy", label: "Enviar", value: "lead", actionType: "submit_form" }] }] };
     expect(validateConversionPath(legacyOnly).complete).toBe(true);

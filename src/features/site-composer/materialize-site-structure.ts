@@ -141,6 +141,8 @@ export function applySiteOperationsToDraft(project: Project, operations: SiteOpe
 }
 
 export function materializeSuggestedSiteStructure(project: Project, suggestion: SuggestedSiteStructure) {
-  const operations = createSiteStructureProposal(project, "site", "", undefined, suggestion).operations;
+  const needsHome = !project.presence?.pages.some((page) => page.isHome && page.isActive) && !suggestion.pages.some((page) => page.type === "home");
+  const normalized = needsHome ? { ...suggestion, pages: suggestion.pages.map((page, index) => index === 0 ? { ...page, type: "home" as const, pathSuggestion: "/" } : page) } : suggestion;
+  const operations = createSiteStructureProposal(project, "site", "", undefined, normalized).operations;
   return applySiteOperationsToDraft(project, operations);
 }

@@ -157,8 +157,7 @@ function plannedQuestions(
 }
 
 function recommendationSelected(session: AISetupSession) {
-  const primary = session.visitorActions.find((action) => action.isPrimary) || session.visitorActions[0];
-  return Boolean(primary && (primary.key === "recommendation" || primary.semanticKey === "recommendation"));
+  return session.visitorActions.some((action) => action.key === "recommendation" || action.semanticKey === "recommendation");
 }
 
 async function composePersistedDiscoveryPlan(
@@ -174,7 +173,7 @@ async function composePersistedDiscoveryPlan(
     ? contextualNames
     : offerNamesFromSetup(session.initialInput.description, answers["qualification.offerings"]);
   if (offeringNames.length < 2) return undefined;
-  const primary = session.visitorActions.find((action) => action.isPrimary) || session.visitorActions[0];
+  const primary = session.visitorActions.find((action) => action.key === "recommendation" || action.semanticKey === "recommendation") || session.visitorActions[0];
   const primaryIntent = architecture?.intents.find((item) => item.semanticKey === primary?.key) || architecture?.intents[0];
   const primaryBlueprint = architecture?.journeyBlueprints.find((item) => item.intentId === primaryIntent?.id);
   const channel = architecture?.channels.find((item) => item.id === primaryBlueprint?.completion.channelId);
@@ -187,7 +186,7 @@ async function composePersistedDiscoveryPlan(
     destination,
     offeringNames,
   });
-  if (session.discoveryPlan?.contextSignature === signature && session.discoveryPlan.status !== "invalidated") return session.discoveryPlan;
+  if (session.discoveryPlan?.contextSignature === signature && session.discoveryPlan.status === "ready") return session.discoveryPlan;
   const planningInput = {
     businessName: session.initialInput.businessName,
     businessDescription: session.initialInput.description,
@@ -226,7 +225,7 @@ export async function reconcileActivationState(
   const profile = profileWithVisitorActions(baseProfile, selectedActions);
   let answers = { ...session.answers };
   if (session.commercialArchitecture && recommendationSelected({ ...session, visitorActions: selectedActions })) {
-    const primary = selectedActions.find((action) => action.isPrimary) || selectedActions[0];
+    const primary = selectedActions.find((action) => action.key === "recommendation" || action.semanticKey === "recommendation") || selectedActions[0];
     const intent = session.commercialArchitecture.intents.find((item) => item.semanticKey === primary?.key) || session.commercialArchitecture.intents[0];
     const blueprint = session.commercialArchitecture.journeyBlueprints.find((item) => item.intentId === intent?.id);
     answers["qualification.objective"] ??= blueprint?.objective;
@@ -634,7 +633,7 @@ export class AISetupService {
       actionsConfirmed: false,
       usedFallback: usedFallback || activationUnderstanding.status === "degraded",
     });
-    if (isAIConfigured() && !usedFallback) {
+    if (isAIConfigured() && !usedFallback && provisional.missingRequirements.some((item) => item.status !== "verified")) {
       try {
         providerQuestions = await getAIProvider().generateMissingQuestions({
           profile,
@@ -866,7 +865,6 @@ export class AISetupService {
       if (!architectureGate.valid) throw new Error(architectureGate.issues[0]?.message || "A arquitetura comercial ainda possui inconsistências.");
     }
     const blocking = session.missingRequirements.filter((item) => item.severity === "blocking" && item.status !== "verified");
-    if (blocking.length) throw new Error("Confirme todas as informações necessárias antes de criar a primeira versão.");
     if (session.activationUnderstanding?.status === "degraded") {
       throw new Error("A análise contextual está degradada. Tente analisar novamente antes de criar a primeira versão.");
     }
@@ -880,6 +878,7 @@ export class AISetupService {
     )) {
       throw new Error("A recomendação precisa de ofertas, DiscoveryPlan e perguntas confirmadas antes da geração.");
     }
+    if (blocking.length) throw new Error("Confirme todas as informações necessárias antes de criar a primeira versão.");
     session = await this.repository.update(actor, { ...session, status: "generating", lastError: undefined });
     const input = compositionInput(session);
     const baseProfile = session.extractedProfile || new RuleBasedBusinessAnalyzer().analyze(input);
