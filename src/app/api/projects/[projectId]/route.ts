@@ -100,6 +100,30 @@ export const PUT = withAuthenticatedActor(
       existing?.settings && typeof existing.settings === "object"
         ? (existing.settings as Record<string, unknown>)
         : {};
+    const previousPayload = previousSettings.projectPayload as Project | undefined;
+    const configurationChanged = ["commercialConfig", "capabilities", "dataRequirements"].some((key) =>
+      JSON.stringify(project[key as keyof Project]) !== JSON.stringify(previousPayload?.[key as keyof Project]),
+    );
+    // Existing projects use the transactional commercial writer so the sidebar
+    // edits reach the same rows that operations and the next GET read.
+    if (existing && configurationChanged) {
+      const { data: commercialSaved, error: commercialError } = await db.rpc("save_project_commercial_data", {
+        p_workspace_id: actor.workspaceId,
+        p_project_id: project.id,
+        p_actor_id: actor.userId,
+        p_payload: {
+          expectedProjectVersion: Number(previousSettings.version || 1),
+          data: project.commercialConfig || {},
+          capabilities: project.capabilities || [],
+          dataRequirements: project.dataRequirements || [],
+          deleted: {},
+        },
+      });
+      if (commercialError) return apiError("Não foi possível salvar a configuração comercial. Suas alterações continuam no editor; tente novamente.", 500, "commercial_save_failed");
+      project.version = Number(commercialSaved.version);
+    } else if (existing) {
+      project.version = Number(previousSettings.version || project.version || 1);
+    }
     const settings = {
       ...previousSettings,
       subtitle: project.subtitle,

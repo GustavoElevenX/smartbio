@@ -150,7 +150,13 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
     saveQueue.current = pending;
     return pending.then((saved) => {
       savedRef.current = snapshot;
-      if (projectRef.current === snapshot) setSaveState("saved");
+      if (projectRef.current === snapshot) {
+        const confirmed = { ...snapshot, version: saved.version, updatedAt: saved.updatedAt };
+        savedRef.current = confirmed;
+        projectRef.current = confirmed;
+        setProject(confirmed);
+        setSaveState("saved");
+      }
       return saved;
     }).catch((error: unknown) => {
       if (projectRef.current === snapshot) {
