@@ -8,7 +8,19 @@ import { getRequestId, logError, requestPathname } from "@/server/observability/
 
 const schema = z.object({
   projectSnapshot: z.custom<Project>((value) => Boolean(value && typeof value === "object")).optional(),
+  publication: z.object({
+    homeMode: z.enum(["site", "journey", "goal", "step"]),
+    conversionGoalId: z.string().min(1).optional(),
+    initialStepId: z.string().min(1).optional(),
+  }).optional(),
   confirm: z.boolean().default(false),
+}).superRefine((value, context) => {
+  if (value.publication?.homeMode === "goal" && !value.publication.conversionGoalId) {
+    context.addIssue({ code: "custom", path: ["publication", "conversionGoalId"], message: "Escolha a meta inicial." });
+  }
+  if (value.publication?.homeMode === "step" && !value.publication.initialStepId) {
+    context.addIssue({ code: "custom", path: ["publication", "initialStepId"], message: "Escolha a página inicial." });
+  }
 });
 
 export const POST = withAuthenticatedActor(
@@ -26,8 +38,8 @@ export const POST = withAuthenticatedActor(
     if (!parsed.success) return apiError("Solicitação de publicação inválida.", 400, "validation_error");
     try {
       const result = parsed.data.confirm
-        ? await publishProject(actor, projectId, parsed.data.projectSnapshot, logContext)
-        : await prepareProjectPublication(actor, projectId, parsed.data.projectSnapshot, logContext);
+        ? await publishProject(actor, projectId, parsed.data.projectSnapshot, parsed.data.publication, logContext)
+        : await prepareProjectPublication(actor, projectId, parsed.data.projectSnapshot, parsed.data.publication, logContext);
       return Response.json({ ok: result.published || result.readiness.publishable, data: result }, {
         status: result.readiness.publishable ? 200 : 422,
       });

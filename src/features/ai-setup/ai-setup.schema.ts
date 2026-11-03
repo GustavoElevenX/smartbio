@@ -2,7 +2,9 @@ import { z } from "zod";
 import { businessCapabilityProfileSchema } from "@/features/business-understanding/business-profile.schema";
 import { capabilityKeySchema } from "@/features/composition/composition.schema";
 import { validateSetupPhone } from "@/features/ai-setup/setup-phone";
+import { validateSetupSalesChannel } from "@/features/ai-setup/setup-sales-channel";
 import { discoveryPlanSchema } from "@/features/qualification/discovery-plan";
+import { setupAnswerContextAuditSchema, setupAnswerContextSchema } from "@/features/ai-setup/setup-answer-interpretation";
 
 export const structuredJourneyQuestionSchema = z.object({
   id: z.string().trim().min(1).max(120),
@@ -151,20 +153,32 @@ export const setupDraftInputSchema = z.object({
   requestedSurface: z.enum(["business_site", "landing_page", "conversion_direct", "recommend"]).optional(),
   businessName: z.string().trim().max(160),
   description: z.string().trim().max(4000),
+  offeringType: z.enum(["products", "services", "both"]).optional(),
+  offerDetails: z.string().trim().max(6000).optional(),
+  resaleAvailable: z.boolean().optional(),
+  resaleDetails: z.string().trim().max(2000).optional(),
+  salesChannel: z.enum(["whatsapp", "phone", "link", "in_person", "other"]).optional(),
+  salesDestination: z.string().trim().max(1000).optional(),
   websiteUrl: z.string().trim().max(1000).optional(),
   phone: z.string().trim().max(40).optional(),
   logoReference: z.string().trim().max(500).optional(),
   brandIdentity: brandIdentitySchema.optional(),
 });
 
+export const minimumBusinessContextLength = 5;
+
 export const setupInitialInputSchema = setupDraftInputSchema.extend({
   businessName: z.string().trim().min(2).max(160),
-  description: z.string().trim().min(15).max(4000),
-  websiteUrl: z.url().optional(),
+  description: z.string().trim().min(minimumBusinessContextLength).max(4000),
+  websiteUrl: z.string().trim().max(1000).optional(),
   phone: z.string().trim().max(40).refine(
     (value) => validateSetupPhone(value).valid,
     "Confira o número. Use DDD + telefone.",
   ).optional(),
+}).superRefine((input, context) => {
+  if (!input.salesChannel) return; // Sessões antigas continuam legíveis.
+  const error = validateSetupSalesChannel(input);
+  if (error) context.addIssue({ code: "custom", message: error, path: [input.salesChannel === "whatsapp" || input.salesChannel === "phone" ? "phone" : "salesDestination"] });
 });
 
 export const visitorActionKeySchema = z.enum([
@@ -243,6 +257,12 @@ export const commercialArchitectureSchema = z.object({
     description: z.string().trim().max(1000).nullish(),
     price: z.number().nonnegative().nullish(),
     priceMode: z.enum(["fixed", "starting_at", "on_request", "free"]).nullish(),
+    variants: z.array(z.object({
+      id: z.string().trim().min(1).max(160),
+      name: z.string().trim().min(1).max(160),
+      priceDelta: z.number().nullable(),
+      isAvailable: z.boolean().nullable(),
+    })).max(200).nullish(),
     evidence: z.array(commercialEvidenceRefSchema).max(12),
     confidence: z.number().min(0).max(1),
   })).max(200),
@@ -425,6 +445,8 @@ export const aiSetupSessionSchema = z.object({
   visitorActions: z.array(visitorActionSelectionSchema).max(8).default([]),
   actionsConfirmed: z.boolean().default(false),
   answers: z.record(z.string(), z.unknown()),
+  answerContexts: z.array(setupAnswerContextSchema).max(100).optional(),
+  answerContextAudit: setupAnswerContextAuditSchema.optional(),
   missingRequirements: z.array(dataRequirementSchema),
   questions: z.array(setupQuestionSchema).max(5).default([]),
   discoveryPlan: discoveryPlanSchema.optional(),

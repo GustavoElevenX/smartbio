@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
@@ -20,7 +24,9 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     }
   },
   "include": [
@@ -29,7 +35,33 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "**/*.mts",
+    ".next-e2e-3016/types/**/*.ts",
+    ".next-e2e-3016/dev/types/**/*.ts",
+    ".next-e2e-mode-toggle/types/**/*.ts",
+    ".next-e2e-mode-toggle/dev/types/**/*.ts",
+    ".next-e2e-publish/types/**/*.ts",
+    ".next-e2e-publish/dev/types/**/*.ts",
+    ".next-e2e-publication/types/**/*.ts",
+    ".next-e2e-publication/dev/types/**/*.ts",
+    ".next-e2e-publication-2/types/**/*.ts",
+    ".next-e2e-publication-2/dev/types/**/*.ts",
+    ".next-e2e-publication-3/types/**/*.ts",
+    ".next-e2e-publication-3/dev/types/**/*.ts",
+    ".next-e2e-publication-4/types/**/*.ts",
+    ".next-e2e-publication-4/dev/types/**/*.ts",
+    ".next-e2e-publication-5/types/**/*.ts",
+    ".next-e2e-publication-5/dev/types/**/*.ts",
+    ".next-e2e-publication-6/types/**/*.ts",
+    ".next-e2e-publication-6/dev/types/**/*.ts",
+    ".next-e2e-publication-7/types/**/*.ts",
+    ".next-e2e-publication-7/dev/types/**/*.ts",
+    ".next-e2e-publication-step/types/**/*.ts",
+    ".next-e2e-publication-step/dev/types/**/*.ts",
+    ".next-e2e-publication-step-confirm/types/**/*.ts",
+    ".next-e2e-publication-step-confirm/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules"
+  ]
 }

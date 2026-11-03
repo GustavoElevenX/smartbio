@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import type { PresenceAction, PresenceLaunchContext } from "@/features/presence/presence.types";
 import { useConversionLauncher } from "./conversion-launcher";
 import { useActivationRuntime } from "@/components/public-activations/activation-runtime-provider";
+import { normalizeWhatsAppPhone } from "@/features/whatsapp/whatsapp-destination";
+import { safeExternalUrl } from "@/lib/external-url";
 
 const styles = {
   primary: "bg-[var(--presence-primary)] text-white shadow-lg shadow-black/10 hover:-translate-y-0.5",
@@ -13,7 +15,7 @@ const styles = {
   link: "px-0 text-[var(--presence-primary)] underline-offset-4 hover:underline",
 };
 
-export function PresenceActionButton({ action, context, pageHref, className = "", onAction }: { action: PresenceAction; context: PresenceLaunchContext; pageHref?: string; className?: string; onAction?: () => void }) {
+export function PresenceActionButton({ action, context, pageHref, whatsappFallbackPhone, className = "", onAction }: { action: PresenceAction; context: PresenceLaunchContext; pageHref?: string; whatsappFallbackPhone?: string; className?: string; onAction?: () => void }) {
   const launcher = useConversionLauncher();
   const activationRuntime = useActivationRuntime();
   const router = useRouter();
@@ -24,9 +26,14 @@ export function PresenceActionButton({ action, context, pageHref, className = ""
     if (action.type === "start_activation" && action.activationId) return activationRuntime?.startActivation(action.activationId);
     if (action.type === "scroll_to_section" && action.anchor) return document.getElementById(action.anchor)?.scrollIntoView({ behavior: "smooth" });
     if (action.type === "go_to_presence_page" && pageHref) return router.push(pageHref);
-    if (action.type === "open_url" && action.url) return window.open(action.url, "_blank", "noopener,noreferrer");
-    if (action.type === "open_whatsapp" && action.whatsappPhone) {
-      const phone = action.whatsappPhone.replace(/\D/g, "");
+    if (action.type === "open_url") {
+      const url = safeExternalUrl(action.url);
+      if (!url) return;
+      return window.open(url, "_blank", "noopener,noreferrer");
+    }
+    if (action.type === "open_whatsapp") {
+      const phone = normalizeWhatsAppPhone(whatsappFallbackPhone || action.whatsappPhone);
+      if (!phone) return;
       return window.open(`https://wa.me/${phone}?text=${encodeURIComponent(action.whatsappMessage || "")}`, "_blank", "noopener,noreferrer");
     }
   }

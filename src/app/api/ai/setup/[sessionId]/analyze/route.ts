@@ -8,7 +8,10 @@ import { withAuthenticatedActor } from "@/server/http/with-authenticated-actor";
 import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
 
 const schema = z.object({
-  input: setupInitialInputSchema.optional(),
+  input: setupInitialInputSchema.refine((input) => Boolean(input.salesChannel), {
+    message: "Escolha por onde o cliente compra ou contrata.",
+    path: ["salesChannel"],
+  }).optional(),
   sources: z.array(sourceReferenceSchema).max(10).optional(),
 });
 

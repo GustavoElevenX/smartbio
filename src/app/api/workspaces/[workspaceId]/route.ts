@@ -6,6 +6,10 @@ import {
   validationError,
 } from "@/server/http/api-response";
 import { withAuthenticatedActor } from "@/server/http/with-authenticated-actor";
+import {
+  getMemoryWorkspace,
+  updateMemoryWorkspace,
+} from "@/server/workspaces/workspace-memory-store";
 
 const schema = z.object({
   name: z.string().trim().min(2).max(160).optional(),
@@ -27,13 +31,7 @@ export const GET = withAuthenticatedActor(
     if (workspaceId !== actor.workspaceId)
       return apiError("Acesso negado.", 403, "workspace_access_denied");
     if (actor.persistence === "memory") {
-      return apiSuccess({
-        id: workspaceId,
-        name: "Meu workspace",
-        slug: "meu-workspace",
-        settings: {},
-        account_status: "active",
-      });
+      return apiSuccess(getMemoryWorkspace(actor));
     }
     const { data, error } = await createServiceClient()!
       .from("workspaces")
@@ -61,13 +59,7 @@ export const PATCH = withAuthenticatedActor(
     const parsed = schema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return validationError(parsed.error);
     if (actor.persistence === "memory") {
-      return apiSuccess({
-        id: workspaceId,
-        name: parsed.data.name ?? "Meu workspace",
-        slug: parsed.data.slug ?? "meu-workspace",
-        settings: parsed.data.settings ?? {},
-        account_status: "active",
-      });
+      return apiSuccess(updateMemoryWorkspace(actor, parsed.data));
     }
     const { data, error } = await createServiceClient()!
       .from("workspaces")
@@ -75,6 +67,12 @@ export const PATCH = withAuthenticatedActor(
       .eq("id", workspaceId)
       .select("id,name,slug,settings,account_status")
       .single();
+    if (error?.code === "23505")
+      return apiError(
+        "Este identificador já está sendo usado por outro workspace.",
+        409,
+        "workspace_slug_exists",
+      );
     if (error)
       return apiError(
         "Não foi possível atualizar o workspace.",

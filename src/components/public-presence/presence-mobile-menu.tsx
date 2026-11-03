@@ -16,11 +16,13 @@ export function PresenceMobileMenu({
   action,
   pageId,
   actionHref,
+  whatsappFallbackPhone,
 }: {
   links: MobileNavigationLink[];
   action?: PresenceAction;
   pageId: string;
   actionHref?: string;
+  whatsappFallbackPhone?: string;
 }) {
   const [open, setOpen] = useState(false);
   if (!links.length && !action) return null;
@@ -57,6 +59,7 @@ export function PresenceMobileMenu({
               <div className="mt-3 border-t border-black/10 pt-4">
                 <PresenceActionButton
                   action={action}
+                  whatsappFallbackPhone={whatsappFallbackPhone}
                   context={{ pageId }}
                   pageHref={actionHref}
                   onAction={() => setOpen(false)}

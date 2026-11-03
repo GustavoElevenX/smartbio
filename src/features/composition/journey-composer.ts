@@ -4,6 +4,7 @@ import { isRecommendationIntent, synthesizePublicDescription } from "@/features/
 import type { CommercialArchitecture } from "@/features/ai-setup/ai-setup.schema";
 import { resolveCompletionDestination, semanticJourneyRouteKey } from "@/features/routing/completion-destination";
 import { formFieldKey } from "@/features/forms/form-field-utils";
+import { isCatalogSelectionLabel } from "@/features/catalog/catalog-selection-fields";
 import type { BusinessCapabilityProfile, ContentBlockType, DataRequirement, ExperienceCompositionInput, JourneyStep, Project, ProjectCapability, RoutingDestination, StepOption } from "@/types";
 
 export type CommercialConfig = NonNullable<Project["commercialConfig"]>;
@@ -16,7 +17,7 @@ const copy: Record<ProjectCapability["key"], { label: string; description: strin
   catalog_order: { label: "Ver produtos", description: "Explore o catálogo quando os itens forem adicionados." },
   reservation: { label: "Consultar disponibilidade", description: "Escolha datas depois que as opções forem configuradas." },
   routing: { label: "Encontrar atendimento", description: "Encontre a unidade ou canal adequado." },
-  payment: { label: "Continuar para pagamento", description: "Acesse o checkout configurado pelo negócio." },
+  payment: { label: "Continuar para pagamento", description: "Acesse a página de pagamento configurada pelo negócio." },
 };
 
 const blockFor: Record<ProjectCapability["key"], ContentBlockType> = {
@@ -59,7 +60,7 @@ function actionLabel(type: CommercialArchitecture["journeyBlueprints"][number]["
   if (type === "whatsapp") return "Continuar no WhatsApp";
   if (type === "phone") return "Ligar agora";
   if (type === "email") return "Continuar por e-mail";
-  return fallback || "Abrir link";
+  return fallback || "Abrir endereço";
 }
 
 function routedCompletionOption(blueprint: CommercialArchitecture["journeyBlueprints"][number], metadata: Record<string, string | number | boolean>): StepOption {
@@ -84,13 +85,11 @@ function isLocationSelectionLabel(label: string) {
   return /unidade|local|loja|filial|cidade|bairro/i.test(label.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
 }
 
-export function isCatalogSelectionLabel(label: string) {
-  return /^(itens?|produtos?|quantidades?)(\s+(do pedido|desejados?|selecionados?))?$/.test(label.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim());
-}
+export { isCatalogSelectionLabel } from "@/features/catalog/catalog-selection-fields";
 
 function architectureComposition(input: ExperienceCompositionInput, architecture: CommercialArchitecture): JourneyComposition {
   const welcomeId = uid("step");
-  const choiceId = uid("step");
+  const choiceId = welcomeId;
   const offeringRuntimeIds = new Map(architecture.offerings.map((offering) => [offering.id, uid("offering")]));
   const channelRuntimeIds = new Map(architecture.channels.map((channel) => [channel.id, uid("destination")]));
   const locationRuntimeIds = new Map(architecture.locations.map((location) => [location.id, uid("location")]));
@@ -130,6 +129,9 @@ function architectureComposition(input: ExperienceCompositionInput, architecture
       return isLocationSelection || declared.collects.length > 0 || Boolean(declared.fields?.length) || declared.usesOfferings.length > 0 || (blueprint.completion.type === "native" && declared.usesLocations.length > 0) || (Boolean(declared.expectedCapability) && !externalizedNativeCapability && !externalizedRoutingCapability);
     });
     const stepIds = declaredSteps.map(() => uid("step"));
+    const collectedKeys = new Set<string>();
+    const collectedLabels = new Set<string>();
+    const bypassedSteps = new Map<string, string>();
     targetByBlueprint.set(blueprint.id, stepIds[0] || completionId);
     for (const [index, declared] of declaredSteps.entries()) {
       const isLocationSelection = blueprint.completion.destinationStrategy === "by_location"
@@ -142,6 +144,10 @@ function architectureComposition(input: ExperienceCompositionInput, architecture
         : ["quote", "scheduling", "reservation"].includes(declared.expectedCapability || "")
         && blueprint.completion.destinationStrategy !== "native"
         ? null
+        : intent.semanticKey === "view_products"
+          && !declared.expectedCapability
+          && architecture.offerings.some((offering) => offering.kind === "product" && declared.usesOfferings.includes(offering.id))
+          ? "catalog_order"
         : declared.expectedCapability;
       const informational = !capability && !declared.collects.length && !declared.fields?.length && (declared.usesOfferings.length > 0 || declared.usesLocations.length > 0);
       const informationBlocks = [
@@ -162,14 +168,27 @@ function architectureComposition(input: ExperienceCompositionInput, architecture
       const formFields: NonNullable<JourneyStep["formFields"]> = declared.fields?.length ? declared.fields.filter((field) => blueprint.completion.destinationStrategy !== "by_location" || !isLocationSelectionLabel(field.label)).map((field) => ({
         id: uid("field"), key: field.key, label: field.label, type: field.type,
         required: field.required, options: field.options.length ? field.options : undefined,
-        showWhen: field.showWhen ?? undefined, includeInHandoff: blueprint.completion.handoffSummary, handoffLabel: field.label,
+        showWhen: field.showWhen ?? undefined, includeInHandoff: blueprint.completion.type === "whatsapp" || blueprint.completion.handoffSummary, handoffLabel: field.label,
       })) : declared.collects
         .filter((label) => blueprint.completion.destinationStrategy !== "by_location" || !isLocationSelectionLabel(label))
         .map((label) => {
           const key = formFieldKey(label, fieldKeys);
           fieldKeys.push(key);
-          return { id: uid("field"), label, key, type: fieldType(label), required: true, includeInHandoff: blueprint.completion.handoffSummary, handoffLabel: label };
+          return { id: uid("field"), label, key, type: fieldType(label), required: true, includeInHandoff: blueprint.completion.type === "whatsapp" || blueprint.completion.handoffSummary, handoffLabel: label };
         });
+      const uniqueFields = formFields.filter((field) => {
+        if (capability === "catalog_order" && isCatalogSelectionLabel(field.label)) return false;
+        if (["order", "buy", "view_products"].includes(intent.semanticKey || "") && declaredSteps.some((step) => step.expectedCapability === "catalog_order") && (isCatalogSelectionLabel(field.label) || isCatalogSelectionLabel(field.key))) return false;
+        const label = field.label.trim().toLocaleLowerCase("pt-BR");
+        if (collectedKeys.has(field.key) || collectedLabels.has(label)) return false;
+        collectedKeys.add(field.key);
+        collectedLabels.add(label);
+        return true;
+      });
+      if (!capability && !informational && !uniqueFields.length) {
+        bypassedSteps.set(stepId, targetStepId);
+        continue;
+      }
       steps.push({
         id: stepId,
         type,
@@ -178,11 +197,21 @@ function architectureComposition(input: ExperienceCompositionInput, architecture
         order: steps.length,
         isActive: true,
         visualVariant: "commercial-intent",
-        blocks: informational ? informationBlocks : [{ id: uid("block"), type: capability ? blockFor[capability] : "form", content: { source: capability || "architecture", intentId: intent.id, blueprintId: blueprint.id, ...(capability === "routing" ? { allowDirectHandoff: false } : {}) } }, ...(capability === "catalog_order" && ordering ? [{ id: uid("block"), type: "cart_summary" as const }] : [])],
-        formFields: capability === "catalog_order" ? formFields.filter((field) => !isCatalogSelectionLabel(field.label)) : formFields,
+        blocks: informational ? informationBlocks : [{ id: uid("block"), type: capability ? blockFor[capability] : "form", content: { source: capability || "architecture", intentId: intent.id, blueprintId: blueprint.id, ...(capability === "catalog_order" && declared.usesOfferings.length ? { itemIds: declared.usesOfferings.filter((id) => architecture.offerings.some((offering) => offering.id === id && offering.kind === "product")).map((id) => offeringRuntimeIds.get(id)) } : {}), ...(capability === "routing" ? { allowDirectHandoff: false } : {}) } }, ...(capability === "catalog_order" ? [{ id: uid("block"), type: "cart_summary" as const }] : [])],
+        formFields: uniqueFields,
         settings: { blueprintId: blueprint.id, intentId: intent.id },
         options: [{ id: uid("option"), label: capability === "quote" ? "Enviar solicitação" : "Continuar", value: blueprint.id, actionType: submitsCapability ? "start_capability" : "continue_with_answers", actionPayload: { ...(submitsCapability ? { capability } : {}), ...(capability === "catalog_order" && ordering ? { requiresCart: true } : {}), blueprintId: blueprint.id, intentId: intent.id, completionType: blueprint.completion.type }, targetStepId }],
       });
+    }
+    const resolveStepId = (id: string) => {
+      let target = id;
+      while (bypassedSteps.has(target)) target = bypassedSteps.get(target)!;
+      return target;
+    };
+    targetByBlueprint.set(blueprint.id, resolveStepId(targetByBlueprint.get(blueprint.id)!));
+    for (const step of steps) {
+      if (step.settings?.blueprintId !== blueprint.id) continue;
+      step.options = step.options?.map((option) => option.targetStepId ? { ...option, targetStepId: resolveStepId(option.targetStepId) } : option);
     }
     const resolution = resolveCompletionDestination({ architecture, blueprint });
     const channel = resolution.status === "resolved" ? resolution.channel : undefined;
@@ -190,32 +219,28 @@ function architectureComposition(input: ExperienceCompositionInput, architecture
     const completionOption: StepOption = blueprint.completion.destinationStrategy === "by_location"
       ? routedCompletionOption(blueprint, metadata)
       : blueprint.completion.destinationStrategy === "native"
-        ? { id: uid("option"), label: "Ver próximos passos", value: blueprint.id, actionType: "go_to_step", targetStepId: choiceId, actionPayload: metadata }
+        ? { id: uid("option"), label: "Voltar ao início", value: blueprint.id, actionType: "go_to_step", targetStepId: choiceId, actionPayload: metadata }
         : architectureAction(channel, actionLabel(blueprint.completion.type, channel?.label), metadata, channel ? channelRuntimeIds.get(channel.id) : undefined);
-    steps.push({ id: completionId, type: "action", title: intent.label, description: blueprint.completion.handoffSummary ? "A Sobe leva um resumo do que foi informado para o atendimento." : "Siga pelo canal indicado pelo negócio.", order: steps.length, isActive: true, visualVariant: "conversion", settings: { blueprintId: blueprint.id, intentId: intent.id }, options: [completionOption] });
+    const lastStep = steps.findLast((step) => step.settings?.blueprintId === blueprint.id);
+    if (blueprint.completion.destinationStrategy === "native" && lastStep && !lastStep.formFields?.length && !lastStep.options?.some((option) => option.actionType === "start_capability")) {
+      // Displaying native information completes the visit; no extra screen is needed.
+      lastStep.options = [completionOption];
+    } else {
+      steps.push({ id: completionId, type: "action", title: blueprint.completion.handoffSummary ? "Confira e continue" : intent.label, description: blueprint.completion.handoffSummary ? "Sua seleção e suas respostas acompanham a conversa com a equipe." : "Siga pelo canal indicado pelo negócio.", order: steps.length, isActive: true, visualVariant: "conversion", settings: { blueprintId: blueprint.id, intentId: intent.id }, options: [completionOption] });
+    }
   }
 
   const visibleBlueprints = architecture.journeyBlueprints
     .filter((blueprint) => intentById.get(blueprint.intentId)?.visibleOnEntry)
     .sort((left, right) => (intentById.get(right.intentId)?.priority || 0) - (intentById.get(left.intentId)?.priority || 0));
-  steps.splice(1, 0, {
-    id: choiceId,
-    type: "choice",
-    title: visibleBlueprints.length > 1 ? "Escolha seu próximo passo" : visibleBlueprints[0] ? "Seu próximo passo" : "Como você quer continuar?",
-    description: architecture.businessSummary.commercialModel,
-    order: 1,
-    isActive: true,
-    visualVariant: "commercial-intent",
-    blocks: [{ id: uid("block"), type: "choice_grid", variant: "brand-composed" }],
-    options: visibleBlueprints.map((blueprint) => {
+  steps[0].options = visibleBlueprints.map((blueprint) => {
       const intent = intentById.get(blueprint.intentId)!;
       const resolution = resolveCompletionDestination({ architecture, blueprint });
       const channel = resolution.status === "resolved" ? resolution.channel : undefined;
       const metadata = { blueprintId: blueprint.id, intentId: intent.id, interestLabel: intent.label, completionType: blueprint.completion.type };
-      if (blueprint.mode.startsWith("direct_") && !blueprint.steps.length && channel?.value) return architectureAction(channel, intent.label, metadata, channelRuntimeIds.get(channel.id));
+      if (blueprint.mode.startsWith("direct_") && !["native", "by_location"].includes(blueprint.completion.destinationStrategy) && !blueprint.steps.some((step) => step.collects.length || step.fields?.length) && channel?.value) return architectureAction(channel, intent.label, metadata, channelRuntimeIds.get(channel.id));
       return { id: uid("option"), label: intent.label, description: intent.visitorNeed, value: intent.id, actionType: "go_to_step" as const, targetStepId: targetByBlueprint.get(blueprint.id) };
-    }),
-  });
+    });
 
   const locationChannelIds = new Set(architecture.locations.flatMap((location) => location.channelIds));
   const channelLocationIds = new Map(architecture.channels.map((channel) => [channel.id, architecture.locations.filter((location) => location.channelIds.includes(channel.id)).map((location) => location.id)]));
@@ -264,7 +289,7 @@ function architectureComposition(input: ExperienceCompositionInput, architecture
         return { id: offeringRuntimeIds.get(offering.id)!, projectId: "setup", name: offering.name, slug: slugify(offering.name), description: offering.description || `Saiba mais sobre ${offering.name}.`, shortDescription: offering.description?.slice(0, 180) || offering.name, serviceMode: channel?.type === "external_url" ? "external_url" as const : "contact" as const, priceMode: offering.priceMode || (offering.price != null ? "fixed" as const : "on_request" as const), price: offering.price ?? undefined, currency: "BRL", destinationId: channel && channel.type !== "external_url" ? channelRuntimeIds.get(channel.id) : undefined, externalUrl: channel?.type === "external_url" ? channel.value || undefined : undefined, isFeatured: index < 3, isActive: true, order: index, settings: { source: "commercial_architecture", offeringKind: offering.kind, architectureOfferingId: offering.id, ...(blueprint ? { blueprintId: blueprint.id, intentId: blueprint.intentId } : {}) } };
       }) : undefined,
       catalogCategories: categoryId ? [{ id: categoryId, projectId: "setup", name: "Opções", order: 0, isActive: true }] : undefined,
-      catalogItems: categoryId ? catalogOfferings.map((offering, index) => ({ id: offeringRuntimeIds.get(offering.id)!, projectId: "setup", categoryId, name: offering.name, description: offering.description ?? undefined, price: offering.price ?? undefined, currency: "BRL", isAvailable: true, variants: [], metadata: { source: "commercial_architecture", architectureOfferingId: offering.id, priceMode: offering.price != null ? offering.priceMode || "fixed" : "manual" }, order: index })) : undefined,
+      catalogItems: categoryId ? catalogOfferings.map((offering, index) => ({ id: offeringRuntimeIds.get(offering.id)!, projectId: "setup", categoryId, name: offering.name, description: offering.description ?? undefined, price: offering.price ?? undefined, currency: "BRL", isAvailable: true, variants: (offering.variants || []).map((variant) => ({ id: variant.id, name: variant.name, priceDelta: variant.priceDelta ?? 0, isAvailable: variant.isAvailable ?? true })), metadata: { source: "commercial_architecture", architectureOfferingId: offering.id, priceMode: offering.price != null ? offering.priceMode || "fixed" : "manual" }, order: index })) : undefined,
       locations: locations.length ? locations : undefined,
       routingDestinations: destinations.length ? destinations : undefined,
       routingRules: routingRules.length ? routingRules : undefined,

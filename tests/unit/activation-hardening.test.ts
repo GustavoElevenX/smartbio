@@ -81,6 +81,20 @@ describe("Activation hardening — resolução estrutural de blockers", () => {
     expect(result.architecture.status).toBe("ready");
   });
 
+  it("interpreta um link válido dentro de uma resposta livre", () => {
+    const fact = { key: "architecture.intent-main.url", label: "Cardápio", reason: "Falta URL", affects: "Cardápio", severity: "blocking" as const, resolutionTarget: { type: "external_url" as const, blueprintId: "blueprint-main", intentId: "intent-main" } };
+    const before = architecture({ mode: "direct_external", strategy: "external_url", collects: [], requiredFacts: [fact] });
+    const result = resolveArchitectureRequirement({
+      architecture: before,
+      requirement: fact,
+      answer: "Não temos site, mas pode usar o link do cardápio: https://menu.example.com/cardapio.",
+      sourceId: "session-free-text",
+    });
+    const blueprint = result.architecture.journeyBlueprints[0];
+    expect(result.resolved).toBe(true);
+    expect(result.architecture.channels.find((item) => item.id === blueprint.completion.channelId)?.value).toBe("https://menu.example.com/cardapio");
+  });
+
   it("não resolve URL ou telefone inválidos", () => {
     const urlFact = { key: "architecture.intent-main.url", label: "Link", reason: "Falta link", affects: "Link", severity: "blocking" as const, resolutionTarget: { type: "external_url" as const, blueprintId: "blueprint-main", intentId: "intent-main" } };
     const urlResult = resolveArchitectureRequirement({ architecture: architecture({ mode: "direct_external", strategy: "external_url", collects: [], requiredFacts: [urlFact] }), requirement: urlFact, answer: "menu sem protocolo" });
@@ -102,6 +116,54 @@ describe("Activation hardening — resolução estrutural de blockers", () => {
     expect(isRequiredFactResolved(result.architecture, fact)).toBe(true);
   });
 
+  it("pede um único WhatsApp principal e o reutiliza em todos os caminhos", () => {
+    const first = architecture();
+    const secondIntent = { ...first.intents[0], id: "intent-secondary", label: "Pedir orçamento", visitorNeed: "Pedir orçamento", priority: 90 };
+    const secondBlueprint = { ...first.journeyBlueprints[0], id: "blueprint-secondary", intentId: secondIntent.id, objective: "Pedir orçamento" };
+    const reconciled = reconcileCommercialArchitectureRequirements({
+      ...first,
+      intents: [...first.intents, secondIntent],
+      journeyBlueprints: [...first.journeyBlueprints, secondBlueprint],
+    });
+    const facts = reconciled.journeyBlueprints.flatMap((blueprint) => blueprint.requiredFacts);
+
+    expect(facts).toHaveLength(1);
+    expect(facts[0]).toMatchObject({ key: "contact.whatsapp.primary", label: "WhatsApp principal" });
+
+    const resolved = resolveArchitectureRequirement({
+      architecture: reconciled,
+      requirement: facts[0],
+      answer: "(11) 98888-7777",
+      sourceId: "session-primary-whatsapp",
+    });
+    const whatsappBlueprints = resolved.architecture.journeyBlueprints.filter((blueprint) => blueprint.completion.type === "whatsapp");
+    expect(resolved.resolved).toBe(true);
+    expect(whatsappBlueprints.every((blueprint) => blueprint.completion.channelId === "channel-whatsapp-primary")).toBe(true);
+    expect(resolved.architecture.journeyBlueprints.flatMap((blueprint) => blueprint.requiredFacts)).toHaveLength(0);
+  });
+
+  it("usa o WhatsApp principal como fallback e deixa números por unidade opcionais", () => {
+    const locations = [location("a"), location("b"), location("c"), location("d")];
+    const primary = channel("wa-primary", "5511988887777", "whatsapp", true);
+    const current = architecture({
+      mode: "routing",
+      strategy: "by_location",
+      channels: [primary],
+      locations,
+      steps: [{ purpose: "Escolher unidade", expectedCapability: "routing", collects: [], usesOfferings: [], usesLocations: locations.map((item) => item.id) }],
+    });
+    const reconciled = reconcileCommercialArchitectureRequirements(current);
+
+    expect(reconciled.journeyBlueprints[0].requiredFacts).toHaveLength(0);
+    expect(validateCommercialArchitectureForMaterialization(reconciled).valid).toBe(true);
+    for (const selectedLocationId of locations.map((item) => item.id)) {
+      expect(resolveCompletionDestination({ architecture: reconciled, blueprint: reconciled.journeyBlueprints[0], selectedLocationId })).toMatchObject({
+        status: "resolved",
+        channel: { id: "wa-primary" },
+      });
+    }
+  });
+
   it("faz o pipeline de answer persistir a arquitetura resolvida, não apenas a resposta", async () => {
     const fact = { key: "architecture.intent-main.destination", label: "WhatsApp", reason: "Falta WhatsApp", affects: "Contato", severity: "blocking" as const, resolutionTarget: { type: "channel_value" as const, channelId: null, intentId: "intent-main", channelType: "whatsapp" as const } };
     const current = architecture({ requiredFacts: [fact] });
@@ -117,7 +179,25 @@ describe("Activation hardening — resolução estrutural de blockers", () => {
     expect(updated.missingRequirements.some((item) => item.key === fact.key)).toBe(false);
   });
 
-  it("mantém multiunidade bloqueada até todas as associações existirem", () => {
+  it("repassa o WhatsApp principal respondido para a geração da primeira versão", async () => {
+    const current = reconcileCommercialArchitectureRequirements(architecture());
+    const session = setupSession(current, {} as Project);
+    session.projectDraft = undefined;
+    session.status = "waiting_answers";
+    session.missingRequirements = requirementsFromCommercialArchitecture(current, session.id);
+    const actor: AISetupActor = { userId: "owner", email: "owner@sobe.test", workspaceId: "workspace", role: "owner", persistence: "memory", mode: "workspace" };
+    const repository = repositoryDouble(session);
+
+    const answered = await new AISetupService(repository).answer(actor, session.id, "contact.whatsapp.primary", "(11) 98888-7777");
+    expect(answered.commercialArchitecture?.journeyBlueprints.flatMap((blueprint) => blueprint.requiredFacts)).toHaveLength(0);
+
+    const generated = await new AISetupService(repository).generate(actor, session.id);
+
+    expect((generated.projectDraft as Project | undefined)?.phone).toBe("+5511988887777");
+    expect(generated.status).toBe("review");
+  });
+
+  it("mantém multiunidade bloqueada até existir também um WhatsApp principal", () => {
     const locations = [location("a", ["wa-a"]), location("b", ["wa-b"]), location("c", ["wa-c"]), location("d")];
     const fact = { key: "architecture.intent-main.location_channels", label: "WhatsApp por unidade", reason: "Falta unidade", affects: "Unidades", severity: "blocking" as const, resolutionTarget: { type: "location_channel_mapping" as const, intentId: "intent-main", locationIds: locations.map((item) => item.id), channelType: "whatsapp" as const } };
     const before = architecture({ mode: "routing", strategy: "by_location", locations, channels: [channel("wa-a", "5511111111111"), channel("wa-b", "5522222222222"), channel("wa-c", "5533333333333")], requiredFacts: [fact], steps: [{ purpose: "Escolher unidade", expectedCapability: "routing", collects: [], usesOfferings: [], usesLocations: locations.map((item) => item.id) }] });
@@ -125,7 +205,29 @@ describe("Activation hardening — resolução estrutural de blockers", () => {
     const result = resolveArchitectureRequirement({ architecture: before, requirement: fact, answer: { d: "5544444444444" } });
     expect(result.resolved).toBe(true);
     expect(result.architecture.locations.find((item) => item.id === "d")?.channelIds).toEqual(["channel-whatsapp-d"]);
-    expect(validateCommercialArchitectureForMaterialization(result.architecture).valid).toBe(true);
+    expect(validateCommercialArchitectureForMaterialization(result.architecture).valid).toBe(false);
+    expect(result.architecture.journeyBlueprints.flatMap((blueprint) => blueprint.requiredFacts)).toContainEqual(expect.objectContaining({ key: "contact.whatsapp.primary" }));
+  });
+
+  it("associa vários telefones às unidades mesmo sem formato de código", () => {
+    const locations = [
+      { ...location("golden"), label: "Unidade Golden Shop" },
+      { ...location("quatro-a"), label: "Unidade Quatro A" },
+      { ...location("coamo"), label: "Unidade Coamo" },
+      { ...location("vinhais"), label: "Unidade Vinhais" },
+    ];
+    const fact = { key: "architecture.intent-main.location_channels", label: "WhatsApp por unidade", reason: "Faltam contatos", affects: "Unidades", severity: "blocking" as const, resolutionTarget: { type: "location_channel_mapping" as const, intentId: "intent-main", locationIds: locations.map((item) => item.id), channelType: "whatsapp" as const } };
+    const before = architecture({ mode: "routing", strategy: "by_location", locations, requiredFacts: [fact], steps: [{ purpose: "Escolher unidade", expectedCapability: "routing", collects: [], usesOfferings: [], usesLocations: locations.map((item) => item.id) }] });
+    const result = resolveArchitectureRequirement({
+      architecture: before,
+      requirement: fact,
+      answer: "Unidade Golden Shop (11) 99999-0001; Unidade Quatro A (11) 99999-0002\nUnidade Coamo (11) 99999-0003 e Unidade Vinhais (11) 99999-0004",
+    });
+    expect(result.resolved).toBe(true);
+    expect(result.architecture.locations.every((item) => item.channelIds.length === 1)).toBe(true);
+    expect(result.architecture.channels.map((item) => item.value)).toEqual(expect.arrayContaining([
+      "+5511999990001", "+5511999990002", "+5511999990003", "+5511999990004",
+    ]));
   });
 
   it("reprova blocker fantasma mesmo quando requiredFacts foi apagado", () => {
@@ -149,7 +251,7 @@ describe("Activation hardening — composer, routing e handoff", () => {
   it("mantém direct_external sem formulário e gera open_url", () => {
     const current = architecture({ mode: "direct_external", strategy: "external_url", channels: [channel("menu", "https://menu.example.com", "external_url")], channelId: "menu", collects: [], steps: [] });
     const composed = journeyComposer.compose({ businessName: "Menu", businessDescription: "Cardápio", primaryGoal: "Ver cardápio", primaryDestination: "Site", slug: "menu" }, profile(), [], current);
-    const option = composed.steps.find((step) => step.type === "choice")?.options?.find((item) => item.label === "Continuar atendimento");
+    const option = composed.steps.find((step) => step.type === "welcome")?.options?.find((item) => item.label === "Continuar atendimento");
     expect(option).toMatchObject({ actionType: "open_url", actionPayload: { url: "https://menu.example.com" } });
     expect(composed.steps.some((step) => step.formFields?.length)).toBe(false);
   });
@@ -264,7 +366,7 @@ describe("Activation hardening — memória comercial e cenários obrigatórios"
     const multi = multiIntentArchitecture(channels, locations);
     const project = await new CompositionOrchestrator(undefined, undefined, undefined, undefined, undefined, multi).compose({ businessName: "Operação Mix", businessDescription: "Quatro unidades, encomendas e revenda", primaryGoal: "Atender", primaryDestination: "WhatsApp", slug: "operacao-mix" });
     const context = projectCommercialContextFromActivation({ projectId: project.id, project, session: setupSession(multi, project), now: "2026-08-27T12:00:00.000Z" });
-    expect(project.steps.find((step) => step.type === "choice")?.options?.find((option) => option.label === "Ver cardápio")?.actionType).toBe("open_url");
+    expect(project.steps.find((step) => step.type === "welcome")?.options?.find((option) => option.label === "Ver cardápio")?.actionType).toBe("open_url");
     const runtimeLocation = project.commercialConfig?.locations?.find((item) => item.settings?.architectureId === "b");
     const runtimeDestination = project.commercialConfig?.routingDestinations?.find((item) => item.key === "wa-b");
     expect(context.locationContexts.find((item) => item.id === "location-context-b")?.locationId).toBe(runtimeLocation?.id);

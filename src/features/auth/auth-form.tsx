@@ -82,7 +82,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" | "forgot" }) {
       <CheckCircle2 size={46} className="mx-auto text-[#15966c]" />
       <h1 className="mt-5 text-3xl font-extrabold tracking-[-.04em]">Confira seu e-mail</h1>
       <p className="mt-3 text-sm leading-6 text-[#6b6b76]">Se os dados estiverem corretos, enviamos as próximas instruções para <strong>{email}</strong>.</p>
-      <Link href={mode === "register" ? "/confirm-email" : "/login"} className="mt-7 inline-flex font-bold text-[#0054fc]">{mode === "register" ? "Reenviar confirmação" : "Voltar para o login"}</Link>
+      <Link href={mode === "register" ? "/confirm-email" : "/login"} className="mt-7 inline-flex font-bold text-[#0054fc]">{mode === "register" ? "Reenviar confirmação" : "Voltar para entrar"}</Link>
     </div>
   );
 
@@ -99,7 +99,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" | "forgot" }) {
       </div>
       {error ? <div role="alert" className="mt-5 rounded-xl border border-[#ffd1d1] bg-[#fff1f1] p-3 text-sm font-medium text-[#a83333]">{error}</div> : null}
       <Button type="submit" size="lg" disabled={loading} className="mt-7 w-full">{loading ? <><LoaderCircle data-icon="inline-start" className="animate-spin" /> Processando…</> : <>{mode === "login" ? "Entrar" : mode === "register" ? "Criar conta grátis" : "Enviar instruções"}<ArrowRight data-icon="inline-end" /></>}</Button>
-      <p className="mt-6 text-center text-sm text-[#777781]">{mode === "login" ? <>Ainda não tem conta? <Link href="/register" className="font-bold text-[#0054fc]">Comece grátis</Link></> : mode === "register" ? <>Já tem uma conta? <Link href="/login" className="font-bold text-[#0054fc]">Entrar</Link></> : <Link href="/login" className="font-bold text-[#0054fc]">Voltar para o login</Link>}</p>
+      <p className="mt-6 text-center text-sm text-[#777781]">{mode === "login" ? <>Ainda não tem conta? <Link href="/register" className="font-bold text-[#0054fc]">Comece grátis</Link></> : mode === "register" ? <>Já tem uma conta? <Link href="/login" className="font-bold text-[#0054fc]">Entrar</Link></> : <Link href="/login" className="font-bold text-[#0054fc]">Voltar para entrar</Link>}</p>
     </form>
   );
 }

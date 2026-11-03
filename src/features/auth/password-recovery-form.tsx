@@ -67,14 +67,14 @@ export function PasswordRecoveryForm() {
       setPassword("");
       setConfirmation("");
     } catch {
-      setError("Não foi possível atualizar sua senha. Solicite um novo link e tente novamente.");
+      setError("Não foi possível atualizar sua senha. Solicite um novo endereço de recuperação e tente novamente.");
     } finally {
       setLoading(false);
     }
   }
 
   if (state === "checking") {
-    return <div className="text-center text-sm text-[#6b6b76]" role="status">Validando seu link…</div>;
+    return <div className="text-center text-sm text-[#6b6b76]" role="status">Validando seu endereço de recuperação…</div>;
   }
 
   if (state === "success") {
@@ -82,8 +82,8 @@ export function PasswordRecoveryForm() {
       <div className="text-center">
         <CheckCircle2 size={46} className="mx-auto text-[#15966c]" />
         <h1 className="mt-5 text-3xl font-extrabold tracking-[-.04em]">Senha alterada</h1>
-        <p className="mt-3 text-sm leading-6 text-[#6b6b76]">Sua nova senha já está ativa. Você pode continuar para o seu workspace.</p>
-        <Link href="/app" className="mt-7 inline-flex min-h-11 items-center rounded-xl bg-[#0054fc] px-5 text-sm font-bold text-white">Ir para o workspace</Link>
+        <p className="mt-3 text-sm leading-6 text-[#6b6b76]">Sua nova senha já está ativa. Você pode continuar para o seu espaço de trabalho.</p>
+        <Link href="/app" className="mt-7 inline-flex min-h-11 items-center rounded-xl bg-[#0054fc] px-5 text-sm font-bold text-white">Ir para o espaço de trabalho</Link>
       </div>
     );
   }
@@ -94,7 +94,7 @@ export function PasswordRecoveryForm() {
         <ShieldAlert className="mx-auto text-[#c34848]" size={48} />
         <h1 className="mt-5 text-3xl font-extrabold tracking-[-.04em]">Recuperação indisponível</h1>
         <p className="mt-3 text-sm leading-6 text-[#6b6b76]">A autenticação não está configurada neste ambiente.</p>
-        <Link href="/login" className="mt-7 inline-flex font-bold text-[#0054fc]">Voltar para o login</Link>
+        <Link href="/login" className="mt-7 inline-flex font-bold text-[#0054fc]">Voltar para entrar</Link>
       </div>
     );
   }
@@ -103,9 +103,9 @@ export function PasswordRecoveryForm() {
     return (
       <div className="text-center">
         <ShieldAlert className="mx-auto text-[#c34848]" size={48} />
-        <h1 className="mt-5 text-3xl font-extrabold tracking-[-.04em]">Link inválido ou expirado</h1>
+        <h1 className="mt-5 text-3xl font-extrabold tracking-[-.04em]">Endereço inválido ou expirado</h1>
         <p className="mt-3 text-sm leading-6 text-[#6b6b76]">Solicite uma nova recuperação de senha para continuar.</p>
-        <Link href="/forgot-password" className="mt-7 inline-flex min-h-11 items-center rounded-xl bg-[#0054fc] px-5 text-sm font-bold text-white">Solicitar novo link</Link>
+        <Link href="/forgot-password" className="mt-7 inline-flex min-h-11 items-center rounded-xl bg-[#0054fc] px-5 text-sm font-bold text-white">Solicitar novo endereço</Link>
       </div>
     );
   }
@@ -132,7 +132,7 @@ export function PasswordRecoveryForm() {
       </div>
       {error ? <div role="alert" className="mt-5 rounded-xl border border-[#ffd1d1] bg-[#fff1f1] p-3 text-sm font-medium text-[#a83333]">{error}</div> : null}
       <Button type="submit" size="lg" disabled={loading} className="mt-7 w-full">{loading ? <><LoaderCircle data-icon="inline-start" className="animate-spin" /> Atualizando…</> : "Atualizar senha"}</Button>
-      <p className="mt-6 text-center text-sm text-[#777781]"><Link href="/login" className="font-bold text-[#0054fc]">Voltar para o login</Link></p>
+      <p className="mt-6 text-center text-sm text-[#777781]"><Link href="/login" className="font-bold text-[#0054fc]">Voltar para entrar</Link></p>
     </form>
   );
 }

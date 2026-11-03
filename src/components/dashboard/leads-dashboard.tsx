@@ -112,7 +112,7 @@ export function LeadsDashboard({ projectId }: { projectId: string }) {
           </Link>
           <p className="text-sm font-semibold text-[#0054fc]">{project.name}</p>
           <h1 className="mt-1 text-3xl font-extrabold tracking-[-.04em]">
-            Leads capturados
+            Contatos comerciais capturados
           </h1>
           <p className="mt-2 text-sm text-[#72727d]">
             Contexto e respostas de cada oportunidade.
@@ -182,7 +182,7 @@ export function LeadsDashboard({ projectId }: { projectId: string }) {
               className="absolute left-3 top-1/2 -translate-y-1/2 text-[#85858f]"
             />
             <Input
-              aria-label="Buscar leads"
+              aria-label="Buscar contatos comerciais"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Buscar por nome, contato ou empresa"
@@ -192,7 +192,7 @@ export function LeadsDashboard({ projectId }: { projectId: string }) {
           <button className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[#dedde5] px-4 text-sm font-bold text-[#666670]">
             <Filter size={16} />{" "}
             {status === "all"
-              ? "Todos os status"
+              ? "Todas as situações"
               : statusLabel[status as Lead["status"]]}
           </button>
         </div>
@@ -202,7 +202,7 @@ export function LeadsDashboard({ projectId }: { projectId: string }) {
               <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-[#eaf3ff] text-[#0054fc]">
                 <Users />
               </span>
-              <h2 className="mt-4 font-extrabold">Nenhum lead encontrado</h2>
+              <h2 className="mt-4 font-extrabold">Nenhum contato comercial encontrado</h2>
               <p className="mt-2 text-sm text-[#7b7b85]">
                 Ajuste os filtros ou compartilhe sua experiência.
               </p>
@@ -213,10 +213,10 @@ export function LeadsDashboard({ projectId }: { projectId: string }) {
             <table className="w-full min-w-[850px] text-left">
               <thead>
                 <tr className="border-b border-[#e8e7ed] bg-[#f7fbff] text-[11px] font-bold uppercase tracking-wider text-[#85858f]">
-                  <th className="px-5 py-3">Lead</th>
+                  <th className="px-5 py-3">Contato comercial</th>
                   <th className="px-5 py-3">Interesse</th>
                   <th className="px-5 py-3">Origem</th>
-                  <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3">Situação</th>
                   <th className="px-5 py-3">Data</th>
                   <th className="px-5 py-3" />
                 </tr>
@@ -229,7 +229,7 @@ export function LeadsDashboard({ projectId }: { projectId: string }) {
                   >
                     <td className="px-5 py-4">
                       <strong className="block text-sm">
-                        {lead.name || "Lead sem nome"}
+                        {lead.name || "Contato sem nome"}
                       </strong>
                       <span className="mt-1 block text-xs text-[#7b7b85]">
                         {lead.email || lead.phone || "Sem contato"}
@@ -248,7 +248,7 @@ export function LeadsDashboard({ projectId }: { projectId: string }) {
                     </td>
                     <td className="px-5 py-4">
                       <select
-                        aria-label={`Status de ${lead.name}`}
+                        aria-label={`Situação de ${lead.name}`}
                         value={lead.status}
                         onChange={(event) =>
                           changeStatus(
@@ -305,7 +305,7 @@ export function LeadsDashboard({ projectId }: { projectId: string }) {
                   {statusLabel[selected.status]}
                 </span>
                 <h2 className="mt-4 text-2xl font-extrabold tracking-[-.035em]">
-                  {selected.name || "Lead sem nome"}
+                  {selected.name || "Contato sem nome"}
                 </h2>
                 <p className="mt-1 text-sm text-[#777781]">
                   {selected.company}
@@ -461,7 +461,7 @@ export function LeadsDashboard({ projectId }: { projectId: string }) {
                       },
                       { label: "Respondeu à jornada", at: selected.createdAt },
                       {
-                        label: selected.operationalStatus || "Lead capturado",
+                        label: selected.operationalStatus || "Contato comercial capturado",
                         at: selected.createdAt,
                       },
                     ]

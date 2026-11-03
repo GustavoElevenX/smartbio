@@ -49,6 +49,53 @@ function blueprintForTarget(architecture: CommercialArchitecture, target: Archit
   return architecture.journeyBlueprints.find((item) => item.intentId === target.intentId);
 }
 
+function primaryWhatsAppChannel(architecture: CommercialArchitecture) {
+  const whatsapp = architecture.channels.filter((channel) => channel.type === "whatsapp");
+  const locationChannelIds = new Set(architecture.locations.flatMap((location) => location.channelIds));
+  const general = whatsapp.filter((channel) => !locationChannelIds.has(channel.id));
+  return whatsapp.find((channel) => channel.isFallback && validCommercialChannel(channel))
+    || general.find((channel) => /principal|geral|central/i.test(`${channel.label} ${channel.purpose || ""}`) && validCommercialChannel(channel))
+    || general.find((channel) => validCommercialChannel(channel))
+    || general.find((channel) => channel.isFallback)
+    || general[0];
+}
+
+function withPrimaryWhatsApp(architecture: CommercialArchitecture) {
+  const normalized = normalizeCommercialArchitecture(architecture);
+  const whatsappBlueprints = normalized.journeyBlueprints.filter((blueprint) => blueprint.completion.type === "whatsapp");
+  if (!whatsappBlueprints.length) return normalized;
+  const selected = primaryWhatsAppChannel(normalized) || {
+    id: "channel-whatsapp-primary",
+    type: "whatsapp" as const,
+    label: "WhatsApp principal",
+    value: null,
+    purpose: "Atendimento principal",
+    isFallback: true,
+    evidence: [],
+    confidence: 1,
+  };
+  const primary = {
+    ...selected,
+    label: "WhatsApp principal",
+    purpose: selected.purpose || "Atendimento principal",
+    isFallback: true,
+  };
+  const channels = [...normalized.channels.filter((channel) => channel.id !== primary.id), primary];
+  const journeyBlueprints = normalized.journeyBlueprints.map((blueprint) => {
+    if (blueprint.completion.type !== "whatsapp") return blueprint;
+    const current = channels.find((channel) => channel.id === blueprint.completion.channelId);
+    const hasSpecificValidDestination = current?.id !== primary.id && validCommercialChannel(current);
+    if (blueprint.completion.destinationStrategy === "by_location") {
+      return { ...blueprint, completion: { ...blueprint.completion, channelId: primary.id } };
+    }
+    if (blueprint.completion.destinationStrategy === "fixed" && !hasSpecificValidDestination) {
+      return { ...blueprint, completion: { ...blueprint.completion, channelId: primary.id } };
+    }
+    return blueprint;
+  });
+  return normalizeCommercialArchitecture({ ...normalized, channels, journeyBlueprints });
+}
+
 export function isRequiredFactResolved(architecture: CommercialArchitecture, fact: RequiredFact): boolean {
   const target = targetFor(architecture, fact);
   if (!target) return false;
@@ -112,17 +159,35 @@ function structuralFacts(architecture: CommercialArchitecture, blueprint: Bluepr
 }
 
 export function deriveRequiredFacts(architecture: CommercialArchitecture) {
-  return architecture.journeyBlueprints.flatMap((blueprint) => {
+  const normalized = withPrimaryWhatsApp(architecture);
+  const facts = normalized.journeyBlueprints.flatMap((blueprint) => {
     const existing = blueprint.requiredFacts
-      .map((fact) => ({ ...fact, resolutionTarget: compatibilityTarget(architecture, blueprint, fact) }))
-      .filter((fact) => !isRequiredFactResolved(architecture, fact));
-    const structural = structuralFacts(architecture, blueprint);
+      .map((fact) => ({ ...fact, resolutionTarget: compatibilityTarget(normalized, blueprint, fact) }))
+      .filter((fact) => !isRequiredFactResolved(normalized, fact));
+    const structural = structuralFacts(normalized, blueprint);
     return [...new Map([...existing, ...structural].map((fact) => [fact.key, fact])).values()];
   });
+  const primary = primaryWhatsAppChannel(normalized);
+  const withoutDuplicatedWhatsAppRequirements = facts.filter((fact) => {
+    const target = targetFor(normalized, fact);
+    return !((target?.type === "channel_value" || target?.type === "location_channel_mapping") && target.channelType === "whatsapp");
+  });
+  if (!primary || !validCommercialChannel(primary)) {
+    const blueprint = normalized.journeyBlueprints.find((item) => item.completion.type === "whatsapp");
+    if (blueprint) withoutDuplicatedWhatsAppRequirements.unshift({
+      key: "contact.whatsapp.primary",
+      label: "WhatsApp principal",
+      reason: "Informe o número principal que receberá os atendimentos. Números específicos por unidade podem ser adicionados depois.",
+      affects: "Atendimento pelo WhatsApp",
+      severity: "blocking",
+      resolutionTarget: { type: "channel_value", channelId: primary?.id || "channel-whatsapp-primary", intentId: blueprint.intentId, channelType: "whatsapp" },
+    });
+  }
+  return [...new Map(withoutDuplicatedWhatsAppRequirements.map((fact) => [fact.key, fact])).values()];
 }
 
 export function reconcileCommercialArchitectureRequirements(input: CommercialArchitecture) {
-  const normalized = normalizeCommercialArchitecture(input);
+  const normalized = withPrimaryWhatsApp(input);
   const facts = deriveRequiredFacts(normalized);
   const byIntent = new Map(normalized.journeyBlueprints.map((blueprint) => [blueprint.intentId, blueprint]));
   const journeyBlueprints = normalized.journeyBlueprints.map((blueprint) => ({
@@ -144,23 +209,79 @@ function answerString(answer: unknown) {
   return typeof answer === "string" ? answer.trim() : "";
 }
 
+function normalizedText(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
+}
+
+function firstHttpUrl(value: string) {
+  return value.match(/https?:\/\/[^\s<>"']+/i)?.[0]?.replace(/[),.;!?]+$/, "") || "";
+}
+
+function firstEmail(value: string) {
+  return value.match(/[^\s@]+@[^\s@]+\.[^\s@]+/)?.[0]?.replace(/[),.;!?]+$/, "") || "";
+}
+
+function phoneCandidates(value: string) {
+  return [...value.matchAll(/(?:\+?55[\s.-]*)?(?:\(?\d{2}\)?[\s.-]*)?(?:9?\d{4})[\s.-]*-?[\s.-]*\d{4}/g)]
+    .map((match) => ({ value: match[0].trim(), index: match.index || 0 }))
+    .filter((candidate) => validateSetupPhone(candidate.value).valid);
+}
+
+function usableChannelValue(value: string, channelType: "whatsapp" | "phone" | "external_url" | "email") {
+  if (channelType === "external_url") return firstHttpUrl(value) || value.trim();
+  if (channelType === "email") return firstEmail(value) || value.trim();
+  return phoneCandidates(value)[0]?.value || value.trim();
+}
+
+function matchingLocation(architecture: CommercialArchitecture, label: string) {
+  const wanted = normalizedText(label).replace(/^unidade\s+/, "").trim();
+  return architecture.locations.find((location) => {
+    const candidate = normalizedText(location.label).replace(/^unidade\s+/, "").trim();
+    return candidate === wanted || candidate.includes(wanted) || wanted.includes(candidate);
+  });
+}
+
 function mappingAnswers(architecture: CommercialArchitecture, target: Extract<ArchitectureResolutionTarget, { type: "location_channel_mapping" }>, answer: unknown) {
   const entries: Array<{ locationId: string; value: string }> = [];
   if (Array.isArray(answer)) {
     for (const item of answer) if (item && typeof item === "object") {
       const row = item as Record<string, unknown>;
-      if (typeof row.locationId === "string" && typeof (row.value ?? row.phone ?? row.url) === "string") entries.push({ locationId: row.locationId, value: String(row.value ?? row.phone ?? row.url) });
+      const location = typeof row.locationId === "string"
+        ? architecture.locations.find((candidate) => candidate.id === row.locationId) || matchingLocation(architecture, row.locationId)
+        : typeof (row.locationLabel ?? row.label ?? row.name) === "string"
+          ? matchingLocation(architecture, String(row.locationLabel ?? row.label ?? row.name))
+          : undefined;
+      if (location && typeof (row.value ?? row.phone ?? row.url) === "string") entries.push({ locationId: location.id, value: String(row.value ?? row.phone ?? row.url) });
     }
   } else if (answer && typeof answer === "object") {
-    for (const [locationId, value] of Object.entries(answer as Record<string, unknown>)) if (typeof value === "string") entries.push({ locationId, value });
+    for (const [locationLabel, value] of Object.entries(answer as Record<string, unknown>)) if (typeof value === "string") {
+      const location = architecture.locations.find((candidate) => candidate.id === locationLabel) || matchingLocation(architecture, locationLabel);
+      if (location) entries.push({ locationId: location.id, value });
+    }
   } else if (typeof answer === "string") {
     for (const line of answer.split(/\r?\n/)) {
       const [label, ...rest] = line.split(/[:=]/);
-      const location = architecture.locations.find((item) => item.id === label.trim() || item.label.toLowerCase() === label.trim().toLowerCase());
+      const location = architecture.locations.find((item) => item.id === label.trim()) || matchingLocation(architecture, label);
       if (location && rest.join(":").trim()) entries.push({ locationId: location.id, value: rest.join(":").trim() });
     }
+    const normalizedAnswer = normalizedText(answer);
+    const locationPositions = architecture.locations
+      .map((location) => ({ location, index: normalizedAnswer.indexOf(normalizedText(location.label)) }))
+      .filter((entry) => entry.index >= 0)
+      .sort((a, b) => a.index - b.index);
+    for (const [index, entry] of locationPositions.entries()) {
+      const section = answer.slice(entry.index, locationPositions[index + 1]?.index ?? answer.length);
+      const value = target.channelType === "external_url"
+        ? firstHttpUrl(section)
+        : target.channelType === "email"
+          ? firstEmail(section)
+          : phoneCandidates(section)[0]?.value || "";
+      if (value) entries.push({ locationId: entry.location.id, value });
+    }
   }
-  return entries.filter((entry) => target.locationIds.length === 0 || target.locationIds.includes(entry.locationId));
+  return [...new Map(entries
+    .filter((entry) => target.locationIds.length === 0 || target.locationIds.includes(entry.locationId))
+    .map((entry) => [entry.locationId, entry])).values()];
 }
 
 export function resolveArchitectureRequirement(input: {
@@ -169,19 +290,20 @@ export function resolveArchitectureRequirement(input: {
   answer: unknown;
   existingProjectData?: Project["commercialConfig"];
   sourceId?: string;
+  evidenceExcerpt?: string;
 }): { architecture: CommercialArchitecture; resolved: boolean; warnings: string[] } {
   const architecture = normalizeCommercialArchitecture(input.architecture);
   const target = targetFor(architecture, input.requirement);
   if (!target) return { architecture, resolved: false, warnings: ["O blocker não possui um destino semântico reconhecido."] };
   const blueprint = blueprintForTarget(architecture, target);
   if (!blueprint) return { architecture, resolved: false, warnings: ["A jornada ligada ao blocker não existe mais."] };
-  const evidence = { sourceId: input.sourceId || "activation-answer", origin: "user" as const, excerpt: "Informação confirmada durante a Activation.", confidence: 1 };
+  const evidence = { sourceId: input.sourceId || "activation-answer", origin: "user" as const, excerpt: input.evidenceExcerpt?.slice(0, 500) || "Informação confirmada durante a criação guiada.", confidence: 1 };
   let patched = architecture;
   const warnings: string[] = [];
 
   if (target.type === "channel_value" || target.type === "external_url") {
-    const value = answerString(input.answer);
     const channelType = target.type === "external_url" ? "external_url" : target.channelType;
+    const value = usableChannelValue(answerString(input.answer), channelType);
     const normalizedValue = channelType === "whatsapp" || channelType === "phone" ? validateSetupPhone(value).normalized : value;
     const valid = channelType === "external_url" ? validHttpUrl(value)
       : channelType === "whatsapp" || channelType === "phone" ? Boolean(validateSetupPhone(value).valid && normalizedValue)
@@ -191,7 +313,7 @@ export function resolveArchitectureRequirement(input: {
       ? target.channelId
       : blueprint.completion.channelId || `channel-${channelType}-${blueprint.intentId}`;
     const existing = architecture.channels.find((item) => item.id === channelId);
-    const channel = { id: channelId, type: channelType, label: existing?.label || (channelType === "external_url" ? `Link de ${blueprint.objective}` : `Contato de ${blueprint.objective}`), value: normalizedValue || value, purpose: existing?.purpose || blueprint.objective, isFallback: existing?.isFallback || false, evidence: [...(existing?.evidence || []), evidence], confidence: 1 };
+    const channel = { id: channelId, type: channelType, label: existing?.label || (channelType === "external_url" ? `Endereço de ${blueprint.objective}` : `Contato de ${blueprint.objective}`), value: normalizedValue || value, purpose: existing?.purpose || blueprint.objective, isFallback: existing?.isFallback || false, evidence: [...(existing?.evidence || []), evidence], confidence: 1 };
     patched = {
       ...architecture,
       channels: [...architecture.channels.filter((item) => item.id !== channelId), channel],
@@ -208,7 +330,7 @@ export function resolveArchitectureRequirement(input: {
       const valid = target.channelType === "external_url" ? validHttpUrl(value) : target.channelType === "email" ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value || "") : Boolean(validateSetupPhone(mapping.value).valid && value);
       if (!valid) { warnings.push(`O destino de ${location.label} é inválido.`); return location; }
       const channelId = `channel-${target.channelType}-${location.id}`;
-      const channel = { id: channelId, type: target.channelType, label: `${target.channelType === "external_url" ? "Link" : target.channelType === "whatsapp" ? "WhatsApp" : target.channelType === "phone" ? "Telefone" : "E-mail"} · ${location.label}`, value: value || mapping.value, purpose: `Atendimento da unidade ${location.label}`, isFallback: false, evidence: [...location.evidence, evidence], confidence: 1 };
+      const channel = { id: channelId, type: target.channelType, label: `${target.channelType === "external_url" ? "Endereço" : target.channelType === "whatsapp" ? "WhatsApp" : target.channelType === "phone" ? "Telefone" : "E-mail"} · ${location.label}`, value: value || mapping.value, purpose: `Atendimento da unidade ${location.label}`, isFallback: false, evidence: [...location.evidence, evidence], confidence: 1 };
       const index = channels.findIndex((item) => item.id === channelId);
       if (index >= 0) channels[index] = channel; else channels.push(channel);
       return { ...location, channelIds: [...new Set([...location.channelIds.filter((id) => id !== channelId), channelId])], evidence: [...location.evidence, evidence], confidence: 1 };
@@ -230,7 +352,7 @@ export function resolveArchitectureRequirement(input: {
 export interface ArchitectureMaterializationIssue { code: string; message: string; blueprintId?: string }
 
 export function validateCommercialArchitectureForMaterialization(architecture: CommercialArchitecture, projectData?: Project["commercialConfig"]) {
-  const normalized = normalizeCommercialArchitecture(architecture);
+  const normalized = withPrimaryWhatsApp(architecture);
   const issues: ArchitectureMaterializationIssue[] = [];
   const blueprintIntentIds = new Set(normalized.journeyBlueprints.map((item) => item.intentId));
   for (const intent of normalized.intents.filter((item) => item.visibleOnEntry)) if (!blueprintIntentIds.has(intent.id)) issues.push({ code: "intent_without_blueprint", message: `O caminho “${intent.label}” ainda não possui uma jornada.` });

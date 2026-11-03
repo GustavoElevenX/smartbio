@@ -572,6 +572,12 @@ export interface JourneyRuntimeState {
   sessionId: string;
   currentStepId: string;
   answers: Record<string, unknown>;
+  journeySelections?: Array<{
+    stepId: string;
+    stepTitle: string;
+    optionId: string;
+    optionLabel: string;
+  }>;
   selectedOfferIds: string[];
   selectedLocationId?: string;
   selectedResourceId?: string;
@@ -830,6 +836,11 @@ export interface Project {
   steps: JourneyStep[];
   conversionGoals?: ConversionGoal[];
   entryPoints?: EntryPoint[];
+  publication?: {
+    homeMode: "site" | "journey" | "goal" | "step";
+    conversionGoalId?: string;
+    initialStepId?: string;
+  };
   presence?: PresenceSite;
   mediaAssets?: MediaAsset[];
   businessProfile?: BusinessCapabilityProfile;

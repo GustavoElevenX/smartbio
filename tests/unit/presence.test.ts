@@ -6,9 +6,11 @@ import { createPresencePage } from "@/features/presence/presence-page-service";
 import { presenceSectionRegistry } from "@/features/presence/section-registry";
 import { resolvePublicSurface } from "@/features/presence/resolve-public-surface";
 import { getPresenceReadinessIssues } from "@/features/presence/presence-readiness";
+import { getProjectReadiness } from "@/features/publishing/project-readiness";
 import { buildConversionAnalytics } from "@/server/analytics/conversion-analytics";
 import { createOpportunity } from "@/server/opportunities/factory";
 import { findDemoProject } from "@/data/demo-projects";
+import { normalizeExternalUrl, safeExternalUrl } from "@/lib/external-url";
 
 function projectWithPresence() {
   const project = structuredClone(findDemoProject("casadesucosmix")!);
@@ -43,6 +45,13 @@ describe("Presence domain", () => {
         url: "https://virou.app",
       }).success,
     ).toBe(true);
+  });
+  it("normalizes external links and rejects unsafe protocols", () => {
+    expect(normalizeExternalUrl(" exemplo.com/cardapio ")).toBe("https://exemplo.com/cardapio");
+    expect(safeExternalUrl("exemplo.com/cardapio")).toBe("https://exemplo.com/cardapio");
+    expect(safeExternalUrl("javascript:alert(1)")).toBeUndefined();
+    expect(safeExternalUrl("https://usuario:senha@exemplo.com")).toBeUndefined();
+    expect(presenceActionSchema.safeParse({ type: "open_url", label: "Abrir", url: "javascript:alert(1)" }).success).toBe(false);
   });
   it("validates a complete generated page by section schema", () =>
     expect(
@@ -87,6 +96,48 @@ describe("Presence domain", () => {
       resolvePublicSurface(project, project.entryPoints[0].key),
     ).toMatchObject({ mode: "landing", page: { id: page.id } });
   });
+  it("opens the link da bio at the main URL even when an old home page exists", () => {
+    const project = projectWithPresence();
+    expect(resolvePublicSurface(project)).toEqual({ mode: "conversion_direct" });
+  });
+  it("can publish the complete guided experience at the main URL", () => {
+    const project = projectWithPresence();
+    project.publication = { homeMode: "journey" };
+    expect(resolvePublicSurface(project)).toEqual({ mode: "conversion_direct" });
+  });
+  it("can publish a specific conversion path at the main URL", () => {
+    const project = projectWithPresence();
+    const goal = project.conversionGoals![0];
+    project.publication = { homeMode: "goal", conversionGoalId: goal.id };
+    expect(resolvePublicSurface(project)).toMatchObject({
+      mode: "conversion_direct",
+      conversionGoalId: goal.id,
+      targetStepId: goal.targetStepId,
+    });
+  });
+  it("can publish one selected journey page at the main URL", () => {
+    const project = projectWithPresence();
+    const step = project.steps.find((item) => item.isActive)!;
+    project.publication = { homeMode: "step", initialStepId: step.id };
+    expect(resolvePublicSurface(project)).toEqual({
+      mode: "conversion_direct",
+      targetStepId: step.id,
+    });
+  });
+  it("keeps explicit campaign entries above the main publication choice", () => {
+    const project = projectWithPresence();
+    const page = project.presence!.pages[0];
+    project.publication = { homeMode: "journey" };
+    project.entryPoints = [{
+      ...project.entryPoints![0],
+      surfaceMode: "presence",
+      presencePageId: page.id,
+    }];
+    expect(resolvePublicSurface(project, project.entryPoints[0].key)).toMatchObject({
+      mode: "presence",
+      page: { id: page.id },
+    });
+  });
   it("blocks publication when a Presence CTA points to a missing goal", () => {
     const project = projectWithPresence();
     const cta = project.presence!.pages[0].sections.find(
@@ -104,6 +155,25 @@ describe("Presence domain", () => {
         issue.key.includes("presence.action"),
       ),
     ).toBe(true);
+  });
+  it("does not block a guided publication because of an unused site CTA", () => {
+    const project = projectWithPresence();
+    const cta = project.presence!.pages[0].sections.find(
+      (section) => section.type === "conversion_cta",
+    )!;
+    cta.content = {
+      primaryAction: {
+        type: "start_conversion_goal",
+        label: "Começar",
+        conversionGoalId: "missing",
+      },
+    };
+    project.publication = { homeMode: "journey" };
+    expect(
+      getProjectReadiness(project).blocking.some((issue) =>
+        issue.key.includes("presence.action"),
+      ),
+    ).toBe(false);
   });
 });
 

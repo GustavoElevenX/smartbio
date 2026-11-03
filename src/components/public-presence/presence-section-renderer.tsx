@@ -16,6 +16,7 @@ import type { PublicActivation } from "@/features/activations/activation.types";
 import { ActivationProductBadge } from "@/components/public-activations/activation-product-badge";
 import { ActivationServiceBadge } from "@/components/public-activations/activation-service-badge";
 import { PublicCatalogShell } from "@/components/public-catalog/catalog-shell";
+import { resolveWhatsAppTarget } from "@/features/whatsapp/whatsapp-destination";
 
 function asset(project: Project, id?: string) {
   const item = project.mediaAssets?.find((candidate) => candidate.id === id);
@@ -116,11 +117,13 @@ function Actions({
   primary?: PresenceAction;
   secondary?: PresenceAction;
 }) {
+  const whatsappPhone = (action: PresenceAction) => resolveWhatsAppTarget(project, { destinationId: action.whatsappDestinationId, phone: action.whatsappPhone })?.phone;
   return primary || secondary ? (
     <div className="mt-7 flex flex-wrap gap-3">
       {primary ? (
         <PresenceActionButton
           action={primary}
+          whatsappFallbackPhone={whatsappPhone(primary)}
           pageHref={pageHref(project, primary)}
           context={{ pageId: page.id, sectionId: section.id }}
         />
@@ -128,6 +131,7 @@ function Actions({
       {secondary ? (
         <PresenceActionButton
           action={secondary}
+          whatsappFallbackPhone={whatsappPhone(secondary)}
           pageHref={pageHref(project, secondary)}
           context={{ pageId: page.id, sectionId: section.id }}
         />
@@ -373,6 +377,7 @@ export function PresenceSectionRenderer({
                   <div className="mt-5">
                     <PresenceActionButton
                       action={activation ? { type: "start_activation", label: "Quero aproveitar", activationId: activation.id, style: "primary" } : serviceAction!}
+                      whatsappFallbackPhone={resolveWhatsAppTarget(project, { destinationId: serviceAction?.whatsappDestinationId, phone: serviceAction?.whatsappPhone })?.phone}
                       pageHref={activation ? undefined : pageHref(project, serviceAction)}
                       context={{ ...context, serviceId: service.id }}
                     />
@@ -441,6 +446,7 @@ export function PresenceSectionRenderer({
                   <div className="mt-4">
                     <PresenceActionButton
                       action={action}
+                      whatsappFallbackPhone={resolveWhatsAppTarget(project, { destinationId: action.whatsappDestinationId, phone: action.whatsappPhone })?.phone}
                       context={{ ...context, catalogItemId: item.id }}
                     />
                   </div>
@@ -605,6 +611,7 @@ export function PresenceSectionRenderer({
                 <div className="mt-6">
                   <PresenceActionButton
                     action={item.action}
+                    whatsappFallbackPhone={resolveWhatsAppTarget(project, { destinationId: item.action.whatsappDestinationId, phone: item.action.whatsappPhone })?.phone}
                     pageHref={pageHref(project, item.action)}
                     context={context}
                   />

@@ -6,6 +6,12 @@ export const AI_SETUP_STORAGE_KEY = "smartbio:last-ai-setup-session";
 const draftSchema = z.object({
   businessName: z.string().max(160),
   description: z.string().max(4000),
+  offeringType: z.enum(["products", "services", "both"]).optional(),
+  offerDetails: z.string().max(6000).optional(),
+  resaleAvailable: z.boolean().optional(),
+  resaleDetails: z.string().max(2000).optional(),
+  salesChannel: z.enum(["whatsapp", "phone", "link", "in_person", "other"]).optional(),
+  salesDestination: z.string().max(1000).optional(),
   websiteUrl: z.string().max(1000),
   phone: z.string().max(40),
 });

@@ -17,10 +17,8 @@ export function buildRecommendationHandoff(input: {
   const labels = new Map((input.fields || []).map((field) => [field.key, field.handoffLabel || field.label]));
   const context = Object.entries(input.answers)
     .filter(([key, value]) => !ignoredKeys.has(key) && Boolean(valueText(value)))
-    .slice(0, 3)
     .map(([key, value]) => `${labels.get(key) || "Contexto"}: ${valueText(value)}`)
-    .join("; ")
-    .slice(0, 360);
+    .join("; ");
   if (input.serviceName && input.confidence !== "uncertain") {
     return {
       answers: {

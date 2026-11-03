@@ -12,6 +12,9 @@ import type {
   PresenceSectionType,
 } from "@/features/presence/presence.types";
 import { SimpleActionEditor } from "@/components/presence-editor/simple-action-editor";
+import { ExternalLinkField } from "@/components/presence-editor/external-link-field";
+import { isValidWhatsAppPhone } from "@/features/whatsapp/whatsapp-destination";
+import { projectWhatsAppNumbers } from "@/features/whatsapp/project-whatsapp-numbers";
 
 interface EditorProps {
   project: Project;
@@ -52,6 +55,7 @@ function AdvancedActionEditor({
     return () => { active = false; };
   }, [project.id]);
   const selectableActivations = activations.filter((item) => (item.status === "active" || item.status === "scheduled") && item.conversionGoalId);
+  const whatsappNumbers = projectWhatsAppNumbers(project).filter((item) => isValidWhatsAppPhone(item.value));
   const defaultAction = {
       type: "start_conversion_goal",
       label: "Começar",
@@ -96,7 +100,7 @@ function AdvancedActionEditor({
           <option value="start_conversion_goal">Iniciar conversão</option>
           <option value="go_to_presence_page">Ir para página</option>
           <option value="scroll_to_section">Rolar para seção</option>
-          <option value="open_url">Abrir URL</option>
+          <option value="open_url">Abrir link externo</option>
           <option value="open_whatsapp">Abrir WhatsApp</option>
           <option value="start_activation">Iniciar ativação</option>
         </select>
@@ -180,31 +184,29 @@ function AdvancedActionEditor({
         </label>
       ) : null}
       {current.type === "open_url" ? (
-        <label className={`${label} mt-3`}>
-          URL
-          <input
-            className={input}
-            type="url"
-            value={current.url || ""}
-            onChange={(event) =>
-              onChange({ ...current, url: event.target.value })
-            }
-          />
-        </label>
+        <ExternalLinkField id={`advanced-external-link-${page.id}-${labelText.replaceAll(" ", "-").toLowerCase()}`} className="mt-3" value={current.url} onChange={(url) => onChange({ ...current, url })} />
       ) : null}
       {current.type === "open_whatsapp" ? (
         <>
           <label className={`${label} mt-3`}>
+            Número de destino
+            <select className={input} value={current.whatsappDestinationId || "manual"} onChange={(event) => onChange({ ...current, whatsappDestinationId: event.target.value === "manual" ? undefined : event.target.value, whatsappPhone: event.target.value === "manual" ? current.whatsappPhone : undefined })}>
+              {whatsappNumbers.map((item) => <option key={item.id} value={item.id}>{item.label}{item.isDefault ? " · Principal" : ""}</option>)}
+              <option value="manual">Outro número</option>
+            </select>
+          </label>
+          {!current.whatsappDestinationId ? <label className={`${label} mt-3`}>
             Telefone
-            {project.phone ? <button type="button" className="float-right text-[11px] text-[#0054fc]" onClick={() => onChange({ ...current, whatsappPhone: project.phone })}>Usar padrão</button> : null}
             <input
               className={input}
+              type="tel"
+              inputMode="tel"
               value={current.whatsappPhone || ""}
               onChange={(event) =>
                 onChange({ ...current, whatsappPhone: event.target.value })
               }
             />
-          </label>
+          </label> : null}
           <label className={`${label} mt-3`}>
             Mensagem
             <textarea
@@ -576,9 +578,9 @@ function CommercialEditor(props: EditorProps) {
 function SectionLayoutEditor(props: EditorProps) {
   const content = props.section.content as any;
   if (props.section.type === "hero") return <div className="grid gap-3"><label className={label}>Composição<select className={input} value={content.variant || "split"} onChange={(event) => patchContent(props, { variant: event.target.value })}><option value="split">Dividido</option><option value="centered">Centralizado</option><option value="background">Imagem de fundo</option><option value="editorial">Editorial</option><option value="product_focus">Foco no produto</option><option value="minimal">Minimalista</option><option value="offer_focus">Foco na oferta</option></select></label><label className={label}>Posição da imagem<select className={input} value={content.media?.position || "right"} onChange={(event) => patchContent(props, { media: { ...(content.media || {}), position: event.target.value } })}><option value="right">Direita</option><option value="left">Esquerda</option><option value="background">Fundo</option></select></label></div>;
-  if (props.section.type === "products" || props.section.type === "services") return <label className={label}>Layout<select className={input} value={content.layout || "grid"} onChange={(event) => patchContent(props, { layout: event.target.value })}><option value="grid">Grade</option>{props.section.type === "services" ? <option value="list">Lista</option> : null}<option value="featured">Destaque</option>{props.section.type === "products" ? <option value="carousel">Carrossel</option> : null}</select></label>;
-  if (props.section.type === "testimonials") return <label className={label}>Layout<select className={input} value={content.layout || "cards"} onChange={(event) => patchContent(props, { layout: event.target.value })}><option value="cards">Cards</option><option value="quote">Citação</option><option value="carousel">Carrossel</option></select></label>;
-  if (props.section.type === "gallery" || props.section.type === "portfolio") return <label className={label}>Layout<select className={input} value={content.layout || "grid"} onChange={(event) => patchContent(props, { layout: event.target.value })}><option value="grid">Grade</option><option value="masonry">Mosaico</option><option value="carousel">Carrossel</option></select></label>;
+  if (props.section.type === "products" || props.section.type === "services") return <label className={label}>Organização<select className={input} value={content.layout || "grid"} onChange={(event) => patchContent(props, { layout: event.target.value })}><option value="grid">Grade</option>{props.section.type === "services" ? <option value="list">Lista</option> : null}<option value="featured">Destaque</option>{props.section.type === "products" ? <option value="carousel">Carrossel</option> : null}</select></label>;
+  if (props.section.type === "testimonials") return <label className={label}>Organização<select className={input} value={content.layout || "cards"} onChange={(event) => patchContent(props, { layout: event.target.value })}><option value="cards">Cartões</option><option value="quote">Citação</option><option value="carousel">Carrossel</option></select></label>;
+  if (props.section.type === "gallery" || props.section.type === "portfolio") return <label className={label}>Organização<select className={input} value={content.layout || "grid"} onChange={(event) => patchContent(props, { layout: event.target.value })}><option value="grid">Grade</option><option value="masonry">Mosaico</option><option value="carousel">Carrossel</option></select></label>;
   return null;
 }
 function MediaEditor(props: EditorProps) {

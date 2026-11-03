@@ -106,7 +106,7 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
           <Zap className="text-[#0054fc]" size={20} />
           <h2 className="mt-5 text-xl font-black">Campanhas</h2>
           <p className="mt-2 text-sm text-[#74717d]">{activationStats.active} ativas · {activationStats.scheduled} agendadas</p>
-          <p className="mt-5 text-sm leading-6 text-[#686570]">Faça o site acompanhar promoções, lançamentos, agenda e o que precisa vender agora.</p>
+          <p className="mt-5 text-sm leading-6 text-[#686570]">Faça a página acompanhar promoções, lançamentos, agenda e o que precisa vender agora.</p>
           <Link href={`/app/projects/${project.id}/activations`} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#dedbe8] px-4 text-sm font-bold text-[#0054fc]">Ver campanhas <ArrowRight size={15}/></Link>
         </div>
         <div className="rounded-[24px] bg-[#1d1b26] p-6 text-white">
@@ -125,25 +125,25 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
         <div>
           <p className="text-sm font-bold text-[#0054fc]">{project.name}</p>
           <h1 className="mt-2 max-w-3xl text-3xl font-black tracking-[-.045em] sm:text-4xl">
-            Sua Sobe está transformando atenção em leads?
+            Sua Sobe está transformando atenção em oportunidades?
           </h1>
           <p className="mt-3 text-sm text-[#74717d]">
             Acompanhe o caminho completo — da visita à conversão confirmada.
           </p>
         </div>
         <Link
-          href={`/app/projects/${project.id}/site`}
+          href={`/app/projects/${project.id}/editor`}
           className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0054fc] px-4 text-sm font-bold text-white"
         >
           <Globe2 size={17} />
-          Editar site
+          Editar link da bio
         </Link>
       </header>
       <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
           ["Visitas", stats.visits, Eye],
           ["Intenções", stats.intentions, MousePointerClick],
-          ["Leads", stats.opportunities, Users],
+          ["Oportunidades", stats.opportunities, Users],
           ["Conversões", stats.conversions, CheckCircle2],
         ].map(([label, value, Icon]) => {
           const CardIcon = Icon as typeof Eye;
@@ -166,7 +166,7 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
           <Zap className="text-[#0054fc]" size={20} />
           <h2 className="mt-5 text-xl font-black">Campanhas</h2>
           <p className="mt-2 text-sm text-[#74717d]">{activationStats.active} ativas · {activationStats.scheduled} agendadas</p>
-          <p className="mt-5 text-sm leading-6 text-[#686570]">Faça o site acompanhar promoções, lançamentos, agenda e o que precisa vender agora.</p>
+          <p className="mt-5 text-sm leading-6 text-[#686570]">Faça a página acompanhar promoções, lançamentos, agenda e o que precisa vender agora.</p>
           <Link href={`/app/projects/${project.id}/activations`} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#dedbe8] px-4 text-sm font-bold text-[#0054fc]">Ver campanhas <ArrowRight size={15} /></Link>
         </div>
         <div className="rounded-[24px] bg-[#1d1b26] p-6 text-white">
@@ -188,15 +188,15 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
               href={`/app/projects/${project.id}/analytics`}
               className="text-xs font-black text-[#0054fc]"
             >
-              Ver analytics <ArrowRight className="inline" size={14} />
+              Ver resultados <ArrowRight className="inline" size={14} />
             </Link>
           </div>
           <div className="mt-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {[
               [
                 project.status === "published"
-                  ? "Site publicado"
-                  : "Site em rascunho",
+                  ? "Página publicada"
+                  : "Página em rascunho",
                 Globe2,
               ],
               [`${pages.length} página${pages.length === 1 ? "" : "s"}`, Eye],
@@ -205,7 +205,7 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
                 `${project.entryPoints?.length || 0} links/origens ativos`,
                 MousePointerClick,
               ],
-              [`${stats.opportunities} leads este mês`, Users],
+              [`${stats.opportunities} oportunidades este mês`, Users],
             ].map(([text, Icon]) => {
               const ItemIcon = Icon as typeof Globe2;
               return (
@@ -233,7 +233,7 @@ export function BusinessOverview({ projectId }: { projectId: string }) {
             {[
               "sua descrição",
               "sua logo",
-              "seu site atual",
+              "sua página atual",
               "seus PDFs",
               "seus produtos e serviços",
             ].map((item) => (

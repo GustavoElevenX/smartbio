@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isExternalUrl } from "@/lib/external-url";
 
 export const presenceActionSchema = z.object({
   type: z.enum(["start_conversion_goal", "go_to_presence_page", "scroll_to_section", "open_url", "open_whatsapp", "start_activation"]),
@@ -6,8 +7,9 @@ export const presenceActionSchema = z.object({
   conversionGoalId: z.string().min(1).optional(),
   pageId: z.string().min(1).optional(),
   anchor: z.string().regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
-  url: z.url().optional(),
-  whatsappPhone: z.string().regex(/^\+?[1-9]\d{7,14}$/).optional(),
+  url: z.string().trim().max(2048).refine(isExternalUrl, "Informe um link HTTP ou HTTPS válido.").optional(),
+  whatsappPhone: z.string().refine((value) => /^\+?[1-9]\d{7,14}$/.test(value.replace(/[\s().-]/g, "")), "Informe um WhatsApp válido com DDD e código do país.").optional(),
+  whatsappDestinationId: z.string().min(1).optional(),
   whatsappMessage: z.string().max(500).optional(),
   activationId: z.string().uuid().optional(),
   style: z.enum(["primary", "secondary", "ghost", "link"]).default("primary"),
@@ -18,7 +20,6 @@ export const presenceActionSchema = z.object({
     go_to_presence_page: "pageId",
     scroll_to_section: "anchor",
     open_url: "url",
-    open_whatsapp: "whatsappPhone",
     start_activation: "activationId",
   };
   const field = required[action.type];

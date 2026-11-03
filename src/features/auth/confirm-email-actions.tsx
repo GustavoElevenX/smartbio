@@ -13,7 +13,7 @@ export function ConfirmEmailActions() {
     setLoading(true);
     const supabase = createClient();
     if (supabase && email.trim()) await supabase.auth.resend({ type: "signup", email: email.trim(), options: { emailRedirectTo: `${location.origin}/auth/callback?next=/app/onboarding` } });
-    setMessage("Se o cadastro existir, um novo link foi enviado.");
+    setMessage("Se o cadastro existir, um novo endereço de confirmação foi enviado.");
     setLoading(false);
   }
   return (

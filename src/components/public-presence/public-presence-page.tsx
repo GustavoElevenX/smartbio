@@ -10,6 +10,7 @@ import { PresenceSectionTracker } from "./presence-section-tracker";
 import { PresenceMobileMenu } from "./presence-mobile-menu";
 import type { PublicActivation } from "@/features/activations/activation.types";
 import { ActivationRuntimeProvider } from "@/components/public-activations/activation-runtime-provider";
+import { resolveWhatsAppTarget } from "@/features/whatsapp/whatsapp-destination";
 
 export type PresenceEditorHooks = {
   selectedSectionId?: string;
@@ -85,6 +86,7 @@ export function PresencePageContent({
   publicActivations?: PublicActivation[];
   editorHooks?: PresenceEditorHooks;
 }) {
+  const whatsappFallbackPhone = resolveWhatsAppTarget(project, { destinationId: page.settings.header.primaryAction?.whatsappDestinationId, phone: page.settings.header.primaryAction?.whatsappPhone })?.phone;
   const heroOverride = publicActivations
     .flatMap((activation) =>
       activation.placements.map((placement) => ({ activation, placement })),
@@ -179,6 +181,7 @@ export function PresencePageContent({
               {header.primaryAction ? (
                 <PresenceActionButton
                   action={header.primaryAction}
+                  whatsappFallbackPhone={whatsappFallbackPhone}
                   context={{ pageId: page.id }}
                   pageHref={
                     primaryActionHref
@@ -198,6 +201,7 @@ export function PresencePageContent({
                   ? pagePath(project, primaryActionHref)
                   : undefined
               }
+              whatsappFallbackPhone={whatsappFallbackPhone}
             />
           </div>
         </header>

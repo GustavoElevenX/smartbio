@@ -19,10 +19,12 @@ export function buildJourneyHandoff(input: {
   intent?: CommercialArchitecture["intents"][number] | { label: string };
   answers: Record<string, unknown>;
   fields: FormField[];
+  includeAll?: boolean;
   selectedLocation?: Pick<BusinessLocation, "id" | "name">;
   selectedOfferings?: Array<{ id: string; name: string }>;
+  selections?: Array<{ stepId: string; stepTitle: string; optionId: string; optionLabel: string }>;
 }) {
-  const includeAll = input.blueprint?.completion.handoffSummary === true;
+  const includeAll = input.includeAll === true || input.blueprint?.completion.handoffSummary === true;
   const entries = input.fields.flatMap((field) => {
     if (!isFormFieldVisible(field, input.answers)) return [];
     if (!includeAll && field.includeInHandoff === false) return [];
@@ -30,6 +32,12 @@ export function buildJourneyHandoff(input: {
     if (input.selectedLocation && [input.selectedLocation.id, input.selectedLocation.name].includes(value)) return [];
     return value ? [{ key: field.key, label: field.handoffLabel || field.label, value }] : [];
   });
+  for (const selection of input.selections || []) {
+    const label = selection.stepTitle.trim() || "Escolha";
+    const value = selection.optionLabel.trim();
+    if (!value || entries.some((item) => item.value.toLocaleLowerCase("pt-BR") === value.toLocaleLowerCase("pt-BR"))) continue;
+    entries.push({ key: `choice_${selection.stepId}`, label, value });
+  }
   if (input.selectedOfferings?.length && !entries.some((item) => /produto|oferta|servi/i.test(item.label))) {
     entries.push({ key: "selected_offerings", label: input.selectedOfferings.length > 1 ? "Opções" : "Opção", value: input.selectedOfferings.map((item) => item.name).join(", ") });
   }

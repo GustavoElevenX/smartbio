@@ -38,6 +38,7 @@ export interface PresenceAction {
   anchor?: string;
   url?: string;
   whatsappPhone?: string;
+  whatsappDestinationId?: string;
   whatsappMessage?: string;
   activationId?: string;
   style?: "primary" | "secondary" | "ghost" | "link";

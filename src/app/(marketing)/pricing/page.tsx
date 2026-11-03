@@ -16,7 +16,7 @@ const benefits = [
   "Formulários e captação de oportunidades",
   "Orçamentos e agendamentos",
   "Catálogo, direcionamentos e multiunidades",
-  "Analytics para entender o que acontece depois do clique",
+  "Análises para entender o que acontece depois do clique",
   "Até 50 ações com IA por mês",
   "Identidade visual criada a partir da sua marca",
   "Extração automática das cores da sua logo",
@@ -73,7 +73,7 @@ export default function PricingPage() {
             </p>
           </div>
           <p className="mx-auto mt-14 max-w-3xl text-center text-lg leading-8 text-[#405064]">
-            {SOBE_POSITIONING} O link da bio é um ponto de entrada para essa estrutura — não o produto inteiro.
+            {SOBE_POSITIONING} O endereço da bio é um ponto de entrada para essa estrutura — não o produto inteiro.
           </p>
         </div>
       </section>

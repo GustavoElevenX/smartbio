@@ -38,6 +38,7 @@ describe("fechamento de ativações e Presence", () => {
 
   it("bloqueia URL, telefone e ativação ausentes com mensagens específicas", () => {
     const project = structuredClone(findDemoProject("casadesucosmix")!);
+    project.phone = undefined;
     const page = createPresencePage(project.id, "Início", "home");
     page.sections[0].content = {
       primaryAction: { type: "open_url", label: "Abrir", url: "javascript:alert(1)" },

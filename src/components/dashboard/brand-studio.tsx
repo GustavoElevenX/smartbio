@@ -11,7 +11,7 @@ import {
   Sparkles,
   Upload,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Label, Select } from "@/components/ui/field";
 import { ExperienceCanvas } from "@/components/public-experience/public-experience";
 import { analyzeBrandFile } from "@/features/brand-intelligence/brand-analyzer";
@@ -39,13 +39,51 @@ export function BrandStudio({ projectId }: { projectId: string }) {
     "identity" | "colors" | "typography" | "style"
   >("identity");
   const [analyzing, setAnalyzing] = useState(false);
-  const [saved, setSaved] = useState(true);
+  const [saveState, setSaveState] = useState<"saved" | "saving" | "error">(
+    "saved",
+  );
   const [error, setError] = useState("");
-  useEffect(() => { void projectRepository.getProject(projectId).then((found) => setProject(found || null)).catch(() => setProject(null)); }, [projectId]);
+  const pendingSave = useRef<Project | null>(null);
+  const saveInFlight = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    void projectRepository
+      .getProject(projectId)
+      .then((found) => setProject(found || null))
+      .catch(() => setProject(null));
+    return () => {
+      mounted.current = false;
+    };
+  }, [projectId]);
+  async function persistPending() {
+    if (saveInFlight.current) return;
+    saveInFlight.current = true;
+    let lastError = "";
+    while (pendingSave.current) {
+      const snapshot = pendingSave.current;
+      pendingSave.current = null;
+      try {
+        await projectRepository.saveBrand(snapshot);
+        lastError = "";
+      } catch (caught) {
+        lastError =
+          caught instanceof Error
+            ? caught.message
+            : "Não foi possível salvar a identidade.";
+      }
+    }
+    saveInFlight.current = false;
+    if (!mounted.current) return;
+    setError(lastError);
+    setSaveState(lastError ? "error" : "saved");
+  }
   function update(next: Project) {
     setProject(next);
-    setSaved(false);
-    void projectRepository.saveProject(next).then(() => setSaved(true)).catch(() => setError("Não foi possível salvar a identidade."));
+    setError("");
+    setSaveState("saving");
+    pendingSave.current = next;
+    void persistPending();
   }
   async function logoChanged(file?: File) {
     if (!file || !project) return;
@@ -121,13 +159,18 @@ export function BrandStudio({ projectId }: { projectId: string }) {
         </div>
         <div className="flex items-center gap-3">
           <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#73737d]">
-            {saved ? (
+            {saveState === "saved" ? (
               <>
                 <Check size={14} className="text-[#15966c]" /> Salvo
               </>
-            ) : (
+            ) : saveState === "saving" ? (
               <>
                 <LoaderCircle size={14} className="animate-spin" /> Salvando…
+              </>
+            ) : (
+              <>
+                <RefreshCw size={14} className="text-[#b54747]" /> Falha ao
+                salvar
               </>
             )}
           </span>
@@ -139,6 +182,23 @@ export function BrandStudio({ projectId }: { projectId: string }) {
           </Link>
         </div>
       </div>
+      {error && (
+        <div
+          role="alert"
+          className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#fff0f0] p-3 text-xs font-semibold text-[#a93d3d]"
+        >
+          <span>{error}</span>
+          {saveState === "error" && (
+            <button
+              type="button"
+              onClick={() => update(project)}
+              className="focus-ring inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 font-bold"
+            >
+              <RefreshCw size={13} /> Tentar novamente
+            </button>
+          )}
+        </div>
+      )}
       <div className="mt-7 grid overflow-hidden rounded-[26px] border border-[#e3e2e9] bg-white xl:grid-cols-[minmax(480px,1fr)_460px]">
         <section>
           <div className="flex overflow-x-auto border-b border-[#e6e5ec] px-4">
@@ -165,7 +225,7 @@ export function BrandStudio({ projectId }: { projectId: string }) {
                   <h2 className="font-extrabold">Logos e favicon</h2>
                 </div>
                 <p className="mt-2 text-sm leading-6 text-[#74747e]">
-                  O original é preservado. O corte existe apenas no preview.
+                  O original é preservado. O corte existe apenas na prévia.
                 </p>
                 <div className="mt-6 grid gap-4 sm:grid-cols-2">
                   <label className="focus-within:ring-4 focus-within:ring-[#0054fc]/10 flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-[20px] border-2 border-dashed border-[#d8d6e3] bg-[#f7fbff] p-4">
@@ -232,11 +292,6 @@ export function BrandStudio({ projectId }: { projectId: string }) {
                   <div className="mt-4 flex items-center gap-2 rounded-xl bg-[#eaf3ff] p-3 text-xs font-bold text-[#0054fc]">
                     <LoaderCircle size={16} className="animate-spin" />{" "}
                     Extraindo paleta e verificando contraste…
-                  </div>
-                )}
-                {error && (
-                  <div className="mt-4 rounded-xl bg-[#fff0f0] p-3 text-xs font-semibold text-[#a93d3d]">
-                    {error}
                   </div>
                 )}
                 <div className="mt-7 rounded-[18px] border border-[#e3e2e9] p-5">
@@ -658,7 +713,7 @@ export function BrandStudio({ projectId }: { projectId: string }) {
         <aside className="flex min-h-[700px] items-center justify-center border-l border-[#e5e4eb] bg-[#efedf4] p-7">
           <div className="w-full max-w-[340px]">
             <div className="mb-3 flex items-center justify-between text-xs font-semibold text-[#777781]">
-              <span>Preview ao vivo</span>
+              <span>Prévia em tempo real</span>
               <span>{project.visualDirection}</span>
             </div>
             <div className="h-[640px] overflow-hidden rounded-[38px] border-[6px] border-[#222126] bg-white p-1.5 shadow-[0_30px_80px_rgba(29,25,55,.2)]">

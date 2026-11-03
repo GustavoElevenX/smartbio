@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { apiError, apiSuccess } from "@/server/http/api-response";
 import { withAuthenticatedActor } from "@/server/http/with-authenticated-actor";
+import { listMemoryWorkspaceMembers } from "@/server/workspaces/workspace-memory-store";
 
 export const GET = withAuthenticatedActor(
   async (
@@ -12,18 +13,7 @@ export const GET = withAuthenticatedActor(
     if (workspaceId !== actor.workspaceId)
       return apiError("Acesso negado.", 403, "workspace_access_denied");
     if (actor.persistence === "memory") {
-      return apiSuccess([
-        {
-          user_id: actor.userId,
-          role: "owner",
-          created_at: new Date(0).toISOString(),
-          profiles: {
-            full_name: "Usuário local",
-            email: actor.email,
-            avatar_url: null,
-          },
-        },
-      ]);
+      return apiSuccess(listMemoryWorkspaceMembers(actor));
     }
     const { data, error } = await createServiceClient()!
       .from("workspace_members")

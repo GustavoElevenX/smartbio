@@ -1,15 +1,16 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { commercialArchitectureSchema, extractedBusinessSourceSchema, setupDraftInputSchema, setupInitialInputSchema, structuredJourneyQuestionSchema, type AISetupSession, type CommercialArchitecture, type ExtractedBusinessSource, type SetupDraftInput, type SetupInitialInput, type SetupQuestion, type SourceReference } from "@/features/ai-setup/ai-setup.schema";
+import { commercialArchitectureSchema, extractedBusinessSourceSchema, setupDraftInputSchema, setupInitialInputSchema, structuredJourneyQuestionSchema, type AISetupSession, type ArchitectureResolutionTarget, type CommercialArchitecture, type ExtractedBusinessSource, type SetupDraftInput, type SetupInitialInput, type SetupQuestion, type SourceReference } from "@/features/ai-setup/ai-setup.schema";
 import { actionsFromActivationUnderstanding, deterministicActivationUnderstanding, markActionsConfirmed, markOfferingsConfirmed, normalizeActivationUnderstanding, understandingOfferingNames } from "@/features/ai-setup/activation-understanding";
-import { activationUnderstandingFromCommercialArchitecture, capabilitiesFromCommercialArchitecture, commercialArchitectureFromActivationUnderstanding, deterministicCommercialArchitecture, normalizeCommercialArchitecture, requirementsFromCommercialArchitecture, visitorActionsFromCommercialArchitecture } from "@/features/ai-setup/commercial-architecture";
+import { activationUnderstandingFromCommercialArchitecture, capabilitiesFromCommercialArchitecture, commercialArchitectureFromActivationUnderstanding, deterministicCommercialArchitecture, normalizeCommercialArchitecture, prepareFirstVersionArchitecture, requirementsFromCommercialArchitecture, visitorActionsFromCommercialArchitecture } from "@/features/ai-setup/commercial-architecture";
 import { reconcileCommercialArchitectureRequirements, resolveArchitectureRequirement, validateCommercialArchitectureForMaterialization } from "@/features/ai-setup/architecture-resolution";
 import { assertArchitectureRuntimeContract, reconcileProjectWithCommercialArchitecture } from "@/features/ai-setup/architecture-materialization";
 import { assertActivationStateInvariants } from "@/features/ai-setup/activation-state-invariants";
 import { materializeSetupAnswers } from "@/features/ai-setup/materialize-setup-answers";
 import { stageGeneratedDraft } from "@/features/ai-setup/stage-generated-draft";
 import { normalizeSetupPhone } from "@/features/ai-setup/setup-phone";
+import { buildSetupAnswerContext, deterministicAnswerInterpretation, type SetupAnswerContext, type SetupAnswerInterpretation } from "@/features/ai-setup/setup-answer-interpretation";
 import { buildQualificationSuggestions } from "@/features/ai-setup/qualification-proposal";
 import { createDiscoveryPlan, discoveryContextSignature, discoveryPlanIsReady } from "@/features/qualification/discovery-plan";
 import { offerNamesFromSetup } from "@/features/qualification/offer-context";
@@ -34,16 +35,21 @@ import { activateTrialAfterFirstStructure } from "@/server/entitlements/trial-se
 import { recordPlatformGrowthEvent } from "@/server/platform-acquisition/platform-acquisition";
 import { assertProjectAccess } from "@/server/auth/project-access";
 import { loadProjectForActor } from "@/server/projects/load-project-for-actor";
-import { materializeSuggestedSiteStructure } from "@/features/site-composer/materialize-site-structure";
-import { suggestedSiteStructureSchema } from "@/features/site-composer/site-composer.schema";
-import { suggestSiteStructure } from "@/features/site-composer/site-structure-suggester";
-import { inferBusinessShape } from "@/features/site-composer/business-shape";
 import { uploadMedia } from "@/server/media/media-service";
 import { requireActivationPreflight } from "@/server/ai-setup/activation-preflight";
 import { AISetupNotFoundError } from "@/server/ai-setup/ai-setup-errors";
 import { logAISetupLifecycle } from "@/server/ai-setup/ai-setup-observability";
 import { projectCommercialContextService } from "@/server/commercial-context/project-commercial-context-service";
 import type { DataRequirement, ExperienceCompositionInput, Project } from "@/types";
+
+function businessBrief(input: SetupInitialInput | AISetupSession["initialInput"]) {
+  const offeringType = input.offeringType === "products" ? "Produtos" : input.offeringType === "services" ? "Serviços" : input.offeringType === "both" ? "Produtos e serviços" : "Não informado";
+  const salesChannel = input.salesChannel === "whatsapp" ? "WhatsApp" : input.salesChannel === "phone" ? "Telefone" : input.salesChannel === "link" ? "Site ou link de vendas" : input.salesChannel === "in_person" ? "Atendimento presencial" : input.salesChannel === "other" ? "Outro canal" : "";
+  const resale = input.resaleAvailable === true
+    ? `O negócio informou que também fornece produtos para revenda. ${input.resaleDetails?.trim() ? `Itens e condições descritos pelo negócio: ${input.resaleDetails.trim()}` : "Os itens e as condições de revenda ainda não foram informados; não assuma que todo o catálogo está disponível para revenda nem invente pedido mínimo ou preço."}`
+    : input.resaleAvailable === false ? "O negócio informou que não fornece produtos para revenda." : "";
+  return [input.description, `Tipo de oferta informado: ${offeringType}.`, input.offerDetails?.trim() ? `Descrição detalhada das ofertas, fornecida pelo negócio:\n${input.offerDetails.trim()}` : "", resale, salesChannel ? `Canal principal de venda ou contratação: ${salesChannel}${input.salesDestination?.trim() ? `. Destino informado: ${input.salesDestination.trim()}` : ""}.` : ""].filter(Boolean).join("\n\n");
+}
 
 function compositionInput(session: AISetupSession): ExperienceCompositionInput {
   const destinationAnswer = Object.entries(session.answers).find(([key]) => key.endsWith(".destination") || key.endsWith(".completion"))?.[1];
@@ -57,41 +63,132 @@ function compositionInput(session: AISetupSession): ExperienceCompositionInput {
       : normalizedDestination.includes("telefone")
         ? "Telefone"
         : destinationText;
+  const architectureWhatsApp = session.commercialArchitecture?.channels
+    .filter((channel) => channel.type === "whatsapp" && channel.value)
+    .toSorted((left, right) => Number(right.isFallback) - Number(left.isFallback))[0]?.value;
+  const phone = session.initialInput.salesChannel && !["whatsapp", "phone"].includes(session.initialInput.salesChannel)
+    ? undefined
+    : session.initialInput.phone || (architectureWhatsApp ? normalizeSetupPhone(architectureWhatsApp) : undefined);
   return {
     businessName: session.initialInput.businessName,
-    businessDescription: session.initialInput.description,
+    businessDescription: businessBrief(session.initialInput),
     primaryGoal: session.visitorActions?.find((action) => action.isPrimary)?.label || (typeof objective === "string" && objective.trim() ? objective : "Criar uma estrutura comercial"),
     primaryDestination: primaryDestination
       ? primaryDestination
-      : session.initialInput.phone ? "WhatsApp" : session.initialInput.websiteUrl ? "Site" : "Formulário",
+      : session.initialInput.salesChannel === "whatsapp" ? "WhatsApp"
+        : session.initialInput.salesChannel === "phone" ? "Telefone"
+          : session.initialInput.salesChannel === "link" ? "Site"
+            : session.initialInput.salesChannel === "in_person" ? "Atendimento presencial"
+              : session.initialInput.salesChannel === "other" ? session.initialInput.salesDestination || "Outro canal"
+                : phone ? "WhatsApp" : session.initialInput.websiteUrl ? "Site" : "Formulário",
     slug: slugify(session.initialInput.businessName),
-    phone: session.initialInput.phone,
-    websiteUrl: session.initialInput.websiteUrl,
+    phone,
+    websiteUrl: session.initialInput.salesChannel === "link" ? session.initialInput.salesDestination : session.initialInput.salesChannel ? undefined : session.initialInput.websiteUrl,
   };
 }
 
-function initialSiteInstruction(project: Project, session: AISetupSession) {
-  const actions = (session.visitorActions || []).map((action) => action.label).join(", ");
-  const verified = session.missingRequirements
-    .filter((requirement) => requirement.status === "verified")
-    .map((requirement) => `${requirement.label}: ${String(requirement.value ?? session.answers[requirement.key] ?? "confirmado")}`)
-    .join("; ");
-  const sources = session.sources.filter((source) => source.status === "processed").map((source) => source.name).join(", ");
-  const architecture = session.commercialArchitecture?.journeyBlueprints.map((blueprint) => {
-    const intent = session.commercialArchitecture?.intents.find((item) => item.id === blueprint.intentId);
-    const channel = session.commercialArchitecture?.channels.find((item) => item.id === blueprint.completion.channelId);
-    return `${intent?.label || blueprint.objective} → ${blueprint.mode}${channel ? ` → ${channel.label}` : ""}`;
-  }).join("; ");
+function firstWebsiteReference(value?: string) {
+  const raw = value?.trim();
+  if (!raw) return undefined;
+  const url = raw.match(/https?:\/\/[^\s<>"']+/i)?.[0]?.replace(/[),.;!?]+$/, "");
+  if (url) return url;
+  const handle = raw.match(/(?:^|\s)@([a-z0-9._]{2,30})(?:\s|$)/i)?.[1];
+  return handle ? `https://instagram.com/${handle}` : undefined;
+}
+
+function normalizedInitialInput(input: SetupInitialInput) {
+  return {
+    ...input,
+    websiteUrl: firstWebsiteReference(input.websiteUrl),
+    phone: normalizeSetupPhone(input.phone),
+  };
+}
+
+function serializedInitialInput(input: SetupInitialInput) {
   return [
-    `Crie a primeira página específica de ${project.name}.`,
-    project.description,
-    project.category ? `Categoria: ${project.category}.` : "",
-    actions ? `Ações confirmadas pelo usuário, em ordem de prioridade: ${actions}.` : "",
-    architecture ? `Arquitetura comercial confirmada, que não deve ser reinventada pelo design: ${architecture}.` : "",
-    verified ? `Informações confirmadas no onboarding: ${verified}.` : "",
-    sources ? `Materiais analisados: ${sources}.` : "",
-    "Mostre múltiplas ações legítimas quando existirem, conecte apenas goals reais e não invente fatos, preços, provas ou números.",
-  ].filter(Boolean).join(" ");
+    `Nome do negócio: ${input.businessName}`,
+    `Descrição fornecida: ${input.description}`,
+    input.offeringType ? `Tipo de oferta informado: ${input.offeringType}` : "",
+    input.offerDetails?.trim() ? `Detalhes das ofertas informados pelo negócio: ${input.offerDetails.trim()}` : "",
+    input.resaleAvailable === true ? `Fornece para revenda: sim.${input.resaleDetails?.trim() ? ` Itens e condições informados: ${input.resaleDetails.trim()}` : " Itens e condições ainda não informados."}` : input.resaleAvailable === false ? "Fornece para revenda: não." : "",
+    input.salesChannel ? `Canal principal de venda ou contratação: ${input.salesChannel}${input.salesDestination?.trim() ? `; destino: ${input.salesDestination.trim()}` : ""}` : "",
+    input.websiteUrl ? `Referência de site, rede social, cardápio ou outro link: ${input.websiteUrl}` : "",
+    input.phone ? `Contato informado: ${input.phone}` : "",
+  ].filter(Boolean).join("\n");
+}
+
+async function interpretFreeAnswer(
+  actor: AISetupActor,
+  session: AISetupSession,
+  requirement: DataRequirement,
+  value: unknown,
+  resolutionTarget?: ArchitectureResolutionTarget | null,
+) {
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  let interpretation = deterministicAnswerInterpretation(value);
+  let interpretationMode: SetupAnswerContext["interpretationMode"] = "deterministic_fallback";
+  if (isAIConfigured()) {
+    const provider = getAIProvider();
+    if (provider.interpretSetupAnswer) {
+      try {
+        interpretation = await provider.interpretSetupAnswer({
+          answer: value,
+          requirement: { key: requirement.key, label: requirement.label, reason: requirement.reason },
+          resolutionTarget,
+          locations: (session.commercialArchitecture?.locations || []).map((location) => ({ id: location.id, label: location.label, address: location.address })),
+          channels: (session.commercialArchitecture?.channels || []).map((channel) => ({ id: channel.id, type: channel.type, label: channel.label, value: channel.value })),
+          workspaceId: actor.workspaceId,
+          setupSessionId: session.id,
+          userId: actor.userId,
+        });
+        interpretationMode = "ai";
+      } catch {
+        // O fallback conserva a resposta integral e os dados reconhecíveis se a IA estiver indisponível.
+      }
+    }
+  }
+  return {
+    interpretation,
+    context: buildSetupAnswerContext({
+      sessionId: session.id,
+      answerKey: requirement.key,
+      question: requirement.label,
+      rawAnswer: value,
+      interpretation,
+      interpretationMode,
+    }),
+  };
+}
+
+function interpretedResolutionValue(
+  interpretation: SetupAnswerInterpretation | undefined,
+  target: ArchitectureResolutionTarget,
+  originalValue: unknown,
+) {
+  if (!interpretation) return originalValue;
+  if (target.type === "location_channel_mapping" && interpretation.locationMappings.length) return interpretation.locationMappings;
+  if (interpretation.textValue) return interpretation.textValue;
+  const expectedKind = target.type === "external_url"
+    ? "url"
+    : target.type === "channel_value"
+      ? target.channelType === "external_url" ? "url" : target.channelType
+      : undefined;
+  return interpretation.recognizedDetails.find((detail) => !expectedKind || detail.kind === expectedKind)?.value || originalValue;
+}
+
+async function initialAnswerContext(actor: AISetupActor, session: AISetupSession, input: SetupInitialInput) {
+  const requirement: DataRequirement = {
+    id: `initial-business-context:${session.id}`,
+    key: "initial.business_context",
+    label: "Informações iniciais do negócio",
+    capability: "project",
+    status: "verified",
+    severity: "warning",
+    reason: "Interpretar integralmente tudo o que a pessoa informou ao iniciar a criação guiada.",
+    origin: "user",
+    sourceId: `setup-answer:${session.id}:initial.business_context`,
+  };
+  return (await interpretFreeAnswer(actor, session, requirement, serializedInitialInput(input)))?.context;
 }
 
 function resolvedRequirements(requirements: DataRequirement[], answers: Record<string, unknown>) {
@@ -171,7 +268,7 @@ async function composePersistedDiscoveryPlan(
   const contextualNames = architecture?.offerings.map((item) => item.name) || understandingOfferingNames(session.activationUnderstanding);
   const offeringNames = contextualNames.length
     ? contextualNames
-    : offerNamesFromSetup(session.initialInput.description, answers["qualification.offerings"]);
+    : offerNamesFromSetup(businessBrief(session.initialInput), answers["qualification.offerings"]);
   if (offeringNames.length < 2) return undefined;
   const primary = session.visitorActions.find((action) => action.key === "recommendation" || action.semanticKey === "recommendation") || session.visitorActions[0];
   const primaryIntent = architecture?.intents.find((item) => item.semanticKey === primary?.key) || architecture?.intents[0];
@@ -441,11 +538,8 @@ export class AISetupService {
   async start(actor: AISetupActor, initialInput: SetupInitialInput, sources: SourceReference[] = []) {
     await requireActivationPreflight(actor);
     const now = new Date().toISOString();
-    const normalizedInput = {
-      ...initialInput,
-      phone: normalizeSetupPhone(initialInput.phone),
-    };
-    const session: AISetupSession = {
+    const normalizedInput = normalizedInitialInput(initialInput);
+    let session: AISetupSession = {
       id: randomUUID(),
       workspaceId: actor.workspaceId,
       status: "collecting",
@@ -462,6 +556,8 @@ export class AISetupService {
       createdAt: now,
       updatedAt: now,
     };
+    const initialContext = await initialAnswerContext(actor, session, initialInput);
+    if (initialContext) session = { ...session, answerContexts: [initialContext] };
     const created = await this.repository.create(actor, session);
     if (actor.persistence === "database") {
       const sourceIds = [...sources.map((source) => source.id), ...(normalizedInput.brandIdentity?.sourceId ? [normalizedInput.brandIdentity.sourceId] : [])];
@@ -489,6 +585,7 @@ export class AISetupService {
       ...session,
       status: "collecting",
       initialInput: draft,
+      answerContextAudit: undefined,
       discoveryPlan: session.discoveryPlan ? { ...session.discoveryPlan, status: "invalidated" } : undefined,
       lastError: undefined,
     });
@@ -502,10 +599,8 @@ export class AISetupService {
     let session = await this.get(actor, id);
     if (revision?.initialInput) {
       const revisedSources = revision.sources ?? session.sources;
-      const revisedInput = {
-        ...revision.initialInput,
-        phone: normalizeSetupPhone(revision.initialInput.phone),
-      };
+      const revisedInput = normalizedInitialInput(revision.initialInput);
+      const initialContext = await initialAnswerContext(actor, { ...session, initialInput: revisedInput }, revision.initialInput);
       session = await this.repository.update(actor, {
         ...session,
         projectId: undefined,
@@ -519,6 +614,8 @@ export class AISetupService {
         visitorActions: [],
         actionsConfirmed: false,
         answers: {},
+        answerContexts: initialContext ? [initialContext] : [],
+        answerContextAudit: undefined,
         missingRequirements: [],
         questions: [],
         sources: revisedSources,
@@ -551,7 +648,7 @@ export class AISetupService {
     const fallbackProfile = new RuleBasedBusinessAnalyzer().analyze(input);
     let profile = fallbackProfile;
     let commercialArchitecture: CommercialArchitecture;
-    let activationUnderstanding = deterministicActivationUnderstanding({ profile: fallbackProfile, businessDescription: session.initialInput.description, phone: session.initialInput.phone, websiteUrl: session.initialInput.websiteUrl });
+    let activationUnderstanding = deterministicActivationUnderstanding({ profile: fallbackProfile, businessDescription: businessBrief(session.initialInput), phone: input.phone, websiteUrl: input.websiteUrl });
     let providerQuestions: SetupQuestion[] | undefined;
     let usedFallback = !isAIConfigured() || sourceEnrichmentFailed;
     let contextualArchitectureProduced = false;
@@ -570,9 +667,9 @@ export class AISetupService {
 
     commercialArchitecture = deterministicCommercialArchitecture({
       businessName: session.initialInput.businessName,
-      businessDescription: session.initialInput.description,
-      phone: session.initialInput.phone,
-      websiteUrl: session.initialInput.websiteUrl,
+      businessDescription: businessBrief(session.initialInput),
+      phone: input.phone,
+      websiteUrl: input.websiteUrl,
       profile,
       sources: sourceData,
     });
@@ -592,9 +689,9 @@ export class AISetupService {
           ? provider.analyzeCommercialArchitecture(analysisInput)
           : provider.analyzeActivationUnderstanding(analysisInput).then((understanding) => commercialArchitectureFromActivationUnderstanding(understanding, {
               businessName: session.initialInput.businessName,
-              businessDescription: session.initialInput.description,
-              phone: session.initialInput.phone,
-              websiteUrl: session.initialInput.websiteUrl,
+              businessDescription: businessBrief(session.initialInput),
+              phone: input.phone,
+              websiteUrl: input.websiteUrl,
               profile,
               sources: sourceData,
             }));
@@ -621,6 +718,8 @@ export class AISetupService {
       activationUnderstanding = normalizeActivationUnderstanding(activationUnderstandingFromCommercialArchitecture(commercialArchitecture));
     }
 
+    commercialArchitecture = prepareFirstVersionArchitecture(commercialArchitecture);
+    activationUnderstanding = normalizeActivationUnderstanding(activationUnderstandingFromCommercialArchitecture(commercialArchitecture));
     const proposedActions = visitorActionsFromCommercialArchitecture(commercialArchitecture);
     const provisional = await reconcileActivationState(actor, {
       ...session,
@@ -778,10 +877,23 @@ export class AISetupService {
     if (!requirement) throw new Error("Essa pergunta não pertence à sessão atual.");
     let activationUnderstanding = session.activationUnderstanding;
     let commercialArchitecture = session.commercialArchitecture;
-    if (commercialArchitecture && key.startsWith("architecture.")) {
-      const fact = commercialArchitecture.journeyBlueprints.flatMap((blueprint) => blueprint.requiredFacts).find((item) => item.key === key);
-      if (!fact) throw new Error("Esse blocker não possui um target estrutural ativo.");
-      const result = resolveArchitectureRequirement({ architecture: commercialArchitecture, requirement: fact, answer: value, sourceId: session.id });
+    const architectureFact = commercialArchitecture
+      ? commercialArchitecture.journeyBlueprints.flatMap((blueprint) => blueprint.requiredFacts).find((item) => item.key === key)
+      : undefined;
+    if (commercialArchitecture && key.startsWith("architecture.") && !architectureFact) throw new Error("Esse blocker não possui um target estrutural ativo.");
+    const interpretedAnswer = await interpretFreeAnswer(actor, session, requirement, value, architectureFact?.resolutionTarget);
+    const answerContexts = interpretedAnswer
+      ? [...(session.answerContexts || []).filter((context) => context.answerKey !== key), interpretedAnswer.context]
+      : session.answerContexts;
+    if (commercialArchitecture && architectureFact) {
+      const fact = architectureFact;
+      const interpretedValue = fact.resolutionTarget
+        ? interpretedResolutionValue(interpretedAnswer?.interpretation, fact.resolutionTarget, value)
+        : value;
+      let result = resolveArchitectureRequirement({ architecture: commercialArchitecture, requirement: fact, answer: interpretedValue, sourceId: interpretedAnswer?.context.sourceId || session.id, evidenceExcerpt: interpretedAnswer?.context.rawAnswer });
+      if (!result.resolved && interpretedValue !== value) {
+        result = resolveArchitectureRequirement({ architecture: commercialArchitecture, requirement: fact, answer: value, sourceId: interpretedAnswer?.context.sourceId || session.id, evidenceExcerpt: interpretedAnswer?.context.rawAnswer });
+      }
       const changed = JSON.stringify(result.architecture) !== JSON.stringify(commercialArchitecture);
       if (!result.resolved && !changed) throw new Error(result.warnings[0] || "A resposta não resolveu a configuração necessária.");
       commercialArchitecture = result.architecture;
@@ -823,6 +935,8 @@ export class AISetupService {
       activationUnderstanding,
       commercialArchitecture,
       answers: { ...session.answers, [key]: value },
+      answerContexts,
+      answerContextAudit: undefined,
     });
     if (key === "qualification.questions" && reconciled.discoveryPlan && Array.isArray(value)) {
       const confirmedQuestions = value
@@ -898,6 +1012,7 @@ export class AISetupService {
       profile,
       capabilities: selectedCapabilities,
       answers: session.answers,
+      answerContexts: session.answerContexts || [],
       discoveryPlan: session.discoveryPlan,
       commercialArchitecture: session.commercialArchitecture,
       workspaceId: actor.workspaceId,
@@ -939,47 +1054,11 @@ export class AISetupService {
         project = applyVisitorActionsToProject(project, { visitorActions: selectedActions });
       }
       project = applyBrandIdentity(project, session);
-      const instruction = initialSiteInstruction(project, { ...session, visitorActions: selectedActions });
-      const plannerSuggestion = suggestSiteStructure(project, instruction);
-      let suggestion = plannerSuggestion;
-      let siteUsedFallback = !isAIConfigured();
-      if (isAIConfigured()) {
-        try {
-          suggestion = suggestedSiteStructureSchema.parse(await getAIProvider().composeSiteStructure({
-            workspaceId: actor.workspaceId,
-            projectId: project.id,
-            setupSessionId: id,
-            userId: actor.userId,
-            instruction,
-            target: "site",
-            businessShape: inferBusinessShape(project),
-            plannerSuggestion,
-            currentSite: project.presence,
-            business: {
-              name: project.name,
-              description: project.description,
-              category: project.category,
-              audience: project.audience,
-              primaryGoal: project.primaryGoal,
-              visualDirection: project.visualDirection,
-              brand: project.brand,
-              businessProfile: project.businessProfile,
-              conversionGoals: project.conversionGoals,
-              commercialConfig: project.commercialConfig,
-            },
-            commercialArchitecture: session.commercialArchitecture,
-          }));
-          siteUsedFallback = false;
-        } catch {
-          suggestion = plannerSuggestion;
-          siteUsedFallback = true;
-        }
-      }
-      project = materializeSuggestedSiteStructure(project, suggestion).project;
+      project = { ...project, presence: undefined, publication: { homeMode: "journey" } };
       const next = await this.repository.update(actor, stageGeneratedDraft(
         session,
         project,
-        session.usedFallback || siteUsedFallback,
+        Boolean(session.usedFallback),
       ));
       await this.repository.addMessage(actor, id, "assistant", "Sua primeira versão foi criada como rascunho e está pronta para teste.", { kind: "generation", projectId: project.id });
       return next;

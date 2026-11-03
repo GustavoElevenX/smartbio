@@ -131,7 +131,7 @@ export function ProjectsList() {
                 </Link>
                 <Link
                   href={`/app/projects/${project.id}/analytics`}
-                  title="Analytics"
+                  title="Resultados"
                   className="focus-ring grid h-10 place-items-center rounded-xl bg-[#f1f0f5] text-[#555560]"
                 >
                   <BarChart3 size={16} />

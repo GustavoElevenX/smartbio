@@ -16,6 +16,8 @@ import { getSectionActions } from "@/features/presence/presence-page-utils";
 import { recordPlatformGrowthEvent } from "@/server/platform-acquisition/platform-acquisition";
 import { resolveAppUrl } from "@/lib/app-url";
 import { logError, type ErrorLogContext } from "@/server/observability/log";
+import { projectWithPublication, type ProjectPublication } from "@/features/publishing/publication-target";
+import { findDemoProject } from "@/data/demo-projects";
 
 type PublicationLogContext = Pick<ErrorLogContext, "requestId" | "route">;
 
@@ -55,12 +57,34 @@ async function serverReadiness(
     });
   }
 
-  const activationIds = [...new Set((project.presence?.pages || []).flatMap((page) => page.sections.flatMap((section) => getSectionActions(section).filter((action) => action.type === "start_activation").map((action) => action.activationId).filter((id): id is string => Boolean(id)))))];
+  const legacyPageIds = new Set((project.entryPoints || [])
+    .filter((entry) => entry.isActive && (entry.surfaceMode === "presence" || entry.surfaceMode === "landing"))
+    .map((entry) => entry.presencePageId)
+    .filter((id): id is string => Boolean(id)));
+  const activationIds = [...new Set((project.presence?.pages || [])
+    .filter((page) => legacyPageIds.has(page.id))
+    .flatMap((page) => page.sections.flatMap((section) => getSectionActions(section)
+      .filter((action) => action.type === "start_activation")
+      .map((action) => action.activationId)
+      .filter((id): id is string => Boolean(id)))))];
   if (activationIds.length) {
-    const { data: activations, error: activationError } = await supabase.from("conversion_activations").select("id,status,conversion_goal_id,published_at").eq("project_id", project.id).in("id", activationIds);
+    const { data: activations, error: activationError } = await supabase.from("conversion_activations")
+      .select("id,status,conversion_goal_id,published_at").eq("project_id", project.id).in("id", activationIds);
     if (activationError) throw activationError;
-    const usable = new Set((activations || []).filter((item) => ["active", "scheduled"].includes(item.status) && item.conversion_goal_id && item.published_at).map((item) => item.id));
-    for (const id of activationIds.filter((item) => !usable.has(item))) readiness = addBlocking(readiness, { id: `${project.id}:presence.activation.${id}`, key: `presence.activation.${id}`, label: "CTA sem ativação válida", capability: "project", status: "invalid", severity: "blocking", reason: "Selecione uma ativação ativa ou agendada, publicada e conectada a uma meta de conversão.", actionLabel: "Corrigir", actionPath: `/app/projects/${project.id}/site` });
+    const usable = new Set((activations || [])
+      .filter((item) => ["active", "scheduled"].includes(item.status) && item.conversion_goal_id && item.published_at)
+      .map((item) => item.id));
+    for (const id of activationIds.filter((item) => !usable.has(item))) readiness = addBlocking(readiness, {
+      id: `${project.id}:presence.activation.${id}`,
+      key: `presence.activation.${id}`,
+      label: "Ação de entrada antiga inválida",
+      capability: "project",
+      status: "invalid",
+      severity: "blocking",
+      reason: "Uma entrada antiga usa uma ação sem campanha ativa e publicada. Revise essa entrada antes de publicar.",
+      actionLabel: "Revisar entrada",
+      actionPath: `/app/projects/${project.id}/entries`,
+    });
   }
 
   const sourceIds = [...new Set((project.dataRequirements || [])
@@ -126,11 +150,18 @@ export async function prepareProjectPublication(
   actor: AuthenticatedActor,
   projectId: string,
   localSnapshot?: Project,
+  publication?: ProjectPublication,
   logContext?: PublicationLogContext,
 ) {
-  const project = actor.persistence === "memory"
+  const loadedProject = actor.persistence === "memory"
     ? localSnapshot
     : await loadProjectForActor(actor, projectId);
+  const actorProject = actor.persistence === "memory" && loadedProject?.workspaceId === "demo-workspace" && findDemoProject(loadedProject.slug)?.id === projectId
+    ? { ...loadedProject, workspaceId: actor.workspaceId }
+    : loadedProject;
+  const project = actorProject && publication
+    ? projectWithPublication(actorProject, publication)
+    : actorProject;
   if (!project || project.id !== projectId || project.workspaceId !== actor.workspaceId) {
     throw new Error("Projeto não encontrado.");
   }
@@ -148,9 +179,10 @@ export async function publishProject(
   actor: AuthenticatedActor,
   projectId: string,
   localSnapshot?: Project,
+  publication?: ProjectPublication,
   logContext?: PublicationLogContext,
 ) {
-  const prepared = await prepareProjectPublication(actor, projectId, localSnapshot, logContext);
+  const prepared = await prepareProjectPublication(actor, projectId, localSnapshot, publication, logContext);
   if (!prepared.readiness.publishable) return prepared;
 
   const snapshot = await createProjectSnapshot(actor, projectId, prepared.project, "project.published");
@@ -182,6 +214,9 @@ export async function publishProject(
     const settings = row?.settings && typeof row.settings === "object"
       ? row.settings as Record<string, unknown>
       : {};
+    const projectPayload = settings.projectPayload && typeof settings.projectPayload === "object"
+      ? settings.projectPayload as Project
+      : prepared.project;
     const { error } = await supabase
       .from("projects")
       .update({
@@ -191,6 +226,11 @@ export async function publishProject(
         settings: {
           ...settings,
           version: published.version,
+          projectPayload: {
+            ...projectPayload,
+            publication: published.publication,
+            updatedAt: now,
+          },
           publishedVersionId: snapshot.versionId,
           publishedVersionNumber: snapshot.versionNumber,
           publishedPayload: published,

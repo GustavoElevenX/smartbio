@@ -9,13 +9,15 @@ test.afterEach(async ({ request }) => {
   expect(response.ok()).toBe(true);
 });
 
-test("Minha página abre no modo simples e permite editar pela prévia", async ({ page }, testInfo) => {
+test("Minha página diferencia os modos rápido e avançado", async ({ page }, testInfo) => {
   await page.goto("/app/projects/demo-casa-sucos/site");
   const create = page.getByRole("button", { name: "Criar página inicial" });
   await expect(create).toBeVisible();
   await create.click();
 
   await expect(page.getByTestId("site-editor-simple")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Modo rápido", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("Edite o essencial direto na prévia.")).toBeAttached();
   await expect(page.getByTestId("site-section-list")).toBeHidden();
   const firstSection = page.locator("[data-editable-presence-section]").first();
   await expect(firstSection).toBeVisible();
@@ -54,8 +56,68 @@ test("Minha página abre no modo simples e permite editar pela prévia", async (
 
   await page.getByTestId("site-editor-mode-toggle").click();
   await expect(page.getByTestId("site-editor-advanced")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Modo avançado", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("Controle toda a estrutura da página.")).toBeAttached();
   await page.getByTestId("site-editor-mode-toggle").click();
   await expect(page.getByTestId("site-editor-simple")).toBeVisible();
+});
+
+test("Minha página permite configurar um link externo seguro", async ({ page }, testInfo) => {
+  const browserErrors: string[] = [];
+  page.on("console", (message) => {
+    if (["error", "warning"].includes(message.type())) browserErrors.push(message.text());
+  });
+  page.on("pageerror", (error) => browserErrors.push(error.message));
+  await page.goto("/app/projects/demo-casa-sucos/site");
+  await expect(page).toHaveURL(/\/app\/projects\/demo-casa-sucos\/site$/);
+  await expect(page).toHaveTitle(/Minha página/);
+  await expect(page.getByText(/Unhandled Runtime Error|Build Error/)).toHaveCount(0);
+  await page.getByRole("button", { name: "Criar página inicial" }).click();
+
+  const firstSection = page.locator("[data-editable-presence-section]").first();
+  if (testInfo.project.name === "mobile-chrome") {
+    await page.getByTestId("simple-editor-backdrop").click({ position: { x: 12, y: 90 } });
+  }
+  await firstSection.getByRole("button", { name: /^Editar / }).click();
+  const panel = testInfo.project.name === "mobile-chrome"
+    ? page.getByRole("dialog", { name: "Editar esta parte" })
+    : page.getByTestId("simple-section-panel");
+
+  await panel.getByLabel("O que deve acontecer quando alguém clicar aqui?").first().selectOption("direct:url");
+  const destination = panel.getByLabel("Link de destino").first();
+  await destination.fill("exemplo.com/cardapio");
+  await destination.blur();
+  await expect(destination).toHaveValue("https://exemplo.com/cardapio");
+  await expect(panel.getByRole("link", { name: "Testar" })).toHaveAttribute("href", "https://exemplo.com/cardapio");
+  await expect(panel.getByText("A página será aberta em uma nova aba.")).toBeVisible();
+
+  await destination.fill("javascript:alert(1)");
+  await destination.blur();
+  await expect(destination).toHaveAttribute("aria-invalid", "true");
+  await expect(panel.getByText(/Use um link válido/)).toBeVisible();
+
+  await destination.fill("loja.exemplo.com/produto");
+  await destination.blur();
+  await expect(destination).toHaveValue("https://loja.exemplo.com/produto");
+  if (process.env.EXTERNAL_LINK_QA_SCREENSHOT && testInfo.project.name === "desktop-chrome") {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.screenshot({ path: process.env.EXTERNAL_LINK_QA_SCREENSHOT, fullPage: false });
+  }
+  if (testInfo.project.name === "mobile-chrome") {
+    await page.getByTestId("simple-editor-backdrop").click({ position: { x: 12, y: 90 } });
+  }
+  await page.getByRole("button", { name: "Salvar" }).click();
+  await expect(page.getByText(/Casa de Sucos Mix · Salvo/)).toBeAttached();
+  if (testInfo.project.name === "desktop-chrome") {
+    await page.context().route("https://loja.exemplo.com/**", (route) => route.fulfill({ status: 200, body: "Destino externo de teste" }));
+    await page.goto("/casadesucosmix");
+    const popupPromise = page.waitForEvent("popup");
+    await page.getByRole("button", { name: "Abrir link" }).first().click();
+    const popup = await popupPromise;
+    await expect(popup).toHaveURL("https://loja.exemplo.com/produto");
+    await popup.close();
+  }
+  expect(browserErrors).toEqual([]);
 });
 
 test("Presence entrega conteúdo server-first e abre a jornada sob demanda", async ({

@@ -1,4 +1,5 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { after } from "next/server";
 import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
@@ -8,6 +9,11 @@ import {
 } from "@/server/http/api-response";
 import { withAuthenticatedActor } from "@/server/http/with-authenticated-actor";
 import { requireResourceCapacity } from "@/server/entitlements/require-entitlement";
+import {
+  createMemoryWorkspaceInvitation,
+  listMemoryWorkspaceInvitations,
+} from "@/server/workspaces/workspace-memory-store";
+import { processNotificationOutboxBatch } from "@/server/notifications/notification-service";
 
 const schema = z.object({ email: z.email().max(250) });
 interface InvitationRouteContext {
@@ -19,12 +25,21 @@ export const GET = withAuthenticatedActor(
     const { workspaceId } = await context.params;
     if (workspaceId !== actor.workspaceId || actor.role !== "owner")
       return apiError("Acesso negado.", 403, "forbidden");
-    if (actor.persistence === "memory") return apiSuccess([]);
-    const { data, error } = await createServiceClient()!
+    if (actor.persistence === "memory")
+      return apiSuccess(listMemoryWorkspaceInvitations(actor));
+    const database = createServiceClient()!;
+    await database
+      .from("workspace_invitations")
+      .update({ status: "expired" })
+      .eq("workspace_id", workspaceId)
+      .eq("status", "pending")
+      .lte("expires_at", new Date().toISOString());
+    const { data, error } = await database
       .from("workspace_invitations")
       .select("id,email,role,status,expires_at,created_at")
       .eq("workspace_id", workspaceId)
       .eq("status", "pending")
+      .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false });
     if (error)
       return apiError(
@@ -43,14 +58,40 @@ export const POST = withAuthenticatedActor(
       return apiError("Acesso negado.", 403, "forbidden");
     const parsed = schema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return validationError(parsed.error);
-    if (actor.persistence === "memory")
-      return apiError(
-        "Convites exigem persistência configurada.",
-        503,
-        "database_required",
-      );
+    const email = parsed.data.email.trim().toLowerCase();
+    const origin = new URL(request.url).origin;
+    if (actor.persistence === "memory") {
+      const result = createMemoryWorkspaceInvitation(actor, email, origin);
+      if ("error" in result) {
+        if (result.error === "existing_member")
+          return apiError("Este e-mail já pertence ao workspace.", 409, "existing_member");
+        return apiError("Já existe um convite pendente para este e-mail.", 409, "invitation_exists");
+      }
+      return apiSuccess({ ...result.invitation, delivery: "local_link" }, 201);
+    }
 
     const database = createServiceClient()!;
+    await database
+      .from("workspace_invitations")
+      .update({ status: "expired" })
+      .eq("workspace_id", workspaceId)
+      .eq("status", "pending")
+      .lte("expires_at", new Date().toISOString());
+    const { data: existingProfile } = await database
+      .from("profiles")
+      .select("id")
+      .ilike("email", email)
+      .maybeSingle();
+    if (existingProfile) {
+      const { data: existingMember } = await database
+        .from("workspace_members")
+        .select("id")
+        .eq("workspace_id", workspaceId)
+        .eq("user_id", existingProfile.id)
+        .maybeSingle();
+      if (existingMember)
+        return apiError("Este e-mail já pertence ao workspace.", 409, "existing_member");
+    }
     const [{ count: members }, { count: pendingInvitations }] =
       await Promise.all([
         database
@@ -70,7 +111,6 @@ export const POST = withAuthenticatedActor(
       feature: "team_members",
       currentUsage: (members || 0) + (pendingInvitations || 0),
     });
-    const email = parsed.data.email.trim().toLowerCase();
     const token = randomBytes(32).toString("base64url");
     const tokenHash = createHash("sha256").update(token).digest("hex");
     const expiresAt = new Date(Date.now() + 7 * 86_400_000).toISOString();
@@ -92,7 +132,6 @@ export const POST = withAuthenticatedActor(
         "invitation_exists",
       );
 
-    const origin = new URL(request.url).origin;
     const { error: outboxError } = await database
       .from("notification_outbox")
       .insert({
@@ -117,6 +156,16 @@ export const POST = withAuthenticatedActor(
         "invitation_delivery_failed",
       );
     }
-    return apiSuccess(invitation, 201);
+    after(async () => {
+      try {
+        await processNotificationOutboxBatch(`workspace-invite:${randomUUID()}`, 10);
+      } catch (error) {
+        console.error("workspace_invitation_delivery_failed", {
+          invitationId: invitation.id,
+          message: error instanceof Error ? error.message : "Falha ao processar a fila.",
+        });
+      }
+    });
+    return apiSuccess({ ...invitation, delivery: "email" }, 201);
   },
 );

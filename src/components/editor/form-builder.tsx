@@ -15,7 +15,7 @@ const fieldTypes: Array<{ value: FormField["type"]; label: string }> = [
   { value: "textarea", label: "Texto longo" }, { value: "select", label: "Lista de seleção" },
   { value: "radio", label: "Escolha única" }, { value: "checkbox", label: "Caixa de confirmação" },
   { value: "date", label: "Data" }, { value: "time", label: "Horário" },
-  { value: "url", label: "Link" }, { value: "file", label: "Arquivo" },
+  { value: "url", label: "Endereço" }, { value: "file", label: "Arquivo" },
 ];
 
 function supportsFiles(project: Project) {

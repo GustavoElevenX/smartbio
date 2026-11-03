@@ -237,7 +237,7 @@ export const casaDeSucos: Project = {
       id: "mix-entry-story",
       projectId: "demo-casa-sucos",
       key: "story-delivery",
-      name: "Story Delivery",
+      name: "História de entrega",
       channel: "story",
       conversionGoalId: "mix-goal-order",
       utmSource: "instagram",
@@ -342,7 +342,7 @@ export const casaDeSucos: Project = {
         {
           id: "mix-order",
           label: "Pedir agora",
-          description: "Delivery ou retirada",
+          description: "Entrega ou retirada",
           icon: "ShoppingBag",
           value: "pedido",
           actionType: "go_to_step",
@@ -388,7 +388,7 @@ export const casaDeSucos: Project = {
       options: [
         {
           id: "mix-delivery",
-          label: "Delivery",
+          label: "Entrega",
           description: "Receba onde estiver",
           icon: "Bike",
           value: "delivery",
@@ -558,7 +558,7 @@ export const verticeB2B: Project = {
     "Estratégia de crescimento para empresas B2B que precisam gerar demanda previsível.",
   subtitle: "Estratégia, mídia e conteúdo conectados à receita.",
   status: "published",
-  primaryGoal: "Gerar leads",
+  primaryGoal: "Gerar contatos comerciais",
   primaryDestination: "WhatsApp",
   category: "Agência B2B",
   phone: "5511988884004",
@@ -704,7 +704,7 @@ export const verticeB2B: Project = {
       options: [
         {
           id: "v-leads",
-          label: "Gerar mais leads",
+          label: "Gerar mais contatos comerciais",
           description: "Crie demanda previsível",
           icon: "Target",
           value: "leads",
@@ -776,7 +776,7 @@ export const verticeB2B: Project = {
           key: "objetivo",
           type: "select",
           required: true,
-          options: ["Gerar leads", "Aumentar autoridade", "Acelerar vendas"],
+          options: ["Gerar contatos comerciais", "Aumentar autoridade", "Acelerar vendas"],
         },
         {
           id: "v-contact",
@@ -807,12 +807,12 @@ export const verticeB2B: Project = {
       isActive: true,
       visualVariant: "orange-spotlight",
       recommendation: {
-        title: "Tráfego Pago + Social Media",
+        title: "Tráfego pago + redes sociais",
         description:
           "Um sistema integrado para gerar demanda, construir confiança e dar previsibilidade ao comercial.",
         label: "Recomendação Vértice",
         benefits: [
-          "Mais leads qualificados",
+          "Mais contatos comerciais qualificados",
           "Mais autoridade",
           "Mais previsibilidade",
         ],
@@ -1683,7 +1683,7 @@ export function findDemoProject(slugOrId: string) {
               description:
                 "Sucos, bowls e lanches preparados para transformar vontade em pedido sem complicação.",
               content: {
-                badges: ["Ingredientes frescos", "Retirada ou delivery"],
+                badges: ["Ingredientes frescos", "Retirada ou entrega"],
                 alignment: "left",
                 primaryAction: goal
                   ? {

@@ -65,7 +65,7 @@ export function CommercialArchitectureReview({ architecture, busy, onConfirm, on
           <span className="grid size-11 shrink-0 place-items-center bg-[#e9fffc] text-[#07172f]"><Sparkles aria-hidden size={19} /></span>
           <div className="min-w-0">
             <h2 id="architecture-review-title" className="text-balance text-xl font-extrabold tracking-[-.025em] text-[#07172f] sm:text-2xl">Entendi seu negócio assim.</h2>
-            <p className="mt-2 max-w-[65ch] text-sm leading-6 text-[#536178]">A Sobe conectou cada intenção ao caminho mais curto que faz sentido. Você confirma a leitura inteira ou ajusta apenas o que mudou.</p>
+            <p className="mt-2 max-w-[65ch] text-sm leading-6 text-[#536178]">Confira como o visitante será atendido. Ao criar, a Sobe monta a página e os caminhos e pergunta apenas o que faltar para funcionar.</p>
           </div>
         </div>
 
@@ -84,8 +84,9 @@ export function CommercialArchitectureReview({ architecture, busy, onConfirm, on
                   <p className="mt-1 text-sm leading-6 text-[#536178]"><span className="font-bold text-[#0054fc]">{modeLabels[blueprint.mode]}</span>{channel ? ` → ${channel.label}` : ""}</p>
                   {collects.length ? <p className="mt-2 text-xs leading-5 text-[#687582]">Antes de concluir, coleta: {collects.join(", ")}.</p> : null}
                   {locations.length ? <p className="mt-1 text-xs leading-5 text-[#687582]">Unidades envolvidas: {[...new Set(locations)].join(", ")}.</p> : null}
+                  {blueprint.assumptions.filter((item) => item.startsWith("Sem catálogo detalhado:")).map((item) => <p key={item} className="mt-2 text-xs leading-5 text-[#795b16]">{item}</p>)}
                   {editing ? <div className="mt-3"><Label htmlFor={`channel-${blueprint.id}`}>Destino deste caminho</Label><Select id={`channel-${blueprint.id}`} value={blueprint.completion.channelId || ""} onChange={(event) => updateDestination(blueprint.id, event.target.value)}><option value="">Concluir dentro da Sobe</option>{draft.channels.filter((item) => item.value).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</Select></div> : null}
-                  {blueprint.requiredFacts.length ? <div className="mt-3 bg-[#fff9e9] px-3 py-2 text-xs leading-5 text-[#795b16]">Precisa confirmar: {blueprint.requiredFacts.map((fact) => fact.label).join(", ")}.</div> : null}
+                  {blueprint.requiredFacts.some((fact) => fact.severity === "blocking") ? <div className="mt-3 bg-[#fff9e9] px-3 py-2 text-xs leading-5 text-[#795b16]">Para funcionar, falta: {blueprint.requiredFacts.filter((fact) => fact.severity === "blocking").map((fact) => fact.label).join(", ")}.</div> : null}
                 </div>
               </div>
             );
@@ -97,9 +98,9 @@ export function CommercialArchitectureReview({ architecture, busy, onConfirm, on
             <Button type="button" size="lg" onClick={() => void onUpdate(draft).then(() => setEditing(false)).catch(() => undefined)} disabled={busy}><Save aria-hidden data-icon size={17} /> {busy ? "Salvando ajustes…" : "Salvar e continuar"}</Button>
             <Button type="button" size="lg" variant="ghost" onClick={() => { setDraft(architecture); setEditing(false); }} disabled={busy}>Cancelar</Button>
           </> : <>
-            <Button type="button" size="lg" onClick={() => void onConfirm()} disabled={busy || architecture.status === "degraded"}><Check aria-hidden data-icon size={17} /> {busy ? "Confirmando…" : "Está certo, continuar"}</Button>
+            <Button type="button" size="lg" onClick={() => void onConfirm()} disabled={busy || architecture.status === "degraded"}><Check aria-hidden data-icon size={17} /> {busy ? "Preparando criação…" : "Criar com essa proposta"}</Button>
             <Button type="button" size="lg" variant="secondary" onClick={() => setEditing(true)} disabled={busy}><PencilLine aria-hidden data-icon size={17} /> Ajustar</Button>
-            <span className="hidden items-center gap-1 text-xs font-bold text-[#687582] sm:ml-auto sm:flex">Próximo: só o que estiver faltando <ArrowRight aria-hidden size={14} /></span>
+            <span className="hidden items-center gap-1 text-xs font-bold text-[#687582] sm:ml-auto sm:flex">Rascunho primeiro. Publicação depois. <ArrowRight aria-hidden size={14} /></span>
           </>}
         </div>
       </div>

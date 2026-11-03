@@ -16,7 +16,11 @@ const labels: Record<CommercialNotificationEvent, [string, string]> = {
   "reservation.reschedule_requested": ["Alteração de reserva", "O visitante solicitou alteração de datas."],
   "source.processing_failed": ["Material não processado", "Uma fonte de negócio falhou durante o processamento."],
   "project.publish_blocked": ["Publicação bloqueada", "O projeto possui dados obrigatórios pendentes."],
-  "project.published": ["Projeto publicado", "A experiência já está disponível para visitantes."],
+  "project.published": ["Sua página está no ar", "A página já está disponível para visitantes."],
+  "traffic.milestone_reached": ["Sua página está recebendo visitas", "Um novo marco de visitas foi alcançado."],
+  "subscription.activated": ["Plano SOBE Pro aprovado", "Seu plano foi ativado e já está disponível."],
+  "subscription.ending": ["Seu plano está perto do fim", "A renovação automática está desativada."],
+  "trial.ending": ["Seu teste termina em breve", "O período gratuito está perto do fim."],
 };
 
 export function escapeHtml(value: unknown) {
@@ -33,12 +37,30 @@ export function notificationTemplate(
   actionUrl?: string,
 ) {
   const [title, fallbackBody] = labels[eventKey];
-  const visitor = typeof data.name === "string"
-    ? data.name
-    : typeof data.visitorName === "string"
-      ? data.visitorName
+  const visitor = typeof data.visitorName === "string" ? data.visitorName : undefined;
+  const projectName = typeof data.projectName === "string"
+    ? data.projectName
+    : eventKey === "project.published" && typeof data.name === "string"
+      ? data.name
       : undefined;
-  const body = visitor ? `${fallbackBody} Contato: ${visitor}.` : fallbackBody;
+  const count = typeof data.count === "number" ? data.count : undefined;
+  const endingAt = typeof data.endingAt === "string" ? new Date(data.endingAt) : undefined;
+  const formattedEndingAt = endingAt && !Number.isNaN(endingAt.getTime())
+    ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "long", timeZone: "America/Sao_Paulo" }).format(endingAt)
+    : undefined;
+  const body = eventKey === "project.published" && projectName
+    ? `${projectName} já está disponível para visitantes.`
+    : eventKey === "traffic.milestone_reached" && count
+      ? count === 1
+        ? "Sua página recebeu a primeira visita. O fluxo começou."
+        : `Sua página já recebeu ${new Intl.NumberFormat("pt-BR").format(count)} visitas.`
+      : eventKey === "subscription.ending" && formattedEndingAt
+        ? `A renovação automática está desativada. Seu acesso ao SOBE Pro continua até ${formattedEndingAt}.`
+        : eventKey === "trial.ending" && formattedEndingAt
+          ? `Seu período gratuito termina em ${formattedEndingAt}. A página e os dados continuam salvos se o acesso expirar.`
+          : visitor
+            ? `${fallbackBody} Contato: ${visitor}.`
+            : fallbackBody;
   const context = [
     ["Interesse", data.interest],
     ["Serviço", data.service],

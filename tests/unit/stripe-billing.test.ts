@@ -190,7 +190,7 @@ describe("Stripe billing domain", () => {
   });
 
   it("aponta a sidebar para a central nativa de cobrança", () => {
-    expect(sidebar).toContain('href="/app/settings/billing"');
+    expect(sidebar).toContain('href: "/app/settings/billing"');
   });
 
   it("usa Checkout embedded atual sem Tax, trial ou métodos hardcoded", () => {

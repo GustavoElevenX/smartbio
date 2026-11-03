@@ -57,8 +57,8 @@ const offerOptions: Array<[OfferKind, string, string]> = [
     "Serviço profissional",
     "Consultoria, clínica, agência ou especialista",
   ],
-  ["physical_product", "Produto físico", "Loja, delivery, kits ou encomendas"],
-  ["digital_product", "Produto digital", "Curso, material ou acesso online"],
+  ["physical_product", "Produto físico", "Loja, entrega, conjuntos ou encomendas"],
+  ["digital_product", "Produto digital", "Curso, material ou acesso pela internet"],
   ["hospitality", "Hospedagem", "Chalé, pousada, hotel ou acomodação"],
   ["rental", "Locação", "Sala, quadra, equipamento ou espaço"],
   ["event", "Evento", "Inscrição, ingresso ou participação"],
@@ -100,7 +100,7 @@ const confirmationOptions: Array<[ConfirmationMode, string, string]> = [
   [
     "external_system",
     "Em outro sistema",
-    "A jornada termina em uma agenda, checkout ou sistema externo.",
+    "A jornada termina em uma agenda, página de pagamento ou sistema externo.",
   ],
 ];
 const completionOptions: Array<[CompletionChannel, string]> = [
@@ -954,7 +954,7 @@ export function OnboardingWizard() {
                     <p className="mt-3 text-xs leading-5 opacity-60">
                       {form.description
                         ? `${form.description.slice(0, 92)}${form.description.length > 92 ? "…" : ""}`
-                        : "As respostas do onboarding definem a jornada, os blocos e a próxima ação."}
+                        : "As respostas da configuração inicial definem a jornada, os blocos e a próxima ação."}
                     </p>
                     <div className="mt-6 space-y-2">
                       {suggestedCapabilities.slice(0, 3).map((item) => (

@@ -29,7 +29,9 @@ export default async function PublicProjectPage({ params, searchParams }: PagePr
   const [{ slug }, query] = await Promise.all([params, searchParams]);
   const project = await loadPublishedPublicProject(slug);
   const surface = project ? resolvePublicSurface(project, value(query.entry), null) : null;
-  if (!project || !surface?.page || surface.mode === "conversion_direct") return <PublicExperience slug={slug} />;
+  if (!project || !surface?.page || surface.mode === "conversion_direct") {
+    return <PublicExperience slug={slug} initialProject={project} initialGoalId={surface?.conversionGoalId} initialStepId={surface?.targetStepId} />;
+  }
   const publicActivations = await resolvePublicActivations(createServiceClient(), { projectId: project.id, entryPointId: surface.entry?.id, pageId: surface.page.id });
   const canonical = `${baseUrl()}/${project.slug}`;
   return <><PublicStructuredData project={project} page={surface.page} canonical={canonical} /><PublicPresencePage project={project} page={surface.page} publicActivations={publicActivations} /></>;

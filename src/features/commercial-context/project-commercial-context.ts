@@ -22,7 +22,7 @@ function evidenceId(value: CommercialEvidenceRef, index: number) {
   return `evidence-${source}-${index + 1}`;
 }
 
-function materializeEvidence(architecture: CommercialArchitecture, now: string) {
+function materializeEvidence(architecture: CommercialArchitecture, session: AISetupSession, now: string) {
   const source = [
     ...architecture.businessSummary.evidence,
     ...architecture.audienceContexts.flatMap((item) => item.evidence),
@@ -30,6 +30,12 @@ function materializeEvidence(architecture: CommercialArchitecture, now: string) 
     ...architecture.channels.flatMap((item) => item.evidence),
     ...architecture.locations.flatMap((item) => item.evidence),
     ...architecture.intents.flatMap((item) => item.evidence),
+    ...(session.answerContexts || []).flatMap((context) => context.facts.map((fact) => ({
+      sourceId: fact.sourceId,
+      origin: fact.origin,
+      excerpt: fact.evidenceExcerpt,
+      confidence: fact.confidence,
+    }))),
   ];
   const seen = new Map<string, CommercialContextEvidence>();
   for (const [index, item] of source.entries()) {
@@ -120,7 +126,7 @@ export function projectCommercialContextFromActivation(input: {
   const now = input.now || new Date().toISOString();
   const confirmed = Boolean(session.architectureReviewed);
   const status = contextStatus(confirmed);
-  const evidence = materializeEvidence(architecture, now);
+  const evidence = materializeEvidence(architecture, session, now);
   const destinationByChannel = new Map(architecture.channels.map((channel) => [channel.id, operationalDestinationId(project, channel)]));
   const intentBlueprints = new Map(architecture.journeyBlueprints.map((blueprint) => [blueprint.intentId, blueprint]));
   const offeringIds = new Map(architecture.offerings.map((offering) => [offering.id, operationalOfferingId(project, offering.id, offering.name)]));

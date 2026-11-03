@@ -76,6 +76,20 @@ describe("onboarding adaptativo", () => {
     expect(legacy.actionsConfirmed).toBe(false);
   });
 
+  it("preserva a distinção entre catálogo e condições de revenda sem duplicar itens", () => {
+    const input = setupInitialInputSchema.parse({
+      businessName: "Loja Aurora",
+      description: "Vende produtos para clientes e revendedores.",
+      offeringType: "products",
+      offerDetails: "Suco natural; sanduíche natural; salada de frutas.",
+      resaleAvailable: true,
+      resaleDetails: "Somente os sucos são fornecidos para revenda; condições sob consulta.",
+    });
+    expect(input.offerDetails).toContain("sanduíche natural");
+    expect(input.resaleDetails).toContain("Somente os sucos");
+    expect(input.resaleAvailable).toBe(true);
+  });
+
   it("transforma várias ações humanas em objetivos ligados a etapas reais", () => {
     const project = structuredClone(casaDeSucos);
     const actions = defaultVisitorActions(project.businessProfile!).slice(0, 3).map((action, index) => ({ ...action, isPrimary: index === 0 }));

@@ -39,6 +39,7 @@ import type {
   StructuredAIRequest,
   CustomVisitorActionInput,
   DiscoveryPlanningInput,
+  SetupAnswerInterpretationInput,
 } from "@/server/ai/ai-provider";
 import { recordAIUsage } from "@/server/ai/ai-usage";
 import { brandAnalysisPrompt } from "@/server/ai/prompts/brand-analysis";
@@ -58,6 +59,8 @@ import { optimizationExplanationPrompt } from "@/server/ai/prompts/optimization-
 import { visitorActionClassificationPrompt } from "@/server/ai/prompts/visitor-action-classification";
 import { aiDiscoveryPlanDraftSchema, discoveryPlanDraftSchema } from "@/features/qualification/discovery-plan";
 import { discoveryPlanPrompt } from "@/server/ai/prompts/discovery-plan";
+import { setupAnswerInterpretationSchema } from "@/features/ai-setup/setup-answer-interpretation";
+import { setupAnswerInterpretationPrompt } from "@/server/ai/prompts/setup-answer-interpretation";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
   requireEntitlement,
@@ -73,6 +76,7 @@ const operationFeatures: Record<string, EntitlementFeature> = {
   activation_understanding: "ai_business_analysis",
   commercial_architecture: "ai_business_analysis",
   missing_questions: "ai_business_analysis",
+  setup_answer_interpretation: "ai_business_analysis",
   discovery_planning: "ai_journey",
   journey_composition: "ai_journey",
   presence_composition: "ai_presence",
@@ -288,6 +292,23 @@ export class OpenAIVirouProvider implements VirouAIProvider {
       options: question.options?.map((option) => ({ ...option, description: option.description ?? undefined })),
       structuredAnswer: question.structuredAnswer?.map((item) => ({ ...item, options: item.options ?? undefined })),
     })) }).questions;
+  }
+
+  interpretSetupAnswer(input: SetupAnswerInterpretationInput) {
+    return this.structured({
+      operation: "setup_answer_interpretation",
+      schemaName: "setup_answer_interpretation",
+      schema: setupAnswerInterpretationSchema,
+      systemPrompt: setupAnswerInterpretationPrompt,
+      payload: {
+        answer: input.answer,
+        requirement: input.requirement,
+        resolutionTarget: input.resolutionTarget,
+        knownLocations: input.locations,
+        knownChannels: input.channels,
+      },
+      context: input,
+    });
   }
 
   private async structuredDocument<T>(request: StructuredAIRequest<T>): Promise<T> {

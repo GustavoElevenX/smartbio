@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { AlertTriangle, Check, Loader2, Plus, Save, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CatalogPanel } from "@/components/commercial-data/catalog/catalog-panel";
@@ -25,7 +26,7 @@ const tabDefinitions: Array<{ key: TabKey; label: string; capabilities?: Capabil
   { key: "services", label: "Serviços" },
   { key: "quotes", label: "Orçamentos", capabilities: ["quote"] },
   { key: "scheduling", label: "Agenda", capabilities: ["scheduling"] },
-  { key: "catalog", label: "Produtos", capabilities: ["catalog_order"] },
+  { key: "catalog", label: "Catálogo de produtos" },
   { key: "reservations", label: "Reservas", capabilities: ["reservation"] },
   { key: "locations", label: "Unidades e roteamento", capabilities: ["routing"] },
   { key: "destinations", label: "Destinos e pagamentos", capabilities: ["routing", "payment"] },
@@ -43,6 +44,10 @@ export function CommercialDataShell({ projectId }: { projectId: string }) {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
   const baselineIds = useRef<ReturnType<typeof collectDeletableIds> | null>(null);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "catalog") setActiveTab("catalog");
+  }, []);
 
   useEffect(() => {
     let current = true;
@@ -85,7 +90,7 @@ export function CommercialDataShell({ projectId }: { projectId: string }) {
 
   const inactive = (Object.keys(capabilityRegistry) as CapabilityKey[]).filter((key) => !enabled.has(key));
   return <div className="flex flex-col gap-6">
-    <header className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#0054fc]">Fonte de verdade operacional</p><h1 className="mt-2 text-3xl font-black tracking-[-.04em]">Dados comerciais</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-[#70707a]">Configure o que o negócio realmente oferece e como opera. A IA pode melhorar a apresentação, mas não altera fatos confirmados.</p></div><Button onClick={save} disabled={saving}>{saving ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <Save data-icon="inline-start" />}{saving ? "Salvando" : "Salvar alterações"}</Button></header>
+    <header className="flex flex-wrap items-start justify-between gap-4"><div><Link href={`/app/projects/${project.id}/editor`} className="text-xs font-bold text-[#0054fc] hover:underline">← Voltar ao link da bio</Link><h1 className="mt-2 text-3xl font-black tracking-[-.04em]">Catálogo e dados comerciais</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-[#70707a]">Descreva os produtos, serviços e opções que existem de verdade. Preços e disponibilidade só aparecem quando você informar.</p></div><Button onClick={save} disabled={saving}>{saving ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <Save data-icon="inline-start" />}{saving ? "Salvando" : "Salvar alterações"}</Button></header>
     {status ? <Alert variant={status.kind === "error" ? "destructive" : "default"}>{status.kind === "ok" ? <Check /> : <AlertTriangle />}<AlertTitle>{status.kind === "ok" ? "Tudo certo" : "Atenção"}</AlertTitle><AlertDescription>{status.message}</AlertDescription></Alert> : null}
     {inactive.length ? <section className="rounded-[20px] border border-[#eaf3ff] bg-[#f7fbff] p-4"><div className="flex items-center gap-2"><Plus size={16} className="text-[#0054fc]" /><h2 className="text-sm font-extrabold">Ativar outra capacidade</h2></div><div className="mt-3 flex flex-wrap gap-2">{inactive.map((key) => <Button key={key} size="sm" variant="secondary" onClick={() => activate(key)}>{capabilityRegistry[key].label}</Button>)}</div></section> : null}
     <div className="rounded-[24px] border border-[#e4e3ea] bg-white p-3 shadow-[0_18px_60px_rgba(29,28,35,.06)] sm:p-5"><Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)}><TabsList className="h-auto w-full justify-start overflow-x-auto bg-[#f3f2f7] p-1.5">{tabs.map((tab) => <TabsTrigger key={tab.key} value={tab.key} className="min-h-10 shrink-0 px-4">{tab.label}</TabsTrigger>)}</TabsList>
@@ -93,7 +98,7 @@ export function CommercialDataShell({ projectId }: { projectId: string }) {
         <TabsContent value="services"><ServicesPanel projectId={project.id} services={config.serviceOfferings || []} destinations={config.routingDestinations || []} quoteDefinition={config.quoteDefinition} schedulableServices={config.schedulableServices || []} onChange={(serviceOfferings) => patchConfig({ serviceOfferings })} /></TabsContent>
         <TabsContent value="quotes"><QuoteConfigPanel value={config.quoteDefinition || defaultQuote(project.id)} onChange={(quoteDefinition) => patchConfig({ quoteDefinition })} /></TabsContent>
         <TabsContent value="scheduling"><SchedulingPanel projectId={project.id} services={config.schedulableServices || []} serviceOfferings={config.serviceOfferings || []} resources={config.resources || []} availabilityRules={config.availabilityRules || []} exceptions={config.availabilityExceptions || []} onChange={patchConfig} /></TabsContent>
-        <TabsContent value="catalog"><CatalogPanel projectId={project.id} categories={config.catalogCategories || []} items={config.catalogItems || []} onChange={patchConfig} /></TabsContent>
+        <TabsContent value="catalog"><CatalogPanel projectId={project.id} categories={config.catalogCategories || []} items={config.catalogItems || []} onChange={(next) => { patchConfig(next); if (next.catalogItems?.length) activate("catalog_order"); }} /></TabsContent>
         <TabsContent value="reservations"><ReservationsPanel projectId={project.id} units={config.reservableUnits || []} blocks={config.reservationBlocks || []} policies={config.policies || []} onChange={patchConfig} /></TabsContent>
         <TabsContent value="locations"><LocationsPanel projectId={project.id} locations={config.locations || []} destinations={config.routingDestinations || []} onChange={patchConfig} /></TabsContent>
         <TabsContent value="destinations"><DestinationsPanel destinations={config.routingDestinations || []} paymentUrl={config.paymentUrl} onChange={patchConfig} /></TabsContent>

@@ -168,6 +168,35 @@ describe("CommercialArchitecture context-first", () => {
     expect(questions.every((item) => item.reason.includes("altera o caminho"))).toBe(true);
   });
 
+  it("pede uma informação compartilhada apenas uma vez, mesmo quando vários caminhos dependem dela", () => {
+    const evidence = [{ sourceId: "user", origin: "user" as const, excerpt: "Atendimento pelo WhatsApp", confidence: 1 }];
+    const sharedFact = {
+      key: "whatsapp_number",
+      label: "Número principal do WhatsApp",
+      reason: "O atendimento começa pelo WhatsApp, mas o número ainda não foi informado.",
+      affects: "Atendimento",
+      severity: "blocking" as const,
+      resolutionTarget: null,
+    };
+    const architecture = normalizeCommercialArchitecture({
+      status: "needs_confirmation", confidence: 0.9,
+      businessSummary: { whatItSells: "Sucos", commercialModel: "Atendimento pelo WhatsApp", evidence },
+      offerings: [], channels: [], locations: [], audienceContexts: [], issues: [],
+      intents: [
+        { id: "pedido", semanticKey: "order", label: "Fazer pedido", visitorNeed: "Pedir", priority: 100, visibleOnEntry: true, evidence, confidence: 0.9 },
+        { id: "revenda", semanticKey: "resale", label: "Comprar para revenda", visitorNeed: "Revender", priority: 90, visibleOnEntry: true, evidence, confidence: 0.9 },
+      ],
+      journeyBlueprints: [
+        { id: "bp-pedido", intentId: "pedido", objective: "Fazer pedido", mode: "direct_contact", steps: [], completion: { type: "whatsapp", channelId: null, destinationStrategy: "fixed", handoffSummary: false }, requiredFacts: [sharedFact], assumptions: [], confidence: 0.9 },
+        { id: "bp-revenda", intentId: "revenda", objective: "Comprar para revenda", mode: "direct_contact", steps: [], completion: { type: "whatsapp", channelId: null, destinationStrategy: "fixed", handoffSummary: false }, requiredFacts: [sharedFact], assumptions: [], confidence: 0.9 },
+      ],
+    });
+
+    expect(requirementsFromCommercialArchitecture(architecture, "session")).toEqual([
+      expect.objectContaining({ id: "session:whatsapp_number", key: "whatsapp_number", label: "Número principal do WhatsApp" }),
+    ]);
+  });
+
   it("confirma a interpretação inteira sem seleção manual de ações", async () => {
     process.env.ACTIVATION_GATE_FAKE_AI = "true";
     setAIProviderForTests(new ContractActivationProvider());

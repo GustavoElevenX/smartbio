@@ -336,7 +336,7 @@ export function OpportunitiesPage({ projectId }: { projectId: string }) {
                   </strong>
                   <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-[#65626d]">
                     {items.length
-                      ? "Altere a busca ou o status para encontrar outro contato."
+                      ? "Altere a busca ou a situação para encontrar outro contato."
                       : "Formulários, pedidos, agendamentos e contatos encaminhados passam a aparecer aqui."}
                   </p>
                 </div>

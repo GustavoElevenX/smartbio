@@ -267,6 +267,18 @@ describe("Activation V6 — Offer Intelligence contextual", () => {
     expect(validateConversionPath(fixed).checks.find((check) => check.key === "progressive_questioning")?.valid).toBe(false);
   });
 
+  it("aceita perguntas semanticamente derivadas mesmo quando a redação muda", () => {
+    const { project } = loop();
+    const form = project.steps.find((step) => step.type === "form");
+    if (form?.formFields?.[0])
+      form.formFields[0].label = "Você percebe qual problema no aparelho?";
+    expect(
+      validateConversionPath(project).checks.find(
+        (check) => check.key === "questions",
+      )?.valid,
+    ).toBe(true);
+  });
+
   it("não materializa disponibilidade ou outra capability sem proveniência", () => {
     for (const project of [loop().project, pet().project]) {
       expect(project.capabilities?.some((capability) => capability.key === "scheduling")).toBe(false);

@@ -16,6 +16,7 @@ import { extractExplicitOfferNames } from "@/features/qualification/offer-contex
 import type { BusinessCapabilityProfile, CapabilityKey, DataRequirement, ProjectCapability } from "@/types";
 import { createCapability } from "@/features/capabilities/capability-registry";
 import { validCommercialChannel } from "@/features/routing/completion-destination";
+import { isCatalogSelectionLabel } from "@/features/catalog/catalog-selection-fields";
 
 function normalized(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -90,6 +91,70 @@ function modeFor(key: VisitorActionKey, hasExternalCatalog: boolean, hasContact:
   if (key === "reserve") return "reservation";
   if (["resale", "recommendation", "support"].includes(key)) return "qualification";
   return hasContact ? "direct_contact" : "guided_flow";
+}
+
+// An incomplete catalog must become an honest inquiry, not an empty ordering
+// screen. This is a structure decision; it never creates operational facts.
+export function prepareFirstVersionArchitecture(input: CommercialArchitecture): CommercialArchitecture {
+  const architecture = commercialArchitectureSchema.parse(input);
+  const products = architecture.offerings.filter((offering) => offering.kind === "product");
+  const intents = architecture.intents.map((intent) => ({ ...intent }));
+  const inquiryBlueprintIds = new Set<string>();
+  const journeyBlueprints = architecture.journeyBlueprints.map((blueprint) => {
+    const intent = intents.find((item) => item.id === blueprint.intentId);
+    const shopping = ["order", "buy", "view_products"].includes(intent?.semanticKey || "");
+    if (!shopping || (blueprint.mode.startsWith("direct_") && blueprint.completion.type !== "native")) return blueprint;
+    const references = blueprint.steps.flatMap((step) => step.usesOfferings);
+    const selectable = references.length ? products.filter((product) => references.includes(product.id)) : products;
+    if (selectable.length) {
+      // A generic item/quantity form must not replace known selectable products.
+      const steps = blueprint.steps.map((step) => step.expectedCapability === "catalog_order" ? {
+        ...step, usesOfferings: step.usesOfferings.length ? step.usesOfferings : selectable.map((product) => product.id),
+      } : step);
+      const hasSelection = steps.some((step) => step.expectedCapability === "catalog_order" || (intent?.semanticKey === "view_products" && step.usesOfferings.some((id) => selectable.some((product) => product.id === id))));
+      if (!hasSelection) steps.unshift({ purpose: "Escolha os produtos e as opções disponíveis para sua solicitação.", title: "Escolha os produtos", expectedCapability: "catalog_order", collects: [], usesOfferings: selectable.map((product) => product.id), usesLocations: [] });
+      return { ...blueprint, steps };
+    }
+    if (!intent) return blueprint;
+    inquiryBlueprintIds.add(blueprint.id);
+    intent.label = intent.semanticKey === "view_products" ? "Consultar produtos" : "Solicitar atendimento";
+    const catalogFact = (key: string) => /catalog|products?|produtos?|items|itens|sabores|variantes/i.test(key);
+    const selectionField = isCatalogSelectionLabel;
+    const remaining: CommercialArchitecture["journeyBlueprints"][number]["steps"] = blueprint.steps.map((step) => ({
+      ...step,
+      expectedCapability: step.expectedCapability === "catalog_order" ? null : step.expectedCapability,
+      collects: step.collects.filter((label) => !selectionField(label)),
+      fields: step.fields?.filter((field) => !selectionField(field.key) && !selectionField(field.label)),
+      usesOfferings: [],
+    })).filter((step) => step.collects.length || step.fields?.length || step.usesLocations.length || step.expectedCapability);
+    if (!remaining.some((step) => step.fields?.some((field) => field.key === "interest"))) remaining.unshift({
+      purpose: "Conte o que procura. A equipe confirma as opções e as condições do atendimento.",
+      title: "O que você procura?", expectedCapability: null, collects: ["O que você procura?"],
+      fields: [{ key: "interest", label: "O que você procura?", type: "textarea", required: false, options: [], showWhen: null }],
+      usesOfferings: [], usesLocations: [],
+    });
+    const whatsapp = architecture.channels.find((channel) => channel.type === "whatsapp" && channel.isFallback && validCommercialChannel(channel))
+      || architecture.channels.find((channel) => channel.type === "whatsapp" && validCommercialChannel(channel));
+    const completion = blueprint.completion.type === "native" ? {
+      type: "whatsapp" as const, channelId: whatsapp?.id || null, destinationStrategy: "fixed" as const, handoffSummary: true,
+    } : { ...blueprint.completion, handoffSummary: true };
+    return {
+      ...blueprint, mode: "guided_flow" as const, steps: remaining, completion,
+      requiredFacts: blueprint.requiredFacts.map((fact) => catalogFact(fact.key) ? { ...fact, severity: "warning" as const } : fact),
+      assumptions: [...new Set([...blueprint.assumptions, "Sem catálogo detalhado: esta versão recebe consultas, não pedidos com produtos selecionados. Adicione a lista real para habilitar a seleção."])],
+    };
+  });
+  const inquirySignatures = new Set<string>();
+  const selectedBlueprints = journeyBlueprints.toSorted((left, right) => (intents.find((intent) => intent.id === right.intentId)?.priority || 0) - (intents.find((intent) => intent.id === left.intentId)?.priority || 0)).filter((blueprint) => {
+    if (!inquiryBlueprintIds.has(blueprint.id)) return true;
+    const signature = JSON.stringify({ completion: blueprint.completion, steps: blueprint.steps.map((step) => ({ fields: step.fields, collects: step.collects, locations: step.usesLocations, capability: step.expectedCapability })) });
+    if (inquirySignatures.has(signature)) return false;
+    inquirySignatures.add(signature);
+    return true;
+  });
+  const selectedIntentIds = new Set(selectedBlueprints.map((blueprint) => blueprint.intentId));
+  const removedIntentIds = new Set(journeyBlueprints.filter((blueprint) => !selectedIntentIds.has(blueprint.intentId)).map((blueprint) => blueprint.intentId));
+  return normalizeCommercialArchitecture({ ...architecture, intents: intents.filter((intent) => !removedIntentIds.has(intent.id)), journeyBlueprints: selectedBlueprints });
 }
 
 export function normalizeCommercialArchitecture(input: CommercialArchitecture): CommercialArchitecture {
@@ -216,7 +281,7 @@ export function deterministicCommercialArchitecture(input: {
   const detectedLinks = sources.flatMap((source) => source.detectedLinks || []);
   const channels: CommercialArchitecture["channels"] = [];
   if (input.phone) {
-    channels.push({ id: "channel-whatsapp-primary", type: "whatsapp", label: "WhatsApp principal", value: input.phone, purpose: "Atendimento principal", isFallback: false, evidence: [userEvidence], confidence: 1 });
+    channels.push({ id: "channel-whatsapp-primary", type: "whatsapp", label: "WhatsApp principal", value: input.phone, purpose: "Atendimento principal", isFallback: true, evidence: [userEvidence], confidence: 1 });
   }
   if (input.websiteUrl) {
     const instagram = /instagram\.com/i.test(input.websiteUrl);
@@ -226,7 +291,7 @@ export function deterministicCommercialArchitecture(input: {
     if (link.classification === "whatsapp") {
       channels.push({ id: stableId("channel-whatsapp", link.label || link.url, index), type: "whatsapp", label: link.label || "WhatsApp", value: phoneFromUrl(link.url) ?? null, purpose: "Atendimento encontrado nos materiais", isFallback: false, evidence: [sourceEvidence], confidence: 0.9 });
     } else if (["menu", "catalog", "delivery", "quote", "commercial_b2b", "scheduling", "location"].includes(link.classification)) {
-      channels.push({ id: stableId("channel-link", link.label || link.url, index), type: "external_url", label: link.label || "Link comercial", value: link.url, purpose: link.classification, isFallback: false, evidence: [sourceEvidence], confidence: 0.9 });
+      channels.push({ id: stableId("channel-link", link.label || link.url, index), type: "external_url", label: link.label || "Endereço comercial", value: link.url, purpose: link.classification, isFallback: false, evidence: [sourceEvidence], confidence: 0.9 });
     }
   }
   const normalizedChannels = uniqueBy(channels, (item) => `${item.type}:${item.value || normalized(item.label)}`);
@@ -245,7 +310,7 @@ export function deterministicCommercialArchitecture(input: {
     ...extractExplicitOfferNames(combined).map((name) => ({ name, kind: "other" as const })),
   ].filter((item): item is { name: string; kind: "product" | "service" | "other" } => Boolean(item.name)), (item) => normalized(item.name));
   const explicitKeys = inferDeclaredVisitorActionKeys(combined);
-  if (offerings.length >= 2 && /orient|recomend|descobr|identific|entend|escolh.{0,30}(?:opcao|alternativa|produto|servico)/i.test(normalized(combined)) && !explicitKeys.includes("recommendation")) explicitKeys.unshift("recommendation");
+  if (offerings.length >= 2 && /orient|recomend|descobr|identific/i.test(normalized(combined)) && !explicitKeys.includes("recommendation")) explicitKeys.unshift("recommendation");
   const linkKeys: VisitorActionKey[] = detectedLinks.flatMap((link) => ({
     menu: ["view_products" as const], catalog: ["view_products" as const], delivery: ["order" as const],
     quote: ["quote" as const], commercial_b2b: ["resale" as const], scheduling: ["schedule" as const],
@@ -334,6 +399,8 @@ export function capabilitiesFromCommercialArchitecture(architecture: CommercialA
   for (const blueprint of architecture.journeyBlueprints) {
     if (blueprint.completion.destinationStrategy === "by_location") keys.add("routing");
     for (const step of blueprint.steps) {
+      const intent = architecture.intents.find((item) => item.id === blueprint.intentId);
+      if (intent?.semanticKey === "view_products" && !blueprint.mode.startsWith("direct_") && !step.expectedCapability && architecture.offerings.some((offering) => offering.kind === "product" && step.usesOfferings.includes(offering.id))) keys.add("catalog_order");
       if (!step.expectedCapability) continue;
       if (step.expectedCapability === "routing" && blueprint.completion.destinationStrategy !== "by_location") continue;
       if (["quote", "scheduling", "reservation"].includes(step.expectedCapability) && blueprint.completion.destinationStrategy !== "native") continue;
@@ -344,7 +411,7 @@ export function capabilitiesFromCommercialArchitecture(architecture: CommercialA
 }
 
 export function requirementsFromCommercialArchitecture(architecture: CommercialArchitecture, projectId = "setup"): DataRequirement[] {
-  return architecture.journeyBlueprints.flatMap((blueprint) => {
+  const requirements: DataRequirement[] = architecture.journeyBlueprints.flatMap((blueprint) => {
     const capability = blueprint.steps.find((step) => step.expectedCapability)?.expectedCapability || "project";
     return blueprint.requiredFacts.map((fact) => ({
       id: `${projectId}:${fact.key}`,
@@ -356,6 +423,14 @@ export function requirementsFromCommercialArchitecture(architecture: CommercialA
       reason: `${fact.reason} Isso altera o caminho “${blueprint.objective}”.`,
     }));
   });
+  const unique = new Map<string, DataRequirement>();
+  for (const requirement of requirements) {
+    const current = unique.get(requirement.key);
+    if (!current || (current.severity !== "blocking" && requirement.severity === "blocking")) {
+      unique.set(requirement.key, requirement);
+    }
+  }
+  return [...unique.values()];
 }
 
 export function activationUnderstandingFromCommercialArchitecture(architecture: CommercialArchitecture): ActivationUnderstanding {

@@ -19,6 +19,8 @@ The creation of the first Sobe is context-first. The business owner supplies con
 
 Sobe does not use niche templates as the foundation of creation. The Design System and runtime engines are reusable, but each Commercial Architecture is composed from the specific business, its offers, audiences and commercial contexts, visitor intents, real channels, locations, available evidence, and next commercial action. `visitorActions` is a compatibility adapter derived from that architecture, never the strategic input the owner must configure.
 
+The first-version flow accepts a short business description and optional contact/materials. One complete interpretation review can start draft creation directly; only operational blockers interrupt it, one question at a time. The last necessary answer continues a requested creation. Optional improvements never sit in the mandatory path. Without an identifiable catalog, shopping paths become honest inquiries rather than empty ordering screens. Real product variations are carried into the same catalog used for selection and handoff. B2B qualification remains distinct from B2C purchasing or inquiry, and is not restricted to resale. Missing photos, detailed copy, or catalog material does not justify invented business facts. Publication remains explicit and separate.
+
 ## Commercial memory per project
 
 - The Activation session is transient. After confirmation and project materialization, the understanding moves to `ProjectCommercialContext`, a private, versioned, one-to-one project memory.

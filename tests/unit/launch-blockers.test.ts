@@ -129,6 +129,24 @@ describe("readiness de publicação", () => {
     expect(getProjectReadiness(validProject()).publishable).toBe(true);
   });
 
+  it("não exige uma página de site legada para publicar o link da bio", () => {
+    const project = validProject();
+    project.publication = { homeMode: "site" };
+    expect(getProjectReadiness(project).blocking.some((item) => item.key === "publication.site")).toBe(false);
+  });
+
+  it("exige uma meta ativa quando o link principal começa em uma ação específica", () => {
+    const project = validProject();
+    project.publication = { homeMode: "goal", conversionGoalId: "missing" };
+    expect(getProjectReadiness(project).blocking.some((item) => item.key === "publication.goal")).toBe(true);
+  });
+
+  it("exige uma etapa ativa quando o link principal começa em uma página selecionada", () => {
+    const project = validProject();
+    project.publication = { homeMode: "step", initialStepId: "missing" };
+    expect(getProjectReadiness(project).blocking.some((item) => item.key === "publication.step")).toBe(true);
+  });
+
   it("bloqueia placeholder por metadata, mesmo sem depender do texto", () => {
     const project = validProject();
     project.steps[0].settings = {
@@ -162,5 +180,35 @@ describe("readiness de publicação", () => {
       }],
     };
     expect(getProjectReadiness(project).blocking.some((item) => item.key.includes("destination"))).toBe(true);
+  });
+
+  it("não trata sinais internos da inteligência de ofertas como texto público fictício", () => {
+    const project = validProject();
+    project.commercialConfig = {
+      serviceOfferings: [{
+        id: crypto.randomUUID(),
+        projectId: project.id,
+        name: "Combo família",
+        slug: "combo-familia",
+        serviceMode: "external_url",
+        priceMode: "fixed",
+        price: 80,
+        currency: "BRL",
+        externalUrl: "https://example.org/combo-familia",
+        isFeatured: true,
+        isActive: true,
+        order: 0,
+        settings: {
+          offerIntelligence: {
+            ambiguitySignals: ["quer uma opção completa"],
+          },
+        },
+      }],
+    };
+    expect(
+      getProjectReadiness(project).blocking.filter((item) =>
+        item.key.startsWith("demo."),
+      ),
+    ).toEqual([]);
   });
 });

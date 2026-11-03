@@ -42,7 +42,7 @@ export default function AuthLayout({
             <Sparkles size={14} /> A bio que entende, recomenda e vende
           </span>
           <blockquote className="mt-12 max-w-xl text-5xl font-extrabold leading-[1.04] tracking-[-.055em]">
-            “Nosso link deixou de ser uma lista e virou a melhor conversa antes
+            “Nossa página deixou de ser uma lista e virou a melhor conversa antes
             da conversa.”
           </blockquote>
         </div>

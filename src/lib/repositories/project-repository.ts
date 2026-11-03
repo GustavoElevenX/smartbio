@@ -272,6 +272,67 @@ export const projectRepository = {
       );
     return payload.data;
   },
+  async saveBrand(project: Project): Promise<void> {
+    if (canUseLocalStore()) {
+      localStore.saveProject(project);
+      return;
+    }
+    if (!isSupabaseConfigured())
+      throw new Error("Persistência indisponível. Configure o Supabase.");
+    const normalized = normalizeIds(project);
+    const response = await fetch(
+      `/api/projects/${encodeURIComponent(normalized.id)}/brand`,
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id: normalized.id,
+          brand: normalized.brand,
+          designSystem: normalized.designSystem,
+          visualDirection: normalized.visualDirection,
+        }),
+      },
+    );
+    const payload = (await response.json()) as {
+      error?: { message?: string };
+    };
+    if (!response.ok)
+      throw new Error(
+        payload.error?.message || "Não foi possível salvar a identidade.",
+      );
+  },
+  async saveExperience(project: Project): Promise<Project> {
+    if (canUseLocalStore()) return localStore.saveProject(project);
+    if (!isSupabaseConfigured())
+      throw new Error("Persistência indisponível. Configure o Supabase.");
+    const normalized = normalizeIds(project);
+    const response = await fetch(
+      `/api/projects/${encodeURIComponent(normalized.id)}/experience`,
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id: normalized.id,
+          steps: normalized.steps,
+          conversionGoals: normalized.conversionGoals,
+          entryPoints: normalized.entryPoints,
+        }),
+      },
+    );
+    const payload = (await response.json()) as {
+      data?: { version: number; updatedAt: string };
+      error?: { message?: string };
+    };
+    if (!response.ok || !payload.data)
+      throw new Error(
+        payload.error?.message || "Não foi possível salvar o rascunho.",
+      );
+    return {
+      ...normalized,
+      version: payload.data.version,
+      updatedAt: payload.data.updatedAt,
+    };
+  },
   async deleteProject(id: string) {
     if (canUseLocalStore()) {
       localStore.deleteProject(id);

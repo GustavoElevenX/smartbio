@@ -1,4 +1,5 @@
 import type { CapabilityKey, DataRequirement, Project, ProjectCapability } from "@/types";
+import { whatsappActionHasUsableDestination } from "@/features/whatsapp/whatsapp-destination";
 
 export interface CapabilityRequirementDefinition {
   key: string;
@@ -41,12 +42,12 @@ export const capabilityRequirements: Record<CapabilityKey, CapabilityRequirement
   ],
   routing: [
     { key: "routing.destinations", label: "Destinos de atendimento", required: true, question: "Quais unidades ou canais podem receber o visitante?", validate: (p) => Boolean(p.commercialConfig?.routingDestinations?.length), actionPath: dataPath },
-    { key: "routing.fallback", label: "Fallback de roteamento", required: true, question: "O que deve acontecer quando nenhuma unidade for elegível?", validate: (p) => Boolean(p.capabilities?.find((item) => item.enabled && item.key === "routing")?.configuration?.fallback || p.commercialConfig?.routingDestinations?.some((item) => item.type === "unavailable" || item.isDefault)), actionPath: dataPath },
+    { key: "routing.fallback", label: "Alternativa de roteamento", required: true, question: "O que deve acontecer quando nenhuma unidade for elegível?", validate: (p) => Boolean(p.capabilities?.find((item) => item.enabled && item.key === "routing")?.configuration?.fallback || p.commercialConfig?.routingDestinations?.some((item) => item.type === "unavailable" || item.isDefault)), actionPath: dataPath },
     { key: "routing.location", label: "Unidades de atendimento", required: true, question: "Quais unidades o visitante pode escolher?", validate: (p) => Boolean(p.commercialConfig?.locations?.some((item) => item.isActive) && p.commercialConfig.locations.filter((item) => item.isActive).every((item) => item.routingDestinationId)), actionPath: dataPath },
   ],
   payment: [
-    { key: "payment.url", label: "URL de pagamento", required: true, question: "Qual é a URL segura do checkout?", validate: (p) => isHttpUrl(p.commercialConfig?.paymentUrl), actionPath: dataPath },
-    { key: "payment.cta", label: "CTA de pagamento", required: true, question: "Qual texto deve aparecer no botão de pagamento?", validate: (p) => Boolean(p.steps.some((step) => step.options?.some((option) => option.actionPayload?.capability === "payment" && option.label))), actionPath: dataPath },
+    { key: "payment.url", label: "Endereço de pagamento", required: true, question: "Qual é o endereço seguro da página de pagamento?", validate: (p) => isHttpUrl(p.commercialConfig?.paymentUrl), actionPath: dataPath },
+    { key: "payment.cta", label: "Botão de pagamento", required: true, question: "Qual texto deve aparecer no botão de pagamento?", validate: (p) => Boolean(p.steps.some((step) => step.options?.some((option) => option.actionPayload?.capability === "payment" && option.label))), actionPath: dataPath },
   ],
 };
 
@@ -59,8 +60,7 @@ function hasDestination(project: Project) {
   return project.steps.some((step) => step.options?.some((option) => {
     if (option.actionType === "submit_form" || option.actionType === "capture_lead" || option.actionType === "finish") return true;
     if (option.actionType === "open_whatsapp") {
-      const configured = project.commercialConfig?.routingDestinations?.find((destination) => destination.id === option.actionPayload?.destinationId && destination.type === "whatsapp");
-      return Boolean(configured?.value || option.actionPayload?.phone || project.phone);
+      return whatsappActionHasUsableDestination(project, option);
     }
     if (option.actionType === "open_url") return isHttpUrl(String(option.actionPayload?.url || ""));
     return option.actionType === "start_capability";

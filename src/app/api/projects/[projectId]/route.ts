@@ -27,6 +27,17 @@ const projectSchema = z.custom<Project>(
   "Projeto inválido.",
 );
 
+type ProjectSaveError = { code?: string; message?: string; details?: string; hint?: string } | null;
+
+function isSlugConflict(error: ProjectSaveError) {
+  const description = [error?.message, error?.details, error?.hint].filter(Boolean).join(" ").toLowerCase();
+  return error?.code === "23505" && description.includes("slug");
+}
+
+function collisionSafeSlug(slug: string, projectId: string) {
+  return `${slug.replace(/-[0-9a-f]{8}$/i, "")}-${projectId.slice(0, 8).toLowerCase()}`;
+}
+
 export const GET = withAuthenticatedActor(
   async (
     _request,
@@ -91,7 +102,7 @@ export const PUT = withAuthenticatedActor(
     }
 
     const now = new Date().toISOString();
-    const project: Project = {
+    let project: Project = {
       ...parsed.data,
       workspaceId: actor.workspaceId,
       updatedAt: now,
@@ -119,12 +130,20 @@ export const PUT = withAuthenticatedActor(
           deleted: {},
         },
       });
-      if (commercialError) return apiError("Não foi possível salvar a configuração comercial. Suas alterações continuam no editor; tente novamente.", 500, "commercial_save_failed");
+      if (commercialError) {
+        console.error("commercial_save_failed", {
+          code: commercialError.code,
+          message: commercialError.message,
+          projectId: project.id,
+          workspaceId: actor.workspaceId,
+        });
+        return apiError("Não foi possível salvar a configuração comercial. Suas alterações continuam no editor; tente novamente.", 500, "commercial_save_failed");
+      }
       project.version = Number(commercialSaved.version);
     } else if (existing) {
       project.version = Number(previousSettings.version || project.version || 1);
     }
-    const settings = {
+    let settings = {
       ...previousSettings,
       subtitle: project.subtitle,
       primaryDestination: project.primaryDestination,
@@ -134,7 +153,7 @@ export const PUT = withAuthenticatedActor(
       version: project.version,
       projectPayload: project,
     };
-    const { error: saveError } = await db.from("projects").upsert({
+    const projectRow = () => ({
       id: project.id,
       workspace_id: actor.workspaceId,
       name: project.name,
@@ -147,6 +166,14 @@ export const PUT = withAuthenticatedActor(
       settings,
       published_at: project.publishedAt || null,
     });
+    let { error: saveError } = await db.from("projects").upsert(projectRow());
+    if (!existing && isSlugConflict(saveError)) {
+      project = { ...project, slug: collisionSafeSlug(project.slug, project.id) };
+      settings = { ...settings, projectPayload: project };
+      ({ error: saveError } = await db.from("projects").upsert(projectRow()));
+    }
+    if (saveError)
+      console.error("project_save_failed", { code: saveError.code, projectId: project.id, workspaceId: actor.workspaceId });
     if (saveError)
       return apiError(
         "Não foi possível salvar o projeto.",
@@ -171,12 +198,19 @@ export const PUT = withAuthenticatedActor(
       },
       { onConflict: "project_id" },
     );
-    if (brandError)
+    if (brandError) {
+      console.error("brand_save_failed", {
+        code: brandError.code,
+        message: brandError.message,
+        projectId: project.id,
+        workspaceId: actor.workspaceId,
+      });
       return apiError(
         "O projeto foi salvo, mas a marca não pôde ser atualizada.",
         500,
         "brand_save_failed",
       );
+    }
 
     if (!existing) {
       await recordPlatformGrowthEvent(db, {

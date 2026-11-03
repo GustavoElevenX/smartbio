@@ -20,6 +20,7 @@ import type { GenerationPhase } from "@/components/ai-setup/generation-status";
 import { Button } from "@/components/ui/button";
 import {
   aiSetupSessionSchema,
+  minimumBusinessContextLength,
   type AISetupSession,
   type BrandIdentity,
   type CommercialArchitecture,
@@ -41,6 +42,8 @@ import { projectRepository } from "@/lib/repositories/project-repository";
 import type { Project } from "@/types";
 import type { ActivationPreflight } from "@/features/ai-setup/activation-preflight";
 import { validateSetupPhone } from "@/features/ai-setup/setup-phone";
+import { validateSetupSalesChannel } from "@/features/ai-setup/setup-sales-channel";
+import { calculateSetupReadiness } from "@/features/ai-setup/setup-readiness";
 
 const SetupPreview = dynamic(
   () => import("@/components/ai-setup/setup-preview"),
@@ -49,6 +52,12 @@ const SetupPreview = dynamic(
 const initialForm: InitialSetupForm = {
   businessName: "",
   description: "",
+  offeringType: undefined,
+  offerDetails: "",
+  resaleAvailable: undefined,
+  resaleDetails: "",
+  salesChannel: undefined,
+  salesDestination: "",
   websiteUrl: "",
   phone: "",
 };
@@ -77,7 +86,7 @@ async function apiCall<T>(url: string, init?: RequestInit): Promise<T> {
   };
   if (!response.ok || !payload.ok || payload.data === undefined)
     throw new SetupClientError(
-      payload.error?.message || "Não foi possível continuar o onboarding.",
+      payload.error?.message || "Não foi possível continuar a configuração inicial.",
       response.status,
       payload.error?.code,
     );
@@ -88,6 +97,12 @@ function sessionForm(session: AISetupSession): InitialSetupForm {
   return {
     businessName: session.initialInput.businessName,
     description: session.initialInput.description,
+    offeringType: session.initialInput.offeringType,
+    offerDetails: session.initialInput.offerDetails || "",
+    resaleAvailable: session.initialInput.resaleAvailable,
+    resaleDetails: session.initialInput.resaleDetails || "",
+    salesChannel: session.initialInput.salesChannel,
+    salesDestination: session.initialInput.salesDestination || "",
     websiteUrl: session.initialInput.websiteUrl || "",
     phone: session.initialInput.phone || "",
   };
@@ -140,6 +155,8 @@ export function AISetupShell({
     useState<AISetupDraft>();
   const lastSavedDraft = useRef("");
   const draftVersion = useRef(0);
+  const creationRequested = useRef(false);
+  const generationInFlight = useRef(false);
 
   const adopt = useCallback(
     (next: AISetupSession, draft?: AISetupDraft) => {
@@ -287,6 +304,12 @@ export function AISetupShell({
           requestedSurface: "recommend",
           businessName: form.businessName,
           description: form.description,
+          offeringType: form.offeringType,
+          offerDetails: form.offerDetails,
+          resaleAvailable: form.resaleAvailable,
+          resaleDetails: form.resaleDetails,
+          salesChannel: form.salesChannel,
+          salesDestination: form.salesDestination,
           websiteUrl: form.websiteUrl || undefined,
           phone: form.phone || undefined,
           brandIdentity,
@@ -317,6 +340,7 @@ export function AISetupShell({
     reason: "recovered" | "restarted",
     draft?: AISetupDraft,
   ) {
+    creationRequested.current = false;
     setLifecycle("recovering");
     setBusy(true);
     setError("");
@@ -385,13 +409,20 @@ export function AISetupShell({
 
   async function analyze() {
     if (!ensureActiveSession()) return;
+    creationRequested.current = false;
     if (
       form.businessName.trim().length < 2 ||
-      form.description.trim().length < 15
+      form.description.trim().length < minimumBusinessContextLength ||
+      !form.offeringType
     ) {
       setError(
-        "Informe o nome do negócio e uma descrição com pelo menos 15 caracteres.",
+        "Informe o nome do negócio, escolha o tipo de oferta e conte o que você oferece.",
       );
+      return;
+    }
+    const salesChannelError = validateSetupSalesChannel(form);
+    if (salesChannelError) {
+      setError(salesChannelError);
       return;
     }
     const phone = validateSetupPhone(form.phone);
@@ -413,8 +444,14 @@ export function AISetupShell({
         requestedSurface: "recommend" as const,
         businessName: form.businessName.trim(),
         description: form.description.trim(),
+        offeringType: form.offeringType,
+        offerDetails: form.offerDetails?.trim(),
+        resaleAvailable: form.offeringType === "services" ? undefined : form.resaleAvailable,
+        resaleDetails: form.offeringType === "services" || !form.resaleAvailable ? undefined : form.resaleDetails?.trim(),
+        salesChannel: form.salesChannel,
+        salesDestination: form.salesDestination?.trim(),
         websiteUrl,
-        phone: phone.normalized,
+        phone: form.salesChannel === "whatsapp" || form.salesChannel === "phone" ? phone.normalized : undefined,
         brandIdentity,
       };
       const next = await apiCall<AISetupSession>(
@@ -440,6 +477,8 @@ export function AISetupShell({
 
   async function answer(key: string, value: unknown) {
     if (!ensureActiveSession()) return;
+    if (busy || busyQuestion) return;
+    setBusy(true);
     setBusyQuestion(key);
     setLifecycle("saving");
     setError("");
@@ -464,9 +503,12 @@ export function AISetupShell({
                 ? "mais 1 item necessário"
                 : `mais ${revealed} itens necessários`
             } para revisar.`
-          : "Salvo. A Sobe atualizou o que falta para criar sua primeira versão.",
+          : "Entendido. A Sobe interpretou sua resposta e atualizou a primeira versão.",
       );
       setLifecycle("active");
+      if (creationRequested.current && calculateSetupReadiness(next.missingRequirements, next).readyToGenerate) {
+        await generateFromSession(next);
+      }
     } catch (caught) {
       if (isInvalidSessionError(caught)) invalidateSession(form);
       else {
@@ -479,22 +521,27 @@ export function AISetupShell({
       }
     } finally {
       setBusyQuestion(undefined);
+      setBusy(false);
     }
   }
 
   async function confirmArchitecture() {
     if (!ensureActiveSession()) return;
+    if (busy) return;
+    creationRequested.current = true;
     setBusy(true);
     setLifecycle("saving");
     setError("");
     try {
-      adopt(
-        await apiCall<AISetupSession>(
-          `/api/ai/setup/${session!.id}/architecture`,
-          { method: "POST", body: "{}" },
-        ),
+      const next = await apiCall<AISetupSession>(
+        `/api/ai/setup/${session!.id}/architecture`,
+        { method: "POST", body: "{}" },
       );
+      adopt(next);
       setLifecycle("active");
+      if (calculateSetupReadiness(next.missingRequirements, next).readyToGenerate) {
+        await generateFromSession(next);
+      }
     } catch (caught) {
       if (isInvalidSessionError(caught)) invalidateSession(form);
       else {
@@ -512,6 +559,7 @@ export function AISetupShell({
 
   async function updateArchitecture(architecture: CommercialArchitecture) {
     if (!ensureActiveSession()) return;
+    creationRequested.current = false;
     setBusy(true);
     setLifecycle("saving");
     setError("");
@@ -532,6 +580,13 @@ export function AISetupShell({
 
   async function generate() {
     if (!ensureActiveSession()) return;
+    await generateFromSession(session!);
+  }
+
+  async function generateFromSession(activeSession: AISetupSession) {
+    if (generationInFlight.current) return;
+    if (!calculateSetupReadiness(activeSession.missingRequirements, activeSession).readyToGenerate) return;
+    generationInFlight.current = true;
     setBusy(true);
     setLifecycle("generating");
     setError("");
@@ -548,7 +603,7 @@ export function AISetupShell({
         );
       setGenerationStatus("composing");
       const generatedSession = await apiCall<AISetupSession>(
-        `/api/ai/setup/${session!.id}/generate`,
+        `/api/ai/setup/${activeSession.id}/generate`,
         { method: "POST", body: "{}" },
       );
       const project = generatedSession.projectDraft as Project | undefined;
@@ -558,7 +613,7 @@ export function AISetupShell({
       const saved = await projectRepository.saveProject(project);
       setGenerationStatus("finalizing");
       const finalized = await apiCall<{ session: AISetupSession }>(
-        `/api/ai/setup/${session!.id}/finalize-project`,
+        `/api/ai/setup/${activeSession.id}/finalize-project`,
         {
           method: "POST",
           body: JSON.stringify({
@@ -584,6 +639,7 @@ export function AISetupShell({
         );
       }
     } finally {
+      generationInFlight.current = false;
       setBusy(false);
     }
   }
@@ -701,12 +757,9 @@ export function AISetupShell({
     <div className="animate-enter">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-extrabold tracking-[-.03em] text-[#07172f]">
+          <h2 className="sr-only">
             Novo negócio
           </h2>
-          <p className="mt-1 text-sm text-[#687582]">
-            Da descrição à primeira versão pronta para testar.
-          </p>
         </div>
         {resumed && hasRelevantSetupInformation(session) ? (
           <div className="flex max-w-md items-center gap-3 border border-[#cfe0ff] bg-[#f3f7ff] px-4 py-3 text-xs text-[#40536a]">
@@ -726,7 +779,7 @@ export function AISetupShell({
           </div>
         ) : null}
       </div>
-      <div className="mb-3 grid grid-cols-2 rounded-xl bg-[#e9e7ef] p-1 lg:hidden">
+      <div className="mb-3 grid grid-cols-2 rounded-xl bg-[#e9e7ef] p-1 lg:hidden" aria-label="Criação e prévia">
         <Button
           type="button"
           size="sm"
@@ -784,6 +837,7 @@ export function AISetupShell({
             }}
             onAnalyze={analyze}
             onEditBusinessInfo={() => {
+              creationRequested.current = false;
               setEditingBusinessInfo(true);
               setError("");
             }}

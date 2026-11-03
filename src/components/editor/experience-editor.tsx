@@ -7,10 +7,13 @@ import {
   ArrowUp,
   Check,
   Copy,
+  PackageOpen,
   ExternalLink,
   Eye,
   Layers3,
   LoaderCircle,
+  Maximize2,
+  Minimize2,
   Palette,
   Plus,
   Redo2,
@@ -29,6 +32,7 @@ import { FormBuilder } from "@/components/editor/form-builder";
 import { CapabilityPanel } from "@/components/editor/capability-panel";
 import { AIFieldActions } from "@/components/editor/ai-field-actions";
 import { AIScopeActions } from "@/components/editor/ai-scope-actions";
+import { ExternalLinkField } from "@/components/presence-editor/external-link-field";
 import { ExperienceCanvas } from "@/components/public-experience/public-experience";
 import { PublishReadinessModal } from "@/components/publishing/publish-readiness-modal";
 import {
@@ -40,6 +44,7 @@ import { projectRepository } from "@/lib/repositories/project-repository";
 import { canUseLocalStore } from "@/lib/runtime-mode";
 import { uid } from "@/lib/utils";
 import { experiencePreviewUrl } from "@/features/preview/preview-url";
+import { primaryWhatsAppDestination } from "@/features/whatsapp/project-whatsapp-numbers";
 import type { JourneyStep, Project, StepType } from "@/types";
 
 const stepNames: Record<StepType, string> = {
@@ -59,6 +64,19 @@ const stepNames: Record<StepType, string> = {
   routing: "Roteamento",
   confirmation: "Confirmação",
 };
+
+const editorModeCopy = {
+  quick: {
+    label: "Edição rápida",
+    description:
+      "Edite textos e configurações com campos visuais. Blocos técnicos continuam protegidos.",
+  },
+  advanced: {
+    label: "Edição avançada",
+    description:
+      "Edite a configuração técnica dos blocos em JSON. Use este modo para ajustes específicos.",
+  },
+} as const;
 
 function newStep(type: StepType, order: number): JourneyStep {
   const id = uid("step");
@@ -137,6 +155,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
   const [publishOpen, setPublishOpen] = useState(false);
   const [previewAs, setPreviewAs] = useState("selected");
   const [previewRun, setPreviewRun] = useState(0);
+  const [previewExpanded, setPreviewExpanded] = useState(false);
   const [undoStack, setUndoStack] = useState<Project[]>([]);
   const [redoStack, setRedoStack] = useState<Project[]>([]);
   const projectRef = useRef<Project | null>(null);
@@ -146,7 +165,9 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
   const persist = useCallback((snapshot: Project) => {
     setSaveState("saving");
     setSaveError("");
-    const pending = saveQueue.current.catch(() => undefined).then(() => projectRepository.saveProject(snapshot));
+    const pending = saveQueue.current
+      .catch(() => undefined)
+      .then(() => projectRepository.saveExperience(snapshot));
     saveQueue.current = pending;
     return pending.then((saved) => {
       savedRef.current = snapshot;
@@ -413,16 +434,26 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
             <Redo2 size={17} />
           </button>
         </div>
-        <div className="flex items-center rounded-xl bg-[#f0eff4] p-1">
+        <div
+          className="flex items-center rounded-xl bg-[#f0eff4] p-1"
+          role="group"
+          aria-label="Modo de edição"
+        >
           <button
+            type="button"
             onClick={() => setMode("quick")}
-            className={`rounded-lg px-3 py-2 text-xs font-bold ${mode === "quick" ? "bg-white shadow-sm" : "text-[#777781]"}`}
+            aria-pressed={mode === "quick"}
+            aria-describedby="editor-mode-description"
+            className={`focus-ring rounded-lg px-3 py-2 text-xs font-bold transition ${mode === "quick" ? "bg-[#0054fc] text-white shadow-[0_4px_12px_rgba(0,84,252,.2)]" : "text-[#686873] hover:bg-white/70"}`}
           >
             Rápido
           </button>
           <button
+            type="button"
             onClick={() => setMode("advanced")}
-            className={`rounded-lg px-3 py-2 text-xs font-bold ${mode === "advanced" ? "bg-white shadow-sm" : "text-[#777781]"}`}
+            aria-pressed={mode === "advanced"}
+            aria-describedby="editor-mode-description"
+            className={`focus-ring rounded-lg px-3 py-2 text-xs font-bold transition ${mode === "advanced" ? "bg-[#0054fc] text-white shadow-[0_4px_12px_rgba(0,84,252,.2)]" : "text-[#686873] hover:bg-white/70"}`}
           >
             Avançado
           </button>
@@ -433,15 +464,18 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
           rel="noopener noreferrer"
           className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#dfdee6] px-3 text-xs font-bold"
         >
-          <Eye size={16} /> Preview
+          <Eye size={16} /> Prévia
         </a>
+        <Link href={`/app/projects/${project.id}/data?tab=catalog`} className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#dfdee6] px-3 text-xs font-bold">
+          <PackageOpen size={16} /> Catálogo
+        </Link>
         <Button onClick={() => void publish()} size="sm">
           <Save size={15} />{" "}
           {project.status === "published" ? "Publicar alterações" : "Publicar"}
         </Button>
       </div>
-      <div className="grid min-h-0 min-w-0 flex-1 xl:grid-cols-[280px_minmax(390px,1fr)_360px]">
-        <aside aria-label="Etapas da jornada" className="order-2 min-w-0 border-r border-[#e5e4eb] bg-[#f7fbff] xl:order-1">
+      <div className={`grid min-h-0 min-w-0 flex-1 ${previewExpanded ? "xl:grid-cols-1" : "xl:grid-cols-[260px_minmax(520px,1fr)_340px]"}`}>
+        <aside aria-label="Etapas da jornada" className={`${previewExpanded ? "hidden" : "order-2"} min-w-0 border-r border-[#e5e4eb] bg-[#f7fbff] xl:order-1`}>
           <div className="flex items-center justify-between border-b border-[#e7e6ed] p-4">
             <div>
               <strong className="text-sm">Etapas</strong>
@@ -530,16 +564,28 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
             </button>
           </div>
         </aside>
-        <section aria-label="Prévia da jornada" className="order-1 flex min-w-0 items-start justify-center bg-[#efedf4] p-5 xl:order-2">
-          <div className="relative w-full max-w-[390px]">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-xs font-semibold text-[#777781]">
+        <section aria-label="Prévia da jornada" className="order-1 flex min-w-0 items-start justify-center bg-[#efedf4] p-4 xl:order-2 2xl:p-6">
+          <div className="relative w-full max-w-[620px]">
+            <div className="mb-4 flex flex-wrap items-center gap-2 text-xs font-semibold text-[#777781]">
               <span className="inline-flex items-center gap-2">
-                <Smartphone size={15} /> Preview mobile
+                <Smartphone size={15} /> Prévia mobile
               </span>
-              <label className="flex min-w-0 flex-1 items-center gap-2">Preview como<select aria-label="Preview como" value={previewAs} onChange={(event) => setPreviewAs(event.target.value)} className="min-h-9 min-w-0 flex-1 rounded-lg border border-[#d9d6df] bg-white px-2 text-[11px]"><option value="selected">Etapa selecionada</option><option value="bio">Bio · jornada completa</option>{project.entryPoints?.map((entry) => <option key={entry.id} value={`entry:${entry.key}`}>{entry.name}</option>)}{project.conversionGoals?.map((goal) => <option key={goal.id} value={`goal:${goal.id}`}>{goal.name}</option>)}</select></label>
+              <label className="flex min-w-52 flex-1 items-center gap-2"><span className="sr-only">Visualizar prévia como</span><select aria-label="Visualizar prévia como" value={previewAs} onChange={(event) => setPreviewAs(event.target.value)} className="min-h-9 min-w-0 flex-1 rounded-lg border border-[#d9d6df] bg-white px-2 text-[11px]"><option value="selected">Etapa selecionada</option><option value="bio">Bio · jornada completa</option>{project.entryPoints?.map((entry) => <option key={entry.id} value={`entry:${entry.key}`}>{entry.name}</option>)}{project.conversionGoals?.map((goal) => <option key={goal.id} value={`goal:${goal.id}`}>{goal.name}</option>)}</select></label>
+              <button type="button" className="focus-ring min-h-9 rounded-xl px-3 text-xs font-semibold text-[#0054fc] hover:bg-white/70" onClick={() => setPreviewRun((value) => value + 1)}>Reiniciar</button>
+              <button
+                type="button"
+                className="focus-ring hidden size-9 shrink-0 place-items-center rounded-xl text-[#0054fc] hover:bg-white/70 xl:grid"
+                aria-label={previewExpanded ? "Sair da prévia ampliada" : "Ampliar prévia"}
+                aria-pressed={previewExpanded}
+                onClick={() => setPreviewExpanded((value) => !value)}
+              >
+                {previewExpanded ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+              </button>
             </div>
-            <button type="button" className="mb-3 text-xs font-semibold text-[#0054fc]" onClick={() => setPreviewRun((value) => value + 1)}>Reiniciar prévia</button>
-            <div className="h-[clamp(360px,calc(100dvh-380px),680px)] overflow-hidden rounded-[38px] border-[7px] border-[#222126] bg-white p-1.5 shadow-[0_30px_80px_rgba(29,25,55,.2)]">
+            <div
+              data-testid="journey-preview-device"
+              className={`mx-auto w-full overflow-hidden rounded-[38px] border-[7px] border-[#222126] bg-white p-1.5 shadow-[0_30px_80px_rgba(29,25,55,.2)] ${previewExpanded ? "h-[clamp(600px,calc(100dvh-190px),820px)] max-w-[560px]" : "h-[clamp(500px,calc(100dvh-220px),760px)] max-w-[480px]"}`}
+            >
               <div key={`${previewAs}-${selected.id}-${previewRun}`} tabIndex={0} aria-label="Conteúdo da prévia, role para ver mais" className="h-full overflow-y-auto overscroll-contain rounded-[28px] scrollbar-thin">
                 <ExperienceCanvas
                   key={`${project.id}-${previewAs}-${previewAs === "selected" ? selected.id : ""}-${previewRun}`}
@@ -554,7 +600,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
             <p className="mt-3 text-center text-xs text-[#686471]">Role dentro do celular para ver todo o conteúdo.</p>
           </div>
         </section>
-        <aside aria-label="Editar etapa" className="order-3 min-w-0 border-l border-[#e5e4eb] bg-white">
+        <aside aria-label="Editar etapa" className={`${previewExpanded ? "hidden" : "order-3"} min-w-0 border-l border-[#e5e4eb] bg-white`}>
           <div className="flex items-center justify-between border-b border-[#e7e6ed] px-5 py-4">
             <div>
               <strong className="block text-sm">
@@ -577,6 +623,36 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
             </label>
           </div>
           <div key={selected.id} className="max-h-[700px] overflow-y-auto p-5 scrollbar-thin xl:max-h-[calc(100vh-220px)]">
+            <div
+              id="editor-mode-description"
+              role="status"
+              aria-live="polite"
+              className="mb-5 rounded-[14px] border border-[#cfe0ff] bg-[#f2f7ff] p-3 text-[#07172f]"
+            >
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-[10px] bg-[#0054fc] text-white">
+                  {mode === "quick" ? <Sparkles size={15} /> : <Settings2 size={15} />}
+                </span>
+                <div>
+                  <strong className="block text-xs font-extrabold">
+                    {editorModeCopy[mode].label}
+                  </strong>
+                  <p className="mt-1 text-xs leading-5 text-[#526171]">
+                    {editorModeCopy[mode].description}
+                  </p>
+                </div>
+              </div>
+            </div>
+            {mode === "advanced" ? (
+              <div data-testid="advanced-block-editor" className="mb-6">
+                <BlockEditor
+                  step={selected}
+                  project={activeProject}
+                  mode="advanced"
+                  onChange={(next) => updateStep(next)}
+                />
+              </div>
+            ) : null}
             <div className="mb-5"><Label htmlFor="step-type">Tipo de etapa</Label><Select id="step-type" value={selected.type} onChange={(event) => { const type = event.target.value as StepType; const defaults = newStep(type, selected.order); updateStep({ type, ...(type === "form" ? { formFields: selected.formFields || defaults.formFields } : {}), ...(type === "recommendation" ? { recommendation: selected.recommendation || defaults.recommendation } : {}), options: selected.options || defaults.options || [] }); }}>{(Object.keys(stepNames) as StepType[]).map((type) => <option key={type} value={type}>{stepNames[type]}</option>)}</Select></div>
             <details className="mb-5"><summary className="cursor-pointer py-2 text-sm font-bold">Configuração comercial do negócio</summary><CapabilityPanel project={activeProject} onChange={(next) => commit(() => next)} /></details>
             <details className="mb-5"><summary className="cursor-pointer py-2 text-sm font-bold">Editar com IA</summary><AIScopeActions
@@ -701,14 +777,14 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
                                         ? { capability }
                                         : value === "open_whatsapp"
                                           ? (() => {
-                                              const destination = project.commercialConfig?.routingDestinations?.find((candidate) => candidate.type === "whatsapp");
+                                              const destination = primaryWhatsAppDestination(project);
                                               return {
                                                 ...(destination ? { destinationId: destination.id, phone: destination.value || "" } : { phone: project.phone || "" }),
                                                 message: "",
                                               };
                                             })()
                                           : value === "open_url"
-                                            ? { url: "" }
+                                            ? {}
                                             : undefined) as Record<string, string | number | boolean> | undefined,
                                     }
                                   : item,
@@ -721,8 +797,8 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
                           <option value="open_whatsapp">WhatsApp</option>
                           <option value="open_url">Link externo</option>
                           <option value="continue_with_answers">Continuar com respostas</option>
-                          <option value="capture_lead">Capturar lead</option>
-                          <option value="submit_form">Capturar lead (legado)</option>
+                          <option value="capture_lead">Capturar contato comercial</option>
+                          <option value="submit_form">Capturar contato comercial (antigo)</option>
                           {(project.capabilities || [])
                             .filter((item) => item.enabled)
                             .map((item) => (
@@ -753,21 +829,11 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
                         </div>
                       ) : null}
                       {option.actionType === "open_url" ? (
-                        <div className="mt-3">
-                          <Label htmlFor={`option-url-${option.id}`}>URL de destino</Label>
-                          <Input
-                            id={`option-url-${option.id}`}
-                            type="url"
-                            placeholder="https://exemplo.com"
-                            value={String(option.actionPayload?.url || "")}
-                            onChange={(event) => updateStep({ options: selected.options?.map((item) => item.id === option.id ? { ...item, actionPayload: { ...(item.actionPayload || {}), url: event.target.value } } : item) })}
-                          />
-                          {option.actionPayload?.url && !/^https?:\/\//i.test(String(option.actionPayload.url)) ? <p className="mt-1 text-xs font-semibold text-red-600">Use uma URL completa iniciada por http:// ou https://.</p> : null}
-                        </div>
+                        <ExternalLinkField id={`option-url-${option.id}`} className="mt-3" value={String(option.actionPayload?.url || "")} onChange={(url) => updateStep({ options: selected.options?.map((item) => item.id === option.id ? { ...item, actionPayload: { ...(item.actionPayload || {}), url: url || "" } } : item) })} />
                       ) : null}
                       {option.actionType === "open_whatsapp" ? (
                         <div className="mt-3 grid gap-3">
-                          {(project.commercialConfig?.routingDestinations || []).some((destination) => destination.type === "whatsapp") ? <div><Label htmlFor={`option-destination-${option.id}`}>Destino configurado</Label><Select id={`option-destination-${option.id}`} value={String(option.actionPayload?.destinationId || "")} onChange={(event) => { const destination = project.commercialConfig?.routingDestinations?.find((item) => item.id === event.target.value); updateStep({ options: selected.options?.map((item) => item.id === option.id ? { ...item, actionPayload: { ...(item.actionPayload || {}), destinationId: destination?.id || "", phone: destination?.value || String(item.actionPayload?.phone || "") } } : item) }); }}><option value="">Telefone manual</option>{(project.commercialConfig?.routingDestinations || []).filter((destination) => destination.type === "whatsapp").map((destination) => <option key={destination.id} value={destination.id}>{destination.label}</option>)}</Select></div> : null}
+                          {(project.commercialConfig?.routingDestinations || []).some((destination) => destination.type === "whatsapp") ? <div><Label htmlFor={`option-destination-${option.id}`}>Número de destino</Label><Select id={`option-destination-${option.id}`} value={String(option.actionPayload?.destinationId || "")} onChange={(event) => { const destination = project.commercialConfig?.routingDestinations?.find((item) => item.id === event.target.value); updateStep({ options: selected.options?.map((item) => item.id === option.id ? { ...item, actionPayload: { ...(item.actionPayload || {}), destinationId: destination?.id || "", phone: destination?.value || String(item.actionPayload?.phone || "") } } : item) }); }}><option value="">Outro número</option>{(project.commercialConfig?.routingDestinations || []).filter((destination) => destination.type === "whatsapp").map((destination) => <option key={destination.id} value={destination.id}>{destination.label}{destination.isDefault ? " · Principal" : ""}</option>)}</Select></div> : null}
                           <div><div className="mb-2 flex items-center justify-between"><Label htmlFor={`option-phone-${option.id}`}>Telefone</Label>{project.phone ? <button type="button" className="text-xs font-bold text-[#0054fc]" onClick={() => updateStep({ options: selected.options?.map((item) => item.id === option.id ? { ...item, actionPayload: { ...(item.actionPayload || {}), phone: project.phone || "", destinationId: "" } } : item) })}>Usar padrão</button> : null}</div><Input id={`option-phone-${option.id}`} inputMode="tel" placeholder="5511999999999" value={String(option.actionPayload?.phone || "")} onChange={(event) => updateStep({ options: selected.options?.map((item) => item.id === option.id ? { ...item, actionPayload: { ...(item.actionPayload || {}), phone: event.target.value, destinationId: "" } } : item) })} /></div>
                           <div><Label htmlFor={`option-message-${option.id}`}>Mensagem inicial</Label><Textarea id={`option-message-${option.id}`} className="min-h-20" placeholder="Olá! Quero saber mais." value={String(option.actionPayload?.message || "")} onChange={(event) => updateStep({ options: selected.options?.map((item) => item.id === option.id ? { ...item, actionPayload: { ...(item.actionPayload || {}), message: event.target.value } } : item) })} /></div>
                         </div>
@@ -810,12 +876,14 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
                 </div>
               </div>
             )}
-            <BlockEditor
-              step={selected}
-              project={activeProject}
-              mode={mode}
-              onChange={(next) => updateStep(next)}
-            />
+            {mode === "quick" ? (
+              <BlockEditor
+                step={selected}
+                project={activeProject}
+                mode="quick"
+                onChange={(next) => updateStep(next)}
+              />
+            ) : null}
             {(
               <div className="mt-7 border-t border-[#e5e4eb] pt-6">
                 <div className="flex items-center gap-2">
@@ -1003,6 +1071,7 @@ export function ExperienceEditor({ projectId }: { projectId: string }) {
         open={publishOpen}
         onOpenChange={setPublishOpen}
         project={activeProject}
+        selectedStepId={selected.id}
         onPublished={(published) => {
           setProject(published);
           if (canUseLocalStore()) localStore.saveProject(published);

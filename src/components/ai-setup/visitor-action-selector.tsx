@@ -47,7 +47,7 @@ export function VisitorActionSelector({ initialActions, busy, onConfirm }: { ini
 
   return (
     <section aria-labelledby="visitor-actions-title" className="border-y border-[#dfe6ee] py-6">
-      <h2 id="visitor-actions-title" className="max-w-2xl text-2xl font-extrabold tracking-[-.035em] text-[#07172f]">Quando alguém entrar no seu link, o que você quer que essa pessoa consiga fazer?</h2>
+      <h2 id="visitor-actions-title" className="max-w-2xl text-2xl font-extrabold tracking-[-.035em] text-[#07172f]">Quando alguém entrar na sua página, o que você quer que essa pessoa consiga fazer?</h2>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-[#687582]">Pelo que entendi, estas são as ações mais importantes. Pode ajustar antes de continuar.</p>
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"><strong className="text-[#07172f]">Recomendamos de 2 a 5 ações</strong><span className="text-[#687582]">para manter a primeira página clara.</span><span className="font-bold text-[#0054fc]">{selected.length} selecionada{selected.length === 1 ? "" : "s"}</span></div>
       {selected.length > 5 ? <div role="alert" className="mt-4 flex max-w-2xl items-start gap-2 border border-[#f0d28f] bg-[#fff9e9] p-3 text-sm leading-5 text-[#795b16]"><AlertTriangle className="mt-0.5 size-4 shrink-0" /><span>Você selecionou {selected.length} ações. Muitas opções podem deixar a primeira página confusa; tente manter apenas os 2 a 5 caminhos mais importantes.</span></div> : null}

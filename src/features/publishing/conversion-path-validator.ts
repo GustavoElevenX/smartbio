@@ -11,6 +11,8 @@ import {
 } from "@/features/qualification/offer-intelligence";
 import type { JourneyStep, Project, RoutingDestination, StepOption } from "@/types";
 import { discoveryPlanIsReady } from "@/features/qualification/discovery-plan";
+import { whatsappActionHasUsableDestination } from "@/features/whatsapp/whatsapp-destination";
+import { isExternalUrl } from "@/lib/external-url";
 
 export type ConversionPathCheckKey = "entry" | "primary_action" | "plan" | "questions" | "progressive_questioning" | "circularity" | "offer_integrity" | "result" | "result_quality" | "context" | "public_copy" | "destination";
 
@@ -26,12 +28,59 @@ export interface ConversionPathValidation {
   checks: ConversionPathCheck[];
 }
 
-function isHttpUrl(value: unknown) {
-  try { return ["http:", "https:"].includes(new URL(String(value)).protocol); } catch { return false; }
+const questionStopWords = new Set([
+  "a",
+  "ao",
+  "de",
+  "do",
+  "e",
+  "em",
+  "o",
+  "ou",
+  "para",
+  "que",
+  "um",
+  "uma",
+  "voce",
+]);
+
+function normalizedQuestion(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-function isPhone(value: unknown) {
-  return /^[1-9]\d{7,14}$/.test(String(value || "").replace(/\D/g, ""));
+function questionTerms(value: string) {
+  return new Set(
+    normalizedQuestion(value)
+      .split(" ")
+      .filter((term) => term.length > 2 && !questionStopWords.has(term))
+      .map((term) => (term.length > 4 && term.endsWith("s") ? term.slice(0, -1) : term)),
+  );
+}
+
+function questionsAreRelated(left: string, right: string) {
+  const normalizedLeft = normalizedQuestion(left);
+  const normalizedRight = normalizedQuestion(right);
+  if (
+    normalizedLeft === normalizedRight ||
+    normalizedLeft.includes(normalizedRight) ||
+    normalizedRight.includes(normalizedLeft)
+  )
+    return true;
+  const leftTerms = questionTerms(left);
+  const rightTerms = questionTerms(right);
+  const shared = [...leftTerms].filter((term) => rightTerms.has(term)).length;
+  const shortest = Math.min(leftTerms.size, rightTerms.size);
+  return shared >= 2 && shortest > 0 && shared / shortest >= 0.6;
+}
+
+function isHttpUrl(value: unknown) {
+  return isExternalUrl(value);
 }
 
 function destination(project: Project, option: StepOption): RoutingDestination | undefined {
@@ -42,7 +91,7 @@ function isTerminal(project: Project, option: StepOption) {
   const configured = destination(project, option);
   if (option.actionType === "submit_form" || option.actionType === "capture_lead" || option.actionType === "finish") return true;
   if (option.actionType === "continue_with_answers") return false;
-  if (option.actionType === "open_whatsapp") return isPhone(configured?.value || option.actionPayload?.phone || project.phone);
+  if (option.actionType === "open_whatsapp") return whatsappActionHasUsableDestination(project, option);
   if (option.actionType === "open_url") return isHttpUrl(configured?.value || option.actionPayload?.url);
   return false;
 }
@@ -96,8 +145,11 @@ export function validateConversionPath(project: Project): ConversionPathValidati
   const circular = fields.some((field) => isCircularOfferSelector(field, offerings));
   const usefulQuestions = fields.some((field) => ["need", "signal", "context", "constraint"].includes(field.purpose || "signal"));
   const intelligenceQuestions = offerings.flatMap((offering) => offerIntelligenceFor(offering)?.discriminatingQuestions.map((item) => item.question) || []);
-  const normalizedIntelligenceQuestions = new Set(intelligenceQuestions.map((question) => question.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\?$/, "")));
-  const questionsDerived = fields.some((field) => normalizedIntelligenceQuestions.has(field.label.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\?$/, "")));
+  const questionsDerived = fields.some((field) =>
+    intelligenceQuestions.some((question) =>
+      questionsAreRelated(field.label, question),
+    ),
+  );
   const configuredOfferIds = Array.isArray(result?.settings?.recommendationOfferIds)
     ? result.settings.recommendationOfferIds.filter((id): id is string => typeof id === "string")
     : [];
@@ -133,7 +185,7 @@ export function validateConversionPath(project: Project): ConversionPathValidati
   const checks: ConversionPathCheck[] = [
     { key: "entry", valid: entryValid, label: "Entrada da orientação", reason: entryValid ? "A ação principal inicia a orientação." : "A ação principal não inicia uma etapa de orientação válida." },
     { key: "primary_action", valid: primaryActionValid, label: "Ação principal coerente", reason: primaryActionValid ? "A ação principal materializa a descoberta antes do contato final." : "O objetivo pede orientação, mas a ação principal não inicia a descoberta assistida." },
-    { key: "plan", valid: planReady, label: "Plano contextual da descoberta", reason: planReady ? "Perguntas, ofertas, perfis e fallback usam a mesma versão persistida do plano." : "O plano contextual está ausente, degradado, incompleto ou fora de versão; a publicação permanece bloqueada." },
+    { key: "plan", valid: planReady, label: "Plano contextual da descoberta", reason: planReady ? "Perguntas, ofertas, perfis e alternativas usam a mesma versão armazenada do plano." : "O plano contextual está ausente, degradado, incompleto ou fora de versão; a publicação permanece bloqueada." },
     { key: "questions", valid: fields.length > 0 && !invalidQuestions.length && usefulQuestions && questionsDerived, label: "Perguntas da orientação", reason: fields.length > 0 && !invalidQuestions.length && usefulQuestions && questionsDerived ? "As perguntas derivam das diferenças registradas entre as ofertas." : "Revise perguntas fragmentadas, genéricas ou desconectadas do Offer Intelligence." },
     { key: "progressive_questioning", valid: progressiveQuestioning, label: "Perguntas progressivas", reason: progressiveQuestioning ? "A jornada pode encerrar perguntas quando já existe evidência forte e pedir mais contexto quando necessário." : "A descoberta assistida ainda obriga uma sequência fixa de perguntas." },
     { key: "circularity", valid: !circular, label: "Descoberta sem escolha circular", reason: circular ? "A orientação pede que o visitante escolha diretamente a mesma oferta que deveria ser inferida." : "A orientação parte da necessidade antes de apresentar uma opção." },

@@ -52,6 +52,11 @@ export function reconcileProjectWithCommercialArchitecture(input: {
   const { project, architecture } = input;
   const deterministic = journeyComposer.compose(input.compositionInput, input.profile, input.capabilities, architecture);
   const architectureConfig = assignProjectToCommercialConfig(deterministic.commercialConfig, project.id);
+  const catalogItems = architectureConfig.catalogItems?.map((offering) => {
+    const current = project.commercialConfig?.catalogItems?.find((candidate) => candidate.metadata.architectureOfferingId === offering.metadata.architectureOfferingId);
+    return current ? { ...current, ...offering, id: current.id, variants: current.variants.length ? current.variants : offering.variants, imageAssetId: current.imageAssetId, imageUrl: current.imageUrl, metadata: { ...current.metadata, ...offering.metadata } } : offering;
+  });
+  const catalogIdAliases = new Map((architectureConfig.catalogItems || []).map((offering) => [offering.id, catalogItems?.find((item) => item.metadata.architectureOfferingId === offering.metadata.architectureOfferingId)?.id || offering.id]));
   const discoveryBlueprint = architecture.journeyBlueprints.find((blueprint) => architecture.intents.some((intent) => intent.id === blueprint.intentId && intent.semanticKey === "recommendation"));
   const serviceOfferings = architectureConfig.serviceOfferings?.map((offering) => {
     const architectureOfferingId = offering.settings.architectureOfferingId;
@@ -64,7 +69,7 @@ export function reconcileProjectWithCommercialArchitecture(input: {
     step.type === "form"
     && step.settings?.discoveryPlanId === project.discoveryPlan?.id
   ));
-  let steps: JourneyStep[] = deterministic.steps.map((step) => (
+  let steps: JourneyStep[] = deterministic.steps.map((step) => ({ ...step, blocks: step.blocks?.map((block) => block.type === "catalog_item_cards" && Array.isArray(block.content?.itemIds) ? { ...block, content: { ...block.content, itemIds: block.content.itemIds.map((id) => catalogIdAliases.get(String(id)) || id) } } : block) })).map((step) => (
     discoveryForm
     && step.type === "form"
     && !step.formFields?.length
@@ -77,20 +82,45 @@ export function reconcileProjectWithCommercialArchitecture(input: {
     const recommendation = project.steps.find((step) => step.type === "recommendation");
     if (completion && recommendation) {
       const entry = steps.find((step) => step.settings?.blueprintId === discoveryBlueprint.id);
-      const discoveryEntryId = uid("step");
       steps = steps.map((step) => step.settings?.blueprintId === discoveryBlueprint.id && step.id !== completion.id ? {
         ...step,
         settings: { ...step.settings, journeyMode: "assisted_discovery", discoveryPlanId: project.discoveryPlan!.id },
         options: step.options?.map((option) => option.targetStepId === completion.id ? { ...option, actionType: "continue_with_answers", targetStepId: recommendation.id } : option),
       } : step);
       if (entry && discoveryForm?.formFields?.length) {
-        steps = steps.map((step) => ({ ...step, options: step.options?.map((option) => option.targetStepId === entry.id ? { ...option, targetStepId: discoveryEntryId } : option) }));
-        steps.splice(steps.findIndex((step) => step.id === entry.id), 0, {
-          ...discoveryForm, id: discoveryEntryId, title: "Vamos encontrar uma opção para você",
-          formFields: discoveryForm.formFields.map((field) => ({ ...field, includeInHandoff: true })),
-          settings: { ...discoveryForm.settings, blueprintId: discoveryBlueprint.id, intentId: discoveryBlueprint.intentId, progressiveQuestioning: true, journeyMode: "assisted_discovery" },
-          options: [{ id: uid("option"), label: "Continuar", value: "discovery-context", actionType: "continue_with_answers", targetStepId: entry.id }],
-        });
+        const branchForms = steps.filter((step) => step.type === "form" && step.settings?.blueprintId === discoveryBlueprint.id);
+        const firstForm = branchForms[0];
+        const seenKeys = new Set<string>();
+        const seenLabels = new Set<string>();
+        const fields = [...discoveryForm.formFields, ...branchForms.flatMap((step) => step.formFields || [])].filter((field) => {
+          const label = field.label.trim().toLocaleLowerCase("pt-BR");
+          if (seenKeys.has(field.key) || seenLabels.has(label)) return false;
+          seenKeys.add(field.key);
+          seenLabels.add(label);
+          return true;
+        }).map((field) => ({ ...field, includeInHandoff: true }));
+        if (firstForm) {
+          const duplicateForms = new Set(branchForms.slice(1).map((step) => step.id));
+          const nextAfter = (targetId?: string): string | undefined => duplicateForms.has(targetId || "")
+            ? nextAfter(steps.find((step) => step.id === targetId)?.options?.[0]?.targetStepId)
+            : targetId;
+          steps = steps.filter((step) => !duplicateForms.has(step.id)).map((step) => ({
+            ...step,
+            ...(step.id === firstForm.id ? {
+              title: "Vamos encontrar uma opção para você", formFields: fields,
+              settings: { ...step.settings, progressiveQuestioning: true, journeyMode: "assisted_discovery", discoveryPlanId: project.discoveryPlan!.id },
+            } : {}),
+            options: step.options?.map((option) => ({ ...option, targetStepId: nextAfter(option.targetStepId) })),
+          }));
+        } else {
+          const discoveryEntryId = uid("step");
+          steps = steps.map((step) => ({ ...step, options: step.options?.map((option) => option.targetStepId === entry.id ? { ...option, targetStepId: discoveryEntryId } : option) }));
+          steps.splice(steps.findIndex((step) => step.id === entry.id), 0, {
+            ...discoveryForm, id: discoveryEntryId, title: "Vamos encontrar uma opção para você", formFields: fields,
+            settings: { ...discoveryForm.settings, blueprintId: discoveryBlueprint.id, intentId: discoveryBlueprint.intentId, progressiveQuestioning: true, journeyMode: "assisted_discovery" },
+            options: [{ id: uid("option"), label: "Continuar", value: "discovery-context", actionType: "continue_with_answers", targetStepId: entry.id }],
+          });
+        }
       }
       steps.splice(steps.findIndex((step) => step.id === completion.id), 0, {
         ...recommendation, settings: { ...recommendation.settings, blueprintId: discoveryBlueprint.id, intentId: discoveryBlueprint.intentId },
@@ -119,7 +149,7 @@ export function reconcileProjectWithCommercialArchitecture(input: {
       if (!architectureId) return [id];
       return [
         ...(finalServiceOfferings || []).filter((item) => item.settings.architectureOfferingId === architectureId).map((item) => item.id),
-        ...(architectureConfig.catalogItems || []).filter((item) => item.metadata.architectureOfferingId === architectureId).map((item) => item.id),
+        ...(catalogItems || []).filter((item) => item.metadata.architectureOfferingId === architectureId).map((item) => item.id),
       ];
     }) : location.settings?.offeringIds,
   } }));
@@ -133,7 +163,7 @@ export function reconcileProjectWithCommercialArchitecture(input: {
       ...(project.commercialConfig || {}),
       serviceOfferings: finalServiceOfferings,
       catalogCategories: architectureConfig.catalogCategories,
-      catalogItems: architectureConfig.catalogItems,
+      catalogItems,
       locations,
       routingDestinations: architectureConfig.routingDestinations,
       routingRules: architectureConfig.routingRules,

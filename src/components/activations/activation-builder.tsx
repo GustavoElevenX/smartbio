@@ -26,7 +26,7 @@ const steps = [
   "Onde aparecer",
   "Destino",
   "Resultado",
-  "Preview",
+  "Prévia",
   "Ativar",
 ];
 const initial: ActivationBuilderState = {
@@ -410,7 +410,7 @@ export function ActivationBuilder({
           </div>
         </main>
         <aside className="hidden border-l border-[#e8e7ed] bg-[#f7fbff] p-5 lg:block">
-          <h2 className="font-extrabold">Preview ao vivo</h2>
+          <h2 className="font-extrabold">Prévia em tempo real</h2>
           <p className="mt-1 text-sm text-[#777780]">
             A Presence original permanece intacta.
           </p>

@@ -18,6 +18,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select, Textarea } from "@/components/ui/field";
+import { WhatsAppNumbersEditor } from "@/components/dashboard/whatsapp-numbers-editor";
+import { projectWhatsAppNumbers, whatsappNumberErrors } from "@/features/whatsapp/project-whatsapp-numbers";
 import { projectRepository } from "@/lib/repositories/project-repository";
 import { slugify } from "@/lib/utils";
 import type { Project } from "@/types";
@@ -31,7 +33,7 @@ export function SettingsNav({
     <div className="mb-6 flex gap-2 overflow-x-auto">
       {[
         ["profile", "Perfil", User],
-        ["workspace", "Workspace", Users],
+        ["workspace", "Espaço de trabalho", Users],
         ["billing", "Plano e cobrança", CreditCard],
       ].map(([value, label, Icon]) => {
         const ItemIcon = Icon as typeof User;
@@ -54,6 +56,7 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
   const router = useRouter();
   const [project, setProject] = useState<Project | null>();
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
   useEffect(() => {
     void projectRepository
       .getProject(projectId)
@@ -77,9 +80,18 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
   }
   async function save() {
     if (!project) return;
-    await projectRepository.saveProject(project);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1600);
+    if (Object.keys(whatsappNumberErrors(projectWhatsAppNumbers(project))).length) {
+      setSaveError("Revise os números de WhatsApp destacados antes de salvar.");
+      return;
+    }
+    setSaveError("");
+    try {
+      await projectRepository.saveProject(project);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1600);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Não foi possível salvar as configurações.");
+    }
   }
   async function archive() {
     if (
@@ -154,12 +166,9 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
               onChange={(event) => update({ description: event.target.value })}
             />
           </div>
-          <div id="contact">
-            <Label htmlFor="project-phone">WhatsApp ou telefone</Label>
-            <Input id="project-phone" type="tel" value={project.phone || ""} onChange={(event) => update({ phone: event.target.value || undefined })} placeholder="5511999999999" />
-          </div>
+          <div id="contact" className="contents"><WhatsAppNumbersEditor project={project} onChange={(next) => { setProject(next); setSaveError(""); }} /></div>
           <div>
-            <Label htmlFor="project-status">Status</Label>
+            <Label htmlFor="project-status">Situação</Label>
             <Select
               id="project-status"
               value={project.status}
@@ -190,7 +199,7 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
           </div>
         </div>
         <div className="mt-6 flex items-center gap-3">
-          <Button onClick={save}>
+          <Button onClick={save} disabled={Boolean(Object.keys(whatsappNumberErrors(projectWhatsAppNumbers(project))).length)}>
             <Save size={16} /> Salvar
           </Button>
           {saved && (
@@ -199,6 +208,7 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
             </span>
           )}
         </div>
+        {saveError ? <p role="alert" className="mt-3 text-sm font-semibold text-red-600">{saveError}</p> : null}
       </section>
       <section className="mt-5 rounded-[22px] border border-[#e4e3ea] bg-white p-6">
         <h2 className="font-extrabold">Versionamento</h2>

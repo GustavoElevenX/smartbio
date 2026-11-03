@@ -88,6 +88,15 @@ export function BlockEditor({
         <Label>Blocos desta etapa</Label>
       </div>
       <div className="space-y-3">
+        {mode === "advanced" && blocks.length === 0 ? (
+          <p
+            role="status"
+            className="rounded-[14px] border border-dashed border-[#b9c9e6] bg-[#f7fbff] p-3 text-xs leading-5 text-[#526171]"
+          >
+            Esta etapa ainda não possui blocos para editar em JSON. Escolha um
+            tipo abaixo e clique em Bloco para adicionar o primeiro.
+          </p>
+        ) : null}
         {blocks.map((block) => (
           mode === "advanced" ? <JsonBlock
             key={block.id}

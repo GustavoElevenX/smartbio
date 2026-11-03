@@ -8,8 +8,8 @@ export function inspectPageQuality(page: PresencePage): SiteQualityWarning[] {
   if (!hero) warnings.push({ code: "missing_hero", message: "A página não apresenta uma abertura clara.", pageId: page.id });
   else {
     const content = hero.content as { primaryAction?: unknown; media?: { assetId?: string } };
-    if (!content.primaryAction && !page.defaultConversionGoalId) warnings.push({ code: "hero_missing_cta", message: "O Hero não possui uma ação principal nem herda uma meta da página.", pageId: page.id });
-    if (!content.media?.assetId && !hero.style.backgroundAssetId) warnings.push({ code: "hero_missing_media", message: "O Hero não possui imagem. Use uma composição minimalista ou conecte mídia real.", pageId: page.id });
+    if (!content.primaryAction && !page.defaultConversionGoalId) warnings.push({ code: "hero_missing_cta", message: "O destaque principal não possui uma ação nem herda uma meta da página.", pageId: page.id });
+    if (!content.media?.assetId && !hero.style.backgroundAssetId) warnings.push({ code: "hero_missing_media", message: "O destaque principal não possui imagem. Use uma composição minimalista ou conecte mídia real.", pageId: page.id });
   }
   if (!page.defaultConversionGoalId && !page.sections.some((section) => section.type === "conversion_cta")) warnings.push({ code: "missing_conversion", message: "Conecte a página a um objetivo de conversão.", pageId: page.id });
   page.sections

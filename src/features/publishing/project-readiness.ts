@@ -1,9 +1,11 @@
 import { evaluateCapabilityRequirements } from "@/features/capabilities/capability-requirements";
 import { unsupportedCapabilityReferences } from "@/features/capabilities/capability-provenance";
 import type { CapabilityKey, DataRequirement, Project } from "@/types";
-import { getPresenceReadinessIssues } from "@/features/presence/presence-readiness";
 import { formFieldIssues } from "@/features/forms/form-field-utils";
 import { validateConversionPath } from "@/features/publishing/conversion-path-validator";
+import { isValidWhatsAppPhone, projectHasUsableWhatsApp, whatsappActionHasUsableDestination } from "@/features/whatsapp/whatsapp-destination";
+import { isExternalUrl } from "@/lib/external-url";
+import { projectPublication } from "@/features/publishing/publication-target";
 
 export interface ProjectReadinessResult {
   score: number;
@@ -52,17 +54,7 @@ function requirement(
 }
 
 function isHttpUrl(value: unknown) {
-  if (typeof value !== "string") return false;
-  try {
-    return ["http:", "https:"].includes(new URL(value).protocol);
-  } catch {
-    return false;
-  }
-}
-
-function isPhone(value: unknown) {
-  const digits = String(value || "").replace(/\D/g, "");
-  return /^[1-9]\d{7,14}$/.test(digits);
+  return isExternalUrl(value);
 }
 
 function walk(
@@ -94,7 +86,7 @@ export function getProjectReadiness(project: Project): ProjectReadinessResult {
   const issues: DataRequirement[] = [];
   const dataPath = `/app/projects/${project.id}/data`;
   if (!project.workspaceId) {
-    issues.push(requirement(project, "project.workspace", "Workspace inválido", "O projeto precisa pertencer a um workspace válido."));
+    issues.push(requirement(project, "project.workspace", "Espaço de trabalho inválido", "O negócio precisa pertencer a um espaço de trabalho válido."));
   }
   if (!project.name.trim()) {
     issues.push(requirement(project, "project.name", "Nome do projeto", "Informe o nome do negócio."));
@@ -105,8 +97,22 @@ export function getProjectReadiness(project: Project): ProjectReadinessResult {
   if (!project.steps.some((step) => step.isActive)) {
     issues.push(requirement(project, "project.journey", "Jornada vazia", "Adicione ao menos uma etapa ativa."));
   }
-  if (project.phone && !isPhone(project.phone)) {
+  if (project.phone && !isValidWhatsAppPhone(project.phone)) {
     issues.push(requirement(project, "project.phone", "Telefone inválido", "Revise o telefone principal do projeto."));
+  }
+  const publication = projectPublication(project);
+  if (publication.homeMode === "goal") {
+    const goal = project.conversionGoals?.find((item) => item.isActive && item.id === publication.conversionGoalId);
+    const target = goal ? project.steps.find((step) => step.isActive && step.id === goal.targetStepId) : undefined;
+    if (!goal || !target) {
+      issues.push(requirement(project, "publication.goal", "Início da experiência inválido", "Escolha uma meta ativa que possua uma etapa inicial disponível."));
+    }
+  }
+  if (publication.homeMode === "step") {
+    const step = project.steps.find((item) => item.isActive && item.id === publication.initialStepId);
+    if (!step) {
+      issues.push(requirement(project, "publication.step", "Página inicial inválida", "Escolha uma etapa ativa para abrir no link principal.", `/app/projects/${project.id}/editor`));
+    }
   }
 
   const stepIds = new Set(project.steps.map((step) => step.id));
@@ -117,25 +123,22 @@ export function getProjectReadiness(project: Project): ProjectReadinessResult {
     }
     for (const option of step.options || []) {
       if (!option.actionType) {
-        issues.push(requirement(project, `step.${step.id}.cta`, "CTA sem destino", `O CTA “${option.label}” não possui ação.`));
+        issues.push(requirement(project, `step.${step.id}.cta`, "Botão sem destino", `O botão “${option.label}” não possui ação.`));
       }
       if (
         option.actionType === "go_to_step" &&
         (!option.targetStepId || !stepIds.has(option.targetStepId))
       ) {
-        issues.push(requirement(project, `step.${step.id}.target.${option.id}`, "Referência quebrada", `O CTA “${option.label}” aponta para uma etapa inexistente.`));
+        issues.push(requirement(project, `step.${step.id}.target.${option.id}`, "Referência quebrada", `O botão “${option.label}” aponta para uma etapa inexistente.`));
       }
       if (option.actionType === "start_capability" && !option.actionPayload?.capability) {
-        issues.push(requirement(project, `step.${step.id}.capability.${option.id}`, "CTA sem capacidade", `O CTA “${option.label}” não informa qual fluxo deve iniciar.`));
+        issues.push(requirement(project, `step.${step.id}.capability.${option.id}`, "Botão sem capacidade", `O botão “${option.label}” não informa qual fluxo deve iniciar.`));
       }
       if (option.actionType === "open_url" && !isHttpUrl(option.actionPayload?.url)) {
-        issues.push(requirement(project, `step.${step.id}.url.${option.id}`, "URL inválida", `O CTA “${option.label}” precisa de uma URL HTTP ou HTTPS válida.`));
+        issues.push(requirement(project, `step.${step.id}.url.${option.id}`, "Endereço inválido", `O botão “${option.label}” precisa de um endereço HTTP ou HTTPS válido.`));
       }
-      const whatsappDestination = project.commercialConfig?.routingDestinations?.find(
-        (destination) => destination.id === option.actionPayload?.destinationId && destination.type === "whatsapp",
-      );
-      if (option.actionType === "open_whatsapp" && !isPhone(whatsappDestination?.value || option.actionPayload?.phone || project.phone)) {
-        issues.push(requirement(project, `step.${step.id}.phone.${option.id}`, "Telefone inválido", `O CTA “${option.label}” precisa de um telefone real.`));
+      if (option.actionType === "open_whatsapp" && !whatsappActionHasUsableDestination(project, option)) {
+        issues.push(requirement(project, `step.${step.id}.phone.${option.id}`, "WhatsApp sem destino", `O botão “${option.label}” precisa de um número principal ou de um número válido para cada unidade usada nessa jornada.`));
       }
     }
   }
@@ -216,8 +219,12 @@ export function getProjectReadiness(project: Project): ProjectReadinessResult {
   }
 
   walk(project, (value, path) => {
+    const internalIntelligenceValue =
+      path.includes(".discoveryPlan.") ||
+      path.includes(".settings.offerIntelligence.");
     if (
       typeof value === "string" &&
+      !internalIntelligenceValue &&
       knownDemoValues.some((demo) => value.toLocaleLowerCase("pt-BR").includes(demo))
     ) {
       issues.push(requirement(project, `demo.${path}`, "Dado de demonstração", `Remova o valor fictício encontrado em ${path}.`));
@@ -235,12 +242,19 @@ export function getProjectReadiness(project: Project): ProjectReadinessResult {
   const all = [
     ...(project.dataRequirements || []),
     ...evaluateCapabilityRequirements(project),
-    ...getPresenceReadinessIssues(project),
     ...issues,
   ];
+  const whatsappReady = projectHasUsableWhatsApp(project);
   const unique = [...new Map(all.map((item) => {
     const key = normalizedRequirementKey(item);
-    return [key, key === item.key ? item : { ...item, id: `${project.id}:${key}`, key }];
+    const normalized = key === item.key ? item : { ...item, id: `${project.id}:${key}`, key };
+    return [key, key === "contact.whatsapp" && whatsappReady ? {
+      ...normalized,
+      status: "verified" as const,
+      reason: "O atendimento por WhatsApp possui um destino válido.",
+      actionLabel: undefined,
+      actionPath: undefined,
+    } : normalized];
   })).values()];
   const unresolved = unique.filter((item) => item.status !== "verified");
   const blocking = unresolved.filter((item) => item.severity === "blocking");

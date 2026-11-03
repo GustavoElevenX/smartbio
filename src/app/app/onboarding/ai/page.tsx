@@ -3,7 +3,7 @@ import { AISetupShell } from "@/components/ai-setup/ai-setup-shell";
 import { requireAuthenticatedActor } from "@/server/auth/setup-actor";
 import { getActivationPreflight } from "@/server/ai-setup/activation-preflight";
 
-export const metadata: Metadata = { title: "Onboarding adaptativo" };
+export const metadata: Metadata = { title: "Configuração inicial adaptativa" };
 
 type AIOnboardingPageProps = {
   searchParams: Promise<{ new?: string | string[] }>;

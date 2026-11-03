@@ -111,7 +111,10 @@ const LegacyProductCardsBlock: BlockRenderer = ({
   const legacy = Array.isArray(block.content?.products)
     ? (block.content.products as Array<Record<string, unknown>>)
     : [];
-  const items = project.commercialConfig?.catalogItems || [];
+  const itemIds = Array.isArray(block.content?.itemIds) ? block.content.itemIds as string[] : undefined;
+  const items = (project.commercialConfig?.catalogItems || []).filter((item) =>
+    !itemIds || itemIds.includes(item.id) || !item.metadata?.architectureOfferingId,
+  );
   const products = items.length
     ? items
     : legacy.map((item, index) => ({
@@ -130,53 +133,59 @@ const LegacyProductCardsBlock: BlockRenderer = ({
         variants: [],
         metadata: { emoji: item.emoji },
       }));
-  function add(item: (typeof products)[number]) {
-    const existing = runtime.cart.items.find(
-      (candidate) => candidate.itemId === item.id,
-    );
-    const nextItems = existing
-      ? runtime.cart.items.map((candidate) =>
-          candidate.itemId === item.id
-            ? { ...candidate, quantity: candidate.quantity + 1 }
-            : candidate,
-        )
-      : [...runtime.cart.items, createOrderItem(item)];
-    setRuntime((current) => ({
-      ...current,
-      selectedOfferIds: [...new Set([...current.selectedOfferIds, item.id])],
-      cart: {
-        ...current.cart,
-        items: nextItems,
-        totals: calculateOrderTotals(nextItems, { currency: item.currency }),
-      },
-    }));
-    emit("item_added", { itemId: item.id, itemName: item.name });
+  function add(item: (typeof products)[number], variantId?: string) {
+    if (!item.isAvailable || (variantId && !item.variants.some((variant) => variant.id === variantId && variant.isAvailable))) return;
+    setRuntime((current) => {
+      const existing = current.cart.items.find((candidate) => candidate.itemId === item.id && candidate.variantId === variantId);
+      const nextItems = existing
+        ? current.cart.items.map((candidate) =>
+            candidate.itemId === item.id && candidate.variantId === variantId
+              ? { ...candidate, quantity: candidate.quantity + 1 }
+              : candidate,
+          )
+        : [...current.cart.items, createOrderItem(item, 1, variantId)];
+      return {
+        ...current,
+        selectedOfferIds: [...new Set([...current.selectedOfferIds, item.id])],
+        cart: {
+          ...current.cart,
+          items: nextItems,
+          totals: calculateOrderTotals(nextItems, { currency: item.currency }),
+        },
+      };
+    });
+    emit("item_added", { itemId: item.id, itemName: item.name, ...(variantId ? { variantId } : {}) });
   }
+  if (!products.length) return <p className="text-sm leading-6 text-[var(--muted-fg)]">Os produtos ainda não foram informados pelo negócio.</p>;
   return (
     <div className="grid gap-2">
       {products.map((product) => (
-        <button
-          type="button"
+        <div
           key={product.id}
-          onClick={() => add(product)}
-          className="flex items-center gap-3 rounded-[var(--card-radius)] border border-[var(--border)] bg-[var(--surface)] p-3 text-left shadow-[var(--card-shadow)]"
+          className="rounded-[var(--card-radius)] border border-[var(--border)] bg-[var(--surface)] p-3 text-left shadow-[var(--card-shadow)]"
         >
-          <span className="grid size-12 place-items-center rounded-2xl bg-[var(--muted)] text-2xl">
-            {String(product.metadata.emoji || "✨")}
-          </span>
-          <span className="flex-1">
-            <strong className="block text-sm">{product.name}</strong>
+          <div className="flex items-center gap-3">
+          <ShoppingBag size={22} className="shrink-0 text-[var(--primary)]" />
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-bold">{product.name}</h2>
+            {product.description ? <p className="mt-1 text-xs leading-5 text-[var(--muted-fg)]">{product.description}</p> : null}
             <small className="text-[var(--muted-fg)]">
-              {product.price
+              {product.price != null
                 ? new Intl.NumberFormat("pt-BR", {
                     style: "currency",
                     currency: product.currency,
                   }).format(product.price)
-                : product.description}
+                : "Preço sob consulta"}
             </small>
-          </span>
-          <Plus size={18} className="text-[var(--primary)]" />
-        </button>
+          </div>
+          {!product.variants.length ? <button type="button" disabled={!product.isAvailable} aria-label={`Adicionar ${product.name}`} onClick={() => add(product)} className="grid min-h-11 min-w-11 place-items-center rounded-[var(--button-radius)] bg-[var(--muted)] text-[var(--primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)] disabled:opacity-50"><Plus size={18} /></button> : null}
+          </div>
+          {product.variants.length ? <div className="mt-3 flex flex-wrap gap-2" aria-label={`Opções de ${product.name}`}>
+            {product.variants.map((variant) => <button key={variant.id} type="button" disabled={!product.isAvailable || !variant.isAvailable} aria-label={`Adicionar ${product.name} · ${variant.name}`} onClick={() => add(product, variant.id)} className="flex min-h-11 items-center gap-2 rounded-[var(--button-radius)] border border-[var(--border)] px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)] disabled:opacity-50"><Plus size={14} /><span>{variant.name}</span>{product.price != null && variant.priceDelta !== 0 ? <small>{new Intl.NumberFormat("pt-BR", { style: "currency", currency: product.currency }).format(product.price + variant.priceDelta)}</small> : null}</button>)}
+          </div> : null}
+          {runtime.cart.items.some((item) => item.itemId === product.id) ? <p aria-live="polite" className="mt-2 text-xs font-semibold text-[var(--primary)]">{runtime.cart.items.filter((item) => item.itemId === product.id).reduce((total, item) => total + item.quantity, 0)} na seleção</p> : null}
+          {!product.isAvailable ? <p className="mt-2 text-xs text-[var(--muted-fg)]">Indisponível no momento</p> : null}
+        </div>
       ))}
     </div>
   );
@@ -624,26 +633,28 @@ const CatalogItemCardsBlock = LegacyProductCardsBlock;
 
 const CartSummaryBlock: BlockRenderer = ({ project, runtime, setRuntime, emit }) => {
   const pricesKnown = runtime.cart.items.every((item) => project.commercialConfig?.catalogItems?.find((product) => product.id === item.itemId)?.price != null);
-  function quantity(itemId: string, delta: number) {
-    const items = runtime.cart.items
-      .map((item) =>
-        item.itemId === itemId
-          ? { ...item, quantity: item.quantity + delta }
-          : item,
-      )
-      .filter((item) => item.quantity > 0);
-    setRuntime((current) => ({
-      ...current,
-      selectedOfferIds: current.selectedOfferIds.filter((id) => !runtime.cart.items.some((item) => item.itemId === id) || items.some((item) => item.itemId === id)),
-      cart: {
-        ...current.cart,
-        items,
-        totals: calculateOrderTotals(items, {
-          currency: current.cart.totals.currency,
-        }),
-      },
-    }));
-    emit("cart_viewed", { itemCount: items.length });
+  function quantity(itemId: string, delta: number, variantId?: string) {
+    setRuntime((current) => {
+      const items = current.cart.items
+        .map((item) =>
+          item.itemId === itemId && item.variantId === variantId
+            ? { ...item, quantity: item.quantity + delta }
+            : item,
+        )
+        .filter((item) => item.quantity > 0);
+      return {
+        ...current,
+        selectedOfferIds: current.selectedOfferIds.filter((id) => !current.cart.items.some((item) => item.itemId === id) || items.some((item) => item.itemId === id)),
+        cart: {
+          ...current.cart,
+          items,
+          totals: calculateOrderTotals(items, {
+            currency: current.cart.totals.currency,
+          }),
+        },
+      };
+    });
+    emit("cart_viewed", { itemId, ...(variantId ? { variantId } : {}) });
   }
   if (!runtime.cart.items.length)
     return (
@@ -674,8 +685,8 @@ const CartSummaryBlock: BlockRenderer = ({ project, runtime, setRuntime, emit })
             <button
               type="button"
               aria-label={`Diminuir ${item.name}`}
-              onClick={() => quantity(item.itemId, -1)}
-              className="grid size-8 place-items-center rounded-lg bg-[var(--muted)]"
+              onClick={() => quantity(item.itemId, -1, item.variantId)}
+              className="grid size-11 place-items-center rounded-lg bg-[var(--muted)]"
             >
               <Minus size={14} />
             </button>
@@ -683,8 +694,8 @@ const CartSummaryBlock: BlockRenderer = ({ project, runtime, setRuntime, emit })
             <button
               type="button"
               aria-label={`Aumentar ${item.name}`}
-              onClick={() => quantity(item.itemId, 1)}
-              className="grid size-8 place-items-center rounded-lg bg-[var(--muted)]"
+              onClick={() => quantity(item.itemId, 1, item.variantId)}
+              className="grid size-11 place-items-center rounded-lg bg-[var(--muted)]"
             >
               <Plus size={14} />
             </button>

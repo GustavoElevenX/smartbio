@@ -10,6 +10,8 @@ import type { BusinessShape, SuggestedSiteStructure } from "@/features/site-comp
 import type { OptimizationAIExplanation } from "@/features/optimization/schema";
 import type { DiscoveryPlan, DiscoveryPlanDraft } from "@/features/qualification/discovery-plan";
 import type { commercialContextForAI } from "@/features/commercial-context/project-commercial-context";
+import type { ArchitectureResolutionTarget } from "@/features/ai-setup/ai-setup.schema";
+import type { SetupAnswerContext, SetupAnswerInterpretation } from "@/features/ai-setup/setup-answer-interpretation";
 
 export interface AIRequestContext {
   workspaceId: string;
@@ -32,11 +34,20 @@ export interface MissingQuestionInput extends AIRequestContext {
   answers: Record<string, unknown>;
 }
 
+export interface SetupAnswerInterpretationInput extends AIRequestContext {
+  answer: string;
+  requirement: { key: string; label: string; reason: string };
+  resolutionTarget?: ArchitectureResolutionTarget | null;
+  locations: Array<{ id: string; label: string; address?: string | null }>;
+  channels: Array<{ id: string; type: string; label: string; value?: string | null }>;
+}
+
 export interface JourneyAIInput extends AIRequestContext {
   input: ExperienceCompositionInput;
   profile: BusinessCapabilityProfile;
   capabilities: ProjectCapability[];
   answers: Record<string, unknown>;
+  answerContexts?: SetupAnswerContext[];
   confirmedCommercialData?: Project["commercialConfig"];
   discoveryPlan?: DiscoveryPlan;
   commercialArchitecture?: CommercialArchitecture;
@@ -106,6 +117,7 @@ export interface SiteCompositionInput extends AIRequestContext {
   business: Pick<Project, "name" | "description" | "category" | "audience" | "primaryGoal" | "visualDirection" | "brand" | "businessProfile" | "conversionGoals" | "commercialConfig">;
   commercialArchitecture?: CommercialArchitecture;
   commercialContext?: ReturnType<typeof commercialContextForAI>;
+  answerContexts?: SetupAnswerContext[];
 }
 export interface OptimizationExplanationInput extends AIRequestContext {
   project: Pick<Project, "name" | "category" | "audience" | "primaryGoal">;
@@ -118,6 +130,7 @@ export interface VirouAIProvider {
   analyzeActivationUnderstanding(input: ActivationUnderstandingInput): Promise<ActivationUnderstanding>;
   analyzeCommercialArchitecture?(input: CommercialArchitectureInput): Promise<CommercialArchitecture>;
   generateMissingQuestions(input: MissingQuestionInput): Promise<SetupQuestion[]>;
+  interpretSetupAnswer?(input: SetupAnswerInterpretationInput): Promise<SetupAnswerInterpretation>;
   composeDiscoveryPlan(input: DiscoveryPlanningInput): Promise<DiscoveryPlanDraft>;
   composeJourney(input: JourneyAIInput): Promise<AIJourneyDraftPayload>;
   composePresence(input: PresenceCompositionInput): Promise<AIPresenceDraft>;

@@ -61,7 +61,11 @@ export function resolveCompletionDestination(input: {
     const explicitlySelected = completion.channelId ? candidates.find((channel) => channel.id === completion.channelId) : undefined;
     if (explicitlySelected) return { status: "resolved", channel: explicitlySelected, reason: `Destination ${completion.type} explicitamente associado à jornada e à unidade.` };
     if (candidates.length === 1) return { status: "resolved", channel: candidates[0], reason: `Único destination ${completion.type} compatível com a unidade selecionada.` };
-    if (!candidates.length) return { status: "incomplete", reason: `A unidade selecionada não possui destination ${completion.type} confirmado.` };
+    if (!candidates.length) {
+      const fallback = architecture.channels.find((channel) => channel.type === completion.type && channel.isFallback && validCommercialChannel(channel));
+      if (fallback) return { status: "resolved", channel: fallback, reason: `A unidade usa o destination ${completion.type} principal como fallback.` };
+      return { status: "incomplete", reason: `A unidade selecionada não possui destination ${completion.type} confirmado.` };
+    }
     return { status: "ambiguous", reason: `A unidade selecionada possui mais de um destination ${completion.type}; a jornada precisa indicar qual usar.` };
   }
 

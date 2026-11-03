@@ -4,7 +4,7 @@ export type GenerationPhase = "idle" | "checking" | "composing" | "saving" | "fi
 
 const stages: Array<{ phase: Exclude<GenerationPhase, "idle" | "ready">; label: string }> = [
   { phase: "checking", label: "Conferindo a configuração" },
-  { phase: "composing", label: "Montando a jornada e organizando os serviços" },
+  { phase: "composing", label: "Montando a página e conectando os caminhos" },
   { phase: "saving", label: "Salvando a primeira versão" },
   { phase: "finalizing", label: "Preparando a revisão de lançamento" },
 ];

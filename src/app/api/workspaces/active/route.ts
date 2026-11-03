@@ -6,7 +6,7 @@ import { ACTIVE_WORKSPACE_COOKIE, activeWorkspaceCookieOptions } from "@/server/
 import { apiError, apiSuccess, validationError } from "@/server/http/api-response";
 import { withAuthenticatedActor } from "@/server/http/with-authenticated-actor";
 
-const schema = z.object({ workspaceId: z.uuid() });
+const schema = z.object({ workspaceId: z.string().trim().min(1).max(150) });
 
 export const POST = withAuthenticatedActor(async (request, _context, actor) => {
   const parsed = schema.safeParse(await request.json().catch(() => null));
@@ -14,6 +14,8 @@ export const POST = withAuthenticatedActor(async (request, _context, actor) => {
   if (actor.persistence === "memory") {
     if (parsed.data.workspaceId !== actor.workspaceId) return apiError("Você não participa deste workspace.", 403, "workspace_access_denied");
   } else {
+    if (!z.uuid().safeParse(parsed.data.workspaceId).success)
+      return apiError("Workspace inválido.", 400, "validation_error");
     const client = createServiceClient();
     if (!client) throw new Error("Supabase não configurado.");
     const { data } = await client.from("workspace_members")

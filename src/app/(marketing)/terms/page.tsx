@@ -27,7 +27,7 @@ export default function TermsPage() {
         <h2>Conta e acesso</h2>
         <p className="mt-4">
           Você é responsável por fornecer informações corretas, manter suas
-          credenciais protegidas e controlar quem acessa o seu workspace. Avise
+          credenciais protegidas e controlar quem acessa o seu espaço de trabalho. Avise
           o suporte se identificar uso não autorizado da conta.
         </p>
       </section>

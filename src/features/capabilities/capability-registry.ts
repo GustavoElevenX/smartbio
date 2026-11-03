@@ -55,7 +55,7 @@ export const capabilityRegistry: Record<CapabilityKey, CapabilityDefinition> = {
   payment: {
     key: "payment",
     label: "Pagamento conectado",
-    visitorDescription: "continuar para um checkout ou pagamento de sinal externo",
+    visitorDescription: "continuar para uma página de pagamento ou pagamento de sinal externo",
     enabledByFeature: features.externalPayments,
     defaultConfiguration: { mode: "external_url" },
   },

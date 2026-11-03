@@ -33,7 +33,7 @@ export default function InvitePage() {
       <section className="w-full max-w-lg rounded-3xl border bg-white p-8 text-center shadow-sm">
         <p className="text-sm font-bold text-[#0054fc]">Convite Sobe</p>
         <h1 className="mt-3 text-3xl font-extrabold">
-          Colabore neste workspace
+          Colabore neste espaço de trabalho
         </h1>
         <p className="mt-3 text-sm text-[#686873]">
           Entre com o mesmo e-mail que recebeu o convite e confirme sua entrada.

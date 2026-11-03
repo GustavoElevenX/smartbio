@@ -1,4 +1,4 @@
-import type { AISetupSession } from "@/features/ai-setup/ai-setup.schema";
+import { minimumBusinessContextLength, type AISetupSession } from "@/features/ai-setup/ai-setup.schema";
 import { discoveryPlanIsReady } from "@/features/qualification/discovery-plan";
 import type { DataRequirement } from "@/types";
 
@@ -22,7 +22,7 @@ export function calculateSetupReadiness(
   session?: Pick<AISetupSession, "initialInput"> & Partial<Pick<AISetupSession, "actionsConfirmed" | "architectureReviewed" | "commercialArchitecture" | "extractedProfile" | "activationUnderstanding" | "visitorActions" | "discoveryPlan" | "answers">>,
 ): SetupReadiness {
   const businessReady = Boolean(
-    session?.initialInput.businessName && session.initialInput.description.length >= 15,
+    session && session.initialInput.businessName.trim().length >= 2 && session.initialInput.description.trim().length >= minimumBusinessContextLength,
   );
   const verified = requirements.filter((item) => item.status === "verified").length;
   const blocking = requirements.filter(

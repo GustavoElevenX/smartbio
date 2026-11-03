@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { apiError, apiSuccess } from "@/server/http/api-response";
 import { withAuthenticatedActor } from "@/server/http/with-authenticated-actor";
 import { requireResourceCapacity } from "@/server/entitlements/require-entitlement";
+import { acceptMemoryWorkspaceInvitation } from "@/server/workspaces/workspace-memory-store";
 
 interface AcceptInvitationRouteContext {
   params: Promise<{ token: string }>;
@@ -14,13 +15,13 @@ export const POST = withAuthenticatedActor(
     context: AcceptInvitationRouteContext,
     actor,
   ) => {
-    if (actor.persistence === "memory")
-      return apiError(
-        "Convite indisponível neste modo.",
-        503,
-        "database_required",
-      );
     const { token } = await context.params;
+    if (actor.persistence === "memory") {
+      const invitation = acceptMemoryWorkspaceInvitation(token);
+      return invitation
+        ? apiSuccess(invitation)
+        : apiError("Convite inválido ou expirado.", 410, "invalid_invitation");
+    }
     const database = createServiceClient()!;
     const tokenHash = createHash("sha256").update(token).digest("hex");
     const { data: invitation, error } = await database

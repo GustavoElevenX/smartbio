@@ -31,7 +31,7 @@ describe("recuperação de senha", () => {
     expect(form).toContain("getSession");
     expect(form).toContain("updateUser({ password })");
     expect(form).toContain('setState("invalid")');
-    expect(form).toContain("Link inválido ou expirado");
+    expect(form).toContain("Endereço inválido ou expirado");
     expect(form).not.toContain("console.log");
   });
 

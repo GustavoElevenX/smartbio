@@ -14,12 +14,14 @@ import {
   Plus,
   Redo2,
   Save,
+  SlidersHorizontal,
   Sparkles,
   Smartphone,
   Tablet,
   Trash2,
   Undo2,
   X,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -61,6 +63,29 @@ type Device = "desktop" | "tablet" | "mobile";
 type MobilePanel = "pages" | "sections" | "properties";
 export type SiteEditorMode = "simple" | "advanced";
 const viewport = { desktop: 1120, tablet: 768, mobile: 390 };
+
+const editorModes: Array<{
+  value: SiteEditorMode;
+  label: string;
+  description: string;
+  guidance: string;
+  icon: typeof Zap;
+}> = [
+  {
+    value: "simple",
+    label: "Modo rápido",
+    description: "Edite o essencial direto na prévia.",
+    guidance: "Clique em qualquer parte da página para alterar textos, imagens e botões.",
+    icon: Zap,
+  },
+  {
+    value: "advanced",
+    label: "Modo avançado",
+    description: "Controle toda a estrutura da página.",
+    guidance: "Organize páginas e seções, ajuste o visual e acesse configurações completas.",
+    icon: SlidersHorizontal,
+  },
+];
 type AIProposal = {
   kind: "page" | "section";
   draft: AIPresenceDraft;
@@ -101,6 +126,82 @@ const copilotActions: Array<{ intent: SiteComposerIntent; label: string }> = [
   { intent: "focus_offer", label: "Dar mais destaque ao que eu vendo" },
   { intent: "create_landing", label: "Criar uma página para campanha" },
 ];
+
+function EditorModeSelector({
+  mode,
+  onChange,
+}: {
+  mode: SiteEditorMode;
+  onChange: (mode: SiteEditorMode) => void;
+}) {
+  const activeMode = editorModes.find((option) => option.value === mode)!;
+
+  return (
+    <section
+      aria-label="Modo do editor"
+      className={`border-b px-3 py-2.5 sm:px-4 ${
+        mode === "advanced"
+          ? "border-[#19385f] bg-[#07172f] text-white"
+          : "border-[#dfe6ee] bg-white text-[#07172f]"
+      }`}
+    >
+      <div className="flex items-center gap-4">
+        <div
+          role="group"
+          aria-label="Escolha como editar"
+          className={`grid shrink-0 grid-cols-2 gap-1 p-1 ${
+            mode === "advanced" ? "bg-[#0b2446]" : "bg-[#edf2f7]"
+          }`}
+        >
+          {editorModes.map((option) => {
+            const Icon = option.icon;
+            const selected = option.value === mode;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                data-testid={
+                  selected
+                    ? `site-editor-mode-${option.value}`
+                    : "site-editor-mode-toggle"
+                }
+                aria-pressed={selected}
+                onClick={() => onChange(option.value)}
+                className={`focus-ring flex min-h-11 items-center gap-2 px-3 text-left text-xs font-black transition-colors sm:min-w-36 ${
+                  selected
+                    ? "bg-[#0054fc] text-white shadow-[0_8px_22px_rgba(0,84,252,.22)]"
+                    : mode === "advanced"
+                      ? "text-[#aab7c6] hover:bg-[#16355b] hover:text-white"
+                      : "text-[#536171] hover:bg-white hover:text-[#07172f]"
+                }`}
+              >
+                <Icon size={16} aria-hidden="true" />
+                <span>{option.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="hidden min-w-0 lg:block" aria-live="polite">
+          <p className="text-xs font-black">{activeMode.description}</p>
+          <p
+            className={`mt-0.5 text-xs ${
+              mode === "advanced" ? "text-[#aab7c6]" : "text-[#657487]"
+            }`}
+          >
+            {activeMode.guidance}
+          </p>
+        </div>
+        <span
+          className={`ml-auto hidden shrink-0 text-[10px] font-black uppercase tracking-[.12em] xl:block ${
+            mode === "advanced" ? "text-[#02e5cd]" : "text-[#0054fc]"
+          }`}
+        >
+          {mode === "advanced" ? "Controle completo" : "Edição guiada"}
+        </span>
+      </div>
+    </section>
+  );
+}
 
 function operationDescription(operation: SiteOperation) {
   if (operation.type === "add_page")
@@ -414,7 +515,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
       type === "home"
         ? "Início"
         : type === "landing"
-          ? "Nova landing page"
+          ? "Nova página de campanha"
           : "Nova página",
       type,
       pages,
@@ -841,7 +942,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
         <div>
           <h1 className="text-2xl font-black">Projeto não encontrado</h1>
           <p className="mt-2 text-sm text-[#706d78]">
-            Verifique se o projeto pertence ao workspace ativo.
+            Verifique se o negócio pertence ao espaço de trabalho ativo.
           </p>
         </div>
       </div>
@@ -892,19 +993,6 @@ export function SiteEditor({ projectId }: { projectId: string }) {
           </p>
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-1">
-          <Button
-            data-testid="site-editor-mode-toggle"
-            size="sm"
-            variant="secondary"
-            onClick={() => {
-              setMode((current) =>
-                current === "simple" ? "advanced" : "simple",
-              );
-              setMobilePanel(undefined);
-            }}
-          >
-            {mode === "simple" ? "Modo avançado" : "Modo simples"}
-          </Button>
           <Button
             className="hidden sm:inline-flex"
             size="icon"
@@ -995,6 +1083,13 @@ export function SiteEditor({ projectId }: { projectId: string }) {
           {message}
         </div>
       ) : null}
+      <EditorModeSelector
+        mode={mode}
+        onChange={(nextMode) => {
+          setMode(nextMode);
+          setMobilePanel(undefined);
+        }}
+      />
       {mode === "simple" && pages.length > 1 ? (
         <div className="flex items-end gap-3 border-b border-[#dfe6ee] bg-white px-4 py-3">
           <label className="min-w-0 flex-1 text-xs font-extrabold text-[#536178]">
@@ -1179,7 +1274,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
       ) : null}
       <div
         data-testid={`site-editor-${mode}`}
-        className={`grid min-h-[calc(100vh-137px)] grid-cols-1 ${mode === "advanced" ? "xl:grid-cols-[240px_minmax(380px,1fr)_320px]" : "lg:grid-cols-[minmax(480px,1fr)_340px]"}`}
+        className={`grid min-h-[calc(100vh-205px)] grid-cols-1 ${mode === "advanced" ? "xl:grid-cols-[240px_minmax(380px,1fr)_320px]" : "lg:grid-cols-[minmax(480px,1fr)_340px]"}`}
       >
         <aside
           className={
@@ -1212,7 +1307,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
                   className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold hover:bg-[#f2f1f5]"
                   onClick={() => addPage("landing")}
                 >
-                  Landing page
+                  Página de campanha
                 </button>
               </div>
             ) : null}
@@ -1319,7 +1414,12 @@ export function SiteEditor({ projectId }: { projectId: string }) {
             </button>
           </div>
         </aside>
-        <section className="min-w-0 bg-[#e9eff5] p-4 md:p-7">
+        <section
+          aria-label={mode === "simple" ? "Prévia para edição rápida" : "Prévia no modo avançado"}
+          className={`min-w-0 p-4 md:p-7 ${
+            mode === "simple" ? "bg-[#f1f5f9]" : "bg-[#dfe7ef]"
+          }`}
+        >
           <div
             className="mx-auto overflow-auto rounded-[22px] border border-[#cfdae5] bg-[#dde6ee] p-3 shadow-inner"
             style={{ maxWidth: viewport[device] + 26 }}
@@ -1427,11 +1527,16 @@ export function SiteEditor({ projectId }: { projectId: string }) {
         >
           <div className="border-b border-[#e6e4eb] px-4 py-3">
             <div className="flex items-center justify-between">
-              <strong className="text-xs uppercase tracking-[.12em] text-[#77727e]">
-                {activeSection
-                  ? presenceSectionRegistry[activeSection.type].label
-                  : "Página"}
-              </strong>
+              <div>
+                <strong className="text-xs uppercase tracking-[.12em] text-[#4f5f73]">
+                  {activeSection
+                    ? presenceSectionRegistry[activeSection.type].label
+                    : "Página"}
+                </strong>
+                <p className="mt-1 text-[11px] font-semibold text-[#7a8796]">
+                  Ajustes completos de conteúdo, visual e comportamento
+                </p>
+              </div>
               <Button
                 className="ml-auto xl:hidden"
                 size="icon"
@@ -1948,7 +2053,7 @@ export function SiteEditor({ projectId }: { projectId: string }) {
             ) : null}
             <div className="mt-5 rounded-2xl border border-[#dfe7ef] bg-[#f8fafc] p-4">
               <div className="flex items-center justify-between gap-3">
-                <strong className="text-sm">Diff semântico</strong>
+                <strong className="text-sm">Comparação semântica</strong>
                 <button
                   type="button"
                   className="text-xs font-black text-[#0054fc]"

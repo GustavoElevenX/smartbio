@@ -83,7 +83,10 @@ export function SimpleSectionInspector({
         <p className="text-xs font-extrabold text-[#536178]">
           {presenceSectionRegistry[section.type].label}
         </p>
-        <h2 className="mt-1 text-xl font-black tracking-[-.025em]">Edite esta parte</h2>
+        <h2 className="mt-1 text-xl font-black tracking-[-.025em]">Edição rápida</h2>
+        <p className="mt-2 text-sm leading-6 text-[#657487]">
+          Altere apenas o que seus visitantes veem. As configurações completas continuam no modo avançado.
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
@@ -177,7 +180,7 @@ export function SimpleSectionInspector({
             {[
               ["showOpeningHours", "Mostrar horários"],
               ["showPhone", "Mostrar telefone e WhatsApp"],
-              ["showMapLink", "Mostrar link do mapa"],
+              ["showMapLink", "Mostrar endereço do mapa"],
             ].map(([key, text]) => (
               <label key={key} className="flex min-h-11 items-center gap-3 text-sm font-bold">
                 <input type="checkbox" checked={content[key] !== false} onChange={(event) => patchContent({ [key]: event.target.checked })} />

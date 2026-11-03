@@ -51,8 +51,8 @@ export const reservedSlugs = new Set([
 ]);
 
 export const goalOptions = [
-  "Gerar vendas", "Gerar leads", "Receber pedidos", "Agendar", "Apresentar serviços", "Criar orçamento", "Outro",
+  "Gerar vendas", "Gerar contatos comerciais", "Receber pedidos", "Agendar", "Apresentar serviços", "Criar orçamento", "Outro",
 ];
 
-export const destinationOptions = ["WhatsApp", "Formulário", "Link externo", "Agenda", "Checkout", "E-mail"];
-export const personalityOptions = ["Minimalista", "Premium", "Vibrante", "Elegante", "Tecnológica", "Orgânica"];
+export const destinationOptions = ["WhatsApp", "Formulário", "Endereço externo", "Agenda", "Pagamento", "E-mail"];
+export const personalityOptions = ["Minimalista", "Sofisticada", "Vibrante", "Elegante", "Tecnológica", "Orgânica"];

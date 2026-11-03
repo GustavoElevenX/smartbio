@@ -158,7 +158,7 @@ export function markActionsConfirmed(
     ...action,
     source: unchanged ? (current.find((item) => item.key === action.key)?.source || understanding.source) : "business_confirmed" as const,
     confidence: unchanged ? current.find((item) => item.key === action.key)?.confidence : 1,
-    evidence: unchanged ? current.find((item) => item.key === action.key)?.evidence : ["Ação ajustada pelo empresário no onboarding."],
+    evidence: unchanged ? current.find((item) => item.key === action.key)?.evidence : ["Ação ajustada pelo empresário na configuração inicial."],
     confirmedByBusiness: true,
   }));
   const primary = selected.find((action) => action.isPrimary) || selected[0];
@@ -199,7 +199,7 @@ export function markOfferingsConfirmed(
       ...(existing.get(normalize(name)) || {
         name,
         kind: "other" as const,
-        evidence: "Opção informada pelo empresário durante o onboarding.",
+        evidence: "Opção informada pelo empresário durante a configuração inicial.",
       }),
       name,
       confidence: 1,

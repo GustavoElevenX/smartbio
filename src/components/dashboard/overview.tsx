@@ -33,7 +33,7 @@ function nextActionHref(
   if (key === "confirm") return `/app/projects/${projectId}/opportunities`;
   if (key === "optimize" || key === "friction")
     return `/app/projects/${projectId}/analytics`;
-  return `/app/projects/${projectId}/site`;
+  return `/app/projects/${projectId}/editor`;
 }
 
 function observedDays(overview: WorkspaceOperationalOverview) {
@@ -259,7 +259,7 @@ export function Overview({
               <thead className="text-xs text-[#526171]">
                 <tr className="border-b border-[#dfe5eb]">
                   <th className="px-5 py-3">Negócio</th>
-                  <th>Status</th>
+                  <th>Situação</th>
                   <th>Sessões</th>
                   <th>Conversões</th>
                   <th>Valor confirmado</th>

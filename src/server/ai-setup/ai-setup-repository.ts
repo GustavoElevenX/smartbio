@@ -11,9 +11,25 @@ declare global {
 
 const sessions = globalThis.__smartBioAISetupSessions ??= new Map<string, AISetupSession>();
 
-function persistenceFailure(operation: string, error: { code?: string } | null, userMessage: string): never {
+const LEGACY_ANSWER_CONTEXTS_KEY = "__sobe_answer_contexts";
+const LEGACY_ANSWER_CONTEXT_AUDIT_KEY = "__sobe_answer_context_audit";
+
+type PersistenceError = {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+} | null;
+
+function persistenceFailure(operation: string, error: PersistenceError, userMessage: string): never {
   console.error("ai_setup_persistence_failed", { operation, code: error?.code });
   throw new Error(userMessage);
+}
+
+function answerContextColumnsUnavailable(error: PersistenceError) {
+  const description = [error?.message, error?.details, error?.hint].filter(Boolean).join(" ").toLowerCase();
+  return ["PGRST204", "42703"].includes(error?.code || "")
+    && (description.includes("answer_contexts") || description.includes("answer_context_audit"));
 }
 
 function compatibleCommercialArchitecture(value: unknown) {
@@ -39,6 +55,16 @@ function compatibleCommercialArchitecture(value: unknown) {
 }
 
 function rowToSession(row: Record<string, unknown>): AISetupSession {
+  const persistedAnswers = row.answers && typeof row.answers === "object"
+    ? structuredClone(row.answers) as Record<string, unknown>
+    : {};
+  const legacyAnswerContexts = persistedAnswers[LEGACY_ANSWER_CONTEXTS_KEY];
+  const legacyAnswerContextAudit = persistedAnswers[LEGACY_ANSWER_CONTEXT_AUDIT_KEY];
+  const persistedAnswerContexts = Array.isArray(row.answer_contexts) && row.answer_contexts.length > 0
+    ? row.answer_contexts
+    : legacyAnswerContexts || row.answer_contexts || [];
+  delete persistedAnswers[LEGACY_ANSWER_CONTEXTS_KEY];
+  delete persistedAnswers[LEGACY_ANSWER_CONTEXT_AUDIT_KEY];
   return aiSetupSessionSchema.parse({
     id: row.id,
     workspaceId: row.workspace_id,
@@ -52,7 +78,9 @@ function rowToSession(row: Record<string, unknown>): AISetupSession {
     architectureEdited: row.architecture_edited || false,
     visitorActions: row.visitor_actions || [],
     actionsConfirmed: row.actions_confirmed || false,
-    answers: row.answers || {},
+    answers: persistedAnswers,
+    answerContexts: persistedAnswerContexts,
+    answerContextAudit: row.answer_context_audit || legacyAnswerContextAudit || undefined,
     missingRequirements: row.missing_requirements || [],
     questions: row.questions || [],
     discoveryPlan: row.discovery_plan || undefined,
@@ -65,7 +93,14 @@ function rowToSession(row: Record<string, unknown>): AISetupSession {
   });
 }
 
-function sessionToRow(session: AISetupSession, actor: AISetupActor) {
+function sessionToRow(session: AISetupSession, actor: AISetupActor, legacyAnswerContextStorage = false) {
+  const answers = legacyAnswerContextStorage
+    ? {
+        ...session.answers,
+        ...(session.answerContexts?.length ? { [LEGACY_ANSWER_CONTEXTS_KEY]: session.answerContexts } : {}),
+        ...(session.answerContextAudit ? { [LEGACY_ANSWER_CONTEXT_AUDIT_KEY]: session.answerContextAudit } : {}),
+      }
+    : session.answers;
   return {
     id: session.id,
     workspace_id: actor.workspaceId,
@@ -80,7 +115,11 @@ function sessionToRow(session: AISetupSession, actor: AISetupActor) {
     architecture_edited: session.architectureEdited || false,
     visitor_actions: session.visitorActions,
     actions_confirmed: session.actionsConfirmed,
-    answers: session.answers,
+    answers,
+    ...(legacyAnswerContextStorage ? {} : {
+      answer_contexts: session.answerContexts || [],
+      answer_context_audit: session.answerContextAudit || null,
+    }),
     missing_requirements: session.missingRequirements,
     questions: session.questions,
     discovery_plan: session.discoveryPlan || null,
@@ -100,7 +139,10 @@ export class AISetupRepository {
     }
     const client = createServiceClient();
     if (!client) throw new Error("Persistência do onboarding indisponível.");
-    const { data, error } = await client.from("ai_setup_sessions").insert(sessionToRow(session, actor)).select("*").single();
+    let { data, error } = await client.from("ai_setup_sessions").insert(sessionToRow(session, actor)).select("*").single();
+    if (answerContextColumnsUnavailable(error)) {
+      ({ data, error } = await client.from("ai_setup_sessions").insert(sessionToRow(session, actor, true)).select("*").single());
+    }
     if (error) persistenceFailure("create_session", error, "Não foi possível iniciar a configuração.");
     return rowToSession(data);
   }
@@ -114,11 +156,18 @@ export class AISetupRepository {
     }
     const client = createServiceClient();
     if (!client) throw new Error("Persistência do onboarding indisponível.");
-    const { data, error } = await client
+    let { data, error } = await client
       .from("ai_setup_sessions")
       .insert(sessionToRow(session, actor))
       .select("*")
       .single();
+    if (answerContextColumnsUnavailable(error)) {
+      ({ data, error } = await client
+        .from("ai_setup_sessions")
+        .insert(sessionToRow(session, actor, true))
+        .select("*")
+        .single());
+    }
     if (!error && data) return rowToSession(data);
     if (error?.code === "23505") {
       const retry = await this.get(actor, session.id);
@@ -196,7 +245,7 @@ export class AISetupRepository {
     }
     const client = createServiceClient();
     if (!client) throw new Error("Persistência do onboarding indisponível.");
-    const { data, error } = await client
+    let { data, error } = await client
       .from("ai_setup_sessions")
       .update(sessionToRow(next, actor))
       .eq("id", next.id)
@@ -204,6 +253,16 @@ export class AISetupRepository {
       .eq("created_by", actor.userId)
       .select("*")
       .maybeSingle();
+    if (answerContextColumnsUnavailable(error)) {
+      ({ data, error } = await client
+        .from("ai_setup_sessions")
+        .update(sessionToRow(next, actor, true))
+        .eq("id", next.id)
+        .eq("workspace_id", actor.workspaceId)
+        .eq("created_by", actor.userId)
+        .select("*")
+        .maybeSingle());
+    }
     if (!data && (!error || error.code === "PGRST116"))
       throw new AISetupNotFoundError("Sessão de onboarding não encontrada.");
     if (error)

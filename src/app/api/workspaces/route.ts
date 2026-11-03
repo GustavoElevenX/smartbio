@@ -6,15 +6,17 @@ import {
   ACTIVE_WORKSPACE_COOKIE,
   activeWorkspaceCookieOptions,
 } from "@/server/auth/active-workspace";
+import { getMemoryWorkspace } from "@/server/workspaces/workspace-memory-store";
 
 export const GET = withAuthenticatedActor(async (_request, _context, actor) => {
   if (actor.persistence === "memory") {
+    const workspace = getMemoryWorkspace(actor);
     return apiSuccess({
       activeWorkspaceId: actor.workspaceId,
       workspaces: [
         {
           id: actor.workspaceId,
-          name: "Meu workspace",
+          name: workspace.name,
           plan: "trial",
           role: actor.role,
         },

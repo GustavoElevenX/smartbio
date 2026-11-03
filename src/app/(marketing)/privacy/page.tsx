@@ -17,8 +17,8 @@ export default function PrivacyPage() {
         <h2>Dados que coletamos</h2>
         <p className="mt-4">
           Tratamos dados de conta e do negócio, como nome, e-mail, perfil,
-          workspace, ofertas, canais e configurações. Também tratamos dados de
-          uso e, quando um visitante preenche uma jornada, os dados de lead
+          espaço de trabalho, ofertas, canais e configurações. Também tratamos dados de
+          uso e, quando um visitante preenche uma jornada, os dados de contato comercial
           enviados por ele, como nome, contato, respostas e contexto da origem.
         </p>
       </section>
@@ -27,7 +27,7 @@ export default function PrivacyPage() {
         <h2>Como usamos os dados</h2>
         <p className="mt-4">
           Usamos essas informações para autenticar usuários, criar e publicar
-          páginas, operar jornadas, gerar leads e oportunidades, oferecer
+          páginas, operar jornadas, gerar contatos comerciais e oportunidades, oferecer
           agendamentos, processar cobranças, medir o uso, prevenir abusos e
           prestar suporte. Também usamos dados para cumprir obrigações legais e
           proteger a segurança da plataforma.
@@ -57,7 +57,7 @@ export default function PrivacyPage() {
       </section>
 
       <section>
-        <h2>Leads de visitantes</h2>
+        <h2>Contatos comerciais de visitantes</h2>
         <p className="mt-4">
           O negócio que publica uma página define quais dados solicita e para
           qual finalidade comercial. A SOBE processa esses dados para entregar a
