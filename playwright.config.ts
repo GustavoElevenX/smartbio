@@ -12,12 +12,13 @@ export default defineConfig({
   use: { baseURL: `http://127.0.0.1:${e2ePort}`, trace: "on-first-retry", screenshot: "only-on-failure" },
   projects: [{ name: "mobile-chrome", use: { ...devices["Pixel 7"] } }, { name: "desktop-chrome", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: `"${process.execPath}" node_modules/next/dist/bin/next dev --hostname 127.0.0.1 --port ${e2ePort}`,
+    command: `"${process.execPath}" node_modules/next/dist/bin/next dev --webpack --hostname 127.0.0.1 --port ${e2ePort}`,
     url: `http://127.0.0.1:${e2ePort}`,
     reuseExistingServer: reuseE2eServer,
     timeout: 120_000,
     env: {
       ...process.env,
+      NEXT_DIST_DIR: process.env.NEXT_DIST_DIR || ".next-e2e",
       ACTIVATION_GATE_FAKE_AI: process.env.ACTIVATION_GATE_FAKE_AI || "true",
       E2E_DISABLE_RATE_LIMITS: "true",
       ENABLE_LOCAL_DEV_AUTH: "true",

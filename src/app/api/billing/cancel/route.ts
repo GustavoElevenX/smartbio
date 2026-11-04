@@ -2,11 +2,9 @@ import { apiError, apiSuccess } from "@/server/http/api-response";
 import { withAuthenticatedActor } from "@/server/http/with-authenticated-actor";
 import { billingErrorResponse, scheduleSubscriptionCancellation } from "@/server/billing/billing-service";
 import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
-import { z } from "zod";
+import { feedbackSchema } from "@/features/billing/cancellation-feedback";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getRequestId, requestPathname } from "@/server/observability/log";
-
-export const feedbackSchema = z.object({ reason: z.enum(["not_using", "no_traffic", "no_result", "too_expensive", "alternative", "missing_feature", "other"]).optional(), comment: z.string().trim().max(1000).optional() });
 
 export const runtime = "nodejs";
 export const POST = withAuthenticatedActor(async (request, _context, actor) => {

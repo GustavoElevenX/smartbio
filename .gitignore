@@ -13,12 +13,15 @@
 # testing
 /coverage
 /test-results/
+/.tmp/
 /playwright-report/
 /blob-report/
 
 # next.js
 /.next/
 /.next-e2e*/
+/.next-content-build*/
+/.next-content-dev*/
 /out/
 
 # production

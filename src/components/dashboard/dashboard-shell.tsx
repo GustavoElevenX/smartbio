@@ -10,6 +10,7 @@ import {
   Check,
   ChevronDown,
   CreditCard,
+  Images,
   FolderKanban,
   HelpCircle,
   LayoutDashboard,
@@ -19,6 +20,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
+  Sparkles,
   X,
   Zap,
 } from "lucide-react";
@@ -164,6 +166,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           href: `/app/projects/${projectId}/opportunities`,
           label: "Oportunidades",
           icon: BriefcaseBusiness,
+        },
+        ...(process.env.NEXT_PUBLIC_FEATURE_CONTENT_STUDIO !== "false"
+          ? [{ href: `/app/projects/${projectId}/content`, label: "Conteúdo", icon: Images }]
+          : []),
+        {
+          href: `/app/projects/${projectId}/visuals`,
+          label: "Artes com IA",
+          icon: Sparkles,
         },
         {
           href: `/app/projects/${projectId}/analytics`,

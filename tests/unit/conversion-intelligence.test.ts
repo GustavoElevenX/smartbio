@@ -5,7 +5,7 @@ import { entryUnderperformanceRules, journeyFrictionRules, presenceRules } from 
 import { resolveNextBestAction } from "@/features/dashboard/next-best-action";
 import { applyEntryChannelPreset } from "@/features/entry-points/presets";
 import { buildTrialValueSummary } from "@/features/billing/trial-value-summary";
-import { feedbackSchema } from "@/app/api/billing/cancel/route";
+import { feedbackSchema } from "@/features/billing/cancellation-feedback";
 import type { AnalyticsEvent, EntryPoint } from "@/types";
 
 const event = (sessionId: string, eventName: AnalyticsEvent["eventName"], patch: Partial<AnalyticsEvent> = {}): AnalyticsEvent => ({ id: `${sessionId}:${eventName}:${Math.random()}`, projectId: "p", visitorId: sessionId, sessionId, eventName, createdAt: "2026-08-01T00:00:00.000Z", ...patch });
