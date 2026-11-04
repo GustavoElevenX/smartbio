@@ -23,6 +23,12 @@ O caminho híbrido da SOBE mantém texto editável e exportação determinístic
 - A imagem aprovada continua como referência de direção no Design Kit. A auditoria visual do PNG na aprovação usa visão quando `OPENAI_API_KEY` está configurada.
 - O editor aceita um ajuste visual específico para a próxima geração e o injeta no prompt sem substituir a identidade nem os fatos confirmados.
 
-## Limite técnico que permanece
+## Correção da qualidade de imagem (04/11/2026)
 
-O FLUX.1 schnell da integração Cloudflare atual recebe texto, não a imagem aprovada como referência. Portanto, a continuidade visual entre gerações usa a especificação e as cores salvas; não há ainda a mesma transferência visual da capa aprovada que existe no caminho de IA do Carrossell. O modelo também pode produzir uma imagem fraca mesmo com uma boa direção. A revisão humana antes de publicar continua necessária.
+- O Motor Visual usa `gpt-image-2.5-sunburst` em qualidade `xhigh` quando `OPENAI_API_KEY` está configurada. `VISUAL_IMAGE_QUALITY=max` aumenta ainda mais o esforço e o custo; `high` reduz o custo. O modelo é configurável sem afetar o módulo Conteúdo.
+- A geração calcula a proporção e resolução da área real da fotografia em cada composição. A imagem deixa de ser sempre gerada num formato único para depois sofrer um corte grande.
+- Uma foto já selecionada na arte é enviada como referência visual com alta fidelidade. Isso permite preservar formato físico e marcas reais de uma embalagem, além de correções guiadas pela imagem atual. O prompt proíbe alegações e rótulos inventados.
+- A Cloudflare permanece disponível como fallback de baixo custo. A qualidade visual da rota Flux Schnell continua limitada pelo modelo; para o padrão premium, configure OpenAI.
+- A foto gerada continua separada dos textos, preço, CTA e logo, que são compostos pelo SVG e permanecem editáveis.
+
+A IA ainda pode errar formato e detalhes de embalagem sem uma foto real do produto. A revisão visual humana antes de publicar permanece necessária.

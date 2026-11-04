@@ -6,7 +6,7 @@ O motor aceita produtos, serviços, experiências, cursos e outros assuntos sem 
 
 O fluxo agora salva uma especificação de direção criativa antes do PNG: objetivo, conceito, produto, estilo, composição, tipografia, distribuição, paleta, fotografia, marca e restrições. Com `OPENAI_API_KEY`, a IA propõe três direções distintas; sem a chave, o modo de demonstração usa três direções determinísticas. A foto continua sendo gerada por Cloudflare Workers AI e o texto permanece editável no estúdio. As seis estratégias novas são Full Bleed, Editorial, Product Hero, Minimal Premium, Promotional e Lifestyle. Composição final: SVG e Sharp.
 
-Para a direção de arte e a auditoria visual do PNG final na aprovação, configure `OPENAI_API_KEY`, `OPENAI_MODEL` e, opcionalmente, `OPENAI_VISION_MODEL` no servidor/Vercel. A auditoria verifica correspondência do produto, legibilidade, contraste, marca, margens, hierarquia, alinhamento, densidade, cortes e cores do Design Kit. Para gerar a fotografia, configure também `CONTENT_IMAGE_PROVIDER=cloudflare`, `CLOUDFLARE_ACCOUNT_ID` e `CLOUDFLARE_API_TOKEN`. A IA de direção usa a mesma chave e modelo do módulo Conteúdo. Sem Cloudflare, escolha uma foto existente; a aprovação de composições fotográficas com produto anunciado exige foto. Sem OpenAI, continuam as validações determinísticas, mas a auditoria visual por visão não roda. Não use uma imagem gerada como prova do rótulo real: compare a embalagem final com o produto vendido antes de publicar.
+Para a direção de arte, geração premium e auditoria visual do PNG final, configure `OPENAI_API_KEY`, `OPENAI_MODEL` e, opcionalmente, `OPENAI_VISION_MODEL` no servidor/Vercel. A auditoria verifica correspondência do produto, legibilidade, contraste, marca, margens, hierarquia, alinhamento, densidade, cortes e cores do Design Kit. Para geração básica de baixo custo, configure Cloudflare. Sem qualquer provedor de imagens, escolha uma foto existente; a aprovação de composições fotográficas com produto anunciado exige foto. Sem OpenAI, continuam as validações determinísticas, mas a auditoria visual por visão não roda. Compare a embalagem final com o produto vendido antes de publicar.
 
 O caso de teste Casa de Sucos Mix está em `artifacts/visual-engine/`: três PNGs 1080 × 1350 e as fotografias de teste. O produto foi declarado como suco de laranja em embalagem de 1 litro; nenhum preço, ingrediente ou benefício foi criado. Essas imagens são material de teste interno e não devem aparecer em páginas públicas.
 
@@ -38,7 +38,20 @@ O código está pronto, mas o banco remoto precisa receber as migrações. No re
 
 O comando `db push --remote` e o uso de `--dry-run` seguem a [documentação atual do Supabase](https://supabase.com/docs/guides/local-development/cli-workflows). Evite colar migrações avulsas no SQL Editor quando o projeto usa histórico de migrações: o [Supabase alerta](https://supabase.com/docs/guides/deployment/database-migrations) que isso não registra a migração e pode quebrar o próximo `db push`.
 
-## 2. Cloudflare Workers AI — somente para a foto gerada por IA
+## 2. Geração de imagem premium e alternativa de baixo custo
+
+Para imagem de padrão publicitário, configure no servidor e na Vercel:
+
+```dotenv
+OPENAI_API_KEY=...
+VISUAL_IMAGE_PROVIDER=openai
+VISUAL_IMAGE_MODEL=gpt-image-2.5-sunburst
+VISUAL_IMAGE_QUALITY=xhigh
+```
+
+O modo `auto` prioriza OpenAI quando a chave existe e usa Cloudflare caso contrário. `max` é a qualidade mais alta, com maior custo; `high` reduz custo. Estas variáveis afetam apenas o Motor Visual. A geração premium aceita uma foto selecionada na arte como referência para preservar a embalagem real. Para produtos com formato, rótulo ou marca específicos, suba uma foto do produto antes de gerar. Sem referência, inspecione o resultado antes de publicar.
+
+### Cloudflare Workers AI — alternativa básica para a foto gerada por IA
 
 O modo de templates funciona sem Cloudflare. Para ativar o botão **Gerar imagem com IA**:
 

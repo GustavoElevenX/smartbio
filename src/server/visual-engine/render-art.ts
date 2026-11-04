@@ -40,7 +40,17 @@ export function visualSvg(spec: VisualSpec, kit: DesignKit, hasPhoto: boolean, h
   const x = textRight ? w*.54 : pad;
   const width = side || textRight ? w*.39 : m === "full_bleed" && hasPhoto ? w*.53 : w-pad*2;
   let field = hasPhoto ? "" : `<rect width="${w}" height="${h}" fill="${bg}"/>`;
-  if (dark) field += `<defs><linearGradient id="shade" x2="0" y2="1"><stop stop-color="#07111B" stop-opacity=".82"/><stop offset=".48" stop-color="#07111B" stop-opacity=".08"/><stop offset="1" stop-color="#07111B" stop-opacity=".55"/></linearGradient></defs><rect width="${w}" height="${h}" fill="url(#shade)"/>`;
+  if (dark) {
+    const zone = direction?.textZone || "top";
+    const gradient = zone === "bottom"
+      ? `<linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop offset=".45" stop-color="#07111B" stop-opacity="0"/><stop offset="1" stop-color="#07111B" stop-opacity=".78"/></linearGradient>`
+      : zone === "right"
+        ? `<linearGradient id="shade" x1="0" y1="0" x2="1" y2="0"><stop offset=".28" stop-color="#07111B" stop-opacity="0"/><stop offset="1" stop-color="#07111B" stop-opacity=".78"/></linearGradient>`
+        : zone === "left"
+          ? `<linearGradient id="shade" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#07111B" stop-opacity=".78"/><stop offset=".72" stop-color="#07111B" stop-opacity="0"/></linearGradient>`
+          : `<linearGradient id="shade" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#07111B" stop-opacity=".72"/><stop offset=".5" stop-color="#07111B" stop-opacity=".46"/><stop offset=".8" stop-color="#07111B" stop-opacity="0"/></linearGradient>`;
+    field += `<defs>${gradient}</defs><rect width="${w}" height="${h}" fill="url(#shade)"/>`;
+  }
   if (direction?.treatment === "light_overlay" && imageZone === "full" && hasPhoto) field += `<rect width="${w}" height="${h}" fill="${kit.surface}" opacity=".70"/>`;
   if (direction?.motif === "rule" || (!direction && m === "editorial")) field += `<rect x="${x}" y="${r(h*.12)}" width="${r(w*.08)}" height="${r(7*scale)}" fill="${kit.accent}"/>`;
   if (direction?.motif === "disc" && !hasPhoto) field += `<circle cx="${r(w*.54)}" cy="${r(h*.52)}" r="${r(w*.33)}" fill="${kit.accent}" opacity=".18"/>`;

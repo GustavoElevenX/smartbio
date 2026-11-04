@@ -22,7 +22,7 @@ export function buildVisualPrompt(input: { kit: DesignKit; spec: VisualSpec; bus
     d?.revisionNote ? `Requested correction: ${d.revisionNote}. Preserve the established brand identity and all confirmed facts.` : "",
     `Brand colors as subtle environmental accents: ${input.kit.primary}, ${input.kit.secondary}, ${input.kit.accent}.`,
     "Compose the visual background as a complete art-directed campaign scene, not a stock photo or generic template. Use a coherent visual metaphor only when it clarifies the actual offer. No fabricated attributes or claims.",
-    "No text, letters, typography, numbers, signs, logo, labels, watermarks or UI.",
+    "No newly invented text, headline, typography, numbers, signs, logo, package copy, watermarks or UI. If a real product photograph is supplied as reference, preserve its existing package markings rather than replacing them.",
   ].join(" ").slice(0, 2000);
 }
 const strategy = ["full_bleed", "editorial", "product_hero", "minimal_premium", "promotional", "lifestyle"] as const;
@@ -52,7 +52,8 @@ export function planVisualVariants(raw: unknown, kit: DesignKit, business: { nam
     }
   }
   return layouts.map((layout, variant) => {
-    const base = visualSpecSchema.parse({ target: brief.target, layout, headline: brief.headline || (subject ? subject.slice(0, 120) : business.name), subheading: brief.subheading ?? "", cta: brief.cta ?? business.defaultCta ?? "", price: brief.price || "", subject, imageAssetId: brief.imageAssetId ?? (variant === 0 ? reference?.imageAssetId : null) ?? null, imagePrompt: "", kitVersion: kit.version, variant, direction: makeDirection(layout, subject || business.name, kit), directionSource: "rules" });
+    const matchingReferenceImage = variant === 0 && subject && reference?.subject.trim().toLowerCase() === subject.trim().toLowerCase() ? reference.imageAssetId : null;
+    const base = visualSpecSchema.parse({ target: brief.target, layout, headline: brief.headline || (subject ? subject.slice(0, 120) : business.name), subheading: brief.subheading ?? "", cta: brief.cta ?? business.defaultCta ?? "", price: brief.price || "", subject, imageAssetId: brief.imageAssetId ?? matchingReferenceImage ?? null, imagePrompt: "", kitVersion: kit.version, variant, direction: makeDirection(layout, subject || business.name, kit), directionSource: "rules" });
     return { ...base, imagePrompt: buildVisualPrompt({ kit, spec: base, businessName: business.name, businessDescription: business.description, offering: subject }) };
   });
 }

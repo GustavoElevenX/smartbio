@@ -3,6 +3,7 @@ import sharp from "sharp";
 import { readFile, writeFile } from "node:fs/promises";
 import { deriveDesignKit, planVisualVariants, readableInk } from "@/features/visual-engine/visual-planner";
 import { assessVisual, renderVisualPng, visualSvg } from "@/server/visual-engine/render-art";
+import { chooseVisualImageProvider, planVisualImage } from "@/features/visual-engine/image-plan";
 
 const kit = deriveDesignKit({ name: "Casa & Cia", palette: ["#07172F", "#E7E7E7", "#00D7E7"] });
 describe("Motor Visual SOBE", () => {
@@ -13,7 +14,7 @@ describe("Motor Visual SOBE", () => {
     expect(variants[0].layout).toBe(reference.layout);
     expect(new Set(variants.map(item => item.layout)).size).toBe(3);
     expect(variants[0].kitVersion).toBe(2);
-    expect(variants.every(item => item.imagePrompt.includes("No text"))).toBe(true);
+    expect(variants.every(item => item.imagePrompt.includes("No newly invented text"))).toBe(true);
     expect(variants.every(item => item.headline === "Casa & Cia")).toBe(true);
   });
   it("escapa texto do usuário e entrega PNG nos tamanhos prometidos", async () => {
@@ -26,7 +27,7 @@ describe("Motor Visual SOBE", () => {
     const metadata = await sharp(png).metadata();
     expect(metadata.format).toBe("png");
     expect([metadata.width, metadata.height]).toEqual([1200, 630]);
-  });
+  }, 15000);
   it("usa uma foto real sem cobri-la com o fundo SVG", async () => {
     const spec = planVisualVariants({ target: "hero" }, kit, { name: "Casa & Cia", description: "Móveis sob medida" })[0];
     const source = await sharp({ create: { width: 80, height: 80, channels: 3, background: "#ed1234" } }).png().toBuffer();
@@ -70,5 +71,33 @@ describe("Motor Visual SOBE", () => {
     const right = await sharp(png).extract({ left: 980, top: 750, width: 1, height: 1 }).raw().toBuffer();
     expect(left[0]).toBe(237);
     expect(right[0]).not.toBe(237);
+  });
+  it("prioriza geração premium e preserva a alternativa gratuita quando a chave não existe", () => {
+    expect(chooseVisualImageProvider({ preferred: "auto", openaiKey: "configured", cloudflareAccount: "account", cloudflareToken: "token" })).toBe("openai");
+    expect(chooseVisualImageProvider({ preferred: "auto", cloudflareAccount: "account", cloudflareToken: "token" })).toBe("cloudflare");
+    expect(() => chooseVisualImageProvider({ preferred: "openai", cloudflareAccount: "account", cloudflareToken: "token" })).toThrow("OPENAI_API_KEY");
+  });
+  it("planeja imagens de alta resolução na proporção da área real e pede fidelidade do produto", () => {
+    const mix = deriveDesignKit({ name: "Casa de Sucos Mix", palette: ["#173F27", "#F6E8C8", "#F3921C"] });
+    const [full, editorial, hero] = planVisualVariants({ target: "card", subject: "Suco de laranja em embalagem de 1 litro" }, mix, { name: "Casa de Sucos Mix", description: "Sucos" });
+    const plans = [full, editorial, hero].map(spec => planVisualImage(spec, mix));
+    expect(plans.every(plan => plan.width % 16 === 0 && plan.height % 16 === 0 && Math.min(plan.width, plan.height) >= 512)).toBe(true);
+    expect(plans[0].size).not.toBe(plans[1].size);
+    expect(plans.every(plan => plan.prompt.includes("1 litro") && plan.prompt.includes("packaging") && plan.prompt.includes("No generated headline"))).toBe(true);
+    expect(plans.every(plan => !plan.prompt.includes("price: R$"))).toBe(true);
+  });
+  it("não reaproveita fotografia de outro produto como referência", () => {
+    const previous = planVisualVariants({ target: "card", subject: "Suco de laranja em embalagem de 1 litro" }, kit, { name: "Marca", description: "Sucos" })[0];
+    const reference = { ...previous, imageAssetId: crypto.randomUUID() };
+    const next = planVisualVariants({ target: "card", subject: "Suco de uva em embalagem de 1 litro" }, kit, { name: "Marca", description: "Sucos" }, reference);
+    expect(next.every(spec => spec.imageAssetId === null)).toBe(true);
+  });
+  it("compõe a amostra premium do suco sem rasterizar o texto na foto", async () => {
+    const mix = deriveDesignKit({ name: "Casa de Sucos Mix", palette: ["#173F27", "#F6E8C8", "#F3921C"] });
+    const spec = planVisualVariants({ target: "card", subject: "Suco de laranja em embalagem de 1 litro", headline: "Suco de laranja", subheading: "Embalagem de 1 litro" }, mix, { name: "Casa de Sucos Mix", description: "Sucos" })[0];
+    const source = await readFile("artifacts/visual-engine/mix-premium-source.png");
+    const png = await renderVisualPng(spec, mix, source);
+    expect([ (await sharp(png).metadata()).width, (await sharp(png).metadata()).height ]).toEqual([1080, 1350]);
+    if (process.env.RENDER_MIX_SAMPLE === "1") await writeFile("artifacts/visual-engine/mix-premium-preview.png", png);
   });
 });

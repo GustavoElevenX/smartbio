@@ -3,13 +3,15 @@ import sharp from "sharp";
 import { createServiceClient } from "@/lib/supabase/server";
 import { assertProjectAccess } from "@/server/auth/project-access";
 import type { AuthenticatedActor } from "@/server/auth/setup-actor";
-import { projectContext, parseCloudflareImage } from "@/server/content-studio/studio";
+import { projectContext } from "@/server/content-studio/studio";
 import { loadProjectForActor } from "@/server/projects/load-project-for-actor";
 import { savePresencePageForActor } from "@/server/presence/presence-page-service";
 import { designKitEditSchema, designKitSchema, visualBriefSchema, visualEditSchema, visualSpecSchema, type DesignKit, type VisualSpec } from "@/features/visual-engine/schema";
 import { buildVisualPrompt, deriveDesignKit, makeDirection, planVisualVariants } from "@/features/visual-engine/visual-planner";
 import { assessVisual, renderVisualPng } from "./render-art";
 import { directArt, verifyArtworkQuality } from "./art-director";
+import { chooseVisualImageProvider } from "@/features/visual-engine/image-plan";
+import { generateBasicVisualImage, generatePremiumVisualImage } from "./image-generator";
 
 const bucket = "media-private";
 const memory = globalThis as typeof globalThis & { __sobeVisualKits?: Map<string, DesignKit>; __sobeVisualArt?: Map<string, Record<string, unknown>> };
@@ -181,18 +183,16 @@ export async function approveArtwork(actor: AuthenticatedActor, projectId: strin
 export async function generateArtworkImage(actor: AuthenticatedActor, projectId: string, artworkId: string) {
   await assertProjectAccess(actor, projectId, "write");
   if (actor.persistence === "memory") throw new Error("Imagens por IA exigem um negócio salvo no Supabase.");
-  if (process.env.CONTENT_IMAGE_PROVIDER !== "cloudflare" || !process.env.CLOUDFLARE_ACCOUNT_ID || !process.env.CLOUDFLARE_API_TOKEN) throw new Error("Geração de imagem aguardando configuração da Cloudflare na SOBE.");
+  const provider = chooseVisualImageProvider({ preferred: process.env.VISUAL_IMAGE_PROVIDER, openaiKey: process.env.OPENAI_API_KEY, cloudflareAccount: process.env.CLOUDFLARE_ACCOUNT_ID, cloudflareToken: process.env.CLOUDFLARE_API_TOKEN });
   const row = await getArtwork(actor, projectId, artworkId);
   const spec = visualSpecSchema.parse(row.spec_json);
-  const prompt = spec.imagePrompt;
+  const kit = designKitSchema.parse(row.kit_json);
   const client = db();
   const { data: reservation, error } = await client.rpc("reserve_visual_image", { p_workspace_id: actor.workspaceId, p_project_id: projectId, p_artwork_id: artworkId, p_user_id: actor.userId, p_workspace_cap: Number(process.env.CONTENT_IMAGE_MAX_PER_WORKSPACE_PER_DAY || 3), p_global_cap: Number(process.env.CONTENT_IMAGE_GLOBAL_DAILY_CAP || 20), p_artwork_cap: Number(process.env.CONTENT_IMAGE_MAX_PER_POST || 3) });
   if (error || !reservation) throw new Error("Cota de imagens por IA alcançada. Você pode continuar criando artes com templates e fotos salvas.");
   try {
-    const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(process.env.CLOUDFLARE_ACCOUNT_ID)}/ai/run/@cf/black-forest-labs/flux-1-schnell`, { method: "POST", headers: { Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`, "Content-Type": "application/json" }, body: JSON.stringify({ prompt, steps: 4 }), signal: AbortSignal.timeout(30000) });
-    if (!response.ok) throw new Error(response.status === 429 ? "A cota da Cloudflare acabou. Tente novamente amanhã." : `Cloudflare retornou ${response.status}.`);
-    const source = parseCloudflareImage(await response.json());
-    const png = await sharp(source, { limitInputPixels: 40_000_000 }).rotate().png().toBuffer();
+    const reference = provider === "openai" ? await assetBytes(actor, projectId, spec.imageAssetId) : undefined;
+    const png = provider === "openai" ? await generatePremiumVisualImage(spec, kit, reference) : await generateBasicVisualImage(spec, kit);
     const assetId = await saveMedia(actor, projectId, artworkId, png, "ai");
     const updated = await editArtwork(actor, projectId, artworkId, { currentVersion: row.version, patch: { imageAssetId: assetId } });
     await client.from("visual_ai_usage").update({ status: "completed" }).eq("id", reservation);
