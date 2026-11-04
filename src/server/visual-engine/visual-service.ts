@@ -9,7 +9,7 @@ import { savePresencePageForActor } from "@/server/presence/presence-page-servic
 import { designKitEditSchema, designKitSchema, visualBriefSchema, visualEditSchema, visualSpecSchema, type DesignKit, type VisualSpec } from "@/features/visual-engine/schema";
 import { buildVisualPrompt, deriveDesignKit, makeDirection } from "@/features/visual-engine/visual-planner";
 import { assessVisual, renderVisualPng } from "./render-art";
-import { directArt, verifyPhotographicSubject } from "./art-director";
+import { directArt, verifyArtworkQuality } from "./art-director";
 
 const bucket = "media-private";
 const memory = globalThis as typeof globalThis & { __sobeVisualKits?: Map<string, DesignKit>; __sobeVisualArt?: Map<string, Record<string, unknown>> };
@@ -161,9 +161,8 @@ export async function approveArtwork(actor: AuthenticatedActor, projectId: strin
   const spec = visualSpecSchema.parse(row.spec_json);
   const issues = assessVisual(spec, designKitSchema.parse(row.kit_json), Boolean(spec.imageAssetId), Boolean(kit.logoAssetId));
   if (issues.length) throw new Error(`Revise a arte antes de aprovar: ${issues.join(" ")}`);
-  const photo = await assetBytes(actor, projectId, spec.imageAssetId);
-  if (photo) await verifyPhotographicSubject(spec.subject, photo);
   const bytes = await renderArtwork(actor, projectId, artworkId);
+  if (actor.persistence === "database") await verifyArtworkQuality(spec.subject, designKitSchema.parse(row.kit_json), bytes);
   const assetId = actor.persistence === "memory" ? null : await saveMedia(actor, projectId, artworkId, bytes, "art");
   const patch = { status: "approved", output_asset_id: assetId, updated_at: new Date().toISOString() };
   if (actor.persistence === "memory") demoArt.set(artworkId, { ...row, ...patch });

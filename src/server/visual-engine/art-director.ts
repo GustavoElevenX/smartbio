@@ -26,13 +26,16 @@ export async function directArt(raw: unknown, kit: DesignKit, business: { name: 
     return { ...spec, imagePrompt: buildVisualPrompt({ kit, spec, businessName: business.name, businessDescription: business.description, offering: spec.subject }) };
   });
 }
-export async function verifyPhotographicSubject(subject: string, image: Buffer) {
-  if (!process.env.OPENAI_API_KEY || !subject) return;
+export async function verifyArtworkQuality(subject: string, kit: DesignKit, image: Buffer) {
+  if (!process.env.OPENAI_API_KEY) return;
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 30000, maxRetries: 0 });
-  const verdictSchema = z.object({ matches: z.boolean(), reason: z.string().max(180) });
-  const result = await client.responses.parse({ model: process.env.OPENAI_VISION_MODEL || process.env.OPENAI_MODEL || "gpt-5.4-mini-2026-03-17", max_output_tokens: 180,
-    input: [{ role: "system", content: "Verifique se a foto representa o produto anunciado, incluindo volume e formato de embalagem quando especificados. Seja estrito: copo, garrafa ou embalagem pequena não correspondem a caixa de suco de 1 litro. Não infira texto ilegível." },
-      { role: "user", content: [{ type: "input_text", text: `Produto anunciado: ${subject}` }, { type: "input_image", image_url: `data:image/png;base64,${image.toString("base64")}`, detail: "low" }] }],
-    text: { format: zodTextFormat(verdictSchema, "product_match") } });
-  if (!result.output_parsed?.matches) throw new Error(`A fotografia não parece corresponder ao produto: ${result.output_parsed?.reason || "revise a embalagem e o volume."}`);
+  const verdictSchema = z.object({ productMatch: z.boolean(), legible: z.boolean(), contrast: z.boolean(), logoSize: z.boolean(), safeMargins: z.boolean(), hierarchy: z.boolean(), alignment: z.boolean(), density: z.boolean(), noBadCrop: z.boolean(), kitCoherence: z.boolean(), reason: z.string().max(300) });
+  const result = await client.responses.parse({ model: process.env.OPENAI_VISION_MODEL || process.env.OPENAI_MODEL || "gpt-5.4-mini-2026-03-17", max_output_tokens: 350,
+    input: [{ role: "system", content: "Você faz controle de qualidade de uma peça publicitária final. Avalie fatos visíveis, não preferências subjetivas. Produto e volume devem corresponder à descrição; se não houver produto especificado, productMatch é true. Considere legibilidade, contraste, logo/assinatura com tamanho legível, margens seguras, hierarquia, alinhamento, densidade, cortes indesejados e coerência de cores. Não exija logo gráfico quando a marca aparece em texto. Seja rigoroso apenas com problemas materiais. Responda no schema." },
+      { role: "user", content: [{ type: "input_text", text: JSON.stringify({ advertisedProduct: subject, designKit: { name: kit.name, primary: kit.primary, secondary: kit.secondary, accent: kit.accent, surface: kit.surface } }) }, { type: "input_image", image_url: `data:image/png;base64,${image.toString("base64")}`, detail: "high" }] }],
+    text: { format: zodTextFormat(verdictSchema, "artwork_quality") } });
+  const verdict = result.output_parsed;
+  if (!verdict) throw new Error("A IA não conseguiu verificar a arte final.");
+  const failed = Object.entries(verdict).filter(([key, value]) => key !== "reason" && value === false).map(([key]) => key);
+  if (failed.length) throw new Error(`Revise a arte antes de aprovar (${failed.join(", ")}): ${verdict.reason}`);
 }

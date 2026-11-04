@@ -146,5 +146,3 @@ do $$ declare t text; begin
     execute format('create policy %I on public.%I for all to authenticated using (public.is_workspace_member(workspace_id) and public.project_workspace(project_id)=workspace_id) with check (public.is_workspace_member(workspace_id) and public.project_workspace(project_id)=workspace_id)',t||'_write',t);
   end loop;
 end $$;
-
-\n

@@ -79,9 +79,3 @@ export function ContentStudio({ projectId }: { projectId: string }) {
     {confirming && post ? <div role="dialog" aria-modal="true" aria-label="Confirmar publicação" className="fixed inset-0 z-50 grid place-items-center bg-[#07172F]/70 p-4"><div className="w-full max-w-lg bg-white p-6 shadow-xl"><h2 className="text-xl font-bold">Confirmar {confirming==="now" ? "publicação" : "agendamento"}</h2><p className="mt-3 text-sm">Conta: <strong>{instagram.displayName || "Instagram conectado"}</strong></p><p className="mt-1 text-sm">Cards: <strong>{post.slides_json.length}</strong> · Versão: <strong>{post.current_version}</strong></p>{confirming==="schedule" ? <p className="mt-1 text-sm">Horário local: <strong>{new Date(when).toLocaleString("pt-BR")}</strong></p> : null}<p className="mt-4 max-h-36 overflow-auto whitespace-pre-wrap bg-slate-50 p-3 text-sm">{post.caption}</p><div className="mt-6 flex justify-end gap-3"><button onClick={()=>setConfirming(null)} className="px-4 py-2 text-sm font-semibold">Voltar</button><button onClick={()=>publish(confirming)} disabled={!!busy} className="bg-[#0054FC] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Confirmar</button></div></div></div> : null}
   </main>;
 }
-
-
-
-
-
-\n
