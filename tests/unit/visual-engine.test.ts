@@ -53,4 +53,22 @@ describe("Motor Visual SOBE", () => {
       if (process.env.RENDER_MIX_SAMPLE === "1") await writeFile(`artifacts/visual-engine/mix-alternative-${i+1}.png`, png);
     }
   });
+  it("planeja segmentos diferentes sem impor embalagem ou nicho ao prompt", () => {
+    for (const subject of ["Consulta contábil para pequenas empresas", "Curso online de desenho", "Reserva de hospedagem", "Coleção de móveis sob medida"]) {
+      const specs = planVisualVariants({ target: "card", subject }, kit, { name: "Marca de teste", description: subject });
+      expect(new Set(specs.map(spec => spec.layout)).size).toBe(3);
+      expect(specs.every(spec => spec.direction?.protagonist === subject)).toBe(true);
+      expect(specs.every(spec => !spec.imagePrompt.includes("one-liter carton"))).toBe(true);
+    }
+  });
+  it("aplica a zona de imagem da direção, além do nome do layout", async () => {
+    const base = planVisualVariants({ target: "card", subject: "Curso online de desenho" }, kit, { name: "Ateliê", description: "Aulas de desenho" })[1];
+    const spec = { ...base, direction: { ...base.direction!, imageZone: "left" as const, textZone: "right" as const } };
+    const red = await sharp({ create: { width: 100, height: 100, channels: 3, background: "#ed1234" } }).png().toBuffer();
+    const png = await renderVisualPng(spec, kit, red);
+    const left = await sharp(png).extract({ left: 100, top: 750, width: 1, height: 1 }).raw().toBuffer();
+    const right = await sharp(png).extract({ left: 980, top: 750, width: 1, height: 1 }).raw().toBuffer();
+    expect(left[0]).toBe(237);
+    expect(right[0]).not.toBe(237);
+  });
 });

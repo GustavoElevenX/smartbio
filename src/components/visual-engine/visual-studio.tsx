@@ -64,7 +64,7 @@ export function VisualStudio({ projectId }: { projectId: string }) {
   async function saveEdit() {
     if (!art || !edit) return;
     await run("edit", async () => {
-      await requestJson(`${base}/${art.id}`, { method: "PATCH", body: JSON.stringify({ currentVersion: art.version, patch: { headline: edit.headline, subheading: edit.subheading, cta: edit.cta, price: edit.price, layout: edit.layout, imageAssetId: edit.imageAssetId } }) });
+      await requestJson(`${base}/${art.id}`, { method: "PATCH", body: JSON.stringify({ currentVersion: art.version, patch: { headline: edit.headline, subheading: edit.subheading, cta: edit.cta, price: edit.price, layout: edit.layout, imageAssetId: edit.imageAssetId, direction: edit.direction } }) });
       await load(); setNotice("Alterações salvas. A prévia e o PNG foram atualizados.");
     });
   }
@@ -74,7 +74,7 @@ export function VisualStudio({ projectId }: { projectId: string }) {
   }
   async function aiImage() {
     if (!art) return;
-    await run("image", async () => { await requestJson(`${base}/${art.id}/image`, { method: "POST" }); await load(); setNotice("Imagem criada por IA. Revise a arte antes de aprovar."); });
+    await run("image", async () => { await requestJson(`${base}/${art.id}/image`, { method: "POST" }); await load(); setNotice("Visual criado por IA. Revise a arte antes de aprovar."); });
   }
   async function apply() {
     if (!art || !pageId) return;
@@ -121,15 +121,16 @@ export function VisualStudio({ projectId }: { projectId: string }) {
         {art && edit && <section className="grid gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:grid-cols-[minmax(0,1fr)_310px]">
           <div><div className="flex items-center justify-between"><h2 className="text-lg font-bold text-slate-950">Alternativa {art.spec_json.variant + 1}</h2><span className="text-xs text-slate-500">{targets.find(item => item.id === art.spec_json.target)?.label}</span></div><div className="mt-4 flex max-h-[670px] justify-center overflow-hidden rounded-xl bg-slate-100"><img src={preview} alt="Prévia atual da arte" className="max-h-[670px] max-w-full object-contain" /></div><a href={`${base}/${art.id}/render?download=1`} className={`${buttonClass} mt-3 w-full border border-slate-200 bg-white text-slate-800 hover:bg-slate-50`}><Download size={16} /> Baixar PNG</a><p className="mt-2 text-center text-xs text-slate-500">A prévia usa o mesmo arquivo PNG da exportação.</p></div>
           <div className="space-y-3"><h3 className="font-bold text-slate-900">Editar esta arte</h3>
-            {edit.direction && <div className="border-y border-slate-200 py-3 text-xs text-slate-700"><p className="font-bold text-slate-900">{edit.direction.creativeConcept}</p><p className="mt-1">{edit.direction.composition}</p><p className="mt-1 text-slate-500">Produto: {edit.direction.protagonist}</p></div>}
+            {edit.direction && <div className="border-y border-slate-200 py-3 text-xs text-slate-700"><p className="font-bold text-slate-900">{edit.direction.creativeConcept}</p><p className="mt-1">{edit.direction.composition}</p><p className="mt-1 text-slate-500">Assunto: {edit.direction.protagonist} · {edit.directionSource === "ai" ? "Direção por IA" : "Direção local"}</p></div>}
+            {edit.direction && <label className="block text-xs font-semibold text-slate-700">Ajuste visual para a próxima geração<textarea className={`${inputClass} mt-1`} rows={2} maxLength={400} placeholder="Ex.: mais espaço para o título; assunto inteiro no enquadramento" value={edit.direction.revisionNote || ""} onChange={e => setEdit({ ...edit, direction: { ...edit.direction!, revisionNote: e.target.value } })} /></label>}
             <label className="block text-xs font-semibold text-slate-700">Título<input className={`${inputClass} mt-1`} value={edit.headline} maxLength={120} onChange={e => setEdit({ ...edit, headline: e.target.value })} /></label>
             <label className="block text-xs font-semibold text-slate-700">Descrição<textarea className={`${inputClass} mt-1`} rows={3} value={edit.subheading} maxLength={240} onChange={e => setEdit({ ...edit, subheading: e.target.value })} /></label>
             <div className="grid grid-cols-2 gap-2"><label className="block text-xs font-semibold text-slate-700">Botão<input className={`${inputClass} mt-1`} value={edit.cta} maxLength={70} onChange={e => setEdit({ ...edit, cta: e.target.value })} /></label><label className="block text-xs font-semibold text-slate-700">Preço<input className={`${inputClass} mt-1`} value={edit.price} maxLength={50} onChange={e => setEdit({ ...edit, price: e.target.value })} /></label></div>
             <label className="block text-xs font-semibold text-slate-700">Composição<select className={`${inputClass} mt-1`} value={edit.layout} onChange={e => setEdit({ ...edit, layout: e.target.value as VisualSpec["layout"] })}>{layouts.map(layout => <option key={layout} value={layout}>{layout}</option>)}</select></label>
             <label className="block text-xs font-semibold text-slate-700">Imagem de apoio<select className={`${inputClass} mt-1`} value={edit.imageAssetId || ""} onChange={e => setEdit({ ...edit, imageAssetId: e.target.value || null })}><option value="">Sem imagem</option>{data.media.map(item => <option key={item.id} value={item.id}>{item.originalName}</option>)}</select></label>
             <button disabled={Boolean(busy)} onClick={saveEdit} className={`${buttonClass} w-full bg-slate-900 text-white hover:bg-slate-800`}><RefreshCcw size={16} /> Salvar e regenerar</button>
-            <button disabled={Boolean(busy)} onClick={aiImage} className={`${buttonClass} w-full border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100`}><ImagePlus size={16} /> Gerar imagem com IA</button>
-            <p className="text-xs text-slate-500">A IA cria apenas a foto de apoio. Textos e marca são renderizados pela SOBE. Há limite diário de uso.</p>
+            <button disabled={Boolean(busy)} onClick={aiImage} className={`${buttonClass} w-full border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100`}><ImagePlus size={16} /> Gerar visual com IA</button>
+            <p className="text-xs text-slate-500">A IA cria o visual de apoio conforme a direção escolhida. Textos e marca continuam editáveis na SOBE. Há limite diário de uso.</p>
             <button disabled={Boolean(busy)} onClick={approve} className={`${buttonClass} w-full bg-blue-600 text-white hover:bg-blue-700`}><Sparkles size={16} /> Aprovar esta arte</button>
             {art.status === "approved" && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3"><p className="text-xs font-bold text-emerald-900">Arte aprovada</p><label className="mt-3 block text-xs font-semibold text-emerald-950">Aplicar no destaque da página<select className={`${inputClass} mt-1`} value={pageId} onChange={e => setPageId(e.target.value)}><option value="">Selecione a página</option>{data.pages.filter(page => page.hasHero).map(page => <option key={page.id} value={page.id}>{page.name}</option>)}</select></label><button disabled={Boolean(busy) || !pageId} onClick={apply} className={`${buttonClass} mt-2 w-full bg-emerald-700 text-white hover:bg-emerald-800`}>Aplicar no rascunho</button></div>}
           </div>

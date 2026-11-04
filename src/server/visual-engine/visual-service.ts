@@ -7,7 +7,7 @@ import { projectContext, parseCloudflareImage } from "@/server/content-studio/st
 import { loadProjectForActor } from "@/server/projects/load-project-for-actor";
 import { savePresencePageForActor } from "@/server/presence/presence-page-service";
 import { designKitEditSchema, designKitSchema, visualBriefSchema, visualEditSchema, visualSpecSchema, type DesignKit, type VisualSpec } from "@/features/visual-engine/schema";
-import { buildVisualPrompt, deriveDesignKit, makeDirection } from "@/features/visual-engine/visual-planner";
+import { buildVisualPrompt, deriveDesignKit, makeDirection, planVisualVariants } from "@/features/visual-engine/visual-planner";
 import { assessVisual, renderVisualPng } from "./render-art";
 import { directArt, verifyArtworkQuality } from "./art-director";
 
@@ -96,7 +96,9 @@ export async function createArtworks(actor: AuthenticatedActor, projectId: strin
   const offering = business.context?.offeringContexts.find(item => item.id === brief.offeringId && item.status === "confirmed")?.label;
   const referenceRow = kit.referenceArtworkId ? await getArtwork(actor, projectId, kit.referenceArtworkId).catch(() => null) : null;
   const reference = referenceRow?.status === "approved" ? visualSpecSchema.parse(referenceRow.spec_json) : undefined;
-  const specs = await directArt(brief, kit, { name: business.name, description: business.description, offering }, reference);
+  const confirmedFacts = business.context?.offeringContexts.filter(item => item.status === "confirmed").map(item => item.label).slice(0, 8) || [];
+  const input = { name: business.name, description: business.description, offering, confirmedFacts };
+  const specs = actor.persistence === "memory" ? planVisualVariants(brief, kit, input, reference) : await directArt(brief, kit, input, reference);
   const groupId = crypto.randomUUID();
   const now = new Date().toISOString();
   const rows = specs.map(spec => ({ id: crypto.randomUUID(), workspace_id: actor.workspaceId, project_id: projectId, group_id: groupId, spec_json: spec, kit_json: kit, version: 1, status: "draft", output_asset_id: null, created_by: actor.userId, created_at: now, updated_at: now }));
@@ -115,7 +117,7 @@ export async function editArtwork(actor: AuthenticatedActor, projectId: string, 
   const draft = visualSpecSchema.parse({ ...row.spec_json as VisualSpec, ...edit.patch });
   const kit = designKitSchema.parse(row.kit_json);
   const business = await projectContext(actor, projectId);
-  const directed = edit.patch.layout && edit.patch.layout !== (row.spec_json as VisualSpec).layout ? { ...draft, direction: makeDirection(draft.layout, draft.subject || business.name, kit) } : draft;
+  const directed = edit.patch.layout && edit.patch.layout !== (row.spec_json as VisualSpec).layout ? { ...draft, direction: { ...makeDirection(draft.layout, draft.subject || business.name, kit), revisionNote: draft.direction?.revisionNote } } : draft;
   const spec = { ...directed, imagePrompt: buildVisualPrompt({ kit, spec: directed, businessName: business.name, businessDescription: business.description, offering: directed.subject }) };
   const patch = { spec_json: spec, version: edit.currentVersion + 1, status: "draft", output_asset_id: null, updated_at: new Date().toISOString() };
   if (actor.persistence === "memory") { const updated = { ...row, ...patch }; demoArt.set(artworkId, updated); return updated; }
@@ -190,7 +192,7 @@ export async function generateArtworkImage(actor: AuthenticatedActor, projectId:
     const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(process.env.CLOUDFLARE_ACCOUNT_ID)}/ai/run/@cf/black-forest-labs/flux-1-schnell`, { method: "POST", headers: { Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`, "Content-Type": "application/json" }, body: JSON.stringify({ prompt, steps: 4 }), signal: AbortSignal.timeout(30000) });
     if (!response.ok) throw new Error(response.status === 429 ? "A cota da Cloudflare acabou. Tente novamente amanhã." : `Cloudflare retornou ${response.status}.`);
     const source = parseCloudflareImage(await response.json());
-    const png = await sharp(source, { limitInputPixels: 40_000_000 }).rotate().resize(1200, 1200, { fit: "cover" }).png().toBuffer();
+    const png = await sharp(source, { limitInputPixels: 40_000_000 }).rotate().png().toBuffer();
     const assetId = await saveMedia(actor, projectId, artworkId, png, "ai");
     const updated = await editArtwork(actor, projectId, artworkId, { currentVersion: row.version, patch: { imageAssetId: assetId } });
     await client.from("visual_ai_usage").update({ status: "completed" }).eq("id", reservation);

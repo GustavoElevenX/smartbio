@@ -34,6 +34,11 @@ export const artDirectionSchema = z.object({
   brandPlacement: z.string().max(160), restrictions: z.array(z.string().max(180)).max(12),
   imageZone: z.enum(["full", "right", "left", "center", "none"]), textZone: z.enum(["top", "bottom", "left", "right", "center"]),
   imageFocalPoint: z.enum(["left", "center", "right"]), treatment: z.enum(["natural", "dark_overlay", "light_overlay", "cutout"]),
+  motif: z.enum(["none", "rule", "frame", "disc"]).optional(),
+  typeScale: z.enum(["restrained", "balanced", "expressive"]).optional(),
+  imageScale: z.enum(["detail", "balanced", "dominant"]).optional(),
+  medium: z.enum(["photography", "illustration", "graphic", "mixed"]).optional(),
+  revisionNote: z.string().trim().max(400).optional(),
 });
 export const visualSpecSchema = z.object({
   target: visualTargetSchema,
@@ -48,8 +53,9 @@ export const visualSpecSchema = z.object({
   kitVersion: z.number().int().positive(),
   variant: z.number().int().min(0).max(2),
   direction: artDirectionSchema.optional(),
+  directionSource: z.enum(["ai", "rules"]).optional(),
 });
-export const visualEditSchema = z.object({ currentVersion: z.number().int().positive(), patch: visualSpecSchema.pick({ headline: true, subheading: true, cta: true, price: true, layout: true, imageAssetId: true }).partial() });
+export const visualEditSchema = z.object({ currentVersion: z.number().int().positive(), patch: visualSpecSchema.pick({ headline: true, subheading: true, cta: true, price: true, layout: true, imageAssetId: true, direction: true }).partial() });
 export type DesignKit = z.infer<typeof designKitSchema>;
 export type ArtDirection = z.infer<typeof artDirectionSchema>;
 export type VisualSpec = z.infer<typeof visualSpecSchema>;

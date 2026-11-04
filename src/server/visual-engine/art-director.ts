@@ -6,23 +6,23 @@ import { artDirectionSchema, visualBriefSchema, visualLayoutSchema, type DesignK
 import { buildVisualPrompt, makeDirection, planVisualVariants } from "@/features/visual-engine/visual-planner";
 
 const directionsSchema = z.object({ proposals: z.array(z.object({ layout: visualLayoutSchema, direction: artDirectionSchema })).length(3) });
-export async function directArt(raw: unknown, kit: DesignKit, business: { name: string; description: string; offering?: string; defaultCta?: string }, reference?: VisualSpec) {
+export async function directArt(raw: unknown, kit: DesignKit, business: { name: string; description: string; offering?: string; defaultCta?: string; confirmedFacts?: string[] }, reference?: VisualSpec) {
   const brief = visualBriefSchema.parse(raw);
   const base = planVisualVariants(brief, kit, business, reference);
   if (!process.env.OPENAI_API_KEY) return base;
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 45000, maxRetries: 0 });
   const result = await client.responses.parse({ model: process.env.OPENAI_MODEL || "gpt-5.4-mini-2026-03-17", max_output_tokens: 4000,
-    input: [{ role: "system", content: "Você é diretor de arte publicitário. Crie exatamente três propostas visuais substancialmente diferentes. Selecione três estratégias distintas entre full_bleed, editorial, product_hero, minimal_premium, promotional, lifestyle. O Design Kit restringe a linguagem cromática e tipográfica. Produto, embalagem, volume e alegações devem corresponder estritamente aos fatos. Não invente preços, benefícios ou características. Não inclua texto rasterizado na fotografia. Descreva posicionamento, contraste, áreas seguras e tratamento. Responda em português brasileiro no schema." },
+    input: [{ role: "system", content: "Você é diretor de arte publicitário para qualquer tipo de negócio. Crie exatamente três propostas visuais substancialmente diferentes: uma imersiva, uma tipográfica e uma centrada no assunto, escolhendo estratégias distintas entre full_bleed, editorial, product_hero, minimal_premium, promotional, lifestyle. Não presuma que o assunto é um produto físico: serviços, experiências e causas precisam de representação própria. O Design Kit é a identidade contínua, não um template. Escolha imageZone, textZone, imageFocalPoint, treatment, motif, typeScale, imageScale e medium para cada proposta; esses campos controlam o renderizador e o gerador de imagem. Fotografia, ilustração, composição gráfica ou mistura são possibilidades conforme o assunto. O visual deve acrescentar uma ideia, não decorar. Se houver formato, volume ou embalagem confirmados, preserve-os. Não invente preços, benefícios, características nem provas. Não inclua texto rasterizado no visual gerado. Margens seguras, hierarquia e legibilidade são obrigatórias. Responda em português brasileiro no schema." },
       { role: "user", content: JSON.stringify({ brief, kit, business, reference: reference?.direction, fallback: base.map(x => x.direction) }) }],
-    text: { format: zodTextFormat(directionsSchema, "art_directions") } });
-  const proposals = result.output_parsed?.proposals;
+    text: { format: zodTextFormat(directionsSchema, "art_directions") } }).catch(() => null);
+  const proposals = result?.output_parsed?.proposals;
   if (!proposals || new Set(proposals.map(x => x.layout)).size !== 3) return base;
   return proposals.map((proposal, variant) => {
     const layout = proposal.layout;
     const direction = { ...makeDirection(layout, base[variant].subject || business.name, kit), ...proposal.direction,
       protagonist: base[variant].subject || business.name,
-      restrictions: [...new Set([...proposal.direction.restrictions, "Não inventar preço, benefício ou característica", "Não alterar volume ou formato comercial do produto", "Não cortar o produto"])].slice(0, 12) };
-    const spec = { ...base[variant], layout, direction, variant };
+      restrictions: [...new Set([...proposal.direction.restrictions, "Não inventar preço, benefício ou característica", "Preservar formato ou volume quando confirmados", "Não cortar o assunto principal"])].slice(0, 12) };
+    const spec = { ...base[variant], layout, direction, variant, directionSource: "ai" as const };
     return { ...spec, imagePrompt: buildVisualPrompt({ kit, spec, businessName: business.name, businessDescription: business.description, offering: spec.subject }) };
   });
 }
