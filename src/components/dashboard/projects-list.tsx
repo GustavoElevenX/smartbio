@@ -10,14 +10,30 @@ import {
   Palette,
   Pencil,
   Plus,
+  Settings2,
+  Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { projectRepository } from "@/lib/repositories/project-repository";
 import type { Project } from "@/types";
 import { publicProjectUrl } from "@/lib/public-url";
 
 export function ProjectsList() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   useEffect(() => { void projectRepository.getProjects().then(setProjects); }, []);
   async function duplicate(project: Project) {
     const copy = {
@@ -32,6 +48,20 @@ export function ProjectsList() {
     };
     await projectRepository.saveProject(copy);
     setProjects(await projectRepository.getProjects());
+  }
+  async function removeProject() {
+    if (!projectToDelete || deleting) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      await projectRepository.deleteProject(projectToDelete.id);
+      setProjects((current) => current.filter((project) => project.id !== projectToDelete.id));
+      setProjectToDelete(null);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Não foi possível excluir o projeto.");
+    } finally {
+      setDeleting(false);
+    }
   }
   return (
     <div className="animate-enter">
@@ -79,12 +109,37 @@ export function ProjectsList() {
                 >
                   {project.name.slice(0, 2).toUpperCase()}
                 </span>
-                <button
-                  className="focus-ring grid size-9 place-items-center rounded-xl bg-white/70 text-[#4e4e56]"
-                  aria-label="Mais opções"
-                >
-                  <MoreHorizontal size={18} />
-                </button>
+                <Popover open={openMenuId === project.id} onOpenChange={(open) => setOpenMenuId(open ? project.id : null)}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="focus-ring grid size-9 place-items-center rounded-xl bg-white/70 text-[#4e4e56]"
+                      aria-label={`Mais opções para ${project.name}`}
+                    >
+                      <MoreHorizontal size={18} />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-52 rounded-xl border-[#e4e3ea] p-1.5">
+                    <Link
+                      href={`/app/projects/${project.id}/settings`}
+                      onClick={() => setOpenMenuId(null)}
+                      className="focus-ring flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-[#4e4e56] hover:bg-[#f1f0f5]"
+                    >
+                      <Settings2 size={16} /> Configurações
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpenMenuId(null);
+                        setDeleteError("");
+                        setProjectToDelete(project);
+                      }}
+                      className="focus-ring flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-semibold text-[#b72e2e] hover:bg-[#fff0f0]"
+                    >
+                      <Trash2 size={16} /> Excluir projeto
+                    </button>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="relative mt-7">
                 <h2 className="text-xl font-extrabold tracking-[-.035em]">
@@ -160,6 +215,28 @@ export function ProjectsList() {
           </article>
         ))}
       </div>
+      <Dialog open={Boolean(projectToDelete)} onOpenChange={(open) => {
+        if (!open && !deleting) {
+          setProjectToDelete(null);
+          setDeleteError("");
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir projeto?</DialogTitle>
+            <DialogDescription>
+              {projectToDelete ? `“${projectToDelete.name}” será excluído permanentemente, incluindo sua página pública.` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError ? <p role="alert" className="text-sm font-semibold text-[#b72e2e]">{deleteError}</p> : null}
+          <DialogFooter className="gap-2">
+            <Button variant="secondary" disabled={deleting} onClick={() => setProjectToDelete(null)}>Cancelar</Button>
+            <Button variant="danger" disabled={deleting} onClick={() => void removeProject()}>
+              {deleting ? "Excluindo..." : "Excluir projeto"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
