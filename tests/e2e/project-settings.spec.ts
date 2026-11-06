@@ -2,6 +2,29 @@ import { expect, test } from "@playwright/test";
 import path from "node:path";
 import { findDemoProject } from "../../src/data/demo-projects";
 
+test("modo simples e avançado compartilham o rascunho sem publicar", async ({ page, request }) => {
+  const project = structuredClone(findDemoProject("demo-casa-sucos")!);
+  await request.put(`/api/projects/${project.id}`, { data: project });
+  await page.goto(`/app/projects/${project.id}/settings`);
+
+  const draftName = `${project.name} edição`;
+  await page.getByLabel("Nome do negócio").fill(draftName);
+  await expect(page.getByText("Há alterações não salvas.", { exact: false })).toBeVisible();
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await page.getByRole("link", { name: /Ajustar o que os visitantes procuram/ }).click();
+  await expect(page).toHaveURL(new RegExp(`/settings$`));
+  await page.getByRole("button", { name: "Avançado" }).click();
+  await expect(page.getByLabel("Nome", { exact: true })).toHaveValue(draftName);
+  await page.getByRole("button", { name: "Simples" }).click();
+  await expect(page.getByLabel("Nome do negócio")).toHaveValue(draftName);
+  await page.getByRole("button", { name: "Salvar alterações" }).click();
+  await expect(page.getByText("Alterações salvas", { exact: true })).toBeVisible({ timeout: 15_000 });
+  await page.reload();
+  await expect(page.getByLabel("Nome do negócio")).toHaveValue(draftName);
+
+  await request.put(`/api/projects/${project.id}`, { data: project });
+});
+
 test("cadastra vários WhatsApps, valida duplicados e preserva o principal", async ({ page, request }, testInfo) => {
   const browserErrors: string[] = [];
   page.on("console", (message) => { if (message.type() === "error") browserErrors.push(message.text()); });
@@ -11,6 +34,9 @@ test("cadastra vários WhatsApps, valida duplicados e preserva o principal", asy
   await page.goto(`/app/projects/${project.id}/settings`);
 
   await expect(page).toHaveTitle(/Configurações do negócio/);
+  await expect(page.getByRole("button", { name: "Simples" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("heading", { name: "Meu negócio" })).toBeVisible();
+  await page.getByRole("button", { name: "Avançado" }).click();
   await expect(page.getByRole("group", { name: "Números de WhatsApp" })).toBeVisible();
   await expect(page.locator("[data-nextjs-dialog-overlay]")).toHaveCount(0);
   await expect(page.getByText("Principal", { exact: true })).toBeVisible();
@@ -31,6 +57,7 @@ test("cadastra vários WhatsApps, valida duplicados e preserva o principal", asy
   await expect(page.getByText("Alterações salvas", { exact: true })).toBeVisible();
 
   await page.reload();
+  await page.getByRole("button", { name: "Avançado" }).click();
   await expect(page.getByLabel("Nome do atendimento")).toHaveCount(2);
   await expect(page.getByLabel("Nome do atendimento").nth(1)).toHaveValue("Equipe de vendas");
   await expect(page.getByLabel("Número", { exact: true }).nth(1)).toHaveValue("55 21 98888-0000");

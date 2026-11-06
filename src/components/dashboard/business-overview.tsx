@@ -1,253 +1,95 @@
 "use client";
 
 import Link from "next/link";
-import {
-  ArrowRight,
-  CheckCircle2,
-  Eye,
-  Globe2,
-  MousePointerClick,
-  Sparkles,
-  Target,
-  Users,
-  Zap,
-} from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ArrowRight, Check, Copy, ExternalLink } from "lucide-react";
+import { useEffect, useState } from "react";
 import { projectRepository } from "@/lib/repositories/project-repository";
-import { commercialRepository } from "@/lib/repositories/commercial-repository";
 import { localStore } from "@/lib/local-store";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
-import type { AnalyticsEvent, CommercialOpportunity, Project } from "@/types";
+import { features } from "@/lib/constants";
+import type { Project } from "@/types";
 
 export function BusinessOverview({ projectId }: { projectId: string }) {
   const [project, setProject] = useState<Project | null>();
-  const [events, setEvents] = useState<AnalyticsEvent[]>([]);
-  const [opportunities, setOpportunities] = useState<CommercialOpportunity[]>(
-    [],
-  );
-  const [remoteStats, setRemoteStats] = useState<{
-    visits: number;
-    intentions: number;
-    opportunities: number;
-    conversions: number;
-  }>();
-  const [activationStats, setActivationStats] = useState({ active: 0, scheduled: 0 });
+  const [opportunityCount, setOpportunityCount] = useState<number>();
+  const [campaigns, setCampaigns] = useState({ active: 0, scheduled: 0 });
+  const [copied, setCopied] = useState(false);
+
   useEffect(() => {
-    void projectRepository
-      .getProject(projectId)
-      .then(async (found) => {
-        setProject(found || null);
-        if (!found) return;
-        void fetch(`/api/projects/${found.id}/activations`).then(async (response) => { if (!response.ok) return; const payload = await response.json() as { data?: { activations?: Array<{ status: string }> } }; const activations = payload.data?.activations || []; setActivationStats({ active: activations.filter((item) => item.status === "active").length, scheduled: activations.filter((item) => item.status === "scheduled").length }); }).catch(() => undefined);
-        if (isSupabaseConfigured()) {
-          const response = await fetch(
-            `/api/projects/${found.id}/analytics/overview?from=${encodeURIComponent(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())}`,
-          );
-          const payload = (await response.json()) as {
-            data?: {
-              sessions: number;
-              opportunities: number;
-              conversions: number;
-              funnel?: Array<{ key: string; sessions: number }>;
-            };
-          };
-          if (payload.data)
-            setRemoteStats({
-              visits: payload.data.sessions,
-              intentions:
-                payload.data.funnel?.find((stage) => stage.key === "intention")
-                  ?.sessions || 0,
-              opportunities: payload.data.opportunities,
-              conversions: payload.data.conversions,
-            });
-          return;
-        }
-        setEvents(await commercialRepository.getEvents(found.id));
-        setOpportunities(localStore.getOpportunities(found.id));
-      })
-      .catch(() => setProject(null));
+    void projectRepository.getProject(projectId).then(async (found) => {
+      setProject(found || null);
+      if (!found) return;
+      if (isSupabaseConfigured()) {
+        void fetch(`/api/projects/${found.id}/analytics/overview?from=${encodeURIComponent(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())}`)
+          .then((response) => response.json())
+          .then((payload: { data?: { opportunities?: number } }) => setOpportunityCount(payload.data?.opportunities || 0))
+          .catch(() => undefined);
+      } else {
+        setOpportunityCount(localStore.getOpportunities(found.id).length);
+      }
+      if (features.activations) void fetch(`/api/projects/${found.id}/activations`)
+        .then((response) => response.ok ? response.json() : null)
+        .then((payload: { data?: { activations?: Array<{ status: string }> } } | null) => {
+          const items = payload?.data?.activations || [];
+          setCampaigns({ active: items.filter((item) => item.status === "active").length, scheduled: items.filter((item) => item.status === "scheduled").length });
+        }).catch(() => undefined);
+    }).catch(() => setProject(null));
   }, [projectId]);
-  const localStats = useMemo(
-    () => ({
-      visits: new Set(
-        events
-          .filter((event) =>
-            ["page_view", "presence_page_viewed"].includes(event.eventName),
-          )
-          .map((event) => event.sessionId),
-      ).size,
-      intentions: new Set(
-        events
-          .filter((event) =>
-            ["conversion_goal_selected", "conversion_goal_resolved"].includes(
-              event.eventName,
-            ),
-          )
-          .map((event) => event.sessionId),
-      ).size,
-      opportunities: opportunities.length,
-      conversions: opportunities.filter((item) => item.status === "converted")
-        .length,
-    }),
-    [events, opportunities],
-  );
-  const stats = remoteStats || localStats;
-  if (project === undefined)
-    return <div className="h-96 animate-pulse rounded-[24px] bg-white" />;
-  if (!project)
-    return (
-      <>
-      <div className="rounded-[24px] bg-white p-10 text-center">
-        Negócio não encontrado.
+
+  if (project === undefined) return <div className="h-72 animate-pulse rounded-2xl bg-white" aria-label="Carregando início do negócio" />;
+  if (!project) return <p className="rounded-2xl bg-white p-8 text-sm text-[#526171]">Negócio não encontrado.</p>;
+
+  const base = `/app/projects/${project.id}`;
+  const publicPath = `/${encodeURIComponent(project.slug)}`;
+  const published = project.status === "published";
+  const nextAction = !project.description.trim()
+    ? { label: "Conte sobre seu negócio", href: `${base}/settings` }
+    : !project.phone && !(project.commercialConfig?.routingDestinations || []).some((item) => item.type === "whatsapp" && item.value)
+      ? { label: "Configure o atendimento", href: `${base}/settings` }
+      : !published
+        ? { label: "Revise e publique", href: `${base}/launch` }
+        : { label: "Veja as oportunidades", href: `${base}/opportunities` };
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(new URL(publicPath, window.location.origin).toString());
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return <div className="mx-auto max-w-5xl animate-enter">
+    <header className="border-b border-[#dfe6ee] pb-7">
+      <p className="text-sm font-semibold text-[#526171]">{project.name}</p>
+      <h1 className="mt-2 text-3xl font-extrabold tracking-[-.035em] text-[#07172f]">Início</h1>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-[#526171]">Acompanhe sua SOBE e o próximo passo para receber contatos úteis.</p>
+    </header>
+    <section className="mt-7 grid gap-6 rounded-2xl bg-[#07172f] p-6 text-white sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center" aria-labelledby="publication-title">
+      <div>
+        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${published ? "bg-[#dbf8ed] text-[#086b4d]" : "bg-[#fff4d8] text-[#795300]"}`}>{published ? "Publicada" : project.status === "archived" ? "Arquivada" : "Rascunho"}</span>
+        <h2 id="publication-title" className="mt-4 text-xl font-bold">Sua SOBE {published ? "está no ar" : "está em preparação"}</h2>
+        <p className="mt-2 break-all text-sm text-[#d5e0ee]">{publicPath}</p>
       </div>
-      {/*
-      <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_1.15fr]">
-        <div className="rounded-[24px] border border-[#e4e2e9] bg-white p-6">
-          <Zap className="text-[#0054fc]" size={20} />
-          <h2 className="mt-5 text-xl font-black">Campanhas</h2>
-          <p className="mt-2 text-sm text-[#74717d]">{activationStats.active} ativas · {activationStats.scheduled} agendadas</p>
-          <p className="mt-5 text-sm leading-6 text-[#686570]">Faça a página acompanhar promoções, lançamentos, agenda e o que precisa vender agora.</p>
-          <Link href={`/app/projects/${project.id}/activations`} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#dedbe8] px-4 text-sm font-bold text-[#0054fc]">Ver campanhas <ArrowRight size={15}/></Link>
-        </div>
-        <div className="rounded-[24px] bg-[#1d1b26] p-6 text-white">
-          <h2 className="text-xl font-black">O que você quer melhorar agora?</h2>
-          <p className="mt-2 text-sm leading-6 text-white/60">Transforme o momento do negócio em um rascunho editável. A IA não publica nada sozinha.</p>
-          <Link href={`/app/projects/${project.id}/activations/new`} className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-xl bg-white px-5 text-sm font-bold text-[#201d2a]">Criar campanha <ArrowRight size={16}/></Link>
-        </div>
-      </section>
-      */}
-      </>
-    );
-  const pages = project.presence?.pages || [];
-  return (
-    <div className="animate-enter">
-      <header className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-        <div>
-          <p className="text-sm font-bold text-[#0054fc]">{project.name}</p>
-          <h1 className="mt-2 max-w-3xl text-3xl font-black tracking-[-.045em] sm:text-4xl">
-            Sua Sobe está transformando atenção em oportunidades?
-          </h1>
-          <p className="mt-3 text-sm text-[#74717d]">
-            Acompanhe o caminho completo — da visita à conversão confirmada.
-          </p>
-        </div>
-        <Link
-          href={`/app/projects/${project.id}/editor`}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0054fc] px-4 text-sm font-bold text-white"
-        >
-          <Globe2 size={17} />
-          Editar link da bio
-        </Link>
-      </header>
-      <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          ["Visitas", stats.visits, Eye],
-          ["Intenções", stats.intentions, MousePointerClick],
-          ["Oportunidades", stats.opportunities, Users],
-          ["Conversões", stats.conversions, CheckCircle2],
-        ].map(([label, value, Icon]) => {
-          const CardIcon = Icon as typeof Eye;
-          return (
-            <div
-              key={String(label)}
-              className="rounded-[20px] border border-[#e4e2e9] bg-white p-5"
-            >
-              <CardIcon size={18} className="text-[#0054fc]" />
-              <strong className="mt-7 block text-3xl">{Number(value)}</strong>
-              <span className="mt-1 text-sm font-bold text-[#6f6b76]">
-                {String(label)}
-              </span>
-            </div>
-          );
-        })}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => void copyLink()} className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-bold text-[#07172f] hover:bg-[#eaf3ff]">{copied ? <Check size={16} /> : <Copy size={16} />}{copied ? "Link copiado" : "Copiar link"}</button>
+        <Link href={`${publicPath}/preview`} target="_blank" rel="noopener noreferrer" className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#8fa1b8] px-4 text-sm font-bold text-white hover:bg-[#0b2446]">Testar minha SOBE <ExternalLink size={15} aria-hidden="true" /></Link>
       </div>
-      <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_1.15fr]">
-        <div className="rounded-[24px] border border-[#e4e2e9] bg-white p-6">
-          <Zap className="text-[#0054fc]" size={20} />
-          <h2 className="mt-5 text-xl font-black">Campanhas</h2>
-          <p className="mt-2 text-sm text-[#74717d]">{activationStats.active} ativas · {activationStats.scheduled} agendadas</p>
-          <p className="mt-5 text-sm leading-6 text-[#686570]">Faça a página acompanhar promoções, lançamentos, agenda e o que precisa vender agora.</p>
-          <Link href={`/app/projects/${project.id}/activations`} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#dedbe8] px-4 text-sm font-bold text-[#0054fc]">Ver campanhas <ArrowRight size={15} /></Link>
-        </div>
-        <div className="rounded-[24px] bg-[#1d1b26] p-6 text-white">
-          <h2 className="text-xl font-black">O que você quer melhorar agora?</h2>
-          <p className="mt-2 text-sm leading-6 text-white/60">Transforme o momento do negócio em um rascunho editável. A IA não publica nada sozinha.</p>
-          <Link href={`/app/projects/${project.id}/activations/new`} className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-xl bg-white px-5 text-sm font-bold text-[#201d2a]">Criar campanha <ArrowRight size={16} /></Link>
-        </div>
-      </section>
-      {pages.length ? (
-        <section className="mt-6 rounded-[24px] border border-[#e4e2e9] bg-white p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-black">Sua Sobe</h2>
-              <p className="mt-1 text-xs text-[#77737f]">
-                Dados reais do projeto atual.
-              </p>
-            </div>
-            <Link
-              href={`/app/projects/${project.id}/analytics`}
-              className="text-xs font-black text-[#0054fc]"
-            >
-              Ver resultados <ArrowRight className="inline" size={14} />
-            </Link>
-          </div>
-          <div className="mt-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            {[
-              [
-                project.status === "published"
-                  ? "Página publicada"
-                  : "Página em rascunho",
-                Globe2,
-              ],
-              [`${pages.length} página${pages.length === 1 ? "" : "s"}`, Eye],
-              [`${project.conversionGoals?.length || 0} ações disponíveis`, Target],
-              [
-                `${project.entryPoints?.length || 0} links/origens ativos`,
-                MousePointerClick,
-              ],
-              [`${stats.opportunities} oportunidades este mês`, Users],
-            ].map(([text, Icon]) => {
-              const ItemIcon = Icon as typeof Globe2;
-              return (
-                <div
-                  key={String(text)}
-                  className="rounded-2xl bg-[#f6f5f8] p-4"
-                >
-                  <ItemIcon size={16} className="text-[#0054fc]" />
-                  <strong className="mt-5 block text-sm">{String(text)}</strong>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      ) : (
-        <section className="mt-6 rounded-[26px] border border-dashed border-[#cbc7d5] bg-white p-8 sm:p-10">
-          <Sparkles className="text-[#0054fc]" />
-          <h2 className="mt-5 text-2xl font-black">
-            Sua presença ainda não está no ar.
-          </h2>
-          <p className="mt-3 text-sm leading-7 text-[#716d78]">
-            A Sobe pode criar sua primeira versão usando:
-          </p>
-          <ul className="mt-4 grid gap-2 text-sm font-bold text-[#514d58] sm:grid-cols-2">
-            {[
-              "sua descrição",
-              "sua logo",
-              "sua página atual",
-              "seus PDFs",
-              "seus produtos e serviços",
-            ].map((item) => (
-              <li key={item}>• {item}</li>
-            ))}
-          </ul>
-          <Link
-            href="/app/onboarding/ai"
-            className="mt-7 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0054fc] px-4 text-sm font-bold text-white"
-          >
-            Criar com IA <ArrowRight size={16} />
-          </Link>
-        </section>
-      )}
+    </section>
+    <section className="mt-7 grid gap-5 border-y border-[#dfe6ee] py-5 sm:grid-cols-3" aria-label="Resumo do negócio">
+      <div><strong className="block text-2xl text-[#07172f]">{opportunityCount ?? "—"}</strong><span className="text-sm text-[#526171]">oportunidades neste mês</span></div>
+      {features.activations ? <><div><strong className="block text-2xl text-[#07172f]">{campaigns.active}</strong><span className="text-sm text-[#526171]">campanhas ativas</span></div><div><strong className="block text-2xl text-[#07172f]">{campaigns.scheduled}</strong><span className="text-sm text-[#526171]">campanhas programadas</span></div></> : null}
+    </section>
+    <section className="mt-8 flex flex-col gap-5 rounded-2xl border border-[#dfe6ee] bg-white p-6 sm:flex-row sm:items-center sm:justify-between">
+      <div><h2 className="text-lg font-bold text-[#07172f]">Próxima ação</h2><p className="mt-1 text-sm text-[#526171]">{published ? "Veja quem procurou seu negócio e continue o atendimento." : "Complete o essencial e confira a experiência antes de publicar."}</p></div>
+      <Link href={nextAction.href} className="focus-ring inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl bg-[#0054fc] px-4 text-sm font-bold text-white hover:bg-[#0048d9]">{nextAction.label}<ArrowRight size={16} aria-hidden="true" /></Link>
+    </section>
+    <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm font-bold text-[#0054fc]">
+      <Link href={`${base}/opportunities`} className="focus-ring inline-flex min-h-11 items-center hover:underline">Oportunidades</Link>
+      {features.activations ? <Link href={`${base}/activations`} className="focus-ring inline-flex min-h-11 items-center hover:underline">Campanhas</Link> : null}
+      <Link href={`${base}/minha-sobe`} className="focus-ring inline-flex min-h-11 items-center hover:underline">Minha SOBE</Link>
+      <Link href={`${base}/analytics`} className="focus-ring inline-flex min-h-11 items-center hover:underline">Resultados detalhados</Link>
     </div>
-  );
+  </div>;
 }

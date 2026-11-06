@@ -9,13 +9,13 @@ test("menu lateral organiza a navegação e mantém o modo recolhido", async ({
     if (message.type() === "error") consoleErrors.push(message.text());
   });
 
-  await page.goto("/app/projects/demo-casa-sucos/site");
+  await page.goto("/app/projects/demo-casa-sucos/minha-sobe");
 
   const sidebar = page.getByRole("complementary", { name: "Menu lateral" });
   await expect(sidebar).toBeVisible();
   await expect(sidebar).toHaveCSS("width", "272px");
   await expect(
-    sidebar.getByRole("link", { name: "Minha página" }),
+    sidebar.getByRole("link", { name: "Minha SOBE" }),
   ).toHaveAttribute("aria-current", "page");
   await expect(sidebar.getByText("Proprietário")).toBeVisible();
 
@@ -29,7 +29,7 @@ test("menu lateral organiza a navegação e mantém o modo recolhido", async ({
     sidebarBounds!.x + sidebarBounds!.width,
   );
   await expect(
-    sidebar.getByRole("link", { name: "Minha página" }),
+    sidebar.getByRole("link", { name: "Minha SOBE" }),
   ).toBeVisible();
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem("sobe:sidebar-collapsed")))
@@ -64,7 +64,7 @@ test("menu móvel controla foco, rolagem e fechamento", async ({ page }, testInf
     if (message.type() === "error") consoleErrors.push(message.text());
   });
 
-  await page.goto("/app/projects/demo-casa-sucos/site");
+  await page.goto("/app/projects/demo-casa-sucos/minha-sobe");
   const trigger = page.getByRole("button", { name: "Abrir menu" });
   await trigger.click();
 
@@ -95,7 +95,7 @@ test("menu móvel controla foco, rolagem e fechamento", async ({ page }, testInf
   await page.setViewportSize({ width: 393, height: 851 });
 
   await trigger.click();
-  await dialog.getByRole("link", { name: "Início", exact: true }).click();
+  await dialog.getByRole("link", { name: "Início", exact: true }).first().click();
   await expect(dialog).toBeHidden();
   await expect(page).toHaveURL(/\/app$/);
   expect(consoleErrors).toEqual([]);

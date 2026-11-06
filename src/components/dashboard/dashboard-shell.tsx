@@ -4,13 +4,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
-  BarChart3,
   Bell,
   BriefcaseBusiness,
   Check,
   ChevronDown,
   CreditCard,
-  Images,
   FolderKanban,
   HelpCircle,
   LayoutDashboard,
@@ -20,7 +18,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
-  Sparkles,
   X,
   Zap,
 } from "lucide-react";
@@ -52,6 +49,7 @@ interface NavigationItem {
   label: string;
   icon: LucideIcon;
   exact?: boolean;
+  disabled?: boolean;
 }
 
 const workspaceItems: NavigationItem[] = [
@@ -97,6 +95,8 @@ function SidebarLink({
   onNavigate: () => void;
 }) {
   const Icon = item.icon;
+
+  if (item.disabled) return <span aria-disabled="true" title={`${item.label} indisponível neste plano`} className={cn("flex min-h-11 items-center rounded-xl text-sm font-semibold text-[#8796a6]", collapsed ? "justify-center px-2" : "gap-3 px-3")}><Icon size={18} aria-hidden="true" /><span className={cn(collapsed && "sr-only")}>{item.label}</span></span>;
 
   return (
     <Link
@@ -153,45 +153,29 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     ? [
         {
           href: `/app/projects/${projectId}`,
-          label: "Visão geral",
+          label: "Início",
           icon: LayoutDashboard,
           exact: true,
-        },
-        {
-          href: `/app/projects/${projectId}/editor`,
-          label: "Link da bio",
-          icon: FolderKanban,
         },
         {
           href: `/app/projects/${projectId}/opportunities`,
           label: "Oportunidades",
           icon: BriefcaseBusiness,
         },
-        ...(process.env.NEXT_PUBLIC_FEATURE_CONTENT_STUDIO !== "false"
-          ? [{ href: `/app/projects/${projectId}/content`, label: "Conteúdo", icon: Images }]
-          : []),
         {
-          href: `/app/projects/${projectId}/visuals`,
-          label: "Artes com IA",
-          icon: Sparkles,
+          href: `/app/projects/${projectId}/activations`,
+          label: "Campanhas",
+          icon: Zap,
+          disabled: !features.activations,
         },
         {
-          href: `/app/projects/${projectId}/analytics`,
-          label: "Resultados",
-          icon: BarChart3,
+          href: `/app/projects/${projectId}/minha-sobe`,
+          label: "Minha SOBE",
+          icon: FolderKanban,
         },
-        ...(features.activations
-          ? [
-              {
-                href: `/app/projects/${projectId}/activations`,
-                label: "Campanhas",
-                icon: Zap,
-              },
-            ]
-          : []),
         {
           href: `/app/projects/${projectId}/settings`,
-          label: "Configurações do negócio",
+          label: "Configurações",
           icon: Settings,
         },
       ]
@@ -292,6 +276,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const activeItem = [...projectItems, ...workspaceItems].find((item) =>
     isNavigationItemActive(pathname, item),
   );
+  const legacyPageLabel = pathname.endsWith("/analytics") ? "Resultados" : pathname.endsWith("/content") ? "Conteúdo" : pathname.endsWith("/visuals") ? "Artes com IA" : pathname.endsWith("/editor") ? "Editor avançado" : undefined;
   const settingsActive =
     pathname.startsWith("/app/settings") &&
     !pathname.startsWith("/app/settings/billing");
@@ -301,7 +286,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       ? "Novo negócio"
       : pathname.startsWith("/app/onboarding")
         ? "Criar minha Sobe"
-        : activeItem?.label ||
+        : legacyPageLabel || activeItem?.label ||
           (billingActive
             ? "Plano e cobrança"
             : settingsActive
@@ -309,7 +294,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               : "Visão geral");
 
   function closeMobileMenu() {
-    setMobileOpen(false);
+    window.setTimeout(() => setMobileOpen(false), 0);
   }
 
   function toggleDesktopSidebar() {

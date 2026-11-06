@@ -23,6 +23,7 @@ import { projectWhatsAppNumbers, whatsappNumberErrors } from "@/features/whatsap
 import { projectRepository } from "@/lib/repositories/project-repository";
 import { slugify } from "@/lib/utils";
 import type { Project } from "@/types";
+import { SimpleSettings } from "@/components/dashboard/simple-settings";
 
 export function SettingsNav({
   active,
@@ -55,6 +56,9 @@ export function SettingsNav({
 export function ProjectSettings({ projectId }: { projectId: string }) {
   const router = useRouter();
   const [project, setProject] = useState<Project | null>();
+  const [mode, setMode] = useState<"simple" | "advanced">("simple");
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
   useEffect(() => {
@@ -63,6 +67,26 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
       .then((found) => setProject(found || null))
       .catch(() => setProject(null));
   }, [projectId]);
+  useEffect(() => {
+    if (!dirty) return;
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    const preventAccidentalNavigation = (event: MouseEvent) => {
+      const anchor = (event.target as Element | null)?.closest("a[href]");
+      if (!anchor || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      if (window.confirm("Há alterações não salvas. Sair desta tela e descartar o rascunho?")) return;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    document.addEventListener("click", preventAccidentalNavigation, true);
+    return () => {
+      window.removeEventListener("beforeunload", beforeUnload);
+      document.removeEventListener("click", preventAccidentalNavigation, true);
+    };
+  }, [dirty]);
   if (project === undefined)
     return (
       <div className="grid h-96 place-items-center">
@@ -77,6 +101,7 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
     );
   function update(patch: Partial<Project>) {
     setProject((current) => (current ? { ...current, ...patch } : current));
+    setDirty(true);
   }
   async function save() {
     if (!project) return;
@@ -85,12 +110,17 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
       return;
     }
     setSaveError("");
+    setSaving(true);
     try {
-      await projectRepository.saveProject(project);
+      const persisted = await projectRepository.saveProject(project);
+      setProject(persisted);
+      setDirty(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 1600);
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Não foi possível salvar as configurações.");
+    } finally {
+      setSaving(false);
     }
   }
   async function archive() {
@@ -120,13 +150,27 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
       >
         ← Projetos
       </Link>
-      <h1 className="mt-4 text-3xl font-extrabold tracking-[-.04em]">
-        Configurações do negócio
-      </h1>
+      <h1 className="mt-4 text-3xl font-extrabold tracking-[-.04em]">Configurações</h1>
       <p className="mt-2 text-sm text-[#74747e]">
-        Informações, produtos, unidades, marca e materiais em um só lugar.
+        Ensine à SOBE sobre seu negócio e escolha como ela prepara cada contato.
       </p>
-      <nav aria-label="Áreas das configurações do negócio" className="mt-6 flex gap-2 overflow-x-auto border-y border-[#dfe6ee] py-3">
+      <div role="group" aria-label="Modo de configuração" className="mt-6 inline-flex rounded-xl border border-[#dfe6ee] bg-white p-1">
+        <button type="button" aria-pressed={mode === "simple"} onClick={() => setMode("simple")} className={`focus-ring min-h-11 rounded-lg px-5 text-sm font-bold ${mode === "simple" ? "bg-[#0054fc] text-white" : "text-[#536178] hover:bg-[#eef4fa]"}`}>Simples</button>
+        <button type="button" aria-pressed={mode === "advanced"} onClick={() => setMode("advanced")} className={`focus-ring min-h-11 rounded-lg px-5 text-sm font-bold ${mode === "advanced" ? "bg-[#0054fc] text-white" : "text-[#536178] hover:bg-[#eef4fa]"}`}>Avançado</button>
+      </div>
+      {dirty ? <p role="status" className="mt-2 text-sm font-semibold text-[#9a6700]">Há alterações não salvas. Alternar o modo mantém o rascunho nesta tela.</p> : null}
+      {mode === "simple" ? <SimpleSettings project={project} onChange={(next) => { setProject(next); setDirty(true); setSaveError(""); }} onSave={() => void save()} saved={saved} saveError={saveError} dirty={dirty} saving={saving} /> : null}
+      {mode === "advanced" ? <div>
+      <div className="mt-7 grid gap-3 sm:grid-cols-2">
+        {[
+          ["Jornadas e intenções", "Defina caminhos e perguntas por objetivo.", `${project.id}/conversion`],
+          ["Destinos e unidades", "Configure atendimento e roteamento.", `${project.id}/operations`],
+          ["Páginas e entradas", "Ajuste links, páginas e origens.", `${project.id}/entries`],
+          ["Conteúdo e marca", "Edite mídia, textos e identidade.", `${project.id}/editor`],
+          ["Resultados e versões", "Consulte dados e histórico publicado.", `${project.id}/analytics`],
+        ].map(([title, description, path]) => <Link key={path} href={`/app/projects/${path}`} className="focus-ring min-h-24 rounded-xl border border-[#dfe6ee] bg-white p-4 hover:border-[#0054fc]"><strong className="block text-sm text-[#07172f]">{title}</strong><span className="mt-1 block text-xs text-[#526171]">{description}</span></Link>)}
+      </div>
+      <nav aria-label="Ferramentas avançadas do negócio" className="mt-6 flex gap-2 overflow-x-auto border-y border-[#dfe6ee] py-3">
         <a href="#information" className="focus-ring inline-flex min-h-11 shrink-0 items-center bg-[#07172f] px-4 text-sm font-bold text-white">Informações</a>
         <Link href={`/app/projects/${project.id}/data`} className="focus-ring inline-flex min-h-11 shrink-0 items-center px-4 text-sm font-bold text-[#536178] hover:bg-[#eef4fa]">Produtos e serviços</Link>
         <Link href={`/app/projects/${project.id}/data?tab=locations`} className="focus-ring inline-flex min-h-11 shrink-0 items-center px-4 text-sm font-bold text-[#536178] hover:bg-[#eef4fa]">Unidades</Link>
@@ -166,7 +210,7 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
               onChange={(event) => update({ description: event.target.value })}
             />
           </div>
-          <div id="contact" className="contents"><WhatsAppNumbersEditor project={project} onChange={(next) => { setProject(next); setSaveError(""); }} /></div>
+          <div id="contact" className="contents"><WhatsAppNumbersEditor project={project} onChange={(next) => { setProject(next); setDirty(true); setSaveError(""); }} /></div>
           <div>
             <Label htmlFor="project-status">Situação</Label>
             <Select
@@ -199,8 +243,8 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
           </div>
         </div>
         <div className="mt-6 flex items-center gap-3">
-          <Button onClick={save} disabled={Boolean(Object.keys(whatsappNumberErrors(projectWhatsAppNumbers(project))).length)}>
-            <Save size={16} /> Salvar
+          <Button onClick={save} disabled={saving || Boolean(Object.keys(whatsappNumberErrors(projectWhatsAppNumbers(project))).length)}>
+            <Save size={16} /> {saving ? "Salvando…" : "Salvar"}
           </Button>
           {saved && (
             <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#15966c]">
@@ -260,6 +304,7 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
           </button>
         </div>
       </section>
+      </div> : null}
     </div>
   );
 }
