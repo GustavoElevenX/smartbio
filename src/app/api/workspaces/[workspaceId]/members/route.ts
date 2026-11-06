@@ -26,6 +26,16 @@ export const GET = withAuthenticatedActor(
         500,
         "members_failed",
       );
-    return apiSuccess(data || []);
+    return apiSuccess((data || []).map((member) =>
+      member.user_id === actor.userId
+        ? {
+            ...member,
+            profiles: (member.profiles.length
+              ? member.profiles
+              : [{ full_name: null, email: null, avatar_url: null }]
+            ).map((profile) => ({ ...profile, email: profile.email || actor.email })),
+          }
+        : member,
+    ));
   },
 );

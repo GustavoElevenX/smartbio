@@ -60,7 +60,7 @@ export const GET = withAuthenticatedActor(async (_request, _context, actor) => {
       500,
       "profile_failed",
     );
-  return apiSuccess(data);
+  return apiSuccess({ ...data, email: data.email || actor.email });
 });
 
 export const PATCH = withAuthenticatedActor(

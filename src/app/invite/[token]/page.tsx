@@ -1,32 +1,41 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function InvitePage() {
   const { token } = useParams<{ token: string }>();
   const router = useRouter();
   const [status, setStatus] = useState("");
+  const [ready, setReady] = useState(false);
+  const [accepting, setAccepting] = useState(false);
+  useEffect(() => setReady(true), []);
   async function accept() {
+    if (accepting) return;
+    setAccepting(true);
     setStatus("Aceitando convite…");
-    const response = await fetch(
-      `/api/invitations/${encodeURIComponent(token)}/accept`,
-      { method: "POST" },
-    );
-    const payload = await response.json();
-    if (!response.ok) {
-      setStatus(
-        payload.error?.message || "Não foi possível aceitar o convite.",
+    try {
+      const response = await fetch(
+        `/api/invitations/${encodeURIComponent(token)}/accept`,
+        { method: "POST" },
       );
-      return;
+      const payload = await response.json();
+      if (!response.ok) {
+        setStatus(payload.error?.message || "Não foi possível aceitar o convite.");
+        return;
+      }
+      await fetch("/api/workspaces/active", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ workspaceId: payload.data.workspaceId }),
+      });
+      router.push("/app");
+      router.refresh();
+    } catch {
+      setStatus("Não foi possível aceitar o convite. Tente novamente.");
+    } finally {
+      setAccepting(false);
     }
-    await fetch("/api/workspaces/active", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ workspaceId: payload.data.workspaceId }),
-    });
-    router.push("/app");
-    router.refresh();
   }
   return (
     <main className="grid min-h-screen place-items-center bg-[#f7f8fa] p-6">
@@ -41,7 +50,8 @@ export default function InvitePage() {
         <button
           type="button"
           onClick={() => void accept()}
-          className="mt-7 min-h-12 rounded-xl bg-[#0054fc] px-5 font-bold text-white"
+          disabled={!ready || accepting}
+          className="mt-7 min-h-12 rounded-xl bg-[#0054fc] px-5 font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
         >
           Aceitar convite
         </button>
