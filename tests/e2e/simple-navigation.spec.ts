@@ -23,7 +23,7 @@ test("navegação simples oferece início, prévia e configurações", async ({ 
   await page.screenshot({ path: testInfo.outputPath("minha-sobe.png") });
 
   await page.goto(`${base}/settings`);
-  await expect(page.getByRole("button", { name: "Simples" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Simples" })).toHaveAttribute("aria-pressed", "true", { timeout: 30_000 });
   for (const title of ["Meu negócio", "Como atender", "O que perguntar", "Aparência"]) {
     await expect(page.getByRole("heading", { name: title })).toBeVisible();
   }

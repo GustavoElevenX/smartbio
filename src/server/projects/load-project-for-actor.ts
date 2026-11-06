@@ -16,10 +16,12 @@ export async function loadProjectForActor(actor: AuthenticatedActor, projectId: 
   const project = await loadProjectAggregate(actor, projectId);
   if (!project) return null;
   const logoIds = [project.brand.primaryLogoAssetId, project.brand.lightLogoAssetId, project.brand.darkLogoAssetId, project.brand.faviconAssetId].filter((value): value is string => Boolean(value));
-  if (!logoIds.length) return project;
+  const coverIds = project.presence?.pages.flatMap((page) => page.sections.map((section) => section.style.backgroundAssetId).filter((id): id is string => Boolean(id))) || [];
+  const imageIds = [...new Set([...logoIds, ...coverIds])];
+  if (!imageIds.length) return project;
   const database = createServiceClient();
   if (!database) return project;
-  const assets = (project.mediaAssets || []).filter((asset) => logoIds.includes(asset.id));
+  const assets = (project.mediaAssets || []).filter((asset) => imageIds.includes(asset.id));
   const signed = await Promise.all(assets.map(async (asset) => ({
     id: asset.id,
     url: (await database.storage.from("media-private").createSignedUrl(asset.storagePath, 3600)).data?.signedUrl,
@@ -27,6 +29,7 @@ export async function loadProjectForActor(actor: AuthenticatedActor, projectId: 
   const urls = new Map(signed.map((item) => [item.id, item.url]));
   return {
     ...project,
+    mediaAssets: project.mediaAssets?.map((asset) => urls.get(asset.id) ? { ...asset, metadata: { ...asset.metadata, signedUrl: urls.get(asset.id) } } : asset),
     brand: {
       ...project.brand,
       logoDataUrl: project.brand.primaryLogoAssetId ? urls.get(project.brand.primaryLogoAssetId) : undefined,

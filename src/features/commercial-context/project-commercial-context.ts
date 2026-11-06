@@ -242,7 +242,9 @@ function mergeSemantic<T extends { id: string; status: CommercialContextStatus }
   for (const item of incoming) {
     const existing = next.get(item.id);
     if (existing?.status === "confirmed" && mode === "generated") continue;
-    next.set(item.id, mode === "user_edit" || mode === "accepted_proposal" ? { ...item, status: "confirmed" } : item);
+    // A review must explicitly confirm an inference. Editing another field does not
+    // turn every item in a full-context PATCH into a confirmed business fact.
+    next.set(item.id, mode === "accepted_proposal" ? { ...item, status: "confirmed" } : item);
   }
   return [...next.values()];
 }

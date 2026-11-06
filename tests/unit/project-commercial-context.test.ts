@@ -43,6 +43,13 @@ async function fixture(description: string, input: { phone?: string; sources?: E
 }
 
 describe("ProjectCommercialContext", () => {
+  it("não confirma inferências não revisadas em uma edição do contexto", async () => {
+    const { project, session } = await fixture("Venda de sucos naturais.");
+    const current = projectCommercialContextFromActivation({ projectId: project.id, project, session });
+    const inferred = { ...current, intentContexts: current.intentContexts.map((item) => ({ ...item, status: "inferred" as const })) };
+    const next = mergeProjectCommercialContexts(inferred, { ...inferred, summary: { ...inferred.summary, whatItSells: "Sucos" } }, "user_edit");
+    expect(next.intentContexts.every((item) => item.status === "inferred")).toBe(true);
+  });
   it("materializa a Activation em memória durável por projeto e referencia entidades operacionais", async () => {
     const { architecture, project, session } = await fixture("Vendemos produtos e recebemos pedidos pelo WhatsApp.", { phone: "5511999999999" });
     const context = projectCommercialContextFromActivation({ projectId: project.id, project, session, now });
