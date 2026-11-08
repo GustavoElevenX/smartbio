@@ -1,5 +1,6 @@
 export interface CommercialHandoffContext {
   projectId: string;
+  projectName?: string;
   conversionGoalId?: string;
   opportunityId?: string;
   origin: {
@@ -16,6 +17,7 @@ export interface CommercialHandoffContext {
   };
   intent: {
     label?: string;
+    visitorRequest?: string;
     productIds?: string[];
     serviceIds?: string[];
     locationId?: string;
@@ -24,7 +26,10 @@ export interface CommercialHandoffContext {
     label: string;
     value: string;
     include: boolean;
+    source?: "visitor" | "business_confirmed";
   }>;
+  pending?: string[];
+  consent?: { contact: boolean; recordedAt?: string };
   benefit?: {
     label?: string;
     code?: string;

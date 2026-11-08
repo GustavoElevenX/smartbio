@@ -3,17 +3,21 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { apiError, apiSuccess, validationError } from "@/server/http/api-response";
 import { getPublicProjectById } from "@/server/repositories/public-commercial-repository";
 import { registerOpportunity } from "@/server/opportunities/service";
-import { formatCommercialHandoff, toPerformanceEvidence } from "@/features/handoff/handoff-formatter";
+import { formatVisitorHandoff, toPerformanceEvidence } from "@/features/handoff/handoff-formatter";
+import { buildCommercialBriefing } from "@/features/handoff/commercial-briefing";
 import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
 import { publicRateLimitIdentifier } from "@/server/rate-limit/public-identifier";
 
 const contextSchema = z.object({
   projectId: z.string().min(1),
+  projectName: z.string().max(160).optional(),
   conversionGoalId: z.string().optional(),
   origin: z.object({ entryPointId: z.string().optional(), source: z.string().optional(), campaign: z.string().optional(), pageId: z.string().optional(), activationId: z.string().optional() }),
   identity: z.object({ name: z.string().optional(), phone: z.string().optional(), email: z.string().optional() }),
-  intent: z.object({ label: z.string().optional(), productIds: z.array(z.string()).max(50).optional(), serviceIds: z.array(z.string()).max(50).optional(), locationId: z.string().optional() }),
-  qualification: z.array(z.object({ label: z.string().max(120), value: z.string().max(1000), include: z.boolean() })).max(100),
+  intent: z.object({ label: z.string().optional(), visitorRequest: z.string().max(2000).optional(), productIds: z.array(z.string()).max(50).optional(), serviceIds: z.array(z.string()).max(50).optional(), locationId: z.string().optional() }),
+  qualification: z.array(z.object({ label: z.string().max(120), value: z.string().max(1000), include: z.boolean(), source: z.enum(["visitor", "business_confirmed"]).optional() })).max(100),
+  pending: z.array(z.string().max(240)).max(20).optional(),
+  consent: z.object({ contact: z.boolean(), recordedAt: z.string().optional() }).optional(),
   benefit: z.object({ label: z.string().optional(), code: z.string().optional() }).optional(),
 });
 const requestSchema = z.object({ projectId: z.string().min(1), sessionId: z.string().min(1), destinationId: z.string().optional(), context: contextSchema });
@@ -35,8 +39,15 @@ export async function POST(request: Request) {
   if (locationId && !project.commercialConfig?.locations?.some((item) => item.id === locationId && item.isActive)) return respond(apiError("Unidade não disponível.", 422, "invalid_handoff_location"));
   if (locationId && destination?.locationId && destination.locationId !== locationId) return respond(apiError("O destino não corresponde à unidade selecionada.", 422, "invalid_handoff_destination"));
   if (parsed.data.context.conversionGoalId && !project.conversionGoals?.some((item) => item.id === parsed.data.context.conversionGoalId && item.isActive)) return respond(apiError("Caminho não disponível.", 422, "invalid_handoff_goal"));
-  const message = formatCommercialHandoff(parsed.data.context, project);
-  if (!database) return respond(apiSuccess({ persisted: false, message }, 202));
+  // Public input is always a visitor statement; it cannot certify business facts.
+  const safeContext = {
+    ...parsed.data.context,
+    projectName: project.name,
+    qualification: parsed.data.context.qualification.map((item) => ({ ...item, source: "visitor" as const })),
+  };
+  const message = formatVisitorHandoff(safeContext, project);
+  const briefing = buildCommercialBriefing(safeContext);
+  if (!database) return respond(apiSuccess({ persisted: false, message, briefing }, 202));
   const opportunity = await registerOpportunity(database, {
     workspaceId: project.workspaceId,
     projectId: project.id,
@@ -44,7 +55,7 @@ export async function POST(request: Request) {
     sessionId: parsed.data.sessionId,
     sourceType: "routed_contact",
     sourceId: `handoff:${parsed.data.sessionId}:${parsed.data.destinationId || "direct"}`,
-    title: `Contato encaminhado · ${parsed.data.context.intent.label || "Atendimento"}`,
+    title: `Contato iniciado · ${parsed.data.context.intent.label || "Atendimento"}`,
     conversionGoalId: parsed.data.context.conversionGoalId,
     entryPointId: parsed.data.context.origin.entryPointId,
     destinationId: parsed.data.destinationId,
@@ -52,7 +63,7 @@ export async function POST(request: Request) {
     attribution: { entryPointId: parsed.data.context.origin.entryPointId, conversionGoalId: parsed.data.context.conversionGoalId, source: parsed.data.context.origin.source || "direct", campaign: parsed.data.context.origin.campaign, presencePageId: parsed.data.context.origin.pageId },
     visitorData: parsed.data.context.identity,
     summary: message,
-    metadata: { handoff: parsed.data.context, evidence: toPerformanceEvidence(parsed.data.context) },
+    metadata: { handoff: safeContext, briefing, evidence: toPerformanceEvidence(safeContext) },
   });
-  return respond(apiSuccess({ persisted: true, opportunityId: opportunity.id, message }, 201));
+  return respond(apiSuccess({ persisted: true, opportunityId: opportunity.id, message, briefing }, 201));
 }

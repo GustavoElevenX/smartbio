@@ -2,6 +2,11 @@ import type { CommercialArchitecture } from "@/features/ai-setup/ai-setup.schema
 import type { BusinessLocation, FormField } from "@/types";
 import { isFormFieldVisible } from "@/features/forms/form-field-utils";
 
+export function withFreeTextRequest(fields: FormField[], answers: Record<string, unknown>): FormField[] {
+  if (!String(answers.specific_request ?? "").trim() || fields.some((field) => field.key === "specific_request")) return fields;
+  return [...fields, { id: "specific-request", key: "specific_request", label: "Pedido específico", type: "textarea", required: false, includeInHandoff: true }];
+}
+
 function displayValue(value: unknown, field: FormField) {
   if (Array.isArray(value)) return value.filter(Boolean).join(", ");
   if (typeof value === "boolean") return value ? "Sim" : "Não";

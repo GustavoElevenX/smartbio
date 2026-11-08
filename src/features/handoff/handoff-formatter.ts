@@ -1,5 +1,6 @@
 import type { CommercialHandoffContext } from "./commercial-handoff-context";
 import type { Project } from "@/types";
+import { buildWhatsAppMessage } from "@/features/whatsapp/whatsapp";
 
 function line(label: string, value?: string) {
   return value ? `${label}: ${value}` : undefined;
@@ -27,6 +28,26 @@ export function formatCommercialHandoff(context: CommercialHandoffContext, proje
     line("Origem", context.origin.source),
     line("Campanha", context.origin.campaign),
   ].filter(Boolean).join("\n");
+}
+
+export function formatVisitorHandoff(context: CommercialHandoffContext, project?: Project) {
+  const answers: Record<string, string> = {};
+  for (const item of context.qualification) {
+    if (item.include && item.value.trim()) answers[item.label] = item.value.trim();
+  }
+  const location = project?.commercialConfig?.locations?.find((item) => item.id === context.intent.locationId)?.name;
+  if (context.identity.name && !Object.values(answers).includes(context.identity.name)) answers.Nome = context.identity.name;
+  if (context.identity.phone && !Object.values(answers).includes(context.identity.phone)) answers.Telefone = context.identity.phone;
+  if (context.identity.email && !Object.values(answers).includes(context.identity.email)) answers["E-mail"] = context.identity.email;
+  if (context.origin.source) answers.Origem = context.origin.source;
+  if (context.origin.campaign) answers.Campanha = context.origin.campaign;
+  return buildWhatsAppMessage({
+    businessName: project?.name || context.projectName,
+    interest: context.intent.label,
+    location,
+    answers,
+    benefitClaim: context.benefit?.code ? { code: context.benefit.code } : undefined,
+  });
 }
 
 export function formatHandoffUrl(baseUrl: string, context: CommercialHandoffContext) {

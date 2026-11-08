@@ -128,9 +128,9 @@ export function prepareFirstVersionArchitecture(input: CommercialArchitecture): 
       usesOfferings: [],
     })).filter((step) => step.collects.length || step.fields?.length || step.usesLocations.length || step.expectedCapability);
     if (!remaining.some((step) => step.fields?.some((field) => field.key === "interest"))) remaining.unshift({
-      purpose: "Conte o que procura. A equipe confirma as opções e as condições do atendimento.",
-      title: "O que você procura?", expectedCapability: null, collects: ["O que você procura?"],
-      fields: [{ key: "interest", label: "O que você procura?", type: "textarea", required: false, options: [], showWhen: null }],
+      purpose: "Identificar o pedido específico sem presumir catálogo, preço, estoque ou compatibilidade. A equipe confirma as opções e condições.",
+      title: "Qual produto você procura?", expectedCapability: null, collects: ["Qual produto você procura?"],
+      fields: [{ key: "interest", label: "Descreva o produto e os detalhes para identificá-lo (modelo, tamanho ou ano, se aplicável)", type: "textarea", required: false, options: [], showWhen: null }],
       usesOfferings: [], usesLocations: [],
     });
     const whatsapp = architecture.channels.find((channel) => channel.type === "whatsapp" && channel.isFallback && validCommercialChannel(channel))

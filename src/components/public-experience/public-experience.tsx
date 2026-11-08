@@ -37,10 +37,13 @@ import { selectNextQualificationQuestion } from "@/features/qualification/offer-
 import { calculateReservationTotal } from "@/features/reservations/reservation-engine";
 import { resolveRoute } from "@/features/routing/routing-engine";
 import { destinationMatchesCompletion, semanticJourneyRouteKey } from "@/features/routing/completion-destination";
-import { buildJourneyHandoff } from "@/features/handoff/journey-handoff";
+import { buildJourneyHandoff, withFreeTextRequest } from "@/features/handoff/journey-handoff";
+import { buildCommercialBriefing } from "@/features/handoff/commercial-briefing";
+import type { CommercialHandoffContext } from "@/features/handoff/commercial-handoff-context";
+import { formatVisitorHandoff } from "@/features/handoff/handoff-formatter";
+import { buildIntentCollectionPlan, type VisitorIntent } from "@/features/qualification/intent-collection-plan";
 import { contactIdentityFromFields, isFormFieldVisible } from "@/features/forms/form-field-utils";
 import {
-  buildWhatsAppMessage,
   buildWhatsAppUrl,
 } from "@/features/whatsapp/whatsapp";
 import { normalizeWhatsAppPhone, resolveWhatsAppTarget, whatsappRoutingModel } from "@/features/whatsapp/whatsapp-destination";
@@ -465,7 +468,18 @@ export function ExperienceCanvas({
   const progressiveQualification = step?.type === "form"
     && step.settings?.progressiveQuestioning === true
     && hasRecommendationJourney;
-  const qualificationFields = (step?.formFields || []).filter((field) => isFormFieldVisible(field, runtime.answers));
+  const currentGoal = project.conversionGoals?.find((goal) => goal.id === runtime.conversionGoalId);
+  const intent: VisitorIntent = ({ buy: "buy", request_quote: "quote", schedule: "schedule", contact: "contact" } as Record<string, VisitorIntent>)[currentGoal?.kind || ""] || "other";
+  const previousFieldKeys = new Set(history.flatMap((id) => project.steps.find((candidate) => candidate.id === id)?.formFields?.map((field) => field.key) || []));
+  const previousAnswers = Object.fromEntries([...previousFieldKeys].map((key) => [key, runtime.answers[key]]));
+  const collectionPlan = step?.type === "form" ? buildIntentCollectionPlan({
+    intent,
+    fields: step.formFields || [],
+    answers: previousAnswers,
+    hasCatalogItems: Boolean(project.commercialConfig?.catalogItems?.length),
+  }) : undefined;
+  const qualificationFields = (collectionPlan?.questions.map((item) => item.field) || step?.formFields || [])
+    .filter((field) => isFormFieldVisible(field, runtime.answers));
   const renderedFormFields = progressiveQualification
     ? qualificationFields.filter((field, index) => index === 0 || revealedQualificationFieldIds.includes(field.id))
     : qualificationFields;
@@ -708,6 +722,7 @@ export function ExperienceCanvas({
       estimatedValue?: number;
       currency?: string;
       destinationId?: string;
+      metadata?: Record<string, unknown>;
     } = {},
   ) {
     if (preview) return;
@@ -727,6 +742,7 @@ export function ExperienceCanvas({
       summary: input.summary,
       estimatedValue: input.estimatedValue,
       currency: input.currency,
+      metadata: input.metadata,
     });
     localStore.saveOpportunity({ ...opportunity, id: uid("opportunity") });
   }
@@ -1275,7 +1291,7 @@ export function ExperienceCanvas({
             confidence: step.recommendation?.title ? "clear" : runtime.recommendationConfidence,
           })
         : { answers: {}, closing: undefined };
-      const handoffFields = project.steps.flatMap((candidate) => candidate.formFields || []);
+      const handoffFields = withFreeTextRequest(project.steps.flatMap((candidate) => candidate.formFields || []), runtime.answers);
       const selectedLocation = project.commercialConfig?.locations?.find((location) => location.id === runtime.selectedLocationId);
       const allOfferings = [...(project.commercialConfig?.serviceOfferings || []), ...(project.commercialConfig?.catalogItems || [])];
       const journeyHandoff = buildJourneyHandoff({
@@ -1290,24 +1306,33 @@ export function ExperienceCanvas({
       const recommendationAnswers = Object.keys(journeyHandoff.answers).length
         ? Object.fromEntries(Object.entries(recommendationHandoff.answers).filter(([key]) => key !== "contexto_informado"))
         : recommendationHandoff.answers;
-      const message = buildWhatsAppMessage({
-        greeting: String(option.actionPayload?.message || "") || undefined,
-        businessName: project.name,
-        interest: journeyHandoff.interest,
-        location: journeyHandoff.location,
-        activation: launchContext?.activationId
-          ? { name: "Ativação selecionada" }
-          : undefined,
-        benefitClaim: launchContext?.benefitClaimCode
-          ? { code: launchContext.benefitClaimCode }
-          : undefined,
-        answers: {
-          ...journeyHandoff.answers,
-          ...recommendationAnswers,
+      const handoffContext: CommercialHandoffContext = {
+        projectId: project.id,
+        projectName: project.name,
+        conversionGoalId: runtime.conversionGoalId,
+        origin: {
+          entryPointId: runtime.entryPointId,
+          source: runtime.attribution?.source,
+          campaign: runtime.attribution?.campaign,
+          pageId: launchContext?.pageId,
         },
-        items: runtime.cart.items.map((item) => ({ name: item.name, quantity: item.quantity })),
-        closing: recommendationHandoff.closing,
-      });
+        identity: visitorIdentity,
+        intent: {
+          label: journeyHandoff.interest,
+          visitorRequest: String(runtime.answers.specific_request || runtime.answers.interest || runtime.answers.request || runtime.answers.need || "").trim() || undefined,
+          productIds: runtime.cart.items.map((item) => item.itemId),
+          serviceIds: runtime.selectedOfferIds,
+          locationId: runtime.selectedLocationId,
+        },
+        qualification: [
+          ...journeyHandoff.entries.map((entry) => ({ label: entry.label, value: entry.value, include: true, source: "visitor" as const })),
+          ...Object.entries(recommendationAnswers).filter((entry): entry is [string, string] => typeof entry[1] === "string").map(([label, value]) => ({ label, value, include: true, source: "visitor" as const })),
+          ...(cart ? [{ label: "Pedido", value: cart, include: true, source: "visitor" as const }] : []),
+        ],
+        pending: ["preço, disponibilidade e condições dependem de confirmação da equipe"],
+        benefit: launchContext?.benefitClaimCode ? { code: launchContext.benefitClaimCode } : undefined,
+      };
+      const message = formatVisitorHandoff(handoffContext, project);
       emit("handoff_built", { destinationId: configuredDestination?.id || option.actionPayload?.destinationId, locationId: runtime.selectedLocationId, blueprintId: option.actionPayload?.blueprintId, intentId: option.actionPayload?.intentId });
       // Keep the external action in the click gesture, even when analytics is slow.
       if (!preview) window.open(buildWhatsAppUrl(phone, message), "_blank", "noopener,noreferrer");
@@ -1339,7 +1364,7 @@ export function ExperienceCanvas({
           },
         );
       } else if (!preview) {
-        if (canUseLocalStore()) addOpportunity("routed_contact", `handoff:${runtime.sessionId}:${configuredDestination?.id || option.actionPayload?.destinationId || "direct"}`, `Contato · ${journeyHandoff.interest || project.name}`, { summary: message, destinationId: configuredDestination?.id });
+        if (canUseLocalStore()) addOpportunity("routed_contact", `handoff:${runtime.sessionId}:${configuredDestination?.id || option.actionPayload?.destinationId || "direct"}`, `Contato · ${journeyHandoff.interest || project.name}`, { summary: message, destinationId: configuredDestination?.id, metadata: { briefing: buildCommercialBriefing(handoffContext) } });
         const response = await fetch("/api/public/handoff", {
           method: "POST",
           keepalive: true,
@@ -1348,30 +1373,7 @@ export function ExperienceCanvas({
             projectId: project.id,
             sessionId: runtime.sessionId,
             destinationId: configuredDestination?.id || String(option.actionPayload?.destinationId || "") || undefined,
-            context: {
-              projectId: project.id,
-              conversionGoalId: runtime.conversionGoalId,
-              origin: {
-                entryPointId: runtime.entryPointId,
-                source: runtime.attribution?.source,
-                campaign: runtime.attribution?.campaign,
-                pageId: launchContext?.pageId,
-              },
-              identity: visitorIdentity,
-              intent: {
-                label: step.title,
-                productIds: runtime.cart.items.map((item) => item.itemId),
-                serviceIds: runtime.selectedOfferIds,
-                locationId: runtime.selectedLocationId,
-              },
-              qualification: [
-                ...journeyHandoff.entries.map((entry) => ({ label: entry.label, value: entry.value, include: true })),
-                ...(cart ? [{ label: "Pedido", value: runtime.cart.items.map((item) => `${item.quantity}x ${item.name}`).join(", "), include: true }] : []),
-              ],
-              benefit: launchContext?.benefitClaimCode
-                ? { code: launchContext.benefitClaimCode }
-                : undefined,
-            },
+            context: handoffContext,
           }),
         });
         const payload = await response.json().catch(() => null) as { data?: { message?: string } } | null;
@@ -1536,21 +1538,30 @@ export function ExperienceCanvas({
     : { answers: {}, closing: undefined };
   const previewJourneyHandoff = buildJourneyHandoff({
     intent: { label: String(previewWhatsAppOption?.actionPayload?.interestLabel || step.title) },
-    answers: runtime.answers, fields: project.steps.flatMap((candidate) => candidate.formFields || []),
+    answers: runtime.answers, fields: withFreeTextRequest(project.steps.flatMap((candidate) => candidate.formFields || []), runtime.answers),
+    includeAll: true,
     selectedLocation: project.commercialConfig?.locations?.find((location) => location.id === runtime.selectedLocationId),
     selections: runtime.journeySelections,
     selectedOfferings: [...(project.commercialConfig?.serviceOfferings || []), ...(project.commercialConfig?.catalogItems || [])].filter((offering) => runtime.selectedOfferIds.includes(offering.id) && !runtime.cart.items.some((item) => item.itemId === offering.id)),
   });
+  const previewRecommendationAnswers = Object.keys(previewJourneyHandoff.answers).length
+    ? Object.fromEntries(Object.entries(previewHandoff.answers).filter(([key]) => key !== "contexto_informado"))
+    : previewHandoff.answers;
+  const previewContext: CommercialHandoffContext = {
+    projectId: project.id,
+    projectName: project.name,
+    conversionGoalId: runtime.conversionGoalId,
+    origin: { entryPointId: runtime.entryPointId, source: runtime.attribution?.source, campaign: runtime.attribution?.campaign },
+    identity: visitorIdentity,
+    intent: { label: previewJourneyHandoff.interest, locationId: runtime.selectedLocationId },
+    qualification: [
+      ...previewJourneyHandoff.entries.map((entry) => ({ label: entry.label, value: entry.value, include: true, source: "visitor" as const })),
+      ...Object.entries(previewRecommendationAnswers).filter((entry): entry is [string, string] => typeof entry[1] === "string").map(([label, value]) => ({ label, value, include: true, source: "visitor" as const })),
+      ...(runtime.cart.items.length ? [{ label: "Pedido", value: runtime.cart.items.map((item) => `${item.quantity}x ${item.name}`).join(", "), include: true, source: "visitor" as const }] : []),
+    ],
+  };
   const previewMessage = previewWhatsAppOption
-    ? buildWhatsAppMessage({
-        greeting: String(previewWhatsAppOption.actionPayload?.message || "") || undefined,
-        businessName: project.name,
-        interest: previewJourneyHandoff.interest,
-        location: previewJourneyHandoff.location,
-        answers: { ...previewJourneyHandoff.answers, ...Object.fromEntries(Object.entries(previewHandoff.answers).filter(([key]) => key !== "contexto_informado" || !Object.keys(previewJourneyHandoff.answers).length)) },
-        items: runtime.cart.items.map((item) => ({ name: item.name, quantity: item.quantity })),
-        closing: previewHandoff.closing,
-      })
+    ? formatVisitorHandoff(previewContext, project)
     : "";
   const style = {
     "--primary": palette.primary,
@@ -1743,7 +1754,7 @@ export function ExperienceCanvas({
               ))}
               {step.options?.map((option, index) => {
                 const submitsForm = Boolean(
-                  step.formFields?.length && index === 0,
+                  renderedFormFields.length && index === 0,
                 );
                 return (
                   <button

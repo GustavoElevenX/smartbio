@@ -19,24 +19,26 @@ test("Vértice qualifica B2B e recomenda próximo passo", async ({ page }) => {
   await page.getByRole("button", { name: /solicitar diagnóstico/i }).click();
   await page.getByLabel("Qual é o seu negócio?").fill("SaaS B2B");
   await page.getByLabel("Investimento mensal em marketing").selectOption("Acima de R$ 30 mil");
-  await page.getByLabel("Objetivo principal").selectOption("Gerar leads");
+  await page.getByLabel("Objetivo principal").selectOption("Gerar contatos comerciais");
   await page.getByRole("radio", { name: "WhatsApp" }).check();
   await page.getByRole("button", { name: /ver diagnóstico/i }).click();
-  await expect(page.getByText("Tráfego Pago + Social Media")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tráfego pago + redes sociais" })).toBeVisible();
 });
 
 test("entrada direta resolve meta sem exibir o seletor geral", async ({ page }) => {
   await page.goto("/casadesucosmix?entry=story-delivery&utm_source=tiktok&utm_campaign=explicita");
   await expect(page.getByRole("heading", { name: /como deseja receber/i })).toBeVisible();
   await expect(page.getByRole("heading", { name: /o que você deseja fazer hoje/i })).toHaveCount(0);
-  const events = await page.evaluate(() => JSON.parse(localStorage.getItem("smartbio:events:v3") || "[]") as Array<{ eventName: string; utmSource?: string; utmCampaign?: string; entryPointId?: string }>);
-  expect(events.some((event) => event.eventName === "entry_point_loaded" && event.utmSource === "tiktok" && event.utmCampaign === "explicita" && event.entryPointId)).toBe(true);
+  await expect.poll(() => page.evaluate(() => {
+    const events = JSON.parse(localStorage.getItem("smartbio:events:v3") || "[]") as Array<{ eventName: string; utmSource?: string; utmCampaign?: string; entryPointId?: string }>;
+    return events.some((event) => event.eventName === "entry_point_loaded" && event.utmSource === "tiktok" && event.utmCampaign === "explicita" && Boolean(event.entryPointId));
+  })).toBe(true);
 });
 
 test("delivery monta carrinho e envia pedido", async ({ page }) => {
   await page.goto("/casadesucosmix");
   await page.getByRole("button", { name: /pedir agora/i }).click();
-  await page.getByRole("button", { name: /delivery/i }).click();
+  await page.getByRole("button", { name: /^entrega receba onde estiver$/i }).click();
   await page.getByRole("button", { name: /ver produtos/i }).click();
   await page.getByRole("button", { name: /suco natural/i }).click();
   await page.getByRole("button", { name: "Entrega", exact: true }).click();
@@ -64,11 +66,17 @@ test("clínica consulta agenda e confirma horário", async ({ page }) => {
 
 test("chalé consulta período e solicita reserva", async ({ page }) => {
   await page.goto("/chales-serra-clara");
+  await expect.poll(() => page.evaluate(() => {
+    const events = JSON.parse(localStorage.getItem("smartbio:events:v3") || "[]") as Array<{ eventName: string; projectId: string }>;
+    return events.some((event) => event.eventName === "page_view" && event.projectId === "demo-chales");
+  })).toBe(true);
   const reservationStart = page.getByRole("button", { name: /consultar datas/i });
   if (await reservationStart.isVisible()) await reservationStart.click();
   const dates = await page.evaluate(() => { const start = new Date(); start.setDate(start.getDate() + 7); const end = new Date(start); end.setDate(end.getDate() + 2); return [start.toISOString().slice(0, 10), end.toISOString().slice(0, 10)]; });
   await page.getByLabel("Data de entrada").fill(dates[0]);
+  await expect(page.getByLabel("Data de entrada")).toHaveValue(dates[0]);
   await page.getByLabel("Data de saída").fill(dates[1]);
+  await expect(page.getByLabel("Data de saída")).toHaveValue(dates[1]);
   await page.getByRole("button", { name: /consultar disponibilidade/i }).click();
   await page.getByRole("button", { name: /chalé vista/i }).click();
   await page.getByLabel("Nome").fill("Cliente Chalé");

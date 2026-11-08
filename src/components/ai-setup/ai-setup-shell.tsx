@@ -157,6 +157,7 @@ export function AISetupShell({
     useState<AISetupDraft>();
   const lastSavedDraft = useRef("");
   const draftVersion = useRef(0);
+  const pendingInitialForm = useRef<InitialSetupForm | undefined>(undefined);
   const creationRequested = useRef(false);
   const generationInFlight = useRef(false);
 
@@ -164,8 +165,10 @@ export function AISetupShell({
     (next: AISetupSession, draft?: AISetupDraft) => {
       draftVersion.current += 1;
       const parsed = aiSetupSessionSchema.parse(next);
-      const nextForm =
-        parsed.status === "collecting" && draft ? draft : sessionForm(parsed);
+      const nextForm = parsed.status === "collecting"
+        ? draft || pendingInitialForm.current || sessionForm(parsed)
+        : sessionForm(parsed);
+      pendingInitialForm.current = undefined;
       lastSavedDraft.current = draftSignature(
         sessionForm(parsed),
         parsed.initialInput.brandIdentity,
@@ -296,7 +299,8 @@ export function AISetupShell({
     if (!session || session.status !== "collecting" || busy) return;
     const signature = draftSignature(form, brandIdentity);
     if (signature === lastSavedDraft.current) return;
-    const version = draftVersion.current;
+    // A response for an older draft must not replace newer typing.
+    const version = ++draftVersion.current;
     rememberAISetupDraft(session, form);
     const timer = window.setTimeout(() => {
       setLifecycle("saving");
@@ -827,6 +831,7 @@ export function AISetupShell({
                   typeof update === "function" ? update(current) : update;
                 if (next.phone !== current.phone) setPhoneError("");
                 if (session) rememberAISetupDraft(session, next);
+                else pendingInitialForm.current = next;
                 return next;
               });
             }}

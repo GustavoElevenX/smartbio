@@ -1,6 +1,7 @@
 import { Mail, MessageCircle, Phone, UserRound } from "lucide-react";
 import type { CommercialOpportunity, ConversionGoal, EntryPoint } from "@/types";
 import { OpportunityStatusBadge } from "./opportunity-status";
+import type { CommercialBriefing } from "@/features/handoff/commercial-briefing";
 
 export function OpportunityDetails({
   opportunity,
@@ -12,6 +13,7 @@ export function OpportunityDetails({
   entry?: EntryPoint;
 }) {
   const whatsappPhone = opportunity.contactPhone?.replace(/\D/g, "");
+  const briefing = opportunity.metadata.briefing as CommercialBriefing | undefined;
 
   return (
     <div>
@@ -132,6 +134,18 @@ export function OpportunityDetails({
           </h3>
           <p className="mt-2 text-sm leading-6">{opportunity.summary}</p>
         </div>
+      ) : null}
+      {briefing?.projectId === opportunity.projectId ? (
+        <section className="mt-5 rounded-2xl border border-[#d7e1ec] p-4 sm:p-5" aria-label="Briefing comercial">
+          <h3 className="text-sm font-extrabold">Briefing comercial</h3>
+          <p className="mt-3 text-sm"><strong>Objetivo:</strong> {briefing.visitorGoal}</p>
+          {briefing.visitorRequest ? <p className="mt-2 text-sm"><strong>Pedido:</strong> {briefing.visitorRequest}</p> : null}
+          {briefing.visitorStatements?.map((item, index) => <p key={`${item.label}:${index}`} className="mt-2 text-sm"><strong>{item.label}:</strong> {item.value} <span className="text-[#687582]">(informado pelo visitante)</span></p>)}
+          {briefing.confirmedFacts?.map((item, index) => <p key={`${item.label}:${index}`} className="mt-2 text-sm"><strong>{item.label}:</strong> {item.value} <span className="text-[#687582]">(confirmado pelo negócio)</span></p>)}
+          {briefing.pending?.length ? <p className="mt-3 text-sm"><strong>Pendente:</strong> {briefing.pending.join("; ")}</p> : null}
+          <p className="mt-3 text-sm"><strong>Próximo passo:</strong> {briefing.nextStep.action}. {briefing.nextStep.reason}</p>
+          {briefing.origin || briefing.campaign ? <p className="mt-2 text-xs text-[#687582]">Origem: {briefing.origin || "não informada"}{briefing.campaign ? ` · Campanha: ${briefing.campaign}` : ""}</p> : null}
+        </section>
       ) : null}
     </div>
   );

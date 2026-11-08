@@ -28,6 +28,23 @@ test("modo simples e avançado compartilham o rascunho sem publicar", async ({ p
   await request.put(`/api/projects/${project.id}`, { data: project });
 });
 
+test("revisa uma pergunta comercial no Simples e preserva a edição", async ({ page, request }) => {
+  const project = structuredClone(findDemoProject("demo-casa-sucos")!);
+  await request.put(`/api/projects/${project.id}`, { data: project });
+  await page.goto(`/app/projects/${project.id}/settings`);
+  await page.getByRole("button", { name: /O que perguntar/ }).click();
+  const resale = page.getByRole("heading", { name: "Comprar para revenda" }).locator("..");
+  const question = resale.getByLabel("Pergunta ao visitante").first();
+  await expect(question).toBeVisible();
+  await question.fill("Qual volume mensal seu estabelecimento procura?");
+  await page.getByRole("button", { name: "Salvar alterações" }).click();
+  await expect(page.getByText(/Alterações salvas; página pública ainda não atualizada/)).toBeVisible({ timeout: 15_000 });
+  await page.reload();
+  await page.getByRole("button", { name: /O que perguntar/ }).click();
+  await expect(page.getByRole("heading", { name: "Comprar para revenda" }).locator("..").getByLabel("Pergunta ao visitante").first()).toHaveValue("Qual volume mensal seu estabelecimento procura?");
+  await request.put(`/api/projects/${project.id}`, { data: project });
+});
+
 test("cadastra vários WhatsApps, valida duplicados e preserva o principal", async ({ page, request }, testInfo) => {
   const browserErrors: string[] = [];
   page.on("console", (message) => { if (message.type() === "error") browserErrors.push(message.text()); });

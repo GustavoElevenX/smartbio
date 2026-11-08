@@ -724,7 +724,11 @@ const DateRangeBlock: BlockRenderer = ({ runtime, setRuntime, emit }) => {
     const next = { ...range, [key]: value };
     setRuntime((current) => ({
       ...current,
-      selectedDateRange: next,
+      selectedDateRange: {
+        start: current.selectedDateRange?.start || "",
+        end: current.selectedDateRange?.end || "",
+        [key]: value,
+      },
       selectedOfferIds: [],
     }));
     if (next.start && next.end) emit("reservation_search_started", next);

@@ -29,6 +29,7 @@ test("abre o WhatsApp com o resumo organizado da jornada", async ({ page, contex
   await expect(page.getByText("Mix Empresas", { exact: true })).toBeVisible();
 
   const popupPromise = page.waitForEvent("popup");
+  const handoffPromise = page.waitForResponse((response) => response.url().includes("/api/public/handoff") && response.request().method() === "POST");
   await page.getByRole("button", { name: /falar com atendimento comercial/i }).click();
   const whatsapp = await popupPromise;
   await whatsapp.waitForLoadState("domcontentloaded");
@@ -43,6 +44,15 @@ test("abre o WhatsApp com o resumo organizado da jornada", async ({ page, contex
   expect(message).toMatch(/• O que você deseja fazer hoje\? Comprar para revenda/i);
   expect(message).toContain("• Orientação recebida: Mix Empresas foi indicada como possível caminho, sujeito à confirmação da equipe.");
   expect(message).not.toContain("Ver sugestão");
+
+  const handoff = await (await handoffPromise).json() as { data: { message: string; briefing: { visitorStatements: Array<{ value: string }> } } };
+  expect(handoff.data.message).toBe(message);
+  expect(handoff.data.briefing.visitorStatements.some((item) => item.value === "Evento")).toBe(true);
+
+  const opportunities = await page.evaluate(() => Object.entries(localStorage)
+    .filter(([key]) => key.includes("opportunities"))
+    .map(([, value]) => value));
+  expect(opportunities.some((value) => value.includes("briefing") && value.includes("Mix Empresas"))).toBe(true);
 
   const screenshotDir = process.env.QA_SCREENSHOT_DIR;
   if (screenshotDir) await whatsapp.screenshot({ path: path.join(screenshotDir, `whatsapp-journey-summary-${testInfo.project.name}.png`), fullPage: true });
