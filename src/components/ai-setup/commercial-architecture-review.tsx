@@ -69,6 +69,12 @@ export function CommercialArchitectureReview({ architecture, busy, onConfirm, on
           </div>
         </div>
 
+        <div className="mt-6 grid gap-4 rounded-xl border border-[#dfe6ee] bg-[#f7fbff] p-4 sm:grid-cols-2">
+          <div className="sm:col-span-2"><span className="text-xs font-bold text-[#9a6700]">Sugestão da SOBE · confirme antes de criar</span><h3 className="mt-1 text-sm font-extrabold text-[#07172f]">O que entendemos</h3>{editing ? <div className="mt-2"><Label htmlFor="review-what-sells">O que o negócio oferece</Label><Input id="review-what-sells" value={draft.businessSummary.whatItSells} maxLength={4000} onChange={(event) => setDraft((current) => ({ ...current, businessSummary: { ...current.businessSummary, whatItSells: event.target.value } }))} /></div> : <p className="mt-1 text-sm leading-6 text-[#526171]">{draft.businessSummary.whatItSells}</p>}</div>
+          <div><strong className="text-xs text-[#07172f]">Como vende ou atende</strong>{editing ? <Input aria-label="Como vende ou atende" className="mt-2" value={draft.businessSummary.commercialModel} maxLength={600} onChange={(event) => setDraft((current) => ({ ...current, businessSummary: { ...current.businessSummary, commercialModel: event.target.value } }))} /> : <p className="mt-1 text-sm text-[#526171]">{draft.businessSummary.commercialModel}</p>}</div>
+          <div><strong className="text-xs text-[#07172f]">Público identificado</strong>{draft.audienceContexts.length ? <div className="mt-1 space-y-2">{draft.audienceContexts.map((audience) => editing ? <Input key={audience.id} aria-label={`Público: ${audience.label}`} value={audience.label} maxLength={160} onChange={(event) => setDraft((current) => ({ ...current, audienceContexts: current.audienceContexts.map((item) => item.id === audience.id ? { ...item, label: event.target.value } : item) }))} /> : <p key={audience.id} className="text-sm text-[#526171]">{audience.label}</p>)}</div> : <p className="mt-1 text-sm text-[#526171]">Ainda não informado; a SOBE não presumirá um público específico.</p>}</div>
+        </div>
+
         <div className="mt-6 border-y border-[#dfe6ee]">
           {draft.journeyBlueprints.map((blueprint) => {
             const intent = intentById.get(blueprint.intentId);
@@ -81,7 +87,7 @@ export function CommercialArchitectureReview({ architecture, busy, onConfirm, on
                 <span className="grid size-11 place-items-center rounded-full bg-[#07172f] text-[#02e5cd]"><PathIcon mode={blueprint.mode} /></span>
                 <div className="min-w-0">
                   {editing ? <div><Label htmlFor={`intent-${intent.id}`}>Nome do caminho</Label><Input id={`intent-${intent.id}`} value={intent.label} onChange={(event) => updateIntent(intent.id, event.target.value)} maxLength={100} /></div> : <h3 className="text-base font-extrabold text-[#07172f]">{intent.label}</h3>}
-                  <p className="mt-1 text-sm leading-6 text-[#536178]"><span className="font-bold text-[#0054fc]">{modeLabels[blueprint.mode]}</span>{channel ? ` → ${channel.label}` : ""}</p>
+                  <p className="mt-1 text-sm leading-6 text-[#536178]"><span className="font-bold text-[#0054fc]">{modeLabels[blueprint.mode]}</span>{channel ? ` → ${channel.label}${channel.value ? ` (${channel.value})` : ""}` : ""}</p>
                   {collects.length ? <p className="mt-2 text-xs leading-5 text-[#687582]">Antes de concluir, coleta: {collects.join(", ")}.</p> : null}
                   {locations.length ? <p className="mt-1 text-xs leading-5 text-[#687582]">Unidades envolvidas: {[...new Set(locations)].join(", ")}.</p> : null}
                   {blueprint.assumptions.filter((item) => item.startsWith("Sem catálogo detalhado:")).map((item) => <p key={item} className="mt-2 text-xs leading-5 text-[#795b16]">{item}</p>)}

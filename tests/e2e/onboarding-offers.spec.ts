@@ -8,8 +8,11 @@ test("ofertas podem ser descritas ou importadas e a revenda não duplica o catá
   await page.goto("/app/onboarding/ai?new=1");
   await expect(page.getByRole("heading", { name: "Vamos montar a sua Sobe." })).toBeVisible();
   await page.getByLabel("Nome do negócio").fill("Casa de Sucos Mix");
+  await page.getByText("Detalhar ofertas e revenda (opcional)").click();
   await page.locator('label:has(input[name="offeringType"][value="products"])').click();
   await page.getByLabel("O que você vende e como atende?").fill("Preparamos sucos, lanches e saladas para consumo e também fornecemos parte da linha para revenda.");
+  await page.getByText("WhatsApp", { exact: true }).first().click();
+  await page.getByLabel("WhatsApp ou telefone principal").fill("(11) 98765-4321");
 
   await expect(page.getByLabel("Seus produtos", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: /Escrever ou colar/ }).click();

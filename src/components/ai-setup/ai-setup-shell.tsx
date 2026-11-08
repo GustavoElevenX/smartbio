@@ -121,12 +121,14 @@ function isInvalidSessionError(error: unknown) {
 
 type AISetupShellProps = {
   startFresh?: boolean;
+  initialDraft?: AISetupDraft;
   initialPreflight: ActivationPreflight;
   workspaceId: string;
 };
 
 export function AISetupShell({
   startFresh = false,
+  initialDraft,
   initialPreflight,
   workspaceId,
 }: AISetupShellProps) {
@@ -229,7 +231,7 @@ export function AISetupShell({
       setLifecycle("initializing");
       if (startFresh) {
         forgetAISetupSession();
-        await createInitialSession("new");
+        await createInitialSession("new", initialDraft);
         if (active) window.history.replaceState(null, "", "/app/onboarding/ai");
         return;
       }
@@ -288,7 +290,7 @@ export function AISetupShell({
     return () => {
       active = false;
     };
-  }, [adopt, invalidateSession, router, startFresh, workspaceId]);
+  }, [adopt, initialDraft, invalidateSession, router, startFresh, workspaceId]);
 
   useEffect(() => {
     if (!session || session.status !== "collecting" || busy) return;
@@ -412,11 +414,10 @@ export function AISetupShell({
     creationRequested.current = false;
     if (
       form.businessName.trim().length < 2 ||
-      form.description.trim().length < minimumBusinessContextLength ||
-      !form.offeringType
+      form.description.trim().length < minimumBusinessContextLength
     ) {
       setError(
-        "Informe o nome do negócio, escolha o tipo de oferta e conte o que você oferece.",
+        "Informe o nome do negócio e conte em poucas palavras o que ele oferece.",
       );
       return;
     }

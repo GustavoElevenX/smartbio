@@ -19,8 +19,8 @@ test("modo simples e avançado compartilham o rascunho sem publicar", async ({ p
   await expect(page.getByLabel("Nome", { exact: true })).toHaveValue(draftName);
   await page.getByRole("button", { name: "Simples" }).click();
   await expect(page.getByLabel("Nome do negócio")).toHaveValue(draftName);
-  await page.getByRole("button", { name: "Salvar rascunho" }).click();
-  await expect(page.getByText(/Rascunho salvo; página pública ainda não atualizada/)).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Salvar alterações" }).click();
+  await expect(page.getByText(/Alterações salvas; página pública ainda não atualizada/)).toBeVisible({ timeout: 15_000 });
   await page.reload();
   await page.getByRole("button", { name: /Meu negócio/ }).click();
   await expect(page.getByLabel("Nome do negócio")).toHaveValue(draftName);
@@ -97,8 +97,8 @@ test("edita intenção e cor no Simples sem publicar e persiste no celular e des
   await page.getByRole("button", { name: /Aparência/ }).click();
   await page.getByLabel("Cor principal").fill("#2266aa");
   await expect(page.getByText("Prévia do rascunho · ainda não publicada")).toBeVisible();
-  await page.getByRole("button", { name: "Salvar rascunho" }).click();
-  await expect(page.getByText(/Rascunho salvo; página pública ainda não atualizada/)).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Salvar alterações" }).click();
+  await expect(page.getByText(/Alterações salvas; página pública ainda não atualizada/)).toBeVisible({ timeout: 15_000 });
   const saved = await (await request.get(`/api/projects/${project.id}`)).json();
   expect(saved.data.conversionGoals[0].name).toBe("Quero pedir sucos");
   expect(saved.data.designSystem.colors.primary).toBe("#2266aa");

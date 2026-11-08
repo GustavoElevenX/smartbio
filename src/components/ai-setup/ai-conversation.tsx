@@ -73,6 +73,7 @@ export function AIConversation({ form, sources, brandIdentity, logoPreviewUrl, s
   const optionalQuestions = (session?.questions || []).filter((question) => !requiredQuestions.includes(question));
   const creating = !["idle", "ready"].includes(generationStatus);
   const unresolvedWithoutControl = Boolean(architectureReviewed && readiness.blocking > 0 && !requiredQuestions.length);
+  const moment = !analyzed || editingBusinessInfo ? 1 : architectureReviewed ? 3 : 2;
   return (
     <main className="min-w-0 p-5 sm:p-7 xl:p-9">
       <div className="mx-auto max-w-[780px]">
@@ -87,8 +88,9 @@ export function AIConversation({ form, sources, brandIdentity, logoPreviewUrl, s
           <Link href="/app/onboarding/manual" className="hidden shrink-0 text-xs font-bold text-[#536178] underline decoration-[#9fc3ff] underline-offset-4 sm:block">Configuração manual</Link>
         </div>
 
+        <nav aria-label="Momentos da configuração" className="mt-5"><ol className="grid grid-cols-3 gap-2 text-xs font-bold sm:text-sm">{["Conte seu negócio", "Revise a proposta", "Teste e publique"].map((label, index) => <li key={label} className={`min-w-0 border-t-2 pt-2 ${moment >= index + 1 ? "border-[#0054fc] text-[#07172f]" : "border-[#dfe6ee] text-[#687582]"}`} aria-current={moment === index + 1 ? "step" : undefined}>{index + 1}. {label}</li>)}</ol></nav>
         <div className="mt-6 flex flex-col gap-5">
-          <section aria-label="Informações do negócio">
+          {!analyzed || editingBusinessInfo ? <section aria-label="Informações do negócio">
             <div className="grid gap-4">
               <div><Label htmlFor="ai-business-name">Nome do negócio</Label><Input id="ai-business-name" autoComplete="organization" value={form.businessName} onChange={(event) => onFormChange((current) => ({ ...current, businessName: event.target.value }))} placeholder="Ex.: Estúdio Aurora" disabled={inputsDisabled} /></div>
             </div>
@@ -100,7 +102,9 @@ export function AIConversation({ form, sources, brandIdentity, logoPreviewUrl, s
             {!analyzed ? <><Button type="button" size="lg" className="mt-5 w-full sm:w-auto" onClick={() => void onAnalyze()} disabled={!sessionReady || busy || sourcesProcessing}>{busy || sourcesProcessing ? <LoaderCircle data-icon size={17} className="animate-spin" /> : <WandSparkles data-icon size={17} />}{sourcesProcessing ? "Importando materiais…" : busy ? "Preparando sua proposta…" : "Preparar minha Sobe"}</Button><p className="mt-3 text-xs leading-5 text-[#526171]">A IA organiza a proposta. Você revisa uma vez e cria um rascunho; nada é publicado agora.</p></> : null}
             {analyzed && !editingBusinessInfo && !ready ? <Button type="button" size="lg" variant="secondary" className="mt-5 w-full sm:w-auto" onClick={onEditBusinessInfo} disabled={busy}><PencilLine data-icon size={17} /> Editar informações do negócio</Button> : null}
             {analyzed && editingBusinessInfo ? <><p className="mt-4 text-sm leading-6 text-[#536178]">Faça os ajustes necessários. A nova análise vai substituir esta leitura, sem reiniciar a configuração inicial.</p><Button type="button" size="lg" className="mt-3 w-full sm:w-auto" onClick={() => void onAnalyze()} disabled={!sessionReady || busy || sourcesProcessing}>{busy || sourcesProcessing ? <LoaderCircle data-icon size={17} className="animate-spin" /> : <WandSparkles data-icon size={17} />}{sourcesProcessing ? "Importando materiais…" : busy ? "Analisando novamente…" : "Analisar novamente"}</Button></> : null}
-          </section>
+          </section> : null}
+
+          {analyzed && !editingBusinessInfo ? <section className="rounded-xl border border-[#dfe6ee] bg-[#f7fbff] p-5" aria-label="Resumo informado pelo negócio"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-extrabold text-[#07172f]">{form.businessName}</h2><p className="mt-2 text-sm leading-6 text-[#526171]">{form.description}</p></div><Button type="button" variant="secondary" size="sm" onClick={onEditBusinessInfo} disabled={busy}><PencilLine data-icon size={15} />Corrigir informações</Button></div><p className="mt-3 text-xs text-[#526171]">Essas informações vieram de você. Confira abaixo as sugestões da SOBE antes de criar o rascunho.</p></section> : null}
 
           {analyzed && session && !editingBusinessInfo && !architectureReviewed ? <AIMessage role="assistant">Esta é a proposta para o seu negócio. A Sobe preparou os caminhos; você não precisa configurar as etapas.</AIMessage> : null}
           {analyzed && session?.commercialArchitecture && !editingBusinessInfo && !session.architectureReviewed ? <CommercialArchitectureReview architecture={session.commercialArchitecture} busy={busy} onConfirm={onConfirmArchitecture} onUpdate={onUpdateArchitecture} /> : null}

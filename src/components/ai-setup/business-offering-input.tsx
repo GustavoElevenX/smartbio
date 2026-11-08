@@ -34,7 +34,13 @@ export function BusinessOfferingInput({ form, sources, setupSessionId, projectId
       <h2 className="text-lg font-extrabold tracking-[-.025em] text-[#07172f]">O que seu negócio oferece</h2>
       <p className="mt-1 text-sm leading-6 text-[#526171]">Comece pelo essencial. A Sobe organiza os detalhes e você revisa antes de criar.</p>
 
-      <fieldset className="mt-5">
+      <div className="mt-5">
+        <Label htmlFor="ai-description">O que você vende e como atende?</Label>
+        <Textarea id="ai-description" className="min-h-28" value={form.description} onChange={(event) => onFormChange((current) => ({ ...current, description: event.target.value }))} placeholder="Conte em poucas palavras o que seu negócio faz, para quem e como atende." disabled={disabled} aria-describedby="ai-description-hint" />
+        <p id="ai-description-hint" className="mt-2 text-xs leading-5 text-[#526171]">Uma descrição breve basta. A SOBE propõe os caminhos comerciais e você confirma antes de criar.</p>
+      </div>
+      <details className="mt-5 border-t border-[#dfe6ee] pt-3"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-[#07172f]">Detalhar ofertas e revenda (opcional)</summary>
+      <fieldset className="mt-4">
         <legend className="text-sm font-bold text-[#07172f]">Você vende produtos, serviços ou ambos?</legend>
         <div className="mt-3 flex flex-wrap gap-2">
           {offeringOptions.map(([value, label]) => (
@@ -45,12 +51,6 @@ export function BusinessOfferingInput({ form, sources, setupSessionId, projectId
           ))}
         </div>
       </fieldset>
-
-      <div className="mt-5">
-        <Label htmlFor="ai-description">O que você vende e como atende?</Label>
-        <Textarea id="ai-description" className="min-h-28" value={form.description} onChange={(event) => onFormChange((current) => ({ ...current, description: event.target.value }))} placeholder="Conte em poucas palavras o que seu negócio faz, para quem e como atende." disabled={disabled} aria-describedby="ai-description-hint" />
-        <p id="ai-description-hint" className="mt-2 text-xs leading-5 text-[#526171]">Não precisa listar cada item aqui. Escreva como explicaria seu negócio a alguém que vai montar seu link da bio.</p>
-      </div>
 
       <div className="mt-6">
         <h3 className="text-sm font-bold text-[#07172f]">{offerLabel}</h3>
@@ -103,6 +103,7 @@ export function BusinessOfferingInput({ form, sources, setupSessionId, projectId
           ) : null}
         </fieldset>
       ) : null}
+      </details>
     </div>
   );
 }

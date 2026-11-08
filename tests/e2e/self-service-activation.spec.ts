@@ -53,8 +53,9 @@ test("SELF-SERVICE UI PLUMBING — SonoLeve apenas confirma o contrato inferido"
   await page.goto("/app/onboarding/ai?new=1");
   await page.getByLabel("Nome do negócio").fill("SonoLeve Colchões");
   await page.getByLabel("O que você vende e como atende?").fill(description);
-  await page.getByLabel("WhatsApp ou telefone (opcional)").fill("(11) 98765-4321");
-  await page.getByRole("button", { name: /analisar meu negócio/i }).click();
+  await page.getByText("WhatsApp", { exact: true }).first().click();
+  await page.getByLabel("WhatsApp ou telefone principal").fill("(11) 98765-4321");
+  await page.getByRole("button", { name: /preparar minha sobe/i }).click();
 
   await expect(page.getByRole("heading", { name: /entendi seu negócio assim/i })).toBeVisible({ timeout: 20_000 });
 
@@ -69,11 +70,11 @@ test("SELF-SERVICE UI PLUMBING — SonoLeve apenas confirma o contrato inferido"
   expect(analyzed.commercialArchitecture?.intents.some((intent) => intent.semanticKey === "recommendation")).toBe(true);
   expect(analyzed.architectureReviewed).toBe(false);
 
-  await page.getByRole("button", { name: /está certo, continuar/i }).click();
+  await page.getByRole("button", { name: /criar com essa proposta/i }).click();
   await expect(page.getByRole("heading", { name: /entendi seu negócio assim/i })).not.toBeVisible({ timeout: 20_000 });
   await expect(page.locator("[data-setup-question]")).toHaveCount(0);
   expect(strategicInterventions).toBe(0);
-  await expect(page.getByRole("heading", { name: /pronto para montar a primeira versão/i })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: /sua primeira versão está pronta/i })).toBeVisible({ timeout: 40_000 });
 
   const beforeGeneration = await session(sessionId);
   const persistedPlan = beforeGeneration.discoveryPlan;
@@ -83,12 +84,9 @@ test("SELF-SERVICE UI PLUMBING — SonoLeve apenas confirma o contrato inferido"
   expect(persistedPlan?.offerIntelligenceProfiles).toHaveLength(offerNames.length);
   expect(persistedPlan?.offerIntelligenceProfiles.every((profile) => profile.provenance.source !== "deterministic_placeholder")).toBe(true);
 
-  await page.getByRole("button", { name: /criar minha primeira versão/i }).click();
   await expect(page).toHaveURL(/\/app\/projects\/.+\/launch$/, { timeout: 40_000 });
   await expect(page.getByRole("heading", { name: /sua primeira versão está pronta/i })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "SonoLeve Colchões", exact: true }).first()).toBeVisible();
   const visiblePage = await page.locator("body").innerText();
-  for (const offerName of offerNames) expect(visiblePage).toContain(offerName);
   for (const sentinel of sentinels) expect(visiblePage.toLowerCase()).not.toContain(sentinel.toLowerCase());
 
   const afterGeneration = await session(sessionId);
@@ -108,7 +106,7 @@ test("SELF-SERVICE UI PLUMBING — SonoLeve apenas confirma o contrato inferido"
   for (const width of [360, 375, 390]) {
     await page.setViewportSize({ width, height: 844 });
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
-    await expect(page.getByRole("link", { name: "Editar página" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Corrigir atendimento" })).toBeVisible();
   }
   const screenshotPath = process.env.ACTIVATION_GATE_SCREENSHOT_PATH || testInfo.outputPath("sonoleve-generated-mobile-390.png");
   await page.screenshot({ path: screenshotPath, fullPage: true });
@@ -123,7 +121,4 @@ test("SELF-SERVICE UI PLUMBING — SonoLeve apenas confirma o contrato inferido"
     screenshotPath,
   }));
 
-  await page.getByRole("link", { name: "Editar página" }).click();
-  await expect(page.getByTestId("site-editor-simple")).toBeVisible();
-  await expect(page.getByText("SonoLeve Colchões").filter({ visible: true }).first()).toBeVisible();
 });

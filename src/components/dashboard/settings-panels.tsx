@@ -106,12 +106,12 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
     setDirty(true);
   }
   async function save() {
-    if (!project) return;
+    if (!project) return false;
     const validationError = mode === "simple" ? validateSimpleProject(project) : null;
-    if (validationError) { setSaveError(validationError); return; }
+    if (validationError) { setSaveError(validationError); return false; }
     if (Object.keys(whatsappNumberErrors(projectWhatsAppNumbers(project))).length) {
       setSaveError("Revise os números de WhatsApp destacados antes de salvar.");
-      return;
+      return false;
     }
     setSaveError("");
     setSaving(true);
@@ -121,8 +121,10 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
       setDirty(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 1600);
+      return true;
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Não foi possível salvar as configurações.");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -163,7 +165,7 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
         <button type="button" aria-pressed={mode === "advanced"} onClick={() => setMode("advanced")} className={`focus-ring min-h-11 rounded-lg px-5 text-sm font-bold ${mode === "advanced" ? "bg-[#0054fc] text-white" : "text-[#536178] hover:bg-[#eef4fa]"}`}>Avançado</button>
       </div>
       {dirty || contextDirty ? <p role="status" className="mt-2 text-sm font-semibold text-[#9a6700]">Há alterações não salvas. Alternar o modo mantém o rascunho nesta tela.</p> : null}
-      <div hidden={mode !== "simple"}><SimpleSettings project={project} active={mode === "simple"} onChange={(next) => { setProject(next); setDirty(true); setSaveError(""); }} onContextDirtyChange={setContextDirty} onSave={() => void save()} saved={saved} saveError={saveError} dirty={dirty} saving={saving} /></div>
+      <div hidden={mode !== "simple"}><SimpleSettings project={project} active={mode === "simple"} onChange={(next) => { setProject(next); setDirty(true); setSaveError(""); }} onContextDirtyChange={setContextDirty} onSave={save} saved={saved} saveError={saveError} dirty={dirty} saving={saving} /></div>
       {mode === "advanced" ? <div>
       <div className="mt-7 grid gap-3 sm:grid-cols-2">
         {[

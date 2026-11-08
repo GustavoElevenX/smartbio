@@ -8,11 +8,12 @@ test("onboarding adaptativo funciona sem login e gera um rascunho", async ({ pag
 
   await page.getByLabel("Nome do negócio").fill("Clínica Aurora");
   await page.getByLabel("O que você vende e como atende?").fill("Clínica de estética com limpeza de pele, tratamentos faciais e corporais. Quero ajudar o visitante a entender qual caminho pode fazer sentido e solicitar uma avaliação profissional pelo WhatsApp.");
-  await page.getByLabel("WhatsApp ou telefone (opcional)").fill("(11) 98765-4321");
+  await page.getByText("WhatsApp", { exact: true }).first().click();
+  await page.getByLabel("WhatsApp ou telefone principal").fill("(11) 98765-4321");
   await page.getByRole("button", { name: /preparar minha Sobe/i }).click();
 
   await expect(page.getByRole("heading", { name: /entendi seu negócio assim/i })).toBeVisible({ timeout: 15_000 });
-  await page.getByRole("button", { name: /editar informações do negócio/i }).click();
+  await page.getByRole("button", { name: /corrigir informações/i }).click();
   await expect(page.getByLabel("O que você vende e como atende?")).toBeEnabled();
   await page.getByLabel("O que você vende e como atende?").fill("Clínica de estética com tratamentos faciais e corporais. Quero orientar possibilidades sem diagnosticar e encaminhar o visitante para uma avaliação profissional pelo WhatsApp.");
   await page.getByRole("button", { name: /analisar novamente/i }).click();
@@ -23,8 +24,9 @@ test("onboarding adaptativo funciona sem login e gera um rascunho", async ({ pag
   await expect(page).toHaveURL(/\/app\/projects\/.+\/launch$/, { timeout: 30_000 });
   await expect(page.getByRole("heading", { name: /sua primeira versão está pronta/i })).toBeVisible();
   await expect(page.getByText("Rascunho", { exact: true })).toBeVisible();
-  await page.getByRole("link", { name: "Editar página" }).click();
-  await expect(page.getByTestId("site-editor-simple")).toBeVisible();
+  await page.getByRole("link", { name: "Corrigir atendimento" }).click();
+  await expect(page.getByRole("heading", { name: "Configurações" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Simples", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
 
 test("um WhatsApp principal atende todos os caminhos e permite criar a primeira versão", async ({ page }, testInfo) => {
@@ -38,14 +40,13 @@ test("um WhatsApp principal atende todos os caminhos e permite criar a primeira 
   await expect(page).toHaveTitle(/sobe/i);
   await page.getByLabel("Nome do negócio").fill("Rede Casa Norte");
   await page.getByLabel("O que você vende e como atende?").fill("Temos quatro unidades. O cliente pode pedir orçamento, comprar produtos, falar com a equipe ou encontrar uma unidade. Nosso canal de vendas é o WhatsApp.");
+  await page.getByText("WhatsApp", { exact: true }).first().click();
+  await page.getByLabel("WhatsApp ou telefone principal").fill("(11) 98888-7777");
   await page.getByRole("button", { name: /preparar minha Sobe/i }).click();
   await expect(page.getByRole("heading", { name: /entendi seu negócio assim/i })).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: /criar com essa proposta/i }).click();
 
-  const primaryQuestion = page.locator("[data-setup-question]").filter({ hasText: "WhatsApp principal" });
-  await expect(primaryQuestion).toHaveCount(1);
-  await primaryQuestion.locator("input[type=tel]").fill("(11) 98888-7777");
-  await primaryQuestion.getByRole("button", { name: /usar esta resposta/i }).click();
+  await expect(page.locator("[data-setup-question]").filter({ hasText: "WhatsApp principal" })).toHaveCount(0);
   const evidenceDir = process.env.QA_EVIDENCE_DIR;
   if (evidenceDir) await page.screenshot({ path: `${evidenceDir}/${testInfo.project.name}-whatsapp-principal.png`, fullPage: false });
 
@@ -83,6 +84,8 @@ test("sessão órfã entra em recuperação e nunca dispara analyze com id invá
   await expect(name).toHaveValue("");
   await name.fill("Studio Nexo Interiores");
   await page.getByLabel("O que você vende e como atende?").fill("Escritório de arquitetura e interiores que orienta o visitante para o serviço adequado e depois encaminha para conversar com a equipe.");
+  await page.getByText("WhatsApp", { exact: true }).first().click();
+  await page.getByLabel("WhatsApp ou telefone principal").fill("(11) 98765-4321");
   await page.getByRole("button", { name: /preparar minha Sobe/i }).click();
   await expect(page.getByRole("heading", { name: /entendi seu negócio assim/i })).toBeVisible({ timeout: 15_000 });
   expect(analyzeRequests).toHaveLength(1);
@@ -93,7 +96,8 @@ test("refresh retoma a sessão válida e confirma somente o WhatsApp persistido"
   await page.goto("/app/onboarding/ai?new=1");
   const name = page.getByLabel("Nome do negócio");
   const description = page.getByLabel("O que você vende e como atende?");
-  const phone = page.getByLabel("WhatsApp ou telefone (opcional)");
+  await page.getByText("WhatsApp", { exact: true }).first().click();
+  const phone = page.getByLabel("WhatsApp ou telefone principal");
   await name.fill("Studio Nexo Interiores");
   await description.fill("Escritório de arquitetura e interiores que orienta clientes e continua o atendimento pelo WhatsApp.");
   await phone.fill("(11) 98765-4321");
@@ -123,7 +127,8 @@ test("refresh retoma a sessão válida e confirma somente o WhatsApp persistido"
   await expect(description).toHaveValue(/Escritório de arquitetura/);
   await expect(phone).toHaveValue("(11) 98765-4321");
   await page.getByRole("button", { name: /preparar minha Sobe/i }).click();
-  await expect(page.getByText(/whatsapp salvo e confirmado/i)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: /entendi seu negócio assim/i })).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: /corrigir informações/i }).click();
   await expect(phone).toHaveValue("+5511987654321");
 });
 
@@ -152,7 +157,8 @@ test("WhatsApp inválido permanece visível e mostra como corrigir", async ({ pa
   await page.goto("/app/onboarding/ai?new=1");
   await page.getByLabel("Nome do negócio").fill("Studio Norte");
   await page.getByLabel("O que você vende e como atende?").fill("Studio de serviços que orienta clientes e continua o atendimento pelo WhatsApp.");
-  const phone = page.getByLabel("WhatsApp ou telefone (opcional)");
+  await page.getByText("WhatsApp", { exact: true }).first().click();
+  const phone = page.getByLabel("WhatsApp ou telefone principal");
   await phone.fill("123");
   await page.getByRole("button", { name: /preparar minha Sobe/i }).click();
 
@@ -163,6 +169,7 @@ test("WhatsApp inválido permanece visível e mostra como corrigir", async ({ pa
   await phone.fill("5511000000000");
   await page.getByRole("button", { name: /preparar minha Sobe/i }).click();
   await expect(page.getByRole("heading", { name: /entendi seu negócio assim/i })).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: /corrigir informações/i }).click();
   await expect(phone).toHaveValue("+5511000000000");
 });
 
@@ -170,7 +177,8 @@ test("mostra múltiplos caminhos inferidos e permite ajustar a interpretação",
   await page.goto("/app/onboarding/ai?new=1");
   await page.getByLabel("Nome do negócio").fill("Ateliê Norte");
   await page.getByLabel("O que você vende e como atende?").fill("Ateliê que vende peças autorais, mostra catálogo e recebe pedidos e orçamentos pelo WhatsApp.");
-  await page.getByLabel("WhatsApp ou telefone (opcional)").fill("(11) 98765-4321");
+  await page.getByText("WhatsApp", { exact: true }).first().click();
+  await page.getByLabel("WhatsApp ou telefone principal").fill("(11) 98765-4321");
   await page.getByRole("button", { name: /preparar minha Sobe/i }).click();
   await expect(page.getByRole("heading", { name: /entendi seu negócio assim/i })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/consultar produtos|solicitar atendimento|pedir orçamento/i).first()).toBeVisible();
@@ -192,11 +200,12 @@ test("contexto curto sem fotos ou catálogo cria atendimento sem exigir melhoria
   await page.goto("/app/onboarding/ai?new=1");
   await expect(page).toHaveTitle(/sobe/i);
   await expect(page.getByRole("heading", { name: /vamos montar a sua sobe/i })).toBeVisible();
-  await expect(page.getByLabel("Site, Instagram, cardápio ou outro link (opcional)")).toBeHidden();
+  await expect(page.getByLabel("Outro site ou perfil de referência (opcional)")).toBeHidden();
   await page.getByLabel("Nome do negócio").fill("Loja de teste — exemplo");
   await page.getByLabel("O que você vende e como atende?").fill("Vendo roupas. O cliente pode fazer pedido pelo WhatsApp.");
-  await page.getByLabel("WhatsApp ou telefone (opcional)").fill("11987654321");
-  await page.getByLabel("WhatsApp ou telefone (opcional)").blur();
+  await page.getByText("WhatsApp", { exact: true }).first().click();
+  await page.getByLabel("WhatsApp ou telefone principal").fill("11987654321");
+  await page.getByLabel("WhatsApp ou telefone principal").blur();
   await page.emulateMedia({ reducedMotion: "reduce" });
   if (process.env.QA_EVIDENCE_DIR) await page.screenshot({ path: `${process.env.QA_EVIDENCE_DIR}/${testInfo.project.name}-novo-negocio-minimo.png`, fullPage: true });
   await page.getByRole("button", { name: /preparar minha sobe/i }).click();
