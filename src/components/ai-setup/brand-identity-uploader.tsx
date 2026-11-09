@@ -3,6 +3,7 @@
 import { Check, LoaderCircle, Palette, RefreshCw, Sparkles, Upload } from "lucide-react";
 import { useState } from "react";
 import type { BrandIdentity } from "@/features/ai-setup/ai-setup.schema";
+import { sanitizedSvgDataUrl } from "@/features/brand-intelligence/svg-sanitizer";
 
 interface BrandIdentityUploaderProps {
   brand?: BrandIdentity;
@@ -14,6 +15,9 @@ interface BrandIdentityUploaderProps {
 }
 
 function readPreview(file: File) {
+  if (file.type === "image/svg+xml") {
+    return file.text().then(sanitizedSvgDataUrl);
+  }
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));

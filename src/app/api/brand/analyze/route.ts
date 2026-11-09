@@ -13,9 +13,9 @@ export const POST = withAuthenticatedActor(async (request, _context, actor) => {
   const data = await request.formData();
   const file = data.get("logo");
   if (!(file instanceof File) || !allowed.has(file.type) || file.size > 5 * 1024 * 1024) return NextResponse.json({ ok: false, error: { code: "invalid_file", message: "Logo inválida." } }, { status: 400 });
-  let buffer = Buffer.from(await file.arrayBuffer());
-  if (file.type === "image/svg+xml") buffer = Buffer.from(sanitizeSvg(buffer.toString("utf8")));
   try {
+    let buffer = Buffer.from(await file.arrayBuffer());
+    if (file.type === "image/svg+xml") buffer = Buffer.from(sanitizeSvg(buffer.toString("utf8")));
     const image = sharp(buffer, { limitInputPixels: 25_000_000 }).resize(96, 96, { fit: "contain" }).ensureAlpha();
     const { data: pixels } = await image.raw().toBuffer({ resolveWithObject: true });
     const buckets = new Map<string, number>();

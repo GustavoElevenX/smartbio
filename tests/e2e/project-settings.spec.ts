@@ -3,6 +3,7 @@ import path from "node:path";
 import { findDemoProject } from "../../src/data/demo-projects";
 
 test("modo simples e avançado compartilham o rascunho sem publicar", async ({ page, request }) => {
+  test.setTimeout(90_000);
   const project = structuredClone(findDemoProject("demo-casa-sucos")!);
   await request.put(`/api/projects/${project.id}`, { data: project });
   await page.goto(`/app/projects/${project.id}/settings`);

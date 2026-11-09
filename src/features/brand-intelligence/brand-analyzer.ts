@@ -1,16 +1,10 @@
 import type { BrandProfile } from "@/types";
 import { buildPalette, luminance, rgbToHex, saturation } from "./colors";
+import { sanitizedSvgDataUrl } from "./svg-sanitizer";
+export { sanitizeSvg } from "./svg-sanitizer";
 
 const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/svg+xml"]);
 const MAX_LOGO_BYTES = 5 * 1024 * 1024;
-
-export function sanitizeSvg(svg: string) {
-  return svg
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, "")
-    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*')/gi, "")
-    .replace(/\s(?:href|xlink:href)\s*=\s*("|')(?:https?:|data:text\/html)[\s\S]*?\1/gi, "");
-}
 
 async function validateSignature(file: File) {
   const bytes = new Uint8Array(await file.slice(0, 16).arrayBuffer());
@@ -61,16 +55,14 @@ export async function analyzeBrandFile(file: File): Promise<BrandProfile> {
   if (file.size > MAX_LOGO_BYTES) throw new Error("A logo deve ter no máximo 5 MB.");
   await validateSignature(file);
 
-  let logoDataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("Não foi possível ler a logo."));
-    reader.readAsDataURL(file);
-  });
-  if (file.type === "image/svg+xml") {
-    const safe = sanitizeSvg(await file.text());
-    logoDataUrl = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(safe)))}`;
-  }
+  const logoDataUrl = file.type === "image/svg+xml"
+    ? sanitizedSvgDataUrl(await file.text())
+    : await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error("Não foi possível ler a logo."));
+      reader.readAsDataURL(file);
+    });
 
   const image = await new Promise<HTMLImageElement>((resolve, reject) => {
     const element = new Image();
