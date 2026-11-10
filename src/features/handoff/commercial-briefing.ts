@@ -24,6 +24,18 @@ export function buildCommercialBriefing(context: CommercialHandoffContext): Comm
   const pending = [...new Set((context.pending || []).map((item) => item.trim()).filter(Boolean))];
   const goal = context.intent.label?.trim() || "Atendimento solicitado";
   const detail = context.intent.visitorRequest?.trim();
+  const rawKind = context.intent.kind || (/orçament|cotaç|proposta/i.test(goal) ? "request_quote" : /agend|reserv/i.test(goal) ? "schedule" : /compr|pedido/i.test(goal) ? "buy" : "contact");
+  const kind = rawKind === "reserve" ? "schedule" : rawKind === "visit" || rawKind === "learn" || rawKind === "custom" ? "other" : rawKind;
+  const subject = detail ? ` sobre ${detail}` : "";
+  const actions = {
+    buy: `Revisar o pedido${subject} e orientar a conclusão`,
+    request_quote: `Preparar a cotação${subject} com base no que foi informado`,
+    schedule: `Conferir a solicitação de horário${subject} e responder ao visitante`,
+    contact: `Retomar o contato${subject} pelo canal escolhido`,
+    other: `Analisar a solicitação${subject} e indicar o atendimento adequado`,
+  };
+  const collected = visitorStatements.length ? ` Já foram informados: ${visitorStatements.map((item) => item.label).join(", ")}.` : "";
+  const confirmed = confirmedFacts.length ? ` Considere os dados confirmados pela empresa: ${confirmedFacts.map((item) => item.label).join(", ")}.` : "";
   return {
     projectId: context.projectId,
     businessName: context.projectName?.trim() || undefined,
@@ -37,10 +49,10 @@ export function buildCommercialBriefing(context: CommercialHandoffContext): Comm
     location: included.find((item) => /^unidade$/i.test(item.label))?.value,
     contactConsent: context.consent?.contact,
     nextStep: {
-      action: "Confirmar o pedido e orientar o próximo atendimento",
+      action: actions[kind],
       reason: pending.length
-        ? `A equipe precisa confirmar: ${pending.join(", ")}.`
-        : "A equipe deve confirmar condições comerciais antes de assumir preço, disponibilidade ou prazo.",
+        ? `Confirme antes de prometer: ${pending.join(", ")}.${collected}${confirmed}`
+        : `Confirme condições comerciais ainda não verificadas antes de prometer preço, disponibilidade ou prazo.${collected}${confirmed}`,
     },
   };
 }

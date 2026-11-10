@@ -39,6 +39,7 @@ import { resolveRoute } from "@/features/routing/routing-engine";
 import { destinationMatchesCompletion, semanticJourneyRouteKey } from "@/features/routing/completion-destination";
 import { buildJourneyHandoff, withFreeTextRequest } from "@/features/handoff/journey-handoff";
 import { buildCommercialBriefing } from "@/features/handoff/commercial-briefing";
+import { confirmedHandoffFacts } from "@/features/handoff/confirmed-handoff-facts";
 import type { CommercialHandoffContext } from "@/features/handoff/commercial-handoff-context";
 import { formatVisitorHandoff } from "@/features/handoff/handoff-formatter";
 import { buildIntentCollectionPlan, type VisitorIntent } from "@/features/qualification/intent-collection-plan";
@@ -1319,6 +1320,7 @@ export function ExperienceCanvas({
         identity: visitorIdentity,
         intent: {
           label: journeyHandoff.interest,
+          kind: project.conversionGoals?.find((goal) => goal.id === runtime.conversionGoalId)?.kind,
           visitorRequest: String(runtime.answers.specific_request || runtime.answers.interest || runtime.answers.request || runtime.answers.need || "").trim() || undefined,
           productIds: runtime.cart.items.map((item) => item.itemId),
           serviceIds: runtime.selectedOfferIds,
@@ -1332,6 +1334,7 @@ export function ExperienceCanvas({
         pending: ["preço, disponibilidade e condições dependem de confirmação da equipe"],
         benefit: launchContext?.benefitClaimCode ? { code: launchContext.benefitClaimCode } : undefined,
       };
+      handoffContext.qualification.push(...confirmedHandoffFacts(project, handoffContext.intent));
       const message = formatVisitorHandoff(handoffContext, project);
       emit("handoff_built", { destinationId: configuredDestination?.id || option.actionPayload?.destinationId, locationId: runtime.selectedLocationId, blueprintId: option.actionPayload?.blueprintId, intentId: option.actionPayload?.intentId });
       // Keep the external action in the click gesture, even when analytics is slow.

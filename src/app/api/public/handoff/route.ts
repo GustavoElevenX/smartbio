@@ -5,6 +5,7 @@ import { getPublicProjectById } from "@/server/repositories/public-commercial-re
 import { registerOpportunity } from "@/server/opportunities/service";
 import { formatVisitorHandoff, toPerformanceEvidence } from "@/features/handoff/handoff-formatter";
 import { buildCommercialBriefing } from "@/features/handoff/commercial-briefing";
+import { confirmedHandoffFacts } from "@/features/handoff/confirmed-handoff-facts";
 import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
 import { publicRateLimitIdentifier } from "@/server/rate-limit/public-identifier";
 
@@ -40,10 +41,15 @@ export async function POST(request: Request) {
   if (locationId && destination?.locationId && destination.locationId !== locationId) return respond(apiError("O destino não corresponde à unidade selecionada.", 422, "invalid_handoff_destination"));
   if (parsed.data.context.conversionGoalId && !project.conversionGoals?.some((item) => item.id === parsed.data.context.conversionGoalId && item.isActive)) return respond(apiError("Caminho não disponível.", 422, "invalid_handoff_goal"));
   // Public input is always a visitor statement; it cannot certify business facts.
+  const confirmedFacts = confirmedHandoffFacts(project, parsed.data.context.intent);
   const safeContext = {
     ...parsed.data.context,
     projectName: project.name,
-    qualification: parsed.data.context.qualification.map((item) => ({ ...item, source: "visitor" as const })),
+    intent: { ...parsed.data.context.intent, kind: project.conversionGoals?.find((item) => item.id === parsed.data.context.conversionGoalId)?.kind },
+    qualification: [
+      ...parsed.data.context.qualification.filter((item) => !confirmedFacts.some((fact) => fact.label === item.label && fact.value === item.value)).map((item) => ({ ...item, source: "visitor" as const })),
+      ...confirmedFacts,
+    ],
   };
   const message = formatVisitorHandoff(safeContext, project);
   const briefing = buildCommercialBriefing(safeContext);

@@ -33,19 +33,24 @@ const initial: ActivationBuilderState = {
   name: "",
   activationType: "promotion",
   conversionGoalId: "",
-  offerType: "percentage_discount",
-  percentage: "20",
+  offerType: "no_discount",
+  offerDescription: "",
+  percentage: "",
   amount: "",
   minSubtotal: "",
-  eligibility: "first_order_via_virou",
+  eligibility: "any",
   startsAt: "",
   endsAt: "",
-  placements: ["announcement_bar", "hero_override"],
+  placements: ["announcement_bar"],
   locationIds: [],
   completionChannel: "whatsapp",
-  destinationMode: "routing",
+  destinationMode: "goal_default",
   defaultDestinationId: "",
-  conversionPolicy: "redemption_marks_conversion",
+  conversionPolicy: "manual_conversion",
+  maxClaims: "",
+  maxRedemptions: "",
+  maxClaimsPerCustomer: "1",
+  maxRedemptionsPerCustomer: "1",
   title: "",
   message: "",
 };
@@ -54,14 +59,21 @@ type ActivationComposeResponse = {
     draft?: {
       activation?: {
         name?: string;
+        title?: string;
+        message?: string;
         activationType?: ActivationBuilderState["activationType"];
         conversionGoalId?: string;
+        defaultDestinationId?: string;
+        destinationMode?: ActivationBuilderState["destinationMode"];
+        completionChannel?: ActivationBuilderState["completionChannel"];
         eligibility?: { customerRule?: ActivationBuilderState["eligibility"] };
         startsAt?: string;
         endsAt?: string;
+        limits?: { maxClaims?: number; maxRedemptions?: number; maxClaimsPerCustomer?: number; maxRedemptionsPerCustomer?: number };
       };
       offer?: {
         offerType?: ActivationBuilderState["offerType"];
+        description?: string;
         percentage?: number;
         amount?: number;
         minSubtotal?: number;
@@ -69,6 +81,8 @@ type ActivationComposeResponse = {
       placements?: Array<{
         placementType: ActivationBuilderState["placements"][number];
       }>;
+      needsConfirmation?: string[];
+      reasoning?: string[];
     };
   };
   error?: { message?: string };
@@ -83,8 +97,13 @@ export function ActivationBuilder({
   const router = useRouter();
   const [state, setState] = useState(initial);
   const [step, setStep] = useState(0);
+  const [mode, setMode] = useState<"simple" | "advanced">("simple");
+  const [confirmed, setConfirmed] = useState(false);
+  const [needsConfirmation, setNeedsConfirmation] = useState<string[]>([]);
+  const [reasoning, setReasoning] = useState<string[]>([]);
   const [project, setProject] = useState(serverProject || null);
   const [saving, setSaving] = useState(false);
+  const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [aiInstruction, setAiInstruction] = useState("");
   const [composing, setComposing] = useState(false);
@@ -100,8 +119,10 @@ export function ActivationBuilder({
   const destinations: BuilderOption[] = (
     project?.commercialConfig?.routingDestinations || []
   ).map(({ id, label }) => ({ id, name: label }));
-  const update = (patch: Partial<ActivationBuilderState>) =>
+  const update = (patch: Partial<ActivationBuilderState>) => {
+    setConfirmed(false);
     setState((current) => ({ ...current, ...patch }));
+  };
   const offer = useMemo(
     () => ({
       offerType: state.offerType,
@@ -122,6 +143,7 @@ export function ActivationBuilder({
       amount:
         state.offerType === "fixed_discount" ? Number(state.amount) : undefined,
       currency: "BRL",
+      description: state.offerDescription || undefined,
       minSubtotal: state.minSubtotal ? Number(state.minSubtotal) : undefined,
       scope: { locationIds: state.locationIds },
       benefitConfig: {},
@@ -129,7 +151,10 @@ export function ActivationBuilder({
     }),
     [state],
   );
-  async function save() {
+  async function save(action: "draft" | "schedule" | "publish" = "draft") {
+    if (mode === "simple" && !confirmed) { setError("Revise e confirme a proposta antes de continuar."); return; }
+    if (action === "schedule" && (!state.startsAt || new Date(state.startsAt) <= new Date())) { setError("Escolha um início futuro para agendar."); return; }
+    if (action !== "draft" && !state.conversionGoalId) { setError("Escolha uma ação principal antes de publicar."); return; }
     setSaving(true);
     setError("");
     try {
@@ -157,7 +182,12 @@ export function ActivationBuilder({
             ? Number(state.minSubtotal)
             : undefined,
         },
-        limits: { maxClaimsPerCustomer: 1, maxRedemptionsPerCustomer: 1 },
+        limits: {
+          maxClaims: state.maxClaims ? Number(state.maxClaims) : undefined,
+          maxRedemptions: state.maxRedemptions ? Number(state.maxRedemptions) : undefined,
+          maxClaimsPerCustomer: state.maxClaimsPerCustomer ? Number(state.maxClaimsPerCustomer) : undefined,
+          maxRedemptionsPerCustomer: state.maxRedemptionsPerCustomer ? Number(state.maxRedemptionsPerCustomer) : undefined,
+        },
         settings: {
           conversionPolicy: state.conversionPolicy,
           claimTtlMinutes: 1440,
@@ -190,6 +220,14 @@ export function ActivationBuilder({
       };
       if (!response.ok || !payload.data?.activation)
         throw new Error(payload.error?.message || "Não foi possível salvar.");
+      setSavedDraftId(payload.data.activation.id);
+      if (action !== "draft") {
+        const publish = await fetch(`/api/projects/${projectId}/activations/${payload.data.activation.id}/publish`, { method: "POST" });
+        if (!publish.ok) {
+          const failure = await publish.json().catch(() => null) as { error?: { message?: string } } | null;
+          throw new Error(`${failure?.error?.message || "Não foi possível publicar."} O rascunho foi salvo para revisão.`);
+        }
+      }
       router.push(
         `/app/projects/${projectId}/activations/${payload.data.activation.id}`,
       );
@@ -223,12 +261,21 @@ export function ActivationBuilder({
         );
       update({
         name: draft.activation?.name || state.name,
+        title: draft.activation?.title || draft.activation?.name || state.title,
+        message: draft.activation?.message || state.message,
         activationType:
           draft.activation?.activationType || state.activationType,
         conversionGoalId:
-          draft.activation?.conversionGoalId || state.conversionGoalId,
+          goals.find((item) => item.id === draft.activation?.conversionGoalId)?.id || state.conversionGoalId,
+        defaultDestinationId: destinations.find((item) => item.id === draft.activation?.defaultDestinationId)?.id || state.defaultDestinationId,
+        destinationMode: draft.activation?.destinationMode || state.destinationMode,
+        completionChannel: draft.activation?.completionChannel || state.completionChannel,
         eligibility:
           draft.activation?.eligibility?.customerRule || state.eligibility,
+        maxClaims: draft.activation?.limits?.maxClaims?.toString() || state.maxClaims,
+        maxRedemptions: draft.activation?.limits?.maxRedemptions?.toString() || state.maxRedemptions,
+        maxClaimsPerCustomer: draft.activation?.limits?.maxClaimsPerCustomer?.toString() || state.maxClaimsPerCustomer,
+        maxRedemptionsPerCustomer: draft.activation?.limits?.maxRedemptionsPerCustomer?.toString() || state.maxRedemptionsPerCustomer,
         startsAt: draft.activation?.startsAt
           ? draft.activation.startsAt.slice(0, 16)
           : state.startsAt,
@@ -236,12 +283,17 @@ export function ActivationBuilder({
           ? draft.activation.endsAt.slice(0, 16)
           : state.endsAt,
         offerType: draft.offer?.offerType || state.offerType,
+        offerDescription: draft.offer?.description || state.offerDescription,
         percentage: draft.offer?.percentage?.toString() || state.percentage,
         amount: draft.offer?.amount?.toString() || state.amount,
         minSubtotal: draft.offer?.minSubtotal?.toString() || state.minSubtotal,
         placements:
           draft.placements?.map((p) => p.placementType) || state.placements,
       });
+      setNeedsConfirmation(draft.needsConfirmation || []);
+      setReasoning(draft.reasoning || []);
+      setConfirmed(false);
+      if (mode === "simple") setStep(1);
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "Não foi possível compor.",
@@ -250,6 +302,35 @@ export function ActivationBuilder({
       setComposing(false);
     }
   }
+  if (mode === "simple") return (
+    <div className="mx-auto max-w-4xl space-y-6 pb-10">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div><p className="text-sm font-bold text-[#0054fc]">Campanhas</p><h1 className="mt-1 text-3xl font-extrabold">Nova campanha</h1></div>
+        <button type="button" onClick={() => { setMode("advanced"); setStep(0); }} className="focus-ring min-h-11 rounded-xl border border-[#b9c7d6] px-4 text-sm font-bold">Modo Avançado</button>
+      </header>
+      <nav aria-label="Criação da campanha" className="grid grid-cols-3 gap-2 text-xs font-bold sm:text-sm">
+        {["Descrever", "Revisar", "Decidir"].map((label, index) => <button key={label} type="button" onClick={() => setStep(index)} className={`focus-ring min-h-11 rounded-xl px-2 ${step === index ? "bg-[#0054fc] text-white" : "bg-[#eef3fb] text-[#33445d]"}`}>{index + 1}. {label}</button>)}
+      </nav>
+      <main className="rounded-2xl border border-[#d7e1ec] bg-white p-5 sm:p-8">
+        {step === 0 ? <div className="space-y-5"><div><h2 className="text-2xl font-extrabold">O que você quer comunicar?</h2><p className="mt-2 text-sm text-[#526171]">Descreva a oferta ou o objetivo. A Sobe usa o contexto confirmado do negócio para propor uma campanha.</p></div><label className="block text-sm font-bold" htmlFor="campaign-description">Sua campanha</label><textarea id="campaign-description" value={aiInstruction} onChange={(event) => setAiInstruction(event.target.value)} rows={6} placeholder="Ex.: Quero divulgar nosso serviço de avaliação durante novembro e receber pedidos de contato." className="focus-ring w-full rounded-xl border border-[#b9c7d6] p-4 text-base"/><button type="button" onClick={compose} disabled={composing || aiInstruction.trim().length < 3} className="focus-ring inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#0054fc] px-5 font-bold text-white disabled:opacity-50"><Sparkles size={18}/>{composing ? "Interpretando…" : "Propor campanha"}</button></div> : null}
+        {step === 1 ? <div className="space-y-5"><div><h2 className="text-2xl font-extrabold">Revise a proposta</h2><p className="mt-2 text-sm text-[#526171]">Confira cada campo. Informações sem confirmação devem ser verificadas antes de publicar.</p></div>
+          <label className="block text-sm font-bold">Título<input value={state.title} onChange={(event) => update({ title: event.target.value, name: event.target.value })} className="focus-ring mt-2 min-h-12 w-full rounded-xl border border-[#b9c7d6] px-4"/></label>
+          <label className="block text-sm font-bold">Apresentação<textarea value={state.message} onChange={(event) => update({ message: event.target.value })} rows={3} className="focus-ring mt-2 w-full rounded-xl border border-[#b9c7d6] p-4"/></label>
+          <div className="grid gap-4 sm:grid-cols-2"><label className="block text-sm font-bold">Ação principal<select value={state.conversionGoalId} onChange={(event) => update({ conversionGoalId: event.target.value })} className="focus-ring mt-2 min-h-12 w-full rounded-xl border border-[#b9c7d6] px-4"><option value="">Escolha uma ação</option>{goals.map((goal) => <option key={goal.id} value={goal.id}>{goal.name}</option>)}</select></label><label className="block text-sm font-bold">Destino comercial<select value={state.destinationMode} onChange={(event) => update({ destinationMode: event.target.value as ActivationBuilderState["destinationMode"] })} className="focus-ring mt-2 min-h-12 w-full rounded-xl border border-[#b9c7d6] px-4"><option value="goal_default">Destino da ação principal</option><option value="routing">Roteamento da Sobe</option><option value="fixed_destination">Destino específico</option><option value="native">Ação nativa</option></select></label></div>
+          {state.destinationMode === "fixed_destination" ? <label className="block text-sm font-bold">Destino<select value={state.defaultDestinationId} onChange={(event) => update({ defaultDestinationId: event.target.value })} className="focus-ring mt-2 min-h-12 w-full rounded-xl border border-[#b9c7d6] px-4"><option value="">Escolha um destino</option>{destinations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label> : null}
+          <div className="grid gap-4 sm:grid-cols-2"><label className="block text-sm font-bold">Tipo de oferta<select value={state.offerType} onChange={(event) => update({ offerType: event.target.value as ActivationBuilderState["offerType"] })} className="focus-ring mt-2 min-h-12 w-full rounded-xl border border-[#b9c7d6] px-4"><option value="no_discount">Sem desconto</option><option value="percentage_discount">Desconto percentual</option><option value="fixed_discount">Desconto em valor</option></select></label>{state.offerType === "percentage_discount" ? <label className="block text-sm font-bold">Percentual<input type="number" min="0.01" max="100" value={state.percentage} onChange={(event) => update({ percentage: event.target.value })} className="focus-ring mt-2 min-h-12 w-full rounded-xl border border-[#b9c7d6] px-4"/></label> : state.offerType === "fixed_discount" ? <label className="block text-sm font-bold">Valor em reais<input type="number" min="0" value={state.amount} onChange={(event) => update({ amount: event.target.value })} className="focus-ring mt-2 min-h-12 w-full rounded-xl border border-[#b9c7d6] px-4"/></label> : null}</div>
+          <label className="block text-sm font-bold">Condições comunicadas<textarea value={state.offerDescription} onChange={(event) => update({ offerDescription: event.target.value })} rows={2} placeholder="Somente condições confirmadas" className="focus-ring mt-2 w-full rounded-xl border border-[#b9c7d6] p-4"/></label>
+          <ActivationBuilderSchedule state={state} onChange={update}/>
+          {reasoning.length ? <div className="rounded-xl bg-[#f1f7ff] p-4 text-sm"><strong>Por que a Sobe propôs isso</strong><ul className="mt-2 list-disc space-y-1 pl-5">{reasoning.map((item, index) => <li key={index}>{item}</li>)}</ul></div> : null}
+          {needsConfirmation.length ? <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm"><strong>Confirme antes de publicar</strong><ul className="mt-2 list-disc space-y-1 pl-5">{needsConfirmation.map((item, index) => <li key={index}>{item}</li>)}</ul></div> : null}
+          <label className="flex min-h-11 items-center gap-3 text-sm font-semibold"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)}/>Revisei o conteúdo e as condições desta campanha.</label>
+          <button type="button" onClick={() => { if (confirmed) setStep(2); else setError("Revise e confirme a proposta antes de continuar."); }} className="focus-ring min-h-12 rounded-xl bg-[#0054fc] px-5 font-bold text-white">Ver prévia</button>
+        </div> : null}
+        {step === 2 ? <div className="space-y-5"><h2 className="text-2xl font-extrabold">Prévia e decisão</h2><ActivationBuilderPreview state={state}/><p className="text-sm text-[#526171]">Publicar ou agendar usa a mesma validação da campanha avançada. Se faltar configuração, o rascunho permanece salvo para revisão.</p><div className="flex flex-wrap gap-3"><button type="button" onClick={() => save("draft")} disabled={saving} className="focus-ring min-h-12 rounded-xl border border-[#0054fc] px-5 font-bold text-[#0054fc] disabled:opacity-50">Salvar rascunho</button><button type="button" onClick={() => save("schedule")} disabled={saving || !state.startsAt} className="focus-ring min-h-12 rounded-xl border border-[#0054fc] px-5 font-bold text-[#0054fc] disabled:opacity-50">Agendar</button><button type="button" onClick={() => save("publish")} disabled={saving} className="focus-ring min-h-12 rounded-xl bg-[#0054fc] px-5 font-bold text-white disabled:opacity-50">Publicar</button></div></div> : null}
+        {error ? <p role="alert" className="mt-5 rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">{error}{savedDraftId ? <a className="ml-2 underline" href={`/app/projects/${projectId}/activations/${savedDraftId}`}>Abrir rascunho</a> : null}</p> : null}
+      </main>
+    </div>
+  );
   const content =
     step === 0 ? (
       <ActivationBuilderGoal state={state} goals={goals} onChange={update} />
@@ -307,9 +388,10 @@ export function ActivationBuilder({
           <p className="text-xs font-bold text-[#0054fc]">Campanhas</p>
           <h1 className="text-xl font-extrabold">Nova campanha</h1>
         </div>
+        <button type="button" onClick={() => { setMode("simple"); setStep(0); }} className="focus-ring min-h-11 rounded-xl border border-[#b9c7d6] px-4 text-sm font-bold">Modo Simples</button>
         <button
           type="button"
-          onClick={save}
+          onClick={() => save()}
           disabled={saving}
           className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#0054fc] px-4 text-sm font-bold text-[#0054fc] disabled:opacity-50"
         >
@@ -398,7 +480,7 @@ export function ActivationBuilder({
               ) : (
                 <button
                   type="button"
-                  onClick={save}
+                  onClick={() => save()}
                   disabled={saving}
                   className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0054fc] px-5 font-bold text-white"
                 >

@@ -123,7 +123,7 @@ export interface OptimizationExplanationInput extends AIRequestContext {
   project: Pick<Project, "name" | "category" | "audience" | "primaryGoal">;
   suggestion: Pick<OptimizationSuggestion, "title" | "explanation" | "evidence">;
 }
-export interface ActivationCompositionInput extends AIRequestContext { businessProfile: unknown; conversionGoals: Project["conversionGoals"]; catalogSummary: Array<{id:string;name:string;price?:number}>; serviceSummary:Array<{id:string;name:string}>; locations:Array<{id:string;name:string}>; presencePages:Array<{id:string;name:string}>; activeActivations:Pick<ConversionActivation,"id"|"name"|"activationType"|"startsAt"|"endsAt">[]; instruction:string }
+export interface ActivationCompositionInput extends AIRequestContext { businessProfile: unknown; commercialContext?: ReturnType<typeof import("@/features/commercial-context/project-commercial-context").commercialContextForAI>; conversionGoals: Project["conversionGoals"]; destinations:Array<{id:string;label:string}>; catalogSummary: Array<{id:string;name:string;price?:number}>; serviceSummary:Array<{id:string;name:string}>; locations:Array<{id:string;name:string}>; presencePages:Array<{id:string;name:string}>; activeActivations:Pick<ConversionActivation,"id"|"name"|"activationType"|"startsAt"|"endsAt">[]; instruction:string }
 
 export interface VirouAIProvider {
   analyzeBusiness(input: BusinessAnalysisInput): Promise<BusinessAnalysisResult>;

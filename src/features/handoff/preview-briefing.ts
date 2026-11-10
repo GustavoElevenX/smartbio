@@ -35,7 +35,7 @@ export function simulatedBriefing(project: Project, goal: ConversionGoal, answer
     conversionGoalId: goal.id,
     origin: { source: "simulação" },
     identity: {},
-    intent: { label: handoff.interest },
+    intent: { label: handoff.interest, kind: goal.kind },
     qualification: handoff.entries.map((entry) => ({ label: entry.label, value: entry.value, include: true, source: "visitor" as const })),
     pending: fields.filter((field) => !String(answers[field.key] || "").trim()).map((field) => field.label),
   };

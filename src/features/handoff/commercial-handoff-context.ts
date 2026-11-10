@@ -1,3 +1,5 @@
+import type { ConversionGoalKind } from "@/types";
+
 export interface CommercialHandoffContext {
   projectId: string;
   projectName?: string;
@@ -17,6 +19,7 @@ export interface CommercialHandoffContext {
   };
   intent: {
     label?: string;
+    kind?: ConversionGoalKind;
     visitorRequest?: string;
     productIds?: string[];
     serviceIds?: string[];

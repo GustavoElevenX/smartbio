@@ -16,6 +16,8 @@ import { composeActivation } from "@/server/ai/activation-composer";
 import { ActivationService } from "@/server/activations/activation-service";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireEntitlement } from "@/server/entitlements/require-entitlement";
+import { projectCommercialContextRepository } from "@/server/commercial-context/project-commercial-context-repository";
+import { commercialContextForAI } from "@/features/commercial-context/project-commercial-context";
 const schema = z.object({ instruction: z.string().trim().min(3).max(2000) });
 export const POST = withAuthenticatedActor(
   async (
@@ -58,13 +60,18 @@ export const POST = withAuthenticatedActor(
           ),
           rate,
         );
-      const active = await new ActivationService(database).list(projectId);
+      const [active, commercialContext] = await Promise.all([
+        new ActivationService(database).list(projectId),
+        projectCommercialContextRepository.get(actor, projectId),
+      ]);
       const draft = await composeActivation({
         workspaceId: actor.workspaceId,
         projectId,
         userId: actor.userId,
         businessProfile: project.businessProfile,
+        commercialContext: commercialContext ? commercialContextForAI(commercialContext) : undefined,
         conversionGoals: project.conversionGoals,
+        destinations: (project.commercialConfig?.routingDestinations || []).map(({ id, label }) => ({ id, label })),
         catalogSummary: (project.commercialConfig?.catalogItems || []).map(
           ({ id, name, price }) => ({ id, name, price }),
         ),
