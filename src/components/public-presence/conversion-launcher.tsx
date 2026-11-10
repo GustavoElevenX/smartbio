@@ -20,7 +20,7 @@ function runtimeId(key: string) {
   const next = crypto.randomUUID(); sessionStorage.setItem(key, next); return next;
 }
 
-export function ConversionLauncher({ projectSlug, projectId, pageId, presentation = "overlay", previewProject, children }: { projectSlug: string; projectId: string; pageId: string; presentation?: "overlay" | "replace"; previewProject?: Project; children: ReactNode }) {
+export function ConversionLauncher({ projectSlug, projectId, pageId, presentation = "overlay", previewProject, children }: { projectSlug: string; projectId: string; pageId?: string; presentation?: "overlay" | "replace"; previewProject?: Project; children: ReactNode }) {
   const [context, setContext] = useState<PresenceLaunchContext>();
   const [project, setProject] = useState<Project | null>(previewProject || null);
   const [error, setError] = useState("");
@@ -30,7 +30,8 @@ export function ConversionLauncher({ projectSlug, projectId, pageId, presentatio
   const preview = Boolean(previewProject);
   const track = useCallback((eventName: AnalyticsEventName, metadata: Record<string, unknown> = {}) => {
     if (preview) return;
-    const payload = { projectId, visitorId: runtimeId(`virou:visitor:${projectId}`), sessionId: runtimeId(`virou:session:${projectId}`), eventName, conversionGoalId: metadata.goalId ? String(metadata.goalId) : undefined, activationId: metadata.activationId ? String(metadata.activationId) : undefined, benefitClaimId: metadata.benefitClaimId ? String(metadata.benefitClaimId) : undefined, presencePageId: String(metadata.pageId || pageId), presenceSectionId: metadata.sectionId ? String(metadata.sectionId) : undefined, metadata, referrer: document.referrer, deviceType: matchMedia("(max-width: 700px)").matches ? "mobile" : "desktop" };
+    const params = new URLSearchParams(location.search);
+    const payload = { projectId, visitorId: runtimeId(`virou:visitor:${projectId}`), sessionId: runtimeId(`virou:session:${projectId}`), eventName, conversionGoalId: metadata.goalId ? String(metadata.goalId) : undefined, activationId: metadata.activationId ? String(metadata.activationId) : undefined, benefitClaimId: metadata.benefitClaimId ? String(metadata.benefitClaimId) : undefined, presencePageId: metadata.pageId || pageId || undefined, presenceSectionId: metadata.sectionId ? String(metadata.sectionId) : undefined, metadata, referrer: document.referrer, utmSource: params.get("utm_source") || undefined, utmMedium: params.get("utm_medium") || undefined, utmCampaign: params.get("utm_campaign") || (metadata.campaignKey ? String(metadata.campaignKey) : undefined), utmContent: params.get("utm_content") || undefined, utmTerm: params.get("utm_term") || undefined, deviceType: matchMedia("(max-width: 700px)").matches ? "mobile" : "desktop" };
     void fetch("/api/events", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), keepalive: true }).catch(() => undefined);
   }, [pageId, preview, projectId]);
   const close = useCallback(() => { setContext(undefined); setComplete(false); setError(""); if (!preview && history.state?.virouConversion) history.back(); }, [preview]);

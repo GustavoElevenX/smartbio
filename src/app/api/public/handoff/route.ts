@@ -8,20 +8,10 @@ import { buildCommercialBriefing } from "@/features/handoff/commercial-briefing"
 import { confirmedHandoffFacts } from "@/features/handoff/confirmed-handoff-facts";
 import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/server/rate-limit/rate-limit";
 import { publicRateLimitIdentifier } from "@/server/rate-limit/public-identifier";
+import { listPublishedCampaigns } from "@/server/activations/published-campaign-resolver";
+import { publicHandoffContextSchema } from "@/features/handoff/public-handoff-schema";
 
-const contextSchema = z.object({
-  projectId: z.string().min(1),
-  projectName: z.string().max(160).optional(),
-  conversionGoalId: z.string().optional(),
-  origin: z.object({ entryPointId: z.string().optional(), source: z.string().optional(), campaign: z.string().optional(), pageId: z.string().optional(), activationId: z.string().optional() }),
-  identity: z.object({ name: z.string().optional(), phone: z.string().optional(), email: z.string().optional() }),
-  intent: z.object({ label: z.string().optional(), visitorRequest: z.string().max(2000).optional(), productIds: z.array(z.string()).max(50).optional(), serviceIds: z.array(z.string()).max(50).optional(), locationId: z.string().optional() }),
-  qualification: z.array(z.object({ label: z.string().max(120), value: z.string().max(1000), include: z.boolean(), source: z.enum(["visitor", "business_confirmed"]).optional() })).max(100),
-  pending: z.array(z.string().max(240)).max(20).optional(),
-  consent: z.object({ contact: z.boolean(), recordedAt: z.string().optional() }).optional(),
-  benefit: z.object({ label: z.string().optional(), code: z.string().optional() }).optional(),
-});
-const requestSchema = z.object({ projectId: z.string().min(1), sessionId: z.string().min(1), destinationId: z.string().optional(), context: contextSchema });
+const requestSchema = z.object({ projectId: z.string().min(1), sessionId: z.string().min(1), destinationId: z.string().optional(), context: publicHandoffContextSchema });
 
 export async function POST(request: Request) {
   const raw = await request.json().catch(() => null);
@@ -40,11 +30,18 @@ export async function POST(request: Request) {
   if (locationId && !project.commercialConfig?.locations?.some((item) => item.id === locationId && item.isActive)) return respond(apiError("Unidade não disponível.", 422, "invalid_handoff_location"));
   if (locationId && destination?.locationId && destination.locationId !== locationId) return respond(apiError("O destino não corresponde à unidade selecionada.", 422, "invalid_handoff_destination"));
   if (parsed.data.context.conversionGoalId && !project.conversionGoals?.some((item) => item.id === parsed.data.context.conversionGoalId && item.isActive)) return respond(apiError("Caminho não disponível.", 422, "invalid_handoff_goal"));
+  const requestedActivationId = parsed.data.context.origin.activationId;
+  const publishedActivation = requestedActivationId
+    ? (await listPublishedCampaigns(database, project.id)).find((item) => item.status === "active" && item.snapshot.activationId === requestedActivationId)
+    : undefined;
+  if (requestedActivationId && !publishedActivation) return respond(apiError("Campanha indisponível.", 422, "invalid_handoff_activation"));
   // Public input is always a visitor statement; it cannot certify business facts.
   const confirmedFacts = confirmedHandoffFacts(project, parsed.data.context.intent);
   const safeContext = {
     ...parsed.data.context,
     projectName: project.name,
+    origin: { ...parsed.data.context.origin, activationId: publishedActivation?.snapshot.activationId,
+      campaign: parsed.data.context.origin.campaign || publishedActivation?.snapshot.activationKey },
     intent: { ...parsed.data.context.intent, kind: project.conversionGoals?.find((item) => item.id === parsed.data.context.conversionGoalId)?.kind },
     qualification: [
       ...parsed.data.context.qualification.filter((item) => !confirmedFacts.some((fact) => fact.label === item.label && fact.value === item.value)).map((item) => ({ ...item, source: "visitor" as const })),
@@ -60,16 +57,17 @@ export async function POST(request: Request) {
     projectName: project.name,
     sessionId: parsed.data.sessionId,
     sourceType: "routed_contact",
-    sourceId: `handoff:${parsed.data.sessionId}:${parsed.data.destinationId || "direct"}`,
+    sourceId: `handoff:${parsed.data.sessionId}:${parsed.data.destinationId || "direct"}:${publishedActivation?.snapshot.activationId || "standard"}`,
     title: `Contato iniciado · ${parsed.data.context.intent.label || "Atendimento"}`,
     conversionGoalId: parsed.data.context.conversionGoalId,
     entryPointId: parsed.data.context.origin.entryPointId,
     destinationId: parsed.data.destinationId,
+    activationId: publishedActivation?.snapshot.activationId,
     presencePageId: parsed.data.context.origin.pageId,
-    attribution: { entryPointId: parsed.data.context.origin.entryPointId, conversionGoalId: parsed.data.context.conversionGoalId, source: parsed.data.context.origin.source || "direct", campaign: parsed.data.context.origin.campaign, presencePageId: parsed.data.context.origin.pageId },
+    attribution: { entryPointId: parsed.data.context.origin.entryPointId, conversionGoalId: parsed.data.context.conversionGoalId, source: parsed.data.context.origin.source || "direct", campaign: safeContext.origin.campaign, presencePageId: parsed.data.context.origin.pageId },
     visitorData: parsed.data.context.identity,
     summary: message,
-    metadata: { handoff: safeContext, briefing, evidence: toPerformanceEvidence(safeContext) },
+    metadata: { handoff: safeContext, briefing, activationVersion: publishedActivation?.snapshot.activationVersion, evidence: toPerformanceEvidence(safeContext) },
   });
   return respond(apiSuccess({ persisted: true, opportunityId: opportunity.id, message, briefing }, 201));
 }

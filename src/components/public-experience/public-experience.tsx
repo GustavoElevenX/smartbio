@@ -164,6 +164,7 @@ function runtimeFromStorage(
     ...resolveAttribution({
       explicit: readUtm(params),
       entry: resolved.entry,
+      campaignFallback: launchContext?.campaignKey,
       referrer: browser ? document.referrer : "",
       conversionGoalId: directGoal?.id,
     }),
@@ -738,6 +739,7 @@ export function ExperienceCanvas({
       conversionGoalId: runtime.conversionGoalId,
       entryPointId: runtime.entryPointId,
       destinationId: input.destinationId,
+      activationId: launchContext?.activationId,
       attribution: runtime.attribution,
       visitorData: { ...runtime.answers, ...visitorIdentity },
       summary: input.summary,
@@ -1316,6 +1318,7 @@ export function ExperienceCanvas({
           source: runtime.attribution?.source,
           campaign: runtime.attribution?.campaign,
           pageId: launchContext?.pageId,
+          activationId: launchContext?.activationId,
         },
         identity: visitorIdentity,
         intent: {
@@ -1363,11 +1366,12 @@ export function ExperienceCanvas({
               presencePageId: launchContext.pageId,
               presenceSectionId: launchContext.sectionId,
               conversionGoalId: runtime.conversionGoalId,
+              context: handoffContext,
             }),
           },
         );
       } else if (!preview) {
-        if (canUseLocalStore()) addOpportunity("routed_contact", `handoff:${runtime.sessionId}:${configuredDestination?.id || option.actionPayload?.destinationId || "direct"}`, `Contato · ${journeyHandoff.interest || project.name}`, { summary: message, destinationId: configuredDestination?.id, metadata: { briefing: buildCommercialBriefing(handoffContext) } });
+        if (canUseLocalStore()) addOpportunity("routed_contact", `handoff:${runtime.sessionId}:${configuredDestination?.id || option.actionPayload?.destinationId || "direct"}:${launchContext?.activationId || "standard"}`, `Contato · ${journeyHandoff.interest || project.name}`, { summary: message, destinationId: configuredDestination?.id, metadata: { briefing: buildCommercialBriefing(handoffContext), activationVersion: launchContext?.activationVersion } });
         const response = await fetch("/api/public/handoff", {
           method: "POST",
           keepalive: true,
@@ -1554,7 +1558,7 @@ export function ExperienceCanvas({
     projectId: project.id,
     projectName: project.name,
     conversionGoalId: runtime.conversionGoalId,
-    origin: { entryPointId: runtime.entryPointId, source: runtime.attribution?.source, campaign: runtime.attribution?.campaign },
+    origin: { entryPointId: runtime.entryPointId, source: runtime.attribution?.source, campaign: runtime.attribution?.campaign, activationId: launchContext?.activationId },
     identity: visitorIdentity,
     intent: { label: previewJourneyHandoff.interest, locationId: runtime.selectedLocationId },
     qualification: [

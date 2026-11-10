@@ -125,6 +125,8 @@ export interface PresenceSite { pages: PresencePage[] }
 
 export interface PresenceLaunchContext {
   goalId?: string;
+  campaignKey?: string;
+  activationVersion?: number;
   entryPointId?: string;
   pageId?: string;
   sectionId?: string;

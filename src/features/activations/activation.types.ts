@@ -1,3 +1,5 @@
+import type { ActivationDynamicSurface } from "./dynamic-home-contract";
+
 export type ConversionActivationType = "promotion" | "launch" | "fill_calendar" | "lead_capture" | "product_push" | "service_push" | "location_push" | "waitlist" | "seasonal" | "announcement" | "custom";
 export type ConversionActivationStatus = "draft" | "scheduled" | "active" | "paused" | "ended" | "archived";
 export type ActivationOfferType = "percentage_discount" | "fixed_discount" | "free_shipping" | "special_price" | "free_item" | "bonus" | "coupon" | "no_discount";
@@ -31,11 +33,11 @@ export interface ConversionActivation {
   status: ConversionActivationStatus; conversionGoalId?: string; defaultDestinationId?: string; destinationMode?: "routing" | "fixed_destination" | "goal_default" | "native"; title?: string; message?: string; startsAt?: string;
   endsAt?: string; timezone: string; priority: number; requiresIdentity: boolean; identityMode: "none" | "phone" | "email" | "phone_or_email";
   identityVerification?: "none" | "otp"; completionChannel?: "native" | "whatsapp" | "external_url" | "email" | "phone";
-  eligibility: ActivationEligibility; limits: ActivationLimits; settings: Record<string, unknown> & { conversionPolicy?: ActivationConversionPolicy; claimTtlMinutes?: number; claimAfterActivationEnd?: "honor_until_claim_expiry" | "expire_immediately"; termsText?: string; showRemainingUses?: boolean };
+  eligibility: ActivationEligibility; limits: ActivationLimits; settings: Record<string, unknown> & { conversionPolicy?: ActivationConversionPolicy; claimTtlMinutes?: number; claimAfterActivationEnd?: "honor_until_claim_expiry" | "expire_immediately"; termsText?: string; showRemainingUses?: boolean; dynamicSurface?: ActivationDynamicSurface };
   offers: ActivationOffer[]; placements: ActivationPlacement[]; entryPointIds?: string[]; locationIds?: string[]; publishedSnapshot?: object;
   publishedAt?: string; version: number; publishedVersion?: number; createdAt?: string; updatedAt?: string;
 }
-export interface PublicActivation extends Pick<ConversionActivation, "id" | "name" | "title" | "message" | "activationType" | "conversionGoalId" | "defaultDestinationId" | "requiresIdentity" | "identityMode" | "completionChannel" | "startsAt" | "endsAt" | "timezone"> { offer?: Pick<ActivationOffer, "id" | "offerType" | "label" | "description" | "percentage" | "amount" | "specialPrice" | "currency" | "minSubtotal" | "maxDiscount" | "scope">; placements: ActivationPlacement[]; remainingRedemptions?: number }
+export interface PublicActivation extends Pick<ConversionActivation, "id" | "name" | "title" | "message" | "activationType" | "conversionGoalId" | "defaultDestinationId" | "requiresIdentity" | "identityMode" | "completionChannel" | "startsAt" | "endsAt" | "timezone"> { activationKey?: string; publishedVersion?: number; offer?: Pick<ActivationOffer, "id" | "offerType" | "label" | "description" | "percentage" | "amount" | "specialPrice" | "currency" | "minSubtotal" | "maxDiscount" | "scope">; placements: ActivationPlacement[]; remainingRedemptions?: number }
 export interface ActivationPerformance {
   activationId: string; views: number; ctaClicks: number; identities: number; claimsIssued: number; claimsPresented: number; redemptions: number;
   opportunities: number; conversions: number; confirmedValue: number;

@@ -10,7 +10,7 @@ export function ActivationClaimDialog({ activation, projectId, sessionId, pageId
   activation: PublicActivation;
   projectId: string;
   sessionId: string;
-  pageId: string;
+  pageId?: string;
   onClose(): void;
   onSuccess(claim: Claim): void;
   onContinueWithoutBenefit(): void;

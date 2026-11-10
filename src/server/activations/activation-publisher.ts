@@ -1,3 +1,25 @@
 import type { ConversionActivation } from "@/features/activations/activation.types";
 import { publishedActivationSnapshotSchema,type PublishedActivationSnapshot } from "@/features/activations/published-activation.schema";
-export function publishActivationSnapshot(activation:ConversionActivation,now=new Date()):ConversionActivation{const snapshot:PublishedActivationSnapshot={snapshotVersion:1,activationId:activation.id,activationVersion:activation.version,activationKey:activation.activationKey,name:activation.name,activationType:activation.activationType,conversionGoalId:activation.conversionGoalId,defaultDestinationId:activation.defaultDestinationId,destinationMode:activation.destinationMode||"fixed_destination",title:activation.title,message:activation.message,requiresIdentity:activation.requiresIdentity,identityMode:activation.identityMode,identityVerification:activation.identityVerification||"none",completionChannel:activation.completionChannel,startsAt:activation.startsAt,endsAt:activation.endsAt,timezone:activation.timezone,priority:activation.priority,eligibility:activation.eligibility,limits:activation.limits,settings:activation.settings,offers:activation.offers,placements:activation.placements,entryPointIds:activation.entryPointIds||[],locationIds:activation.locationIds||[]};publishedActivationSnapshotSchema.parse(snapshot);return{...activation,status:activation.startsAt&&new Date(activation.startsAt)>now?"scheduled":"active",publishedSnapshot:snapshot,publishedAt:now.toISOString(),publishedVersion:activation.version,updatedAt:now.toISOString()};}
+import { activationDynamicSurfaceSchema } from "@/features/activations/dynamic-home-contract";
+
+export function publishActivationSnapshot(activation: ConversionActivation, now = new Date()): ConversionActivation {
+  const dynamicSurface = activation.settings.dynamicSurface ? activationDynamicSurfaceSchema.parse(activation.settings.dynamicSurface) : undefined;
+  if (dynamicSurface && (dynamicSurface.experienceKey !== activation.activationKey || dynamicSurface.conversionGoalId !== activation.conversionGoalId)) {
+    throw new Error("A página da campanha precisa usar a chave e a meta da campanha.");
+  }
+  const snapshot: PublishedActivationSnapshot = {
+    snapshotVersion: 2, activationId: activation.id, activationVersion: activation.version,
+    activationKey: activation.activationKey, name: activation.name, activationType: activation.activationType,
+    conversionGoalId: activation.conversionGoalId, defaultDestinationId: activation.defaultDestinationId,
+    destinationMode: activation.destinationMode || "fixed_destination", title: activation.title, message: activation.message,
+    requiresIdentity: activation.requiresIdentity, identityMode: activation.identityMode,
+    identityVerification: activation.identityVerification || "none", completionChannel: activation.completionChannel,
+    startsAt: activation.startsAt, endsAt: activation.endsAt, timezone: activation.timezone, priority: activation.priority,
+    eligibility: activation.eligibility, limits: activation.limits, settings: activation.settings, offers: activation.offers,
+    placements: activation.placements, entryPointIds: activation.entryPointIds || [], locationIds: activation.locationIds || [],
+    dynamicSurface,
+  };
+  publishedActivationSnapshotSchema.parse(snapshot);
+  return { ...activation, status: activation.startsAt && new Date(activation.startsAt) > now ? "scheduled" : "active",
+    publishedSnapshot: snapshot, publishedAt: now.toISOString(), publishedVersion: activation.version, updatedAt: now.toISOString() };
+}

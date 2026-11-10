@@ -3,6 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Loader2, Sparkles } from "lucide-react";
 import type { Project } from "@/types";
+import { activationKey } from "@/features/activations/activation-utils";
+import { activationCampaignDraft } from "@/features/activations/activation-campaign-draft";
+import { campaignLocalTimeToIso, toCampaignLocalTime } from "@/features/activations/campaign-timezone";
 import { localStore } from "@/lib/local-store";
 import type {
   ActivationBuilderState,
@@ -17,6 +20,7 @@ import { ActivationBuilderPlacements } from "./activation-builder-placements";
 import { ActivationBuilderDestination } from "./activation-builder-destination";
 import { ActivationBuilderConversion } from "./activation-builder-conversion";
 import { ActivationBuilderPreview } from "./activation-builder-preview";
+import { ActivationCampaignPreview } from "./activation-campaign-preview";
 const steps = [
   "Objetivo",
   "Oferta",
@@ -43,10 +47,12 @@ const initial: ActivationBuilderState = {
   endsAt: "",
   placements: ["announcement_bar"],
   locationIds: [],
-  completionChannel: "whatsapp",
-  destinationMode: "goal_default",
+  completionChannel: "native",
+  destinationMode: "native",
   defaultDestinationId: "",
   conversionPolicy: "manual_conversion",
+  surfaceMode: "exclusive",
+  priority: "0",
   maxClaims: "",
   maxRedemptions: "",
   maxClaimsPerCustomer: "1",
@@ -153,22 +159,29 @@ export function ActivationBuilder({
   );
   async function save(action: "draft" | "schedule" | "publish" = "draft") {
     if (mode === "simple" && !confirmed) { setError("Revise e confirme a proposta antes de continuar."); return; }
-    if (action === "schedule" && (!state.startsAt || new Date(state.startsAt) <= new Date())) { setError("Escolha um início futuro para agendar."); return; }
     if (action !== "draft" && !state.conversionGoalId) { setError("Escolha uma ação principal antes de publicar."); return; }
     setSaving(true);
     setError("");
     try {
+      if (action === "schedule" && (!state.startsAt || campaignLocalTimeToIso(state.startsAt, "America/Sao_Paulo") <= new Date().toISOString())) {
+        throw new Error("Escolha um início futuro para agendar.");
+      }
+      const name = state.name || state.title || "Nova campanha";
+      const dynamicSurface = activationCampaignDraft({ name, title: state.title, message: state.message,
+        conditions: state.offerDescription, conversionGoalId: state.conversionGoalId, mode: state.surfaceMode });
       const body = {
-        name: state.name || state.title || "Nova campanha",
+        name,
+        activationKey: activationKey(name),
         activationType: state.activationType,
         status: "draft",
+        priority: Number(state.priority),
         conversionGoalId: state.conversionGoalId || undefined,
         title: state.title || state.name,
         message: state.message,
         startsAt: state.startsAt
-          ? new Date(state.startsAt).toISOString()
+          ? campaignLocalTimeToIso(state.startsAt, "America/Sao_Paulo")
           : undefined,
-        endsAt: state.endsAt ? new Date(state.endsAt).toISOString() : undefined,
+        endsAt: state.endsAt ? campaignLocalTimeToIso(state.endsAt, "America/Sao_Paulo") : undefined,
         timezone: "America/Sao_Paulo",
         requiresIdentity: state.eligibility !== "any",
         identityMode: state.eligibility === "any" ? "none" : "phone",
@@ -192,6 +205,7 @@ export function ActivationBuilder({
           conversionPolicy: state.conversionPolicy,
           claimTtlMinutes: 1440,
           claimAfterActivationEnd: "honor_until_claim_expiry",
+          dynamicSurface,
         },
         offers: [offer],
         placements: state.placements.map((placementType, index) => ({
@@ -215,14 +229,17 @@ export function ActivationBuilder({
         body: JSON.stringify(body),
       });
       const payload = (await response.json()) as {
-        data?: { activation?: { id: string } };
+        data?: { activation?: { id: string; version: number } };
         error?: { message?: string };
       };
       if (!response.ok || !payload.data?.activation)
         throw new Error(payload.error?.message || "Não foi possível salvar.");
       setSavedDraftId(payload.data.activation.id);
       if (action !== "draft") {
-        const publish = await fetch(`/api/projects/${projectId}/activations/${payload.data.activation.id}/publish`, { method: "POST" });
+        const publish = await fetch(`/api/projects/${projectId}/activations/${payload.data.activation.id}/publish`, {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ confirmed: true, reviewedVersion: payload.data.activation.version }),
+        });
         if (!publish.ok) {
           const failure = await publish.json().catch(() => null) as { error?: { message?: string } } | null;
           throw new Error(`${failure?.error?.message || "Não foi possível publicar."} O rascunho foi salvo para revisão.`);
@@ -277,10 +294,10 @@ export function ActivationBuilder({
         maxClaimsPerCustomer: draft.activation?.limits?.maxClaimsPerCustomer?.toString() || state.maxClaimsPerCustomer,
         maxRedemptionsPerCustomer: draft.activation?.limits?.maxRedemptionsPerCustomer?.toString() || state.maxRedemptionsPerCustomer,
         startsAt: draft.activation?.startsAt
-          ? draft.activation.startsAt.slice(0, 16)
+          ? toCampaignLocalTime(draft.activation.startsAt, "America/Sao_Paulo")
           : state.startsAt,
         endsAt: draft.activation?.endsAt
-          ? draft.activation.endsAt.slice(0, 16)
+          ? toCampaignLocalTime(draft.activation.endsAt, "America/Sao_Paulo")
           : state.endsAt,
         offerType: draft.offer?.offerType || state.offerType,
         offerDescription: draft.offer?.description || state.offerDescription,
@@ -316,17 +333,21 @@ export function ActivationBuilder({
         {step === 1 ? <div className="space-y-5"><div><h2 className="text-2xl font-extrabold">Revise a proposta</h2><p className="mt-2 text-sm text-[#526171]">Confira cada campo. Informações sem confirmação devem ser verificadas antes de publicar.</p></div>
           <label className="block text-sm font-bold">Título<input value={state.title} onChange={(event) => update({ title: event.target.value, name: event.target.value })} className="focus-ring mt-2 min-h-12 w-full rounded-xl border border-[#b9c7d6] px-4"/></label>
           <label className="block text-sm font-bold">Apresentação<textarea value={state.message} onChange={(event) => update({ message: event.target.value })} rows={3} className="focus-ring mt-2 w-full rounded-xl border border-[#b9c7d6] p-4"/></label>
-          <div className="grid gap-4 sm:grid-cols-2"><label className="block text-sm font-bold">Ação principal<select value={state.conversionGoalId} onChange={(event) => update({ conversionGoalId: event.target.value })} className="focus-ring mt-2 min-h-12 w-full rounded-xl border border-[#b9c7d6] px-4"><option value="">Escolha uma ação</option>{goals.map((goal) => <option key={goal.id} value={goal.id}>{goal.name}</option>)}</select></label><label className="block text-sm font-bold">Destino comercial<select value={state.destinationMode} onChange={(event) => update({ destinationMode: event.target.value as ActivationBuilderState["destinationMode"] })} className="focus-ring mt-2 min-h-12 w-full rounded-xl border border-[#b9c7d6] px-4"><option value="goal_default">Destino da ação principal</option><option value="routing">Roteamento da Sobe</option><option value="fixed_destination">Destino específico</option><option value="native">Ação nativa</option></select></label></div>
+          <div className="grid gap-4 sm:grid-cols-2"><label className="block text-sm font-bold">Ação principal<select value={state.conversionGoalId} onChange={(event) => update({ conversionGoalId: event.target.value })} className="focus-ring mt-2 min-h-12 w-full rounded-xl border border-[#b9c7d6] px-4"><option value="">Escolha uma ação</option>{goals.map((goal) => <option key={goal.id} value={goal.id}>{goal.name}</option>)}</select></label><label className="block text-sm font-bold">Destino comercial<select value={state.destinationMode} onChange={(event) => { const destinationMode = event.target.value as ActivationBuilderState["destinationMode"]; update({ destinationMode, completionChannel: destinationMode === "native" ? "native" : "whatsapp" }); }} className="focus-ring mt-2 min-h-12 w-full rounded-xl border border-[#b9c7d6] px-4"><option value="native">Jornada existente</option><option value="goal_default">Destino da ação principal</option><option value="routing">Roteamento da Sobe</option><option value="fixed_destination">Destino específico</option></select></label></div>
           {state.destinationMode === "fixed_destination" ? <label className="block text-sm font-bold">Destino<select value={state.defaultDestinationId} onChange={(event) => update({ defaultDestinationId: event.target.value })} className="focus-ring mt-2 min-h-12 w-full rounded-xl border border-[#b9c7d6] px-4"><option value="">Escolha um destino</option>{destinations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label> : null}
           <div className="grid gap-4 sm:grid-cols-2"><label className="block text-sm font-bold">Tipo de oferta<select value={state.offerType} onChange={(event) => update({ offerType: event.target.value as ActivationBuilderState["offerType"] })} className="focus-ring mt-2 min-h-12 w-full rounded-xl border border-[#b9c7d6] px-4"><option value="no_discount">Sem desconto</option><option value="percentage_discount">Desconto percentual</option><option value="fixed_discount">Desconto em valor</option></select></label>{state.offerType === "percentage_discount" ? <label className="block text-sm font-bold">Percentual<input type="number" min="0.01" max="100" value={state.percentage} onChange={(event) => update({ percentage: event.target.value })} className="focus-ring mt-2 min-h-12 w-full rounded-xl border border-[#b9c7d6] px-4"/></label> : state.offerType === "fixed_discount" ? <label className="block text-sm font-bold">Valor em reais<input type="number" min="0" value={state.amount} onChange={(event) => update({ amount: event.target.value })} className="focus-ring mt-2 min-h-12 w-full rounded-xl border border-[#b9c7d6] px-4"/></label> : null}</div>
           <label className="block text-sm font-bold">Condições comunicadas<textarea value={state.offerDescription} onChange={(event) => update({ offerDescription: event.target.value })} rows={2} placeholder="Somente condições confirmadas" className="focus-ring mt-2 w-full rounded-xl border border-[#b9c7d6] p-4"/></label>
           <ActivationBuilderSchedule state={state} onChange={update}/>
+          <fieldset className="space-y-3"><legend className="text-sm font-extrabold">Onde a campanha deve aparecer?</legend>
+            <label className="flex min-h-12 items-center gap-3 rounded-xl border border-[#b9c7d6] px-4 text-sm font-semibold"><input type="radio" name="campaign-surface" checked={state.surfaceMode === "exclusive_and_home"} onChange={() => update({ surfaceMode: "exclusive_and_home" })}/>Substituir temporariamente a página principal</label>
+            <label className="flex min-h-12 items-center gap-3 rounded-xl border border-[#b9c7d6] px-4 text-sm font-semibold"><input type="radio" name="campaign-surface" checked={state.surfaceMode === "exclusive"} onChange={() => update({ surfaceMode: "exclusive" })}/>Criar somente um link exclusivo</label>
+          </fieldset>
           {reasoning.length ? <div className="rounded-xl bg-[#f1f7ff] p-4 text-sm"><strong>Por que a Sobe propôs isso</strong><ul className="mt-2 list-disc space-y-1 pl-5">{reasoning.map((item, index) => <li key={index}>{item}</li>)}</ul></div> : null}
           {needsConfirmation.length ? <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm"><strong>Confirme antes de publicar</strong><ul className="mt-2 list-disc space-y-1 pl-5">{needsConfirmation.map((item, index) => <li key={index}>{item}</li>)}</ul></div> : null}
           <label className="flex min-h-11 items-center gap-3 text-sm font-semibold"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)}/>Revisei o conteúdo e as condições desta campanha.</label>
           <button type="button" onClick={() => { if (confirmed) setStep(2); else setError("Revise e confirme a proposta antes de continuar."); }} className="focus-ring min-h-12 rounded-xl bg-[#0054fc] px-5 font-bold text-white">Ver prévia</button>
         </div> : null}
-        {step === 2 ? <div className="space-y-5"><h2 className="text-2xl font-extrabold">Prévia e decisão</h2><ActivationBuilderPreview state={state}/><p className="text-sm text-[#526171]">Publicar ou agendar usa a mesma validação da campanha avançada. Se faltar configuração, o rascunho permanece salvo para revisão.</p><div className="flex flex-wrap gap-3"><button type="button" onClick={() => save("draft")} disabled={saving} className="focus-ring min-h-12 rounded-xl border border-[#0054fc] px-5 font-bold text-[#0054fc] disabled:opacity-50">Salvar rascunho</button><button type="button" onClick={() => save("schedule")} disabled={saving || !state.startsAt} className="focus-ring min-h-12 rounded-xl border border-[#0054fc] px-5 font-bold text-[#0054fc] disabled:opacity-50">Agendar</button><button type="button" onClick={() => save("publish")} disabled={saving} className="focus-ring min-h-12 rounded-xl bg-[#0054fc] px-5 font-bold text-white disabled:opacity-50">Publicar</button></div></div> : null}
+        {step === 2 ? <div className="space-y-5"><h2 className="text-2xl font-extrabold">Prévia e decisão</h2><p className="text-sm text-[#526171]">É assim que a página aparecerá com o visual do seu negócio. O botão abre a jornada comercial em modo de prévia.</p><ActivationCampaignPreview project={project} state={state}/><p className="text-sm text-[#526171]">Publicar ou agendar usa a mesma validação da campanha avançada. Se faltar configuração, o rascunho permanece salvo para revisão.</p><div className="flex flex-wrap gap-3"><button type="button" onClick={() => save("draft")} disabled={saving} className="focus-ring min-h-12 rounded-xl border border-[#0054fc] px-5 font-bold text-[#0054fc] disabled:opacity-50">Salvar rascunho</button><button type="button" onClick={() => save("schedule")} disabled={saving || !state.startsAt} className="focus-ring min-h-12 rounded-xl border border-[#0054fc] px-5 font-bold text-[#0054fc] disabled:opacity-50">Agendar</button><button type="button" onClick={() => save("publish")} disabled={saving} className="focus-ring min-h-12 rounded-xl bg-[#0054fc] px-5 font-bold text-white disabled:opacity-50">Publicar</button></div></div> : null}
         {error ? <p role="alert" className="mt-5 rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">{error}{savedDraftId ? <a className="ml-2 underline" href={`/app/projects/${projectId}/activations/${savedDraftId}`}>Abrir rascunho</a> : null}</p> : null}
       </main>
     </div>

@@ -1,6 +1,6 @@
 # Fase 4B — link dinâmico de campanha
 
-## Estado e limite desta entrega
+## Estado do planejamento da Fase 4A
 
 A Fase 4A define `ActivationDynamicSurface`, `DynamicHomeCandidate` e a seleção determinística em `src/features/activations/dynamic-home-contract.ts`. Nenhuma rota pública usa essa seleção ainda. A publicação principal continua em `Project.publication` e o snapshot publicado da Presence continua intacto.
 
@@ -36,3 +36,12 @@ O renderer deve iniciar a jornada existente com `activationId`, `conversionGoalI
 3. Adicionar rota exclusiva e integrar o seletor à rota principal e aos metadados, preservando a precedência de entradas e páginas secundárias.
 4. Conectar publicação, pausa, retomada e fim à invalidação e validar janela temporal na leitura.
 5. Testar empates, publicação simultânea, pausa/fim, expiração, entrada específica, página secundária, UTM, briefing e acesso móvel/desktop. Executar integração real com Supabase e provedor de IA antes de considerar a fase validada em produção.
+
+## Implementação local da Fase 4B
+
+- O snapshot v2 acrescenta `dynamicSurface`; a leitura mantém snapshots v1. A configuração revisada permanece em `settings`, e o snapshot congelado continua em `published_snapshot`. O esquema de banco já contém ambos os campos JSON; não foi necessária migração nem alteração de dados de clientes.
+- `/{slug}/c/{activationKey}` renderiza a página exclusiva somente enquanto o snapshot está ativo. `/{slug}` consulta o mesmo conjunto de snapshots e usa `selectDynamicHomeCandidate` após respeitar uma entrada específica válida. `/{slug}/p/{pageKey}` permanece independente.
+- As duas rotas da campanha usam `force-dynamic`. A janela e o status são avaliados a cada request no servidor; publicação, pausa, retomada, fim e expiração aparecem sem depender de invalidação manual ou tarefa agendada. A publicação anterior do projeto não é sobrescrita.
+- A página pública e a prévia usam o mesmo renderer e o CTA abre a jornada comercial existente. Publicar uma página dinâmica exige confirmação da versão revisada. Editar o rascunho preserva status, snapshot e versão ativos até nova publicação.
+- `activationKey`, `activationId` e versão publicada seguem para eventos e handoff; a campanha entra na atribuição apenas como fallback de UTM. WhatsApp, briefing e Oportunidades derivam do mesmo contexto comercial. Dados operacionais continuam validados no servidor.
+- Validação real com Supabase, IA e cache da plataforma de hospedagem permanece pendente. Os testes locais não certificam esses serviços de produção.
