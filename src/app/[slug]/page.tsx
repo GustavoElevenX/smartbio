@@ -10,22 +10,27 @@ import { resolveAppUrl } from "@/lib/app-url";
 import { CampaignExperience } from "@/components/public-campaign/campaign-experience";
 import { listPublishedCampaigns, resolveCampaignHome } from "@/server/activations/published-campaign-resolver";
 import { publicActivationFromSnapshot } from "@/server/activations/public-activation-resolver";
+import { campaignPresentation } from "@/features/activations/campaign-presentation";
 
 const baseUrl = resolveAppUrl;
 export const dynamic = "force-dynamic";
 function value(input: string | string[] | undefined) { return Array.isArray(input) ? input[0] : input; }
+function showStandardExperience(query: Awaited<PageProps<"/[slug]">["searchParams"]>) {
+  return value(query.view) === "standard";
+}
 
 export async function generateMetadata({ params, searchParams }: PageProps<"/[slug]">): Promise<Metadata> {
   const [{ slug }, query] = await Promise.all([params, searchParams]);
   const project = await loadPublishedPublicProject(slug);
   if (!project) return { title: "Experiência indisponível", robots: { index: false, follow: false } };
   const surface = resolvePublicSurface(project, value(query.entry), null);
-  const campaign = !surface.entry ? resolveCampaignHome(await listPublishedCampaigns(createServiceClient(), project.id)) : null;
+  const campaign = !surface.entry && !showStandardExperience(query) ? resolveCampaignHome(await listPublishedCampaigns(createServiceClient(), project.id)) : null;
   if (campaign?.snapshot.snapshotVersion === 2 && campaign.snapshot.dynamicSurface) {
     const { dynamicSurface } = campaign.snapshot;
+    const content = campaignPresentation(dynamicSurface, publicActivationFromSnapshot(campaign.snapshot));
     const canonical = `${baseUrl()}/${project.slug}`;
-    return { title: dynamicSurface.title, description: dynamicSurface.message || project.description,
-      alternates: { canonical }, openGraph: { title: dynamicSurface.title, description: dynamicSurface.message, url: canonical, type: "website" } };
+    return { title: content.title, description: content.message || project.description,
+      alternates: { canonical }, openGraph: { title: content.title, description: content.message, url: canonical, type: "website" } };
   }
   const page = surface.page;
   const title = page?.seoTitle || page?.title || project.name;
@@ -40,7 +45,7 @@ export default async function PublicProjectPage({ params, searchParams }: PagePr
   const [{ slug }, query] = await Promise.all([params, searchParams]);
   const project = await loadPublishedPublicProject(slug);
   const surface = project ? resolvePublicSurface(project, value(query.entry), null) : null;
-  const campaign = project && !surface?.entry ? resolveCampaignHome(await listPublishedCampaigns(createServiceClient(), project.id)) : null;
+  const campaign = project && !surface?.entry && !showStandardExperience(query) ? resolveCampaignHome(await listPublishedCampaigns(createServiceClient(), project.id)) : null;
   if (project && campaign?.snapshot.snapshotVersion === 2 && campaign.snapshot.dynamicSurface) {
     return <CampaignExperience project={project} surface={campaign.snapshot.dynamicSurface} activation={publicActivationFromSnapshot(campaign.snapshot)} />;
   }

@@ -6,6 +6,7 @@ import type { Project } from "@/types";
 import { activationKey } from "@/features/activations/activation-utils";
 import { activationCampaignDraft } from "@/features/activations/activation-campaign-draft";
 import { campaignLocalTimeToIso, toCampaignLocalTime } from "@/features/activations/campaign-timezone";
+import { businessCampaignTimezone } from "@/features/activations/business-campaign-timezone";
 import { localStore } from "@/lib/local-store";
 import type {
   ActivationBuilderState,
@@ -125,6 +126,7 @@ export function ActivationBuilder({
   const destinations: BuilderOption[] = (
     project?.commercialConfig?.routingDestinations || []
   ).map(({ id, label }) => ({ id, name: label }));
+  const timezone = businessCampaignTimezone(project, state.locationIds);
   const update = (patch: Partial<ActivationBuilderState>) => {
     setConfirmed(false);
     setState((current) => ({ ...current, ...patch }));
@@ -163,7 +165,7 @@ export function ActivationBuilder({
     setSaving(true);
     setError("");
     try {
-      if (action === "schedule" && (!state.startsAt || campaignLocalTimeToIso(state.startsAt, "America/Sao_Paulo") <= new Date().toISOString())) {
+      if (action === "schedule" && (!state.startsAt || campaignLocalTimeToIso(state.startsAt, timezone) <= new Date().toISOString())) {
         throw new Error("Escolha um início futuro para agendar.");
       }
       const name = state.name || state.title || "Nova campanha";
@@ -179,10 +181,10 @@ export function ActivationBuilder({
         title: state.title || state.name,
         message: state.message,
         startsAt: state.startsAt
-          ? campaignLocalTimeToIso(state.startsAt, "America/Sao_Paulo")
+          ? campaignLocalTimeToIso(state.startsAt, timezone)
           : undefined,
-        endsAt: state.endsAt ? campaignLocalTimeToIso(state.endsAt, "America/Sao_Paulo") : undefined,
-        timezone: "America/Sao_Paulo",
+        endsAt: state.endsAt ? campaignLocalTimeToIso(state.endsAt, timezone) : undefined,
+        timezone,
         requiresIdentity: state.eligibility !== "any",
         identityMode: state.eligibility === "any" ? "none" : "phone",
         completionChannel: state.completionChannel,
@@ -294,12 +296,13 @@ export function ActivationBuilder({
         maxClaimsPerCustomer: draft.activation?.limits?.maxClaimsPerCustomer?.toString() || state.maxClaimsPerCustomer,
         maxRedemptionsPerCustomer: draft.activation?.limits?.maxRedemptionsPerCustomer?.toString() || state.maxRedemptionsPerCustomer,
         startsAt: draft.activation?.startsAt
-          ? toCampaignLocalTime(draft.activation.startsAt, "America/Sao_Paulo")
+          ? toCampaignLocalTime(draft.activation.startsAt, timezone)
           : state.startsAt,
         endsAt: draft.activation?.endsAt
-          ? toCampaignLocalTime(draft.activation.endsAt, "America/Sao_Paulo")
+          ? toCampaignLocalTime(draft.activation.endsAt, timezone)
           : state.endsAt,
-        offerType: draft.offer?.offerType || state.offerType,
+        offerType: mode === "simple" && draft.offer?.offerType && !["no_discount", "percentage_discount", "fixed_discount"].includes(draft.offer.offerType)
+          ? "no_discount" : draft.offer?.offerType || state.offerType,
         offerDescription: draft.offer?.description || state.offerDescription,
         percentage: draft.offer?.percentage?.toString() || state.percentage,
         amount: draft.offer?.amount?.toString() || state.amount,
@@ -337,7 +340,7 @@ export function ActivationBuilder({
           {state.destinationMode === "fixed_destination" ? <label className="block text-sm font-bold">Destino<select value={state.defaultDestinationId} onChange={(event) => update({ defaultDestinationId: event.target.value })} className="focus-ring mt-2 min-h-12 w-full rounded-xl border border-[#b9c7d6] px-4"><option value="">Escolha um destino</option>{destinations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label> : null}
           <div className="grid gap-4 sm:grid-cols-2"><label className="block text-sm font-bold">Tipo de oferta<select value={state.offerType} onChange={(event) => update({ offerType: event.target.value as ActivationBuilderState["offerType"] })} className="focus-ring mt-2 min-h-12 w-full rounded-xl border border-[#b9c7d6] px-4"><option value="no_discount">Sem desconto</option><option value="percentage_discount">Desconto percentual</option><option value="fixed_discount">Desconto em valor</option></select></label>{state.offerType === "percentage_discount" ? <label className="block text-sm font-bold">Percentual<input type="number" min="0.01" max="100" value={state.percentage} onChange={(event) => update({ percentage: event.target.value })} className="focus-ring mt-2 min-h-12 w-full rounded-xl border border-[#b9c7d6] px-4"/></label> : state.offerType === "fixed_discount" ? <label className="block text-sm font-bold">Valor em reais<input type="number" min="0" value={state.amount} onChange={(event) => update({ amount: event.target.value })} className="focus-ring mt-2 min-h-12 w-full rounded-xl border border-[#b9c7d6] px-4"/></label> : null}</div>
           <label className="block text-sm font-bold">Condições comunicadas<textarea value={state.offerDescription} onChange={(event) => update({ offerDescription: event.target.value })} rows={2} placeholder="Somente condições confirmadas" className="focus-ring mt-2 w-full rounded-xl border border-[#b9c7d6] p-4"/></label>
-          <ActivationBuilderSchedule state={state} onChange={update}/>
+          <ActivationBuilderSchedule state={state} onChange={update} timezone={timezone}/>
           <fieldset className="space-y-3"><legend className="text-sm font-extrabold">Onde a campanha deve aparecer?</legend>
             <label className="flex min-h-12 items-center gap-3 rounded-xl border border-[#b9c7d6] px-4 text-sm font-semibold"><input type="radio" name="campaign-surface" checked={state.surfaceMode === "exclusive_and_home"} onChange={() => update({ surfaceMode: "exclusive_and_home" })}/>Substituir temporariamente a página principal</label>
             <label className="flex min-h-12 items-center gap-3 rounded-xl border border-[#b9c7d6] px-4 text-sm font-semibold"><input type="radio" name="campaign-surface" checked={state.surfaceMode === "exclusive"} onChange={() => update({ surfaceMode: "exclusive" })}/>Criar somente um link exclusivo</label>
@@ -347,7 +350,7 @@ export function ActivationBuilder({
           <label className="flex min-h-11 items-center gap-3 text-sm font-semibold"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)}/>Revisei o conteúdo e as condições desta campanha.</label>
           <button type="button" onClick={() => { if (confirmed) setStep(2); else setError("Revise e confirme a proposta antes de continuar."); }} className="focus-ring min-h-12 rounded-xl bg-[#0054fc] px-5 font-bold text-white">Ver prévia</button>
         </div> : null}
-        {step === 2 ? <div className="space-y-5"><h2 className="text-2xl font-extrabold">Prévia e decisão</h2><p className="text-sm text-[#526171]">É assim que a página aparecerá com o visual do seu negócio. O botão abre a jornada comercial em modo de prévia.</p><ActivationCampaignPreview project={project} state={state}/><p className="text-sm text-[#526171]">Publicar ou agendar usa a mesma validação da campanha avançada. Se faltar configuração, o rascunho permanece salvo para revisão.</p><div className="flex flex-wrap gap-3"><button type="button" onClick={() => save("draft")} disabled={saving} className="focus-ring min-h-12 rounded-xl border border-[#0054fc] px-5 font-bold text-[#0054fc] disabled:opacity-50">Salvar rascunho</button><button type="button" onClick={() => save("schedule")} disabled={saving || !state.startsAt} className="focus-ring min-h-12 rounded-xl border border-[#0054fc] px-5 font-bold text-[#0054fc] disabled:opacity-50">Agendar</button><button type="button" onClick={() => save("publish")} disabled={saving} className="focus-ring min-h-12 rounded-xl bg-[#0054fc] px-5 font-bold text-white disabled:opacity-50">Publicar</button></div></div> : null}
+        {step === 2 ? <div className="space-y-5"><h2 className="text-2xl font-extrabold">Prévia e decisão</h2><p className="text-sm text-[#526171]">É assim que a página aparecerá com o visual do seu negócio. O botão abre a jornada comercial em modo de prévia.</p><ActivationCampaignPreview project={project} state={state}/><p className="text-sm text-[#526171]">{state.startsAt ? `Início: ${state.startsAt.replace("T", " às ")}. ` : "Início imediato. "}{state.endsAt ? `Fim: ${state.endsAt.replace("T", " às ")}. ` : "Sem término definido. "}Horários no fuso do negócio: {timezone.replaceAll("_", " ")}.</p><p className="text-sm text-[#526171]">Publicar ou agendar usa a mesma validação da campanha avançada. Se faltar configuração, o rascunho permanece salvo para revisão.</p><div className="flex flex-wrap gap-3"><button type="button" onClick={() => save("draft")} disabled={saving} className="focus-ring min-h-12 rounded-xl border border-[#0054fc] px-5 font-bold text-[#0054fc] disabled:opacity-50">Salvar rascunho</button><button type="button" onClick={() => save("schedule")} disabled={saving || !state.startsAt} className="focus-ring min-h-12 rounded-xl border border-[#0054fc] px-5 font-bold text-[#0054fc] disabled:opacity-50">Agendar</button><button type="button" onClick={() => save("publish")} disabled={saving} className="focus-ring min-h-12 rounded-xl bg-[#0054fc] px-5 font-bold text-white disabled:opacity-50">Publicar</button></div></div> : null}
         {error ? <p role="alert" className="mt-5 rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">{error}{savedDraftId ? <a className="ml-2 underline" href={`/app/projects/${projectId}/activations/${savedDraftId}`}>Abrir rascunho</a> : null}</p> : null}
       </main>
     </div>
@@ -374,7 +377,7 @@ export function ActivationBuilder({
         onChange={update}
       />
     ) : step === 4 ? (
-      <ActivationBuilderSchedule state={state} onChange={update} />
+      <ActivationBuilderSchedule state={state} onChange={update} timezone={timezone} />
     ) : step === 5 ? (
       <ActivationBuilderPlacements state={state} onChange={update} />
     ) : step === 6 ? (

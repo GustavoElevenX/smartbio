@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PublicActivation } from "@/features/activations/activation.types";
 import type { PublishedActivationSnapshot } from "@/features/activations/published-activation.schema";
 import { listPublishedCampaigns } from "./published-campaign-resolver";
+import { selectPublishedOffer } from "@/features/activations/select-published-offer";
 
 export function publicActivationFromSnapshot(snapshot: PublishedActivationSnapshot, pageId?: string): PublicActivation {
   return {
@@ -11,7 +12,7 @@ export function publicActivationFromSnapshot(snapshot: PublishedActivationSnapsh
     conversionGoalId: snapshot.conversionGoalId, defaultDestinationId: snapshot.defaultDestinationId,
     requiresIdentity: snapshot.requiresIdentity, identityMode: snapshot.identityMode,
     completionChannel: snapshot.completionChannel, startsAt: snapshot.startsAt, endsAt: snapshot.endsAt,
-    timezone: snapshot.timezone, offer: snapshot.offers.find((item) => item.isActive),
+    timezone: snapshot.timezone, offer: selectPublishedOffer(snapshot),
     placements: snapshot.placements.filter((item) => item.isActive && (!item.presencePageId || item.presencePageId === pageId)),
   };
 }

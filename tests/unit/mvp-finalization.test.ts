@@ -33,7 +33,8 @@ describe("fechamento de ativações e Presence", () => {
   it("continua a meta sem anexar claim quando o benefício falha", () => {
     const source = readFileSync("src/components/public-activations/activation-runtime-provider.tsx", "utf8");
     expect(source).toContain("onContinueWithoutBenefit");
-    expect(source).toMatch(/onContinueWithoutBenefit=\{\(\) => \{[^}]*launcher\.open\(\{ goalId: activation\.conversionGoalId, activationId: activation\.id, campaignKey: activation\.activationKey, activationVersion: activation\.publishedVersion, pageId \}\)/);
+    expect(source).toMatch(/onContinueWithoutBenefit=\{\(\) => \{[^}]*launcher\.open\(\{ goalId: activation\.conversionGoalId, activationId: activation\.id, campaignKey: activation\.activationKey, activationVersion: activation\.publishedVersion, offerId: activation\.offer\?\.id,[^}]*pageId \}\)/);
+    expect(source).not.toMatch(/onContinueWithoutBenefit=\{\(\) => \{[^}]*benefitClaimId:/);
   });
 
   it("bloqueia URL, telefone e ativação ausentes com mensagens específicas", () => {

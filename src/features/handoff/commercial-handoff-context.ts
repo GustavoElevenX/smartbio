@@ -11,6 +11,7 @@ export interface CommercialHandoffContext {
     campaign?: string;
     pageId?: string;
     activationId?: string;
+    activationVersion?: number;
   };
   identity: {
     name?: string;
@@ -34,6 +35,7 @@ export interface CommercialHandoffContext {
   pending?: string[];
   consent?: { contact: boolean; recordedAt?: string };
   benefit?: {
+    offerId?: string;
     label?: string;
     code?: string;
   };

@@ -10,6 +10,10 @@ export function activationCampaignDraft(input: {
   return {
     mode: input.mode, experienceKey: activationKey(input.name || title), title,
     message: input.message.trim() || undefined, conversionGoalId: input.conversionGoalId,
-    sections: input.conditions.trim() ? [{ key: "conditions", kind: "conditions", content: { text: input.conditions.trim() } }] : [],
+    sections: [
+      { key: "hero", kind: "hero", content: { title, text: input.message.trim() } },
+      ...(input.conditions.trim() ? [{ key: "conditions", kind: "conditions" as const, content: { text: input.conditions.trim() } }] : []),
+      { key: "action", kind: "action", content: {} },
+    ],
   };
 }

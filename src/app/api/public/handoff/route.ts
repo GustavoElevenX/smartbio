@@ -10,6 +10,7 @@ import { applyRateLimitHeaders, consumeRateLimit, rateLimitRules } from "@/serve
 import { publicRateLimitIdentifier } from "@/server/rate-limit/public-identifier";
 import { listPublishedCampaigns } from "@/server/activations/published-campaign-resolver";
 import { publicHandoffContextSchema } from "@/features/handoff/public-handoff-schema";
+import { selectPublishedOffer } from "@/features/activations/select-published-offer";
 
 const requestSchema = z.object({ projectId: z.string().min(1), sessionId: z.string().min(1), destinationId: z.string().optional(), context: publicHandoffContextSchema });
 
@@ -35,18 +36,28 @@ export async function POST(request: Request) {
     ? (await listPublishedCampaigns(database, project.id)).find((item) => item.status === "active" && item.snapshot.activationId === requestedActivationId)
     : undefined;
   if (requestedActivationId && !publishedActivation) return respond(apiError("Campanha indisponível.", 422, "invalid_handoff_activation"));
+  const publishedOffer = publishedActivation ? selectPublishedOffer(publishedActivation.snapshot) : undefined;
+  if (publishedActivation && parsed.data.context.origin.activationVersion && parsed.data.context.origin.activationVersion !== publishedActivation.snapshot.activationVersion) {
+    return respond(apiError("Versão da campanha indisponível.", 409, "stale_activation_version"));
+  }
+  if (publishedActivation && parsed.data.context.benefit?.offerId && parsed.data.context.benefit.offerId !== publishedOffer?.id) {
+    return respond(apiError("Oferta da campanha inconsistente.", 422, "invalid_activation_offer"));
+  }
   // Public input is always a visitor statement; it cannot certify business facts.
   const confirmedFacts = confirmedHandoffFacts(project, parsed.data.context.intent);
   const safeContext = {
     ...parsed.data.context,
     projectName: project.name,
     origin: { ...parsed.data.context.origin, activationId: publishedActivation?.snapshot.activationId,
+      activationVersion: publishedActivation?.snapshot.activationVersion,
       campaign: parsed.data.context.origin.campaign || publishedActivation?.snapshot.activationKey },
     intent: { ...parsed.data.context.intent, kind: project.conversionGoals?.find((item) => item.id === parsed.data.context.conversionGoalId)?.kind },
     qualification: [
       ...parsed.data.context.qualification.filter((item) => !confirmedFacts.some((fact) => fact.label === item.label && fact.value === item.value)).map((item) => ({ ...item, source: "visitor" as const })),
       ...confirmedFacts,
     ],
+    benefit: publishedActivation && publishedOffer ? { offerId: publishedOffer.id,
+      label: publishedOffer.offerType === "no_discount" ? undefined : publishedOffer.label } : undefined,
   };
   const message = formatVisitorHandoff(safeContext, project);
   const briefing = buildCommercialBriefing(safeContext);
@@ -67,7 +78,8 @@ export async function POST(request: Request) {
     attribution: { entryPointId: parsed.data.context.origin.entryPointId, conversionGoalId: parsed.data.context.conversionGoalId, source: parsed.data.context.origin.source || "direct", campaign: safeContext.origin.campaign, presencePageId: parsed.data.context.origin.pageId },
     visitorData: parsed.data.context.identity,
     summary: message,
-    metadata: { handoff: safeContext, briefing, activationVersion: publishedActivation?.snapshot.activationVersion, evidence: toPerformanceEvidence(safeContext) },
+    metadata: { handoff: safeContext, briefing, activationVersion: publishedActivation?.snapshot.activationVersion,
+      offerId: publishedOffer?.id, evidence: toPerformanceEvidence(safeContext) },
   });
   return respond(apiSuccess({ persisted: true, opportunityId: opportunity.id, message, briefing }, 201));
 }

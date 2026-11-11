@@ -138,9 +138,10 @@ function runtimeFromStorage(
   launchContext?: PresenceLaunchContext,
   previewStepId?: string,
   initialStepId?: string,
+  hydrate = false,
 ) {
   const fallback = emptyRuntime(project);
-  const browser = typeof window !== "undefined";
+  const browser = hydrate && typeof window !== "undefined";
   const params = new URLSearchParams(browser ? window.location.search : "");
   if (previewGoalId) params.set("goal", previewGoalId);
   if (previewEntryKey) params.set("entry", previewEntryKey);
@@ -438,9 +439,14 @@ export function ExperienceCanvas({
       initialStepId,
     ),
   );
-  const [history, setHistory] = useState<string[]>(() =>
-    historyFromStorage(project, preview),
-  );
+  const [history, setHistory] = useState<string[]>([]);
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    setRuntime(runtimeFromStorage(project, preview, previewGoalId, previewEntryKey,
+      launchContext, previewStepId, initialStepId, true));
+    setHistory(historyFromStorage(project, preview));
+    setHydrated(true);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [leadForm, setLeadForm] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -554,7 +560,7 @@ export function ExperienceCanvas({
   }
 
   useEffect(() => {
-    if (preview) return;
+    if (preview || !hydrated) return;
     try {
       const serializable = {
         ...runtime,
@@ -578,10 +584,10 @@ export function ExperienceCanvas({
         JSON.stringify(serializable),
       );
     } catch {}
-  }, [history, preview, project.slug, runtime]);
+  }, [history, hydrated, preview, project.slug, runtime]);
 
   useEffect(() => {
-    if (!preview) {
+    if (!preview && hydrated) {
       emit("page_view");
       emit("session_started");
       emit("journey_started");
@@ -592,13 +598,13 @@ export function ExperienceCanvas({
       )
         emit("conversion_goal_resolved");
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hydrated]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!preview && step) {
+    if (!preview && hydrated && step) {
       emit("step_viewed");
       if (step.type === "recommendation") emit("recommendation_viewed");
     }
-  }, [runtime.currentStepId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hydrated, runtime.currentStepId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (submitted) onComplete?.();
   }, [onComplete, submitted]);
@@ -1319,6 +1325,7 @@ export function ExperienceCanvas({
           campaign: runtime.attribution?.campaign,
           pageId: launchContext?.pageId,
           activationId: launchContext?.activationId,
+          activationVersion: launchContext?.activationVersion,
         },
         identity: visitorIdentity,
         intent: {
@@ -1335,7 +1342,9 @@ export function ExperienceCanvas({
           ...(cart ? [{ label: "Pedido", value: cart, include: true, source: "visitor" as const }] : []),
         ],
         pending: ["preço, disponibilidade e condições dependem de confirmação da equipe"],
-        benefit: launchContext?.benefitClaimCode ? { code: launchContext.benefitClaimCode } : undefined,
+        benefit: launchContext?.offerId || launchContext?.benefitClaimCode
+          ? { offerId: launchContext.offerId, label: launchContext.offerLabel, code: launchContext.benefitClaimCode }
+          : undefined,
       };
       handoffContext.qualification.push(...confirmedHandoffFacts(project, handoffContext.intent));
       const message = formatVisitorHandoff(handoffContext, project);
@@ -1371,7 +1380,7 @@ export function ExperienceCanvas({
           },
         );
       } else if (!preview) {
-        if (canUseLocalStore()) addOpportunity("routed_contact", `handoff:${runtime.sessionId}:${configuredDestination?.id || option.actionPayload?.destinationId || "direct"}:${launchContext?.activationId || "standard"}`, `Contato · ${journeyHandoff.interest || project.name}`, { summary: message, destinationId: configuredDestination?.id, metadata: { briefing: buildCommercialBriefing(handoffContext), activationVersion: launchContext?.activationVersion } });
+        if (canUseLocalStore()) addOpportunity("routed_contact", `handoff:${runtime.sessionId}:${configuredDestination?.id || option.actionPayload?.destinationId || "direct"}:${launchContext?.activationId || "standard"}`, `Contato · ${journeyHandoff.interest || project.name}`, { summary: message, destinationId: configuredDestination?.id, metadata: { briefing: buildCommercialBriefing(handoffContext), activationVersion: launchContext?.activationVersion, offerId: launchContext?.offerId } });
         const response = await fetch("/api/public/handoff", {
           method: "POST",
           keepalive: true,
@@ -1558,7 +1567,7 @@ export function ExperienceCanvas({
     projectId: project.id,
     projectName: project.name,
     conversionGoalId: runtime.conversionGoalId,
-    origin: { entryPointId: runtime.entryPointId, source: runtime.attribution?.source, campaign: runtime.attribution?.campaign, activationId: launchContext?.activationId },
+    origin: { entryPointId: runtime.entryPointId, source: runtime.attribution?.source, campaign: runtime.attribution?.campaign, activationId: launchContext?.activationId, activationVersion: launchContext?.activationVersion },
     identity: visitorIdentity,
     intent: { label: previewJourneyHandoff.interest, locationId: runtime.selectedLocationId },
     qualification: [
@@ -1566,6 +1575,9 @@ export function ExperienceCanvas({
       ...Object.entries(previewRecommendationAnswers).filter((entry): entry is [string, string] => typeof entry[1] === "string").map(([label, value]) => ({ label, value, include: true, source: "visitor" as const })),
       ...(runtime.cart.items.length ? [{ label: "Pedido", value: runtime.cart.items.map((item) => `${item.quantity}x ${item.name}`).join(", "), include: true, source: "visitor" as const }] : []),
     ],
+    benefit: launchContext?.offerId || launchContext?.benefitClaimCode
+      ? { offerId: launchContext.offerId, label: launchContext.offerLabel, code: launchContext.benefitClaimCode }
+      : undefined,
   };
   const previewMessage = previewWhatsAppOption
     ? formatVisitorHandoff(previewContext, project)

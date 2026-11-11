@@ -26,7 +26,11 @@ async function createCampaign(request: APIRequestContext, label: string, mode: "
     destinationMode: "native", completionChannel: "native", priority,
     requiresIdentity: false, identityMode: "none", eligibility: {}, offers: [], placements: [],
     settings: { dynamicSurface: { mode, experienceKey: key, title: label,
-      message: "Converse com a Casa Mix sobre esta campanha.", conversionGoalId: "mix-goal-resale", sections: [] } },
+      message: "Converse com a Casa Mix sobre esta campanha.", conversionGoalId: "mix-goal-resale", sections: [
+        { key: "hero", kind: "hero", content: { title: label, text: "Uma apresentação publicada pela Casa Mix." } },
+        { key: "conditions", kind: "conditions", content: { title: "Condições", text: "Confirme os detalhes com nossa equipe." } },
+        { key: "action", kind: "action", content: { title: "Fale com a equipe", ctaLabel: "Quero conversar" } },
+      ] } },
   } });
   expect(response.status()).toBe(201);
   const created = await response.json() as { data: { activation: { id: string; version: number } } };
@@ -43,6 +47,8 @@ async function publish(request: APIRequestContext, item: { id: string; version: 
 
 test("página exclusiva, troca da home, prioridade e retorno preservam a jornada", async ({ page, request }) => {
   test.setTimeout(90_000);
+  const hydrationErrors: string[] = [];
+  page.on("pageerror", (error) => { if (/hydrat/i.test(error.message)) hydrationErrors.push(error.message); });
   const original = await page.goto(`/${slug}`, { waitUntil: "domcontentloaded" });
   expect(original?.ok()).toBeTruthy();
   await expect(page.getByRole("heading", { name: "O que você deseja fazer hoje?" })).toBeVisible();
@@ -56,11 +62,19 @@ test("página exclusiva, troca da home, prioridade e retorno preservam a jornada
 
   await navigate(page, `/${slug}`);
   await expect(page.getByRole("heading", { name: home.label })).toBeVisible();
-  await expect(page.getByRole("button", { name: /revenda|contato|continuar/i })).toBeVisible();
+  await expect(page.getByText("Uma apresentação publicada pela Casa Mix.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Condições" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Quero conversar" })).toBeVisible();
+  await page.getByRole("link", { name: "Ver página do negócio" }).first().click();
+  await expect(page).toHaveURL(new RegExp(`/${slug}\\?view=standard$`));
+  await expect(page.getByRole("heading", { name: "O que você deseja fazer hoje?" })).toBeVisible();
+  await navigate(page, `/${slug}`);
+  await expect(page.getByRole("heading", { name: home.label })).toBeVisible();
   await navigate(page, `/${slug}/c/${exclusive.key}`);
   await expect(page.getByRole("heading", { name: exclusive.label })).toBeVisible();
   await navigate(page, `/${slug}?entry=bio`);
   await expect(page.getByRole("heading", { name: "Como deseja receber?" })).toBeVisible();
+  expect(hydrationErrors).toEqual([]);
   await navigate(page, `/${slug}/p/home`);
   await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: home.label })).toHaveCount(0);

@@ -123,7 +123,10 @@ describe("Fase 4B: criação e contexto", () => {
   it("gera página sem catálogo e sem inventar condições", () => {
     expect(activationCampaignDraft({ name: "Oferta", title: "Oferta", message: "Fale conosco",
       conditions: "", conversionGoalId: "goal", mode: "exclusive" })).toMatchObject({
-      experienceKey: "oferta", mode: "exclusive", sections: [],
+      experienceKey: "oferta", mode: "exclusive", sections: [
+        { key: "hero", kind: "hero", content: { title: "Oferta", text: "Fale conosco" } },
+        { key: "action", kind: "action" },
+      ],
     });
   });
 

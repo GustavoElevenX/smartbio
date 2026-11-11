@@ -27,6 +27,7 @@ export function formatCommercialHandoff(context: CommercialHandoffContext, proje
     line("E-mail", alreadyIncluded(context.identity.email) ? undefined : context.identity.email),
     line("Origem", context.origin.source),
     line("Campanha", context.origin.campaign),
+    line("Versão da campanha", context.origin.activationVersion?.toString()),
   ].filter(Boolean).join("\n");
 }
 
@@ -41,6 +42,8 @@ export function formatVisitorHandoff(context: CommercialHandoffContext, project?
   if (context.identity.email && !Object.values(answers).includes(context.identity.email)) answers["E-mail"] = context.identity.email;
   if (context.origin.source) answers.Origem = context.origin.source;
   if (context.origin.campaign) answers.Campanha = context.origin.campaign;
+  if (context.origin.activationVersion) answers["Versão da campanha"] = String(context.origin.activationVersion);
+  if (context.benefit?.label) answers.Oferta = context.benefit.label;
   return buildWhatsAppMessage({
     businessName: project?.name || context.projectName,
     interest: context.intent.label,

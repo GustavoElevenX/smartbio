@@ -11,6 +11,9 @@ export interface CommercialBriefing {
   origin?: string;
   campaign?: string;
   activationId?: string;
+  activationVersion?: number;
+  offerId?: string;
+  offerLabel?: string;
   location?: string;
   contactConsent?: boolean;
   nextStep: { action: string; reason: string };
@@ -48,6 +51,9 @@ export function buildCommercialBriefing(context: CommercialHandoffContext): Comm
     origin: context.origin.source,
     campaign: context.origin.campaign,
     activationId: context.origin.activationId,
+    activationVersion: context.origin.activationVersion,
+    offerId: context.benefit?.offerId,
+    offerLabel: context.benefit?.label,
     location: included.find((item) => /^unidade$/i.test(item.label))?.value,
     contactConsent: context.consent?.contact,
     nextStep: {

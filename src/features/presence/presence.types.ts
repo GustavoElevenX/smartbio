@@ -127,6 +127,8 @@ export interface PresenceLaunchContext {
   goalId?: string;
   campaignKey?: string;
   activationVersion?: number;
+  offerId?: string;
+  offerLabel?: string;
   entryPointId?: string;
   pageId?: string;
   sectionId?: string;
